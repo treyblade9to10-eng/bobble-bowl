@@ -48,6 +48,7 @@ function setFirstDown() {
 }
 
 function stat(p) {
+  if (!G.pstats) G.pstats = {};
   const k = p.side + ':' + p.name;
   return G.pstats[k] || (G.pstats[k] = { name: p.name, side: p.side, pos: p.pos, pass: 0, rush: 0, rec: 0, td: 0, tkl: 0, int: 0, sack: 0, comp: 0, att: 0 });
 }

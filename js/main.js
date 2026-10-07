@@ -155,7 +155,7 @@ cv.addEventListener('pointerdown', e => {
 // ---------- title screen background: a fake game ----------
 function demoSetup() {
   const a = pick(TEAMS); let b; do { b = pick(TEAMS); } while (b === a);
-  Object.assign(G, { teams: [a, b], human: -1, diff: 1, poss: 0, los: 45, ballY: MID, down: 1, score: [0, 0], quarter: 1, clock: 180, demo: true, fx: [] });
+  Object.assign(G, { teams: [a, b], human: -1, diff: 1, poss: 0, los: 45, ballY: MID, down: 1, score: [0, 0], quarter: 1, clock: 180, demo: true, fx: [], pstats: {}, tstats: [{ pass: 0, rush: 0, to: 0 }, { pass: 0, rush: 0, to: 0 }], patSide: null, twoPt: false, next: null, paused: false });
   setFirstDown();
   setupPlay(pick(OFF_PLAYS), pick(DEF_PLAYS));
   snap();
@@ -164,6 +164,10 @@ function demoSetup() {
 // ---------- main loop ----------
 let last = performance.now();
 function frame(now) {
+  requestAnimationFrame(frame); // schedule first so one bad frame can't freeze the game
+  try { step(now); } catch (e) { console.error(e); if (G.demo) G.phase = 'over'; }
+}
+function step(now) {
   const dt = Math.min(0.033, (now - last) / 1000); last = now;
   const inMenu = $('title').classList.contains('show') || $('how').classList.contains('show') || $('select').classList.contains('show');
   if (inMenu) {
@@ -178,7 +182,6 @@ function frame(now) {
   }
   render();
   Input.endFrame();
-  requestAnimationFrame(frame);
 }
 
 function render() {
