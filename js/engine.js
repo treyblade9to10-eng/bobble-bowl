@@ -29,7 +29,7 @@ function spotText(s, x) {
 // ---------------- game setup ----------------
 function newGame(home, away, opts) {
   Object.assign(G, {
-    teams: [home, away], human: opts.humanSide || 0, diff: opts.diff, flags: [], playClock: 0, qtrLen: opts.qtr, score: [0, 0], quarter: 1, clock: opts.qtr,
+    teams: [home, away], human: opts.humanSide || 0, diff: opts.diff, flags: [], playClock: 0, playoff: !!opts.playoff, qtrLen: opts.qtr, score: [0, 0], quarter: 1, clock: opts.qtr,
     fx: [], banner: null, players: [], ball: null, patSide: null, twoPt: false, next: null, firstPoss: 1, paused: false,
     pstats: {}, tstats: [{ pass: 0, rush: 0, to: 0 }, { pass: 0, rush: 0, to: 0 }]
   });
@@ -1327,8 +1327,8 @@ function endQuarter() {
     setDrive(1 - G.firstPoss, ownGoal(1 - G.firstPoss) + dirOf(1 - G.firstPoss) * 25);
     showBanner('HALFTIME', `${G.teams[1].id} ${G.score[1]}  -  ${G.teams[0].id} ${G.score[0]}`, '#fff', 2.5);
   } else if (G.quarter >= 4) {
-    if (G.quarter === 4 && G.score[0] === G.score[1]) {
-      G.quarter = 5; G.clock = G.qtrLen;
+    if ((G.quarter === 4 || G.playoff) && G.score[0] === G.score[1]) {
+      G.quarter = Math.max(5, G.quarter + 1); G.clock = G.qtrLen;
       const s = chance(0.5) ? 0 : 1;
       setDrive(s, ownGoal(s) + dirOf(s) * 25);
       showBanner('OVERTIME!', `Next score wins • ${G.teams[s].name} ball`, '#ffd23f', 2.5);

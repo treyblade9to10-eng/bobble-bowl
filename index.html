@@ -16,7 +16,10 @@
   <div id="title" class="screen show">
     <div class="logo">BOBBLE<span>BOWL</span></div>
     <div class="tag">8 on 8 • 32 NFL teams • Madden 27 ratings • big heads</div>
-    <button class="big" id="btnPlay">PLAY</button>
+    <div class="row">
+      <button class="big" id="btnPlay">QUICK GAME</button>
+      <button class="big gold" id="btnSeason">🏆 SEASON</button>
+    </div>
     <div class="row">
       <button id="btnHow">HOW TO PLAY</button>
       <button id="btnMode">MODE: <span id="modeLabel">?</span></button>
@@ -75,6 +78,47 @@
 
   <div id="rosterPeek"></div>
 
+  <!-- Season: new -->
+  <div id="seasonNew" class="screen">
+    <h2>🏆 New Season</h2>
+    <div id="snRow">
+      <div class="tpanel" id="pSeason">
+        <div class="pside">YOUR TEAM</div>
+        <button class="arr" id="snUp">▲</button>
+        <div class="tbig"></div>
+        <button class="arr" id="snDn">▼</button>
+      </div>
+      <div id="snOpts">
+        <label>Season <select id="snGames"><option value="6">6 games</option><option value="8" selected>8 games</option><option value="12">12 games</option><option value="17">17 games (full)</option></select></label>
+        <label>Quarter <select id="snQtr"><option value="120" selected>2 min</option><option value="180">3 min</option><option value="300">5 min</option></select></label>
+        <label>CPU <select id="snDiff"><option value="0">Rookie</option><option value="1" selected>Pro</option><option value="2">All-Pro</option><option value="3">All-Madden 🔥</option></select></label>
+        <div class="snInfo">Top 4 in your conference make the playoffs.<br>Win 3 playoff games to take the 🏆 Bobble Bowl!</div>
+        <button class="big" id="snStart">START SEASON</button>
+        <button id="snBack">Back</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Season: hub -->
+  <div id="seasonHub" class="screen">
+    <div id="shTop"></div>
+    <div id="shMain">
+      <div id="shLeft">
+        <div id="shNext"></div>
+        <div id="shBtns">
+          <button class="big" id="shPlay">▶ PLAY</button>
+          <button id="shSim">⏩ SIM</button>
+        </div>
+        <div id="shSched"></div>
+      </div>
+      <div id="shRight"><div id="shStand"></div></div>
+    </div>
+    <div class="row">
+      <button id="shMenu">MENU</button>
+      <button id="shQuit">ABANDON SEASON</button>
+    </div>
+  </div>
+
   <!-- Play call -->
   <div id="playcall" class="screen">
     <div id="pcHead"></div>
@@ -93,6 +137,7 @@
       <div id="overStats"></div>
     </div>
     <div class="row">
+      <button class="big" id="btnSeasonCont" style="display:none">CONTINUE SEASON ▶</button>
       <button class="big" id="btnAgain">REMATCH</button>
       <button id="btnNewTeams">NEW TEAMS</button>
     </div>
@@ -133,6 +178,7 @@
 <script src="js/plays.js"></script>
 <script src="js/draw.js"></script>
 <script src="js/engine.js"></script>
+<script src="js/season.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

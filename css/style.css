@@ -177,3 +177,42 @@ body.mobile #vsCol .vs { font-size: 34px; } body.mobile #vsCol { min-width: 150p
 .pgtxt { font-weight: 900; color: #ffd23f; font-family: 'Arial Black', Arial; letter-spacing: 1px; }
 .pgtip { opacity: .75; font-size: 13px; }
 body.mobile .pgbtn { padding: 8px 16px; font-size: 15px; }
+
+/* ---- season ---- */
+button.big.gold { background: #ffd23f; color: #111; border-color: #fff; }
+button.big.gold:hover { background: #ffe57a; }
+#snRow { display: flex; gap: 30px; align-items: center; justify-content: center; flex-wrap: wrap; }
+#snOpts { display: flex; flex-direction: column; gap: 10px; align-items: center; }
+#snOpts label { font-size: 16px; }
+.snInfo { font-family: Arial, sans-serif; font-size: 13px; opacity: .85; text-align: center; background: #0007; padding: 8px 12px; border-radius: 10px; }
+#seasonHub { justify-content: flex-start; padding-top: 14px; overflow-y: auto; }
+#shTop { text-align: center; margin-bottom: 8px; }
+#shTop .big1 { font-size: 30px; font-weight: 900; text-shadow: 3px 3px 0 #000; }
+#shTop .rec { font-size: 18px; color: #ffd23f; font-weight: 900; }
+#shMain { display: flex; gap: 18px; width: min(1150px, 96vw); align-items: flex-start; justify-content: center; }
+#shLeft { flex: 1 1 52%; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+#shRight { flex: 1 1 44%; min-width: 0; }
+#shNext { border-radius: 16px; padding: 12px; text-align: center; border: 3px solid #fff8; box-shadow: 0 5px 0 #000a; }
+#shNext .lbl { font-size: 14px; letter-spacing: 3px; opacity: .9; }
+#shNext .mu { font-size: 30px; font-weight: 900; text-shadow: 2px 2px 0 #000; margin: 4px 0; }
+#shNext .sub { font-family: Arial, sans-serif; font-size: 14px; }
+#shBtns { display: flex; justify-content: center; gap: 6px; }
+#shSched, #shStand { background: #0009; border-radius: 12px; padding: 8px 10px; font-family: Arial, sans-serif; font-size: 13px; }
+#shSched { max-height: 200px; overflow-y: auto; }
+.wkrow { display: flex; justify-content: space-between; padding: 3px 4px; border-bottom: 1px solid #fff1; }
+.wkrow.now { background: #ffd23f22; border-radius: 6px; }
+.wkrow .W { color: #5cff8a; font-weight: bold; } .wkrow .L { color: #ff6a6a; font-weight: bold; } .wkrow .T { color: #ddd; font-weight: bold; }
+#shStand table { width: 100%; border-collapse: collapse; }
+#shStand th { text-align: left; color: #ffd23f; font-size: 12px; padding: 2px 4px; }
+#shStand td { padding: 3px 4px; border-bottom: 1px solid #fff1; }
+#shStand tr.me td { background: #ffd23f33; font-weight: bold; }
+#shStand tr.cut td { border-bottom: 2px dashed #ffd23f; }
+.dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: middle; border: 1px solid #fff8; }
+.bracket { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 6px; }
+.bgame { background: #0008; border-radius: 8px; padding: 4px 8px; font-size: 12px; min-width: 120px; }
+.bgame b { color: #ffd23f; }
+@media (max-height: 500px) {
+  #shTop .big1 { font-size: 20px; } #shNext .mu { font-size: 20px; } #shNext { padding: 6px; }
+  #shSched { max-height: 110px; } #shStand { font-size: 11px; max-height: 230px; overflow-y: auto; }
+  #snOpts { gap: 5px; } #seasonHub { padding-top: 6px; }
+}
