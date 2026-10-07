@@ -1,6 +1,6 @@
 // ---- Rendering: field, bobbleheads, ball, effects, scorebug ----
 const CW = 1280, CH = 720;
-const PX = 26;          // pixels per yard (left/right)
+const PX = 24;          // pixels per yard (left/right)
 const PY = 14;          // pixels per yard (up/down) - squished = tilted camera look
 const FIELD_W = 53.33;
 const cam = { x: 60, y: FIELD_W / 2, shake: 0, zoom: 1 };
@@ -115,13 +115,18 @@ function drawLines(g, G) {
 
 // planned routes before the snap (only for the human's offense)
 function drawRoutes(g, G) {
-  if (G.phase !== 'presnap' || G.poss !== G.human || !G.O) return;
-  g.save(); g.lineWidth = 3; g.setLineDash([8, 6]); g.lineCap = 'round';
+  if (!G.O || !G.play) return;
+  if (G.poss !== G.human) return drawDefJob(g, G);
+  const live = G.phase === 'live';
+  if (!(G.phase === 'presnap' || (live && G.bstate === 'snap'))) return;
+  g.save(); g.lineWidth = live ? 3 : 3.5; g.setLineDash([8, 6]); g.lineCap = 'round';
+  g.globalAlpha = live ? 0.55 : 1;
+  const cols = { 2: '#5aa0ff', 3: '#ff6b6b', 4: '#4fe08a', 1: '#ffbf4a' };
   for (const p of G.O) {
     if (!p.route || !(p.role === 'route' || p.role === 'runpath')) continue;
-    g.strokeStyle = p.role === 'runpath' && !G.play.off.fake ? '#ff9a3dcc' : '#ffffffaa';
-    g.beginPath(); g.moveTo(sx(p.x), sy(p.y));
-    for (const q of p.route.pts) g.lineTo(sx(q.x), sy(q.y));
+    g.strokeStyle = p.role === 'runpath' && !G.play.off.fake ? '#ff9a3d' : (cols[p.slot] || '#fff');
+    g.beginPath(); g.moveTo(sx(live ? p.x : p.hx), sy(live ? p.y : p.hy));
+    for (let i = live ? p.route.i : 0; i < p.route.pts.length; i++) { const q = p.route.pts[i]; g.lineTo(sx(q.x), sy(q.y)); }
     g.stroke();
     const a = p.route.pts[p.route.pts.length - 2] || p, z = p.route.pts[p.route.pts.length - 1];
     if (p.route.end === 'go') { // arrow head
@@ -135,6 +140,25 @@ function drawRoutes(g, G) {
   }
   g.restore();
 }
+// on defense: show what YOUR player is supposed to do
+function drawDefJob(g, G) {
+  const h = G.humanDef;
+  if (!h || !h.assign || !(G.phase === 'presnap' || (G.phase === 'live' && G.bstate === 'snap'))) return;
+  const a = h.assign, d = dirOf(G.poss);
+  g.save(); g.strokeStyle = '#ffe14d'; g.lineWidth = 3; g.setLineDash([6, 6]); g.globalAlpha = 0.8;
+  let label = '';
+  if (a.type === 'man') { const t = G.O[a.t]; g.beginPath(); g.moveTo(sx(h.x), sy(h.y)); g.lineTo(sx(t.x), sy(t.y)); g.stroke(); label = 'COVER ' + lastName(t.name).toUpperCase(); }
+  else if (a.type === 'zone') { const zx = G.los + d * a.d, zy = zoneY(a.y); g.beginPath(); g.ellipse(sx(zx), sy(zy), 6 * PX, 6 * PY, 0, 0, 7); g.stroke(); g.fillStyle = '#ffe14d18'; g.fill(); label = 'GUARD THIS ZONE'; }
+  else if (a.type === 'rush') { const q = G.O[0]; g.beginPath(); g.moveTo(sx(h.x), sy(h.y)); g.lineTo(sx(q.x), sy(q.y)); g.stroke(); label = 'GET THE QB!'; }
+  else { label = 'SPY THE QB'; }
+  g.setLineDash([]); g.globalAlpha = 1;
+  if (G.phase === 'presnap') {
+    g.font = 'bold 13px Arial'; g.textAlign = 'center'; const w = g.measureText(label).width + 14;
+    g.fillStyle = '#ffe14d'; roundRect(g, sx(h.x) - w / 2, sy(h.y) + 12, w, 20, 10); g.fill();
+    g.fillStyle = '#111'; g.fillText(label, sx(h.x), sy(h.y) + 26);
+  }
+  g.restore();
+}
 
 // ---------- the bobblehead ----------
 function teamLook(team, home) {
@@ -143,19 +167,20 @@ function teamLook(team, home) {
     : { jersey: '#f7f7f7', trim: team.c1, num: team.c1, pants: team.pantsAway || '#ececec', sock: team.c1 };
 }
 
-function drawPlayer(g, p, G) {
-  const x = sx(p.x), y = sy(p.y);
-  if (x < -80 || x > CW + 80 || y < -40 || y > CH + 140) return;
+function drawPlayer(g, p, G, at) {
+  const x = at ? at.x : sx(p.x), y = at ? at.y : sy(p.y);
+  if (!at && (x < -80 || x > CW + 80 || y < -40 || y > CH + 140)) return;
   const team = G.teams[p.side], look = teamLook(team, p.side === 0);
   const big = p.pos === 'OL' || p.pos === 'DL';
   const k = Math.min(1, p.speedNow / 5);
   const dir = p.face.dir;
   const carrying = G.ball && G.ball.holder === p;
   const celebrate = p.celebrate > 0;
-  const hop = celebrate ? Math.abs(Math.sin(G.time * 10 + p.slot)) * 14 : 0;
+  const jumping = p.jump > 0;
+  const hop = (celebrate ? Math.abs(Math.sin(G.time * 10 + p.slot)) * 14 : 0) + (jumping ? Math.sin((0.55 - p.jump) / 0.55 * Math.PI) * 30 : 0);
 
   // ground marks
-  if (p.isHuman) {
+  if (p.isHuman && !at) {
     const pulse = 1 + Math.sin(G.time * 8) * 0.08;
     g.strokeStyle = '#ffe14d'; g.lineWidth = 3.5;
     g.beginPath(); g.ellipse(x, y, 22 * pulse, 9 * pulse, 0, 0, 7); g.stroke();
@@ -199,7 +224,7 @@ function drawPlayer(g, p, G) {
     let ex, ey, hx, hy;
     if (carrying && front) { ex = shx + 4; ey = shy + 10; hx = shx + 10; hy = shy + 8; }
     else if (p.throwAnim > 0 && front) { const t = p.throwAnim; ex = shx - 6 + (1 - t) * 14; ey = shy - 10; hx = shx - 4 + (1 - t) * 22; hy = shy - 18 + (1 - t) * 10; }
-    else if (celebrate) { ex = shx + (front ? 4 : -4); ey = shy - 11; hx = shx + (front ? 6 : -6); hy = shy - 22; }
+    else if (celebrate || jumping) { ex = shx + (front ? 4 : -4); ey = shy - 11; hx = shx + (front ? 6 : -6); hy = shy - 22; }
     else if (p.stiff > 0 && front) { ex = shx + 9; ey = shy + 1; hx = shx + 19; hy = shy; }
     else if (p.engaged && front) { ex = shx + 8; ey = shy + 4; hx = shx + 15; hy = shy + 2; }
     else { const s = (front ? -sw : sw); ex = shx + s * 7; ey = shy + 9; hx = shx + s * 12 + 2; hy = shy + 16; }
@@ -256,6 +281,7 @@ function drawPlayer(g, p, G) {
   }
   // labels
   const headTop = y - hop - (big ? 85 : 92);
+  if (at) return;
   const showName = p.isHuman || carrying || (G.phase === 'presnap' && p.off && p.slot <= 4 && p.side === G.human);
   let ly = headTop;
   if (showName && p.down <= 0) {
@@ -386,6 +412,16 @@ function drawBallFree(g, G) {
 function drawAim(g, G) {
   const a = G.aim; if (!a || !G.O) return;
   const qb = G.O[0];
+  if (a.run) {
+    const d = dirOf(G.poss), x0 = sx(qb.x), y0 = sy(qb.y) - 20, x1 = sx(qb.x + d * 7), y1 = y0;
+    g.strokeStyle = '#7fd3ff'; g.fillStyle = '#7fd3ff'; g.lineWidth = 8; g.lineCap = 'round';
+    g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke();
+    g.beginPath(); g.moveTo(x1 + d * 16, y1); g.lineTo(x1 - d * 4, y1 - 14); g.lineTo(x1 - d * 4, y1 + 14); g.fill();
+    g.font = '900 22px Arial Black, Arial'; g.textAlign = 'center'; g.lineWidth = 5; g.strokeStyle = '#000';
+    g.strokeText('QB RUN', (x0 + x1) / 2, y0 - 22); g.fillText('QB RUN', (x0 + x1) / 2, y0 - 22);
+    if (a.from) { g.strokeStyle = '#ffffff66'; g.lineWidth = 3; g.beginPath(); g.moveTo(a.from.x, a.from.y); g.lineTo(a.to.x, a.to.y); g.stroke(); }
+    return;
+  }
   const x0 = sx(qb.x), y0 = sy(qb.y) - 50, x1 = sx(a.tx), y1 = sy(a.ty);
   const len = Math.hypot(a.tx - qb.x, a.ty - qb.y), peak = 0.6 + len * 0.1;
   g.strokeStyle = a.target ? '#ffe14d' : '#ffffffaa'; g.lineWidth = 4; g.setLineDash([2, 10]); g.lineCap = 'round';
@@ -409,6 +445,15 @@ function drawFx(g, G) {
     const a = clamp(f.life / f.max, 0, 1);
     if (f.kind === 'dust') { g.fillStyle = `rgba(225,215,180,${a * 0.6})`; g.beginPath(); g.arc(sx(f.x), sy(f.y) - f.z, f.r * (2 - a), 0, 7); g.fill(); }
     else if (f.kind === 'star') { g.fillStyle = `rgba(255,225,70,${a})`; g.font = 'bold 20px Arial'; g.textAlign = 'center'; g.fillText('★', sx(f.x), sy(f.y) - f.z); }
+    else if (f.kind === 'flag') {
+      const u = Math.min(1, f.t / f.T);
+      const fx = sx(lerp(f.ax, f.x, u)), fy = sy(lerp(f.ay, f.y, u)) - Math.sin(u * Math.PI) * 70;
+      g.save(); g.translate(fx, fy); g.rotate(u < 1 ? f.t * 14 : 0.3);
+      g.fillStyle = '#ffd400'; g.strokeStyle = '#7a5d00'; g.lineWidth = 1.5;
+      g.beginPath(); g.moveTo(-9, -5); g.quadraticCurveTo(0, -9, 9, -4); g.lineTo(8, 5); g.quadraticCurveTo(0, 8, -8, 5); g.closePath(); g.fill(); g.stroke();
+      g.fillStyle = '#fff'; g.beginPath(); g.arc(-6, -3, 2.2, 0, 7); g.fill();
+      g.restore();
+    }
     else if (f.kind === 'confetti') { g.fillStyle = f.color; g.globalAlpha = a; g.fillRect(f.px, f.py, 6, 9); g.globalAlpha = 1; }
     else if (f.kind === 'text') {
       const pop = Math.min(1, (f.max - f.life) * 8);
@@ -456,6 +501,21 @@ function drawHUD(g, G) {
   g.font = 'bold 13px Arial, sans-serif'; g.fillStyle = '#ffd23f';
   g.fillText(G.downText(), x0 + W - 112, y0 + 35);
 
+  // play clock
+  if (G.playClock > 0 && (G.phase === 'playcall' || G.phase === 'presnap')) {
+    const pc = Math.ceil(G.playClock), red = pc <= 5;
+    g.fillStyle = red ? '#c0141ccc' : '#0b0f16e0'; roundRect(g, CW / 2 - 52, y0 + H + 4, 104, 26, 8); g.fill();
+    g.fillStyle = red ? '#fff' : '#ffd23f'; g.font = '900 15px Arial Black, Arial'; g.textAlign = 'center';
+    g.fillText(`⏱ :${String(pc).padStart(2, '0')}`, CW / 2, y0 + H + 22);
+  }
+  // your play
+  if (G.play && (G.phase === 'presnap' || G.phase === 'live') && !G.demo) {
+    const mine = G.poss === G.human ? G.play.off : G.play.def;
+    const t = (G.poss === G.human ? '🏈 ' : '🛡️ ') + mine.name.toUpperCase();
+    g.font = 'bold 14px Arial'; const w = g.measureText(t).width + 22;
+    g.fillStyle = '#0b0f16d0'; roundRect(g, 10, 10, w, 28, 14); g.fill();
+    g.fillStyle = '#fff'; g.textAlign = 'left'; g.fillText(t, 21, 29);
+  }
   // hint + stamina
   if (G.hint) {
     g.font = 'bold 14px Arial, sans-serif'; const w = g.measureText(G.hint).width + 24;
@@ -468,4 +528,79 @@ function drawHUD(g, G) {
     g.fillStyle = h.stamina > 0.3 ? '#2fd06b' : '#ff6040'; roundRect(g, 17, CH - 31, 126 * h.stamina, 10, 5); g.fill();
     g.fillStyle = '#fff'; g.font = 'bold 10px Arial'; g.textAlign = 'left'; g.fillText('SPRINT', 152, CH - 25);
   }
+}
+
+// ---------- referees ----------
+function drawRef(g, r, G) {
+  const x = sx(r.x), y = sy(r.y);
+  if (x < -60 || x > CW + 60) return;
+  g.fillStyle = '#00000055'; g.beginPath(); g.ellipse(x, y, 13, 5, 0, 0, 7); g.fill();
+  g.save(); g.translate(x, y); g.scale(r.face || 1, 1);
+  const k = Math.min(1, (r.moving || 0) / 4), s1 = Math.sin(r.anim) * k;
+  // legs (white knickers, black socks)
+  for (const [side, ph] of [[-1, s1], [1, -s1]]) {
+    g.strokeStyle = OUT; g.lineWidth = 8; g.lineCap = 'round';
+    g.beginPath(); g.moveTo(side * 4, -16); g.lineTo(side * 4 + ph * 9, -1); g.stroke();
+    g.strokeStyle = '#f2f2f2'; g.lineWidth = 5.5; g.beginPath(); g.moveTo(side * 4, -16); g.lineTo(side * 4 + ph * 5, -8); g.stroke();
+    g.strokeStyle = '#111'; g.beginPath(); g.moveTo(side * 4 + ph * 5, -8); g.lineTo(side * 4 + ph * 9, -1); g.stroke();
+  }
+  // striped shirt
+  g.save(); roundRect(g, -10, -38, 20, 23, 5); g.clip();
+  g.fillStyle = '#fff'; g.fillRect(-10, -38, 20, 23);
+  g.fillStyle = '#111'; for (let i = -10; i < 10; i += 5) g.fillRect(i, -38, 2.5, 23);
+  g.restore();
+  g.strokeStyle = OUT; g.lineWidth = 2.2; roundRect(g, -10, -38, 20, 23, 5); g.stroke();
+  // arms (one up when throwing a flag)
+  g.strokeStyle = OUT; g.lineWidth = 6; g.lineCap = 'round';
+  g.beginPath(); g.moveTo(-8, -34); g.lineTo(-12, -22); g.stroke();
+  g.beginPath(); g.moveTo(8, -34); r.throwT > 0 ? g.lineTo(14, -52) : g.lineTo(12, -22); g.stroke();
+  // head: cap + face
+  const R = 15;
+  g.fillStyle = SKIN[1]; g.strokeStyle = OUT; g.lineWidth = 2.2;
+  g.beginPath(); g.arc(1, -52, R, 0, 7); g.fill(); g.stroke();
+  g.fillStyle = '#111'; g.beginPath(); g.arc(1, -54, R, Math.PI * 1.02, Math.PI * 1.98); g.fill();
+  g.fillRect(6, -57, 14, 4);
+  g.fillStyle = '#fff'; g.beginPath(); g.arc(6, -50, 3.3, 0, 7); g.arc(13, -50, 3.3, 0, 7); g.fill();
+  g.fillStyle = '#111'; g.beginPath(); g.arc(7, -50, 1.7, 0, 7); g.arc(14, -50, 1.7, 0, 7); g.fill();
+  g.strokeStyle = '#3a130a'; g.lineWidth = 1.8; g.beginPath(); g.moveTo(6, -43); g.lineTo(13, -43); g.stroke();
+  // whistle
+  g.fillStyle = '#ccc'; g.fillRect(12, -44, 5, 3);
+  g.restore();
+}
+
+// ---------- field goal / punt meter ----------
+function drawKickMeter(g, G) {
+  const km = G.km; if (!km || G.phase !== 'kickmeter') return;
+  const W = 560, H = 196, x0 = (CW - W) / 2, y0 = CH - H - 46;
+  g.fillStyle = '#0b0f16ee'; roundRect(g, x0, y0, W, H, 18); g.fill();
+  g.strokeStyle = '#ffd23f'; g.lineWidth = 3; roundRect(g, x0, y0, W, H, 18); g.stroke();
+  g.fillStyle = '#ffd23f'; g.font = '900 22px Arial Black, Arial'; g.textAlign = 'center';
+  const title = km.kind === 'punt' ? 'PUNT' : km.kind === 'xp' ? 'EXTRA POINT' : `${km.yds}-YARD FIELD GOAL`;
+  g.fillText(title, CW / 2, y0 + 30);
+  g.fillStyle = '#fff'; g.font = 'bold 14px Arial';
+  g.fillText(`${km.kk.name}  •  ${km.kind === 'punt' ? 'P' : 'K'}  •  ${km.kk.ovr} OVR`, CW / 2, y0 + 50);
+  // power bar
+  const bx = x0 + 40, bw = W - 80;
+  const bar = (y, label, active) => { g.fillStyle = active ? '#fff' : '#fff8'; g.font = 'bold 13px Arial'; g.textAlign = 'left'; g.fillText(label, bx, y - 6); g.fillStyle = '#222'; roundRect(g, bx, y, bw, 22, 11); g.fill(); };
+  bar(y0 + 80, '1) POWER', km.stage === 0);
+  const pg = g.createLinearGradient(bx, 0, bx + bw, 0); pg.addColorStop(0, '#2fd06b'); pg.addColorStop(0.7, '#ffd23f'); pg.addColorStop(1, '#ff4040');
+  g.fillStyle = pg; roundRect(g, bx + 2, y0 + 82, Math.max(4, (bw - 4) * km.power), 18, 9); g.fill();
+  if (km.kind !== 'punt') {
+    const nx = bx + bw * Math.min(1, km.need);
+    g.strokeStyle = '#fff'; g.lineWidth = 3; g.beginPath(); g.moveTo(nx, y0 + 76); g.lineTo(nx, y0 + 106); g.stroke();
+    g.fillStyle = '#fff'; g.font = 'bold 11px Arial'; g.textAlign = 'center'; g.fillText(km.need > 1 ? 'OUT OF RANGE!' : 'NEED', Math.min(nx, bx + bw - 30), y0 + 118);
+  }
+  // aim bar
+  bar(y0 + 146, '2) AIM', km.stage === 1);
+  const cx = bx + bw / 2, zw = bw / 2 * km.tol;
+  g.fillStyle = km.kind === 'punt' ? '#2fd06b55' : '#2fd06b'; g.fillRect(cx - zw, y0 + 148, zw * 2, 18);
+  if (km.kind === 'punt') { g.fillStyle = '#ff404077'; g.fillRect(bx + 2, y0 + 148, bw / 2 * 0.25, 18); g.fillRect(bx + bw - 2 - bw / 2 * 0.25, y0 + 148, bw / 2 * 0.25, 18); }
+  if (km.stage >= 1) {
+    const ax = cx + km.aim * (bw / 2 - 4);
+    g.fillStyle = '#fff'; g.beginPath(); g.moveTo(ax, y0 + 144); g.lineTo(ax - 8, y0 + 134); g.lineTo(ax + 8, y0 + 134); g.fill();
+    g.fillRect(ax - 2, y0 + 146, 4, 22);
+  }
+  g.fillStyle = '#ffd23f'; g.font = 'bold 14px Arial'; g.textAlign = 'center';
+  const tap = G.mode === 'mobile' ? 'TAP' : 'SPACE';
+  g.fillText(km.stage === 0 ? `${tap} to lock the POWER` : km.stage === 1 ? `${tap} when the needle is in the GREEN` : '', CW / 2, y0 + H - 6);
 }

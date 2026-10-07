@@ -38,6 +38,7 @@ const Input = {
   pressed: {},   // key code -> pressed this frame
   // mouse / finger on the game canvas (screen coords in 1280x720 space)
   pointer: { down: false, x: 0, y: 0, x0: 0, y0: 0, t: 0, moved: false, aiming: false },
+  stick: { x: 0, y: 0, m: 0 }, // on-screen joystick (mobile)
   taps: [],      // quick taps/clicks this frame
   release: null, // drag-back vector released this frame
   press(code) { if (!this.down[code]) this.pressed[code] = true; this.down[code] = true; },

@@ -9,7 +9,7 @@ function show(id) {
   $('btnPause').style.display = (id === 'playcall' || id === null) && G.teams && !G.demo ? 'block' : 'none';
 }
 
-let myTeam = null, oppTeam = null;
+
 
 // ---------- Mobile / Computer mode ----------
 const looksTouch = ('ontouchstart' in window || navigator.maxTouchPoints > 0) && Math.min(screen.width, screen.height) < 900;
@@ -68,61 +68,53 @@ $('btnHow').onclick = () => { Sound.init(); show('how'); };
 $('btnHowBack').onclick = () => show('title');
 $('btnMute').onclick = () => { Sound.muted = !Sound.muted; $('btnMute').textContent = Sound.muted ? '🔇' : '🔊'; };
 
-// ---------- team select ----------
+// ---------- team select: AWAY (left) vs HOME (right), arrows to scroll ----------
 function teamOvr(t) { const all = t.off.concat(t.def); return Math.round(all.reduce((a, p) => a + p[3], 0) / all.length); }
-function buildGrid() {
-  const grid = $('teamGrid'); grid.innerHTML = '';
-  let lastConf = '';
-  for (const t of TEAMS) {
-    if (t.conf !== lastConf) { lastConf = t.conf; const l = document.createElement('div'); l.className = 'conf-label'; l.textContent = t.conf; grid.appendChild(l); }
-    const c = document.createElement('div');
-    c.className = 'tcard'; c.style.background = `linear-gradient(160deg, ${t.c1} 60%, ${t.c2})`; c.style.color = textOn(t.c1);
-    c.innerHTML = `<div class="ab">${t.id}</div><div class="nm">${t.name}<br>${teamOvr(t)} OVR</div>`;
-    c.onclick = () => { pickTeam(t); peek(t); };
-    c.onmouseenter = () => peek(t); c.onmouseleave = () => $('rosterPeek').style.display = 'none';
-    c.dataset.id = t.id;
-    grid.appendChild(c);
+const sel = { idx: [TEAMS.findIndex(t => t.id === 'KC'), TEAMS.findIndex(t => t.id === 'PHI')], you: 0 }; // idx[0] = home, idx[1] = away
+try { const saved = JSON.parse(localStorage.getItem('bobbleSel') || 'null'); if (saved) Object.assign(sel, saved); } catch (e) {}
+function teamCard(t) {
+  const ovr = teamOvr(t), offO = Math.round(t.off.reduce((a, p) => a + p[3], 0) / 8), defO = Math.round(t.def.reduce((a, p) => a + p[3], 0) / 8);
+  const stars = t.off.concat(t.def).slice().sort((a, b) => b[3] - a[3]).slice(0, 5);
+  return `<div class="ab">${t.id}</div><div class="nm">${t.city}<br>${t.name}</div>
+    <div class="ov">${ovr} OVR</div><div style="font-size:12px;margin-bottom:6px;text-shadow:1px 1px 0 #000">OFF ${offO} • DEF ${defO}</div>
+    <div class="stars">${stars.map(p => `<div>${p[0]} <b>${p[3]}</b> #${p[2]} ${p[1]}</div>`).join('')}</div>
+    <div class="cnt">${TEAMS.indexOf(t) + 1} / ${TEAMS.length}</div>`;
+}
+function renderSelect(bumpSide) {
+  for (const [side, id] of [[0, 'pHome'], [1, 'pAway']]) {
+    const t = TEAMS[sel.idx[side]], el = $(id).querySelector('.tbig');
+    el.innerHTML = teamCard(t);
+    el.style.background = `linear-gradient(160deg, ${t.c1} 55%, ${t.c2})`; el.style.color = textOn(t.c1);
+    const who = $(id).querySelector('.who');
+    who.textContent = sel.you === side ? 'YOU' : 'CPU'; who.className = 'who ' + (sel.you === side ? 'you' : 'cpu');
+    if (bumpSide === side) { el.classList.add('bump'); setTimeout(() => el.classList.remove('bump'), 120); }
   }
-  refreshSelect();
+  $('selHint').textContent = G.mode === 'mobile' ? 'Tap the arrows to change teams' : 'Arrows to change teams  •  W/S = away  •  ↑/↓ = home  •  ENTER = kickoff';
+  try { localStorage.setItem('bobbleSel', JSON.stringify(sel)); } catch (e) {}
 }
-function pickTeam(t) {
-  Sound.click();
-  if (!myTeam || (myTeam && oppTeam)) { myTeam = t; oppTeam = null; }
-  else if (t === myTeam) { myTeam = null; }
-  else oppTeam = t;
-  refreshSelect();
+function moveTeam(side, d) {
+  let i = sel.idx[side];
+  do { i = (i + d + TEAMS.length) % TEAMS.length; } while (i === sel.idx[1 - side]);
+  sel.idx[side] = i; Sound.click(); renderSelect(side);
 }
-function refreshSelect() {
-  document.querySelectorAll('.tcard').forEach(c => {
-    c.classList.toggle('mine', !!myTeam && c.dataset.id === myTeam.id);
-    c.classList.toggle('opp', !!oppTeam && c.dataset.id === oppTeam.id);
-  });
-  $('selectTitle').textContent = !myTeam ? 'Pick YOUR team' : !oppTeam ? 'Now pick who you play' : 'Ready!';
-  $('matchup').innerHTML = myTeam ? `<b>${myTeam.city} ${myTeam.name}</b> vs ${oppTeam ? `<b>${oppTeam.city} ${oppTeam.name}</b>` : '???'}` : '';
-  $('btnKick').disabled = !(myTeam && oppTeam);
-}
-function peek(t) {
-  const row = p => `<div><span class="pos">${p[0]}</span>#${p[2]} ${p[1]} <b>${p[3]}</b> <span style="opacity:.6">SPD ${p[4]}</span></div>`;
-  $('rosterPeek').innerHTML = `<div style="font-size:16px;margin-bottom:4px"><b>${t.city} ${t.name}</b> — ${teamOvr(t)} OVR</div>
-    <div style="opacity:.7;margin:4px 0 2px">OFFENSE</div>${t.off.map(row).join('')}
-    <div style="opacity:.7;margin:6px 0 2px">DEFENSE</div>${t.def.map(row).join('')}
-    <div style="opacity:.5;margin-top:6px;font-size:11px">Madden 27 ratings • rosters as of Oct 7, 2026</div>`;
-  $('rosterPeek').style.display = G.mode === 'mobile' ? 'none' : 'block';
-}
-$('btnRandomOpp').onclick = () => {
-  if (!myTeam) myTeam = pick(TEAMS);
-  do { oppTeam = pick(TEAMS); } while (oppTeam === myTeam);
-  refreshSelect();
-};
-$('btnBackSel').onclick = () => { $('rosterPeek').style.display = 'none'; show('title'); };
+document.querySelectorAll('.arr').forEach(b => b.onclick = () => moveTeam(+b.dataset.side, +b.dataset.d));
+$('btnSwap').onclick = () => { sel.you = 1 - sel.you; Sound.click(); renderSelect(); };
+document.querySelectorAll('.tbig').forEach((el, i) => el.addEventListener('wheel', e => { e.preventDefault(); moveTeam(el.closest('#pHome') ? 0 : 1, e.deltaY > 0 ? 1 : -1); }, { passive: false }));
+window.addEventListener('keydown', e => {
+  if (!$('select').classList.contains('show')) return;
+  if (e.code === 'KeyW') moveTeam(1, -1); if (e.code === 'KeyS') moveTeam(1, 1);
+  if (e.code === 'ArrowUp') moveTeam(0, -1); if (e.code === 'ArrowDown') moveTeam(0, 1);
+  if (e.code === 'Enter') startGame();
+});
+function buildGrid() { renderSelect(); }
+$('btnBackSel').onclick = () => show('title');
 $('btnKick').onclick = startGame;
 
 function startGame() {
-  $('rosterPeek').style.display = 'none';
   Sound.init(); Sound.whistle(); Sound.crowd(false);
   if (G.mode === 'mobile') goFullscreen();
   G.demo = false; show(null);
-  newGame(myTeam, oppTeam, { qtr: +$('optQtr').value, diff: +$('optDiff').value });
+  newGame(TEAMS[sel.idx[0]], TEAMS[sel.idx[1]], { qtr: +$('optQtr').value, diff: +$('optDiff').value, humanSide: sel.you });
 }
 
 // ---------- play calling ----------
@@ -170,12 +162,14 @@ window.addEventListener('keydown', e => {
   if (n >= 1 && n <= pcList.length) choose(n - 1);
 });
 
-// ---------- game over ----------
+// ---------- game over / YOU WIN ----------
+let mvpAnim = null;
 G.hooks.onGameOver = s => {
   if (G.demo) return;
   const me = s.human, them = 1 - me;
   const won = s.score[me] > s.score[them], tie = s.score[me] === s.score[them];
-  $('overTitle').textContent = won ? '🏆 YOU WIN! 🏆' : tie ? 'TIE GAME' : 'YOU LOST 😬';
+  $('over').classList.toggle('win', won);
+  $('overTitle').textContent = won ? 'YOU WIN!' : tie ? 'TIE GAME' : 'GAME OVER';
   const tag = t => `<span style="color:${t.c1 === '#000000' ? '#aaa' : t.c1};-webkit-text-stroke:1px #fff">${t.id}</span>`;
   $('overScore').innerHTML = `${tag(s.teams[1])} ${s.score[1]} - ${s.score[0]} ${tag(s.teams[0])}`;
   const line = (lbl, p, k, suf) => p ? `<div>${lbl}: <b>${p.name}</b> — ${p[k]} ${suf}</div>` : '';
@@ -187,11 +181,49 @@ G.hooks.onGameOver = s => {
       line('Tackles', L.tkl, 'tkl', '') + line('Sacks', L.sack, 'sack', '') + line('INTs', L.int, 'int', '') + '</div>';
   }
   $('overStats').innerHTML = html;
+  // MVP: best performer on the winning team (or yours if tied)
+  const mvpSide = won || tie ? me : them;
+  const score = p => p.pass / 20 + p.rush / 8 + p.rec / 8 + p.td * 6 + p.tkl * 1.5 + p.sack * 4 + p.int * 6;
+  const cand = Object.values(G.pstats || {}).filter(p => p.side === mvpSide).sort((a, b) => score(b) - score(a))[0];
+  drawMvp(cand, mvpSide);
+  // confetti
+  const box = $('confetti'); box.innerHTML = '';
+  if (won) for (let i = 0; i < 70; i++) {
+    const c = document.createElement('i'); const t = s.teams[me];
+    c.style.left = Math.random() * 100 + '%'; c.style.background = pick([t.c1, t.c2, '#fff', '#ffd23f']);
+    c.style.animationDuration = (2 + Math.random() * 3) + 's'; c.style.animationDelay = (-Math.random() * 5) + 's';
+    box.appendChild(c);
+  }
   Sound[won ? 'td' : 'bad']();
-  setTimeout(() => show('over'), 1200);
+  setTimeout(() => show('over'), 1400);
 };
+function drawMvp(st, side) {
+  const cvm = $('mvpCv'), g = cvm.getContext('2d');
+  cancelAnimationFrame(mvpAnim);
+  if (!st) { $('mvpBox').style.display = 'none'; return; }
+  $('mvpBox').style.display = '';
+  const t = G.teams[side];
+  const all = t.off.map((p, i) => [p, true, i]).concat(t.def.map((p, i) => [p, false, i]));
+  const found = all.find(([p]) => p[1] === st.name) || all[0];
+  const p = makePlayer(side, found[1], found[2], found[0]);
+  p.celebrate = 1e9; p.face.dir = 1; p.headScale = 1.15;
+  const bits = [];
+  if (st.pass) bits.push(`${st.pass} pass yds`); if (st.rush) bits.push(`${st.rush} rush yds`); if (st.rec) bits.push(`${st.rec} rec yds`);
+  if (st.td) bits.push(`${st.td} TD`); if (st.tkl) bits.push(`${st.tkl} tkl`); if (st.sack) bits.push(`${st.sack} sacks`); if (st.int) bits.push(`${st.int} INT`);
+  $('mvpText').innerHTML = `<b>${st.name}</b> • ${st.pos} • ${t.name}<br>${bits.join(' • ')}`;
+  const fake = { teams: G.teams, ball: null, phase: 'over', human: G.human, mode: G.mode, time: 0 };
+  const loop = () => {
+    fake.time = performance.now() / 1000; p.anim += 0.05; p.speedNow = 0;
+    g.clearRect(0, 0, 260, 300);
+    const bg = g.createRadialGradient(130, 150, 10, 130, 150, 150); bg.addColorStop(0, t.c1 + 'aa'); bg.addColorStop(1, '#0000');
+    g.fillStyle = bg; g.fillRect(0, 0, 260, 300);
+    g.save(); g.scale(2.6, 2.6); drawPlayer(g, p, fake, { x: 50, y: 108 }); g.restore();
+    if ($('over').classList.contains('show')) mvpAnim = requestAnimationFrame(loop);
+  };
+  setTimeout(loop, 1450);
+}
 $('btnAgain').onclick = () => { show(null); startGame(); };
-$('btnNewTeams').onclick = () => { G.teams = null; myTeam = oppTeam = null; buildGrid(); show('select'); };
+$('btnNewTeams').onclick = () => { G.teams = null; renderSelect(); show('select'); };
 
 // ---------- pause ----------
 function togglePause() {
@@ -235,6 +267,23 @@ cv.addEventListener('pointerup', endPointer);
 cv.addEventListener('pointercancel', endPointer);
 cv.addEventListener('contextmenu', e => e.preventDefault());
 
+// joystick (mobile)
+(function joystick() {
+  const joy = $('joy'), knob = $('joyKnob'); let id = null;
+  const set = e => {
+    const r = joy.getBoundingClientRect();
+    let x = (e.clientX - (r.left + r.width / 2)) / (r.width / 2), y = (e.clientY - (r.top + r.height / 2)) / (r.height / 2);
+    const m = Math.hypot(x, y); if (m > 1) { x /= m; y /= m; }
+    Input.stick.x = x; Input.stick.y = y; Input.stick.m = Math.min(1, m);
+    knob.style.left = (43 + x * 45) + 'px'; knob.style.top = (43 + y * 45) + 'px';
+  };
+  const reset = () => { id = null; Input.stick.x = Input.stick.y = Input.stick.m = 0; knob.style.left = knob.style.top = '43px'; };
+  joy.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); id = e.pointerId; try { joy.setPointerCapture(id); } catch (_) {} set(e); });
+  joy.addEventListener('pointermove', e => { if (e.pointerId === id) set(e); });
+  joy.addEventListener('pointerup', e => { if (e.pointerId === id) reset(); });
+  joy.addEventListener('pointercancel', reset);
+})();
+
 // mobile buttons
 document.querySelectorAll('#mbtns button').forEach(b => {
   const k = b.dataset.k;
@@ -251,9 +300,15 @@ function updateMobileButtons() {
     else if (b.holder === h) st = 'carrier';
     else if (h.side !== G.poss || (b.holder && b.holder.side !== h.side)) st = 'def';
   }
-  if (st === mbState) return;
-  mbState = st;
+  const joyOn = G.phase === 'live' && !G.demo && h && (st === 'def' || st === 'carrier');
+  $('joy').classList.toggle('on', !!joyOn);
+  if (!joyOn && Input.stick.m) { Input.stick.x = Input.stick.y = Input.stick.m = 0; }
+  const key = st + (b && b.flight ? 'air' : '') + (h && h.engaged ? 'eng' : '');
+  if (key === mbState) return;
+  mbState = key;
   document.querySelectorAll('#mbtns button').forEach(x => x.classList.toggle('on', x.dataset.show === st));
+  $('mbDive').textContent = b && b.flight ? '🙌 JUMP' : '💥 DIVE';
+  $('mbSwim').style.display = st === 'def' && h && h.engaged ? 'block' : 'none';
 }
 
 // ---------- title screen background: a fake game ----------
@@ -300,14 +355,14 @@ function render() {
     drawField(ctx, G);
     drawLines(ctx, G);
     drawRoutes(ctx, G);
-    const ps = G.players.slice().sort((a, b) => a.y - b.y);
-    for (const p of ps) drawPlayer(ctx, p, G);
+    const ps = G.players.concat(G.refs || []).sort((a, b) => a.y - b.y);
+    for (const p of ps) p.slot === undefined ? drawRef(ctx, p, G) : drawPlayer(ctx, p, G);
     if (G.ball) drawBallFree(ctx, G);
     drawAim(ctx, G);
     drawFx(ctx, G);
   }
   ctx.restore();
-  if (G.teams && !G.demo) { drawBanner(ctx, G); drawHUD(ctx, G); }
+  if (G.teams && !G.demo) { drawBanner(ctx, G); drawHUD(ctx, G); drawKickMeter(ctx, G); }
 }
 
 requestAnimationFrame(frame);

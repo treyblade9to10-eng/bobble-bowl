@@ -104,4 +104,66 @@ body.mobile #select { touch-action: pan-y; }
   button.big { font-size: 20px; padding: 10px 28px; }
   .modecard { width: 230px; padding: 12px; } .modecard .mi { font-size: 44px; }
 }
-body:not(.mobile) #teamGrid { width: min(960px, calc(100vw - 300px)); margin-right: 270px; }
+
+/* ---- team select: two sides ---- */
+#select { justify-content: center; }
+#matchRow { display: flex; align-items: center; justify-content: center; gap: 22px; width: 100%; }
+.tpanel { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.pside { font-size: 20px; font-weight: 900; letter-spacing: 3px; }
+.pside .who { font-size: 13px; padding: 3px 10px; border-radius: 10px; margin-left: 6px; letter-spacing: 1px; vertical-align: middle; }
+.pside .who.you { background: #ffd23f; color: #111; } .pside .who.cpu { background: #555; color: #fff; }
+.arr { width: 120px; height: 46px; font-size: 22px; margin: 0; border-radius: 14px; }
+.tbig { width: min(330px, 36vw); min-height: 300px; border-radius: 22px; padding: 16px; text-align: center; border: 4px solid #fff8;
+  box-shadow: 0 8px 0 #000a, inset 0 0 40px #0005; transition: transform .12s; font-family: Arial, sans-serif; }
+.tbig.bump { transform: scale(1.04); }
+.tbig .ab { font-size: 64px; font-weight: 900; font-family: 'Arial Black', Arial; line-height: 1; text-shadow: 3px 3px 0 #0008; }
+.tbig .nm { font-size: 22px; font-weight: bold; margin: 4px 0; text-shadow: 2px 2px 0 #0008; }
+.tbig .ov { display: inline-block; margin: 6px 0 10px; padding: 3px 12px; border-radius: 10px; background: #000a; color: #ffd23f; font-weight: 900; font-size: 18px; }
+.tbig .stars { text-align: left; font-size: 13px; background: #0008; color: #fff; border-radius: 12px; padding: 8px 10px; line-height: 1.55; }
+.tbig .stars b { color: #ffd23f; }
+.tbig .cnt { font-size: 11px; opacity: .75; margin-top: 6px; }
+#vsCol { display: flex; flex-direction: column; align-items: center; gap: 8px; min-width: 200px; }
+#vsCol .vs { font-size: 54px; font-weight: 900; color: #ffd23f; text-shadow: 4px 4px 0 #c2381a; }
+#vsCol label { font-size: 15px; }
+#selHint { margin-top: 10px; font-size: 13px; opacity: .7; font-family: Arial, sans-serif; }
+body.mobile .tbig { min-height: 0; padding: 8px; width: 34vw; }
+body.mobile .tbig .ab { font-size: 38px; } body.mobile .tbig .nm { font-size: 15px; } body.mobile .tbig .stars { font-size: 11px; padding: 5px 8px; }
+body.mobile .arr { height: 36px; width: 100px; }
+body.mobile #vsCol .vs { font-size: 34px; } body.mobile #vsCol { min-width: 150px; gap: 5px; }
+@media (max-height: 500px) { .tbig .stars div:nth-child(n+4) { display: none; } #select h2 { display: none; } }
+
+/* ---- win screen ---- */
+#over { overflow: hidden; }
+#trophy { font-size: 70px; display: none; animation: trophy 1.2s ease-in-out infinite; }
+#over.win #trophy { display: block; }
+@keyframes trophy { 50% { transform: translateY(-10px) rotate(6deg) scale(1.08); } }
+#over.win #overTitle { font-size: 64px; color: #ffd23f; text-shadow: 4px 4px 0 #c2381a, 8px 8px 0 #000; animation: bob 1s ease-in-out infinite; }
+#overMain { display: flex; gap: 18px; align-items: center; justify-content: center; flex-wrap: wrap; }
+#mvpBox { background: #0009; border: 3px solid #ffd23f; border-radius: 18px; padding: 8px 14px; text-align: center; }
+#mvpBox .mvpTag { color: #ffd23f; font-weight: 900; letter-spacing: 3px; }
+#mvpCv { width: 200px; height: 230px; display: block; margin: 0 auto; }
+#mvpText { font-family: Arial, sans-serif; font-size: 14px; }
+#confetti { position: absolute; inset: 0; pointer-events: none; }
+#confetti i { position: absolute; top: -20px; width: 10px; height: 16px; animation: fall linear infinite; }
+@keyframes fall { to { transform: translateY(110vh) rotate(720deg); } }
+@media (max-height: 500px) { #trophy { font-size: 40px; } #over.win #overTitle { font-size: 38px; } #mvpCv { width: 130px; height: 150px; } #overStats { font-size: 11px; padding: 6px 10px; } }
+
+/* ---- joystick ---- */
+#joy { display: none; position: absolute; left: 22px; bottom: 22px; width: 150px; height: 150px; border-radius: 50%; z-index: 7;
+  background: radial-gradient(circle, #ffffff22, #ffffff10); border: 3px solid #ffffff66; touch-action: none; }
+#joy.on { display: block; }
+#joyKnob { position: absolute; left: 43px; top: 43px; width: 64px; height: 64px; border-radius: 50%; background: #ffffffaa; border: 3px solid #fff; box-shadow: 0 3px 8px #0008; }
+@media (max-height: 500px) {
+  #select { justify-content: center; padding: 6px; }
+  .tpanel { gap: 4px; }
+  .pside { font-size: 14px; letter-spacing: 2px; }
+  .arr { height: 30px !important; width: 90px !important; font-size: 16px; }
+  .tbig { padding: 6px 8px !important; border-width: 3px; }
+  .tbig .ab { font-size: 30px !important; } .tbig .nm { font-size: 13px !important; margin: 2px 0; }
+  .tbig .ov { font-size: 14px; margin: 3px 0 4px; padding: 1px 10px; }
+  .tbig .stars { font-size: 10.5px !important; padding: 4px 8px !important; line-height: 1.4; }
+  .tbig .stars div:nth-child(n+3) { display: none; }
+  .tbig .cnt { margin-top: 2px; }
+  #vsCol .vs { font-size: 28px !important; } #vsCol button { padding: 6px 12px; } #vsCol button.big { font-size: 18px; padding: 8px 20px; }
+  #selHint { margin-top: 4px; }
+}

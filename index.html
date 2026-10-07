@@ -45,18 +45,32 @@
     <button id="btnHowBack">BACK</button>
   </div>
 
-  <!-- Team select -->
+  <!-- Team select: away on the left, home on the right -->
   <div id="select" class="screen">
-    <h2 id="selectTitle">Pick YOUR team</h2>
-    <div id="teamGrid"></div>
-    <div id="selectBar">
-      <div id="matchup"></div>
-      <label>Quarter <select id="optQtr"><option value="120">2 min</option><option value="180" selected>3 min</option><option value="300">5 min</option></select></label>
-      <label>CPU <select id="optDiff"><option value="0">Rookie</option><option value="1" selected>Pro</option><option value="2">All-Pro</option></select></label>
-      <button id="btnRandomOpp">Random Opponent</button>
-      <button id="btnBackSel">Back</button>
-      <button class="big" id="btnKick" disabled>KICKOFF</button>
+    <h2>Pick the matchup</h2>
+    <div id="matchRow">
+      <div class="tpanel" id="pAway">
+        <div class="pside">AWAY <span class="who"></span></div>
+        <button class="arr" data-side="1" data-d="-1">▲</button>
+        <div class="tbig"></div>
+        <button class="arr" data-side="1" data-d="1">▼</button>
+      </div>
+      <div id="vsCol">
+        <div class="vs">VS</div>
+        <button id="btnSwap">⇄ Switch sides</button>
+        <label>Quarter <select id="optQtr"><option value="120">2 min</option><option value="180" selected>3 min</option><option value="300">5 min</option></select></label>
+        <label>CPU <select id="optDiff"><option value="0">Rookie</option><option value="1" selected>Pro</option><option value="2">All-Pro</option></select></label>
+        <button class="big" id="btnKick">KICKOFF</button>
+        <button id="btnBackSel">Back</button>
+      </div>
+      <div class="tpanel" id="pHome">
+        <div class="pside">HOME <span class="who"></span></div>
+        <button class="arr" data-side="0" data-d="-1">▲</button>
+        <div class="tbig"></div>
+        <button class="arr" data-side="0" data-d="1">▼</button>
+      </div>
     </div>
+    <div id="selHint"></div>
   </div>
 
   <div id="rosterPeek"></div>
@@ -68,11 +82,16 @@
     <div id="pcHint"></div>
   </div>
 
-  <!-- Game over -->
+  <!-- Game over / YOU WIN -->
   <div id="over" class="screen">
+    <div id="confetti"></div>
+    <div id="trophy">🏆</div>
     <h2 id="overTitle">FINAL</h2>
     <div id="overScore"></div>
-    <div id="overStats"></div>
+    <div id="overMain">
+      <div id="mvpBox"><div class="mvpTag">GAME MVP</div><canvas id="mvpCv" width="260" height="300"></canvas><div id="mvpText"></div></div>
+      <div id="overStats"></div>
+    </div>
     <div class="row">
       <button class="big" id="btnAgain">REMATCH</button>
       <button id="btnNewTeams">NEW TEAMS</button>
@@ -95,8 +114,11 @@
     <button data-k="KeyF" data-show="carrier">🌀 SPIN</button>
     <button data-k="KeyR" data-show="carrier">✋ STIFF</button>
     <button data-k="KeyQ" data-show="def">🔄 SWITCH</button>
-    <button data-k="Space" data-show="def">💥 DIVE</button>
+    <button data-k="KeyE" data-show="def" id="mbSwim">🏊 SWIM</button>
+    <button data-k="Space" data-show="def" id="mbDive">💥 DIVE</button>
   </div>
+
+  <div id="joy"><div id="joyKnob"></div></div>
 
   <div id="rotate">📱↻<br>Turn your phone sideways to play</div>
 </div>
