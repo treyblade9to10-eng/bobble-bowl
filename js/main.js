@@ -136,20 +136,34 @@ function onPlayCall(c) {
       pcList = sp.concat(pcList);
     }
   }
-  const coach = coachPick(c, pcList);
+  pcCoach = coachPick(c, pcList);
+  // coach pick goes to the front (after kicks) so it's always on page 1
+  const ci = pcList.findIndex(p => p.key === pcCoach), nSpec = pcList.filter(p => p.special).length;
+  if (ci > nSpec) pcList.splice(nSpec, 0, pcList.splice(ci, 1)[0]);
+  pcOff = humanOff; pcPage = 0;
+  renderCards();
+  show('playcall');
+}
+let pcPage = 0, pcCoach = null, pcOff = true;
+const PER_PAGE = 10;
+function renderCards() {
+  const pages = Math.max(1, Math.ceil(pcList.length / PER_PAGE));
+  pcPage = clamp(pcPage, 0, pages - 1);
+  const list = pcList.slice(pcPage * PER_PAGE, pcPage * PER_PAGE + PER_PAGE);
   const box = $('pcCards'); box.innerHTML = '';
-  const cols = Math.ceil(pcList.length / 2);
+  const cols = Math.max(2, Math.ceil(list.length / 2));
   box.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
   box.style.width = `min(${cols * 200}px, calc(100vw - 20px))`;
-  pcList.forEach((p, i) => {
+  list.forEach((p, j) => {
+    const i = pcPage * PER_PAGE + j;
     const el = document.createElement('div');
-    el.className = 'pcard' + (p.special ? ' special' : '') + (p.key === coach ? ' coach' : '');
+    el.className = 'pcard' + (p.special ? ' special' : '') + (p.key === pcCoach ? ' coach' : '');
     const kind = p.type === 'run' ? 'run' : p.type === 'pass' ? 'pass' : p.special ? 'kick' : '';
-    const label = G.mode === 'mobile' ? (kind === 'run' ? 'RUN' : kind === 'pass' ? 'PASS' : kind === 'kick' ? 'KICK' : 'D') : i + 1;
-    el.innerHTML = `${p.key === coach ? '<span class="cp">⭐ COACH PICK</span>' : ''}<span class="k ${kind}">${label}</span><div class="t">${p.name}</div>`;
+    const label = G.mode === 'mobile' ? (kind === 'run' ? 'RUN' : kind === 'pass' ? 'PASS' : kind === 'kick' ? 'KICK' : 'D') : (j + 1) % 10;
+    el.innerHTML = `${p.key === pcCoach ? '<span class="cp">⭐ COACH PICK</span>' : ''}<span class="k ${kind}">${label}</span><div class="t">${p.name}</div>`;
     const mini = document.createElement('canvas'); mini.width = 120; mini.height = 72;
     if (p.key === 'xp' || p.key === 'two') { const g = mini.getContext('2d'); g.fillStyle = '#3a8a3c'; g.fillRect(0, 0, 120, 72); g.font = 'bold 30px sans-serif'; g.textAlign = 'center'; g.fillText(p.key === 'xp' ? '🦶' : '✌️', 60, 48); }
-    else drawPlayDiagram(mini, p, humanOff);
+    else drawPlayDiagram(mini, p, pcOff);
     el.appendChild(mini);
     const d = document.createElement('div'); d.className = 'd'; d.textContent = p.desc; el.appendChild(d);
     let sx0 = 0;
@@ -157,8 +171,16 @@ function onPlayCall(c) {
     el.addEventListener('click', e => { if (Math.abs(e.clientX - sx0) < 12) choose(i); });
     box.appendChild(el);
   });
-  $('pcHint').textContent = G.mode === 'mobile' ? 'Tap a play  •  ⭐ = what the coach would call' : 'Click a play or press its number  •  ⭐ = what the coach would call';
-  show('playcall');
+  const hint = $('pcHint'); hint.innerHTML = '';
+  if (pages > 1) {
+    const mk = (txt, d) => { const b = document.createElement('button'); b.className = 'pgbtn'; b.textContent = txt; b.onclick = () => { pcPage = (pcPage + d + pages) % pages; Sound.click(); renderCards(); }; return b; };
+    hint.appendChild(mk('◀ PREV', -1));
+    const t = document.createElement('span'); t.className = 'pgtxt'; t.textContent = `PAGE ${pcPage + 1} / ${pages}`; hint.appendChild(t);
+    hint.appendChild(mk('NEXT ▶', 1));
+  }
+  const tip = document.createElement('span'); tip.className = 'pgtip';
+  tip.textContent = G.mode === 'mobile' ? '⭐ = coach pick' : `1-${Math.min(PER_PAGE, list.length) % 10 || 0} pick  •  ←/→ pages  •  ⭐ = coach pick`;
+  hint.appendChild(tip);
 }
 G.hooks.onPlayCall = c => { if (!G.demo) onPlayCall(c); };
 // a simple suggestion so new players always have a good default
@@ -172,6 +194,7 @@ function coachPick(c, list) {
     if (c.toGo >= 7) return pick(['curls', 'mesh', 'slants']);
     return pick(['slants', 'toss', 'screen', 'zone']);
   }
+  if (c.down === 4 && c.toGo > 2) return 'alldrop';
   if (c.toGo <= 2) return 'run';
   if (c.toGo >= 15) return 'prevent';
   if (c.down === 3) return pick(['blitz', 'man']);
@@ -179,6 +202,7 @@ function coachPick(c, list) {
 }
 function choose(i) {
   const p = pcList[i]; if (!p || G.phase !== 'playcall') return;
+  if (G.patSide == null && p.key === 'xp') return;
   Sound.click();
   show(null);
   if (p.key === 'xp' || p.key === 'two') choosePAT(p.key);
@@ -186,8 +210,11 @@ function choose(i) {
 }
 window.addEventListener('keydown', e => {
   if (!$('playcall').classList.contains('show')) return;
+  if (e.code === 'ArrowRight' || e.code === 'ArrowLeft') { const pages = Math.ceil(pcList.length / PER_PAGE); pcPage = (pcPage + (e.code === 'ArrowRight' ? 1 : -1) + pages) % pages; renderCards(); return; }
   const n = parseInt(e.key, 10);
-  if (n >= 1 && n <= pcList.length) choose(n - 1);
+  if (isNaN(n)) return;
+  const i = pcPage * PER_PAGE + (n === 0 ? 9 : n - 1);
+  if (i < Math.min(pcList.length, (pcPage + 1) * PER_PAGE)) choose(i);
 });
 
 // ---------- game over / YOU WIN ----------
@@ -328,6 +355,7 @@ function updateMobileButtons() {
     else if (b.holder === h) st = 'carrier';
     else if (h.side !== G.poss || (b.holder && b.holder.side !== h.side)) st = 'def';
   }
+  if (G.phase === 'dead' && G.cellyGuy && !G.demo) st = 'celly';
   const joyOn = G.phase === 'live' && !G.demo && h && (st === 'def' || st === 'carrier');
   $('joy').classList.toggle('on', !!joyOn);
   if (!joyOn && Input.stick.m) { Input.stick.x = Input.stick.y = Input.stick.m = 0; }

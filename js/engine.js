@@ -87,14 +87,16 @@ function cpuOffCall() {
   }
   const toGo = Math.abs(G.firstDownX - G.los);
   const runW = toGo <= 3 ? 0.55 : toGo >= 8 ? 0.15 : 0.35;
-  if (chance(runW)) return pick(['zone', 'zone', 'toss', 'qbdraw']);
-  return toGo >= 12 ? pick(['verts', 'pa', 'mesh', 'curls', 'verts']) : pick(['slants', 'mesh', 'curls', 'screen', 'pa', 'verts', 'slants']);
+  if (chance(runW)) return pick(['zone', 'zone', 'toss', 'qbdraw', 'dive', 'counter', 'jet']);
+  if (G.clock < 8 && G.quarter % 2 === 0 && fromOwn(G.poss, G.los) > 45) return 'hail';
+  return toGo >= 12 ? pick(['verts', 'pa', 'mesh', 'curls', 'verts', 'ycross', 'flood', 'stopgo', 'drive']) : pick(['slants', 'mesh', 'curls', 'screen', 'pa', 'verts', 'slants', 'outs', 'bubble', 'smash', 'drive', 'ycross']);
 }
 function cpuDefCall() {
   const toGo = Math.abs(G.firstDownX - G.los);
+  if (G.down === 4 && !G.twoPt && toGo > 2 && chance(0.75)) return 'alldrop';
   if (toGo <= 2 && chance(0.5)) return 'run';
   if (toGo >= 15 && chance(0.4)) return 'prevent';
-  return pick(['man', 'c2', 'c3', 'blitz', 'man', 'c3', 'cb', 'run']);
+  return pick(['man', 'c2', 'c3', 'blitz', 'man', 'c3', 'cb', 'run', 'c1', 'c4', 'tampa', 'fire', toGo > 6 ? 'c4' : 'c0']);
 }
 
 // called by the UI when the human picks a card
@@ -119,21 +121,21 @@ function choosePAT(kind) {
 
 // ---------------- formations ----------------
 function makePlayer(side, isOff, slot, tuple) {
-  const [pos, name, num, ovr0, spd0] = tuple;
+  const [pos, name, num, ovr0, spd0, skin0] = tuple;
   const h = hashStr(name);
   const cpu = side !== G.human;
-  const ovr = clamp(ovr0 + (cpu ? [-7, 0, 5][G.diff] : 0), 40, 99);
+  const ovr = clamp(ovr0 + (cpu ? [-7, 0, 5, 10][G.diff] : 0), 40, 99);
   const big = pos === 'OL' || pos === 'DL';
   const spdR = spd0 || POS_SPD[pos] || 80;
   // Madden speed matters: 99 SPD ≈ 12 yd/s, 85 ≈ 9.4, 70 ≈ 6.7
   const yps = Math.max(4.8, 2.6 + (spdR - 50) * 0.16) * GAME_SPEED;
   const skill = isOff && (pos === 'WR' || pos === 'TE' || pos === 'RB');
-  const cpuMul = cpu ? (skill ? [0.85, 0.91, 0.96] : [0.92, 0.98, 1.02])[G.diff] : 1;
+  const cpuMul = cpu ? (skill ? [0.85, 0.91, 0.96, 1.01] : [0.92, 0.98, 1.02, 1.06])[G.diff] : 1;
   return {
     side, off: isOff, slot, pos, name, num, ovr,
     x: 0, y: 0, vx: 0, vy: 0, dvx: 0, dvy: 0,
     spd: yps * cpuMul, spdR, acc: (big ? 20 : 30) * GAME_SPEED,
-    face: { skin: h % 6, beard: ((h >> 5) % 4) === 0, visor: ((h >> 7) % 5) === 0, dir: dirOf(side) },
+    face: { skin: skin0 != null ? skin0 : h % 6, beard: ((h >> 5) % 4) === 0, visor: ((h >> 7) % 5) === 0, dir: dirOf(side) },
     stiff: 0, stiffCd: 0, throwAnim: 0, celebrate: 0, dizzy: 0,
     head: { ox: 0, oy: 0, vx: 0, vy: 0, rot: 0 }, headScale: 1 + ((h >> 9) % 5) * 0.035 + (pos === 'QB' ? 0.06 : 0),
     anim: (h % 100) / 10, speedNow: 0, stamina: 1, down: 0, downDir: 1, stun: 0, spin: 0, juke: 0, jukeCd: 0, spinCd: 0,
@@ -184,7 +186,7 @@ function setupPlay(offPlay, defPlay, preview) {
   for (let s = 1; s <= 4; s++) {
     const p = O[s];
     const rt = offPlay.routes && offPlay.routes[s];
-    if (s === 1 && offPlay.rb) {
+    if (s === (offPlay.carrier || 1) && offPlay.rb) {
       p.role = 'runpath';
       p.route = { pts: offPlay.rb.path.map(([dd, w]) => ({ x: L + d * dd, y: clamp(by + ws * w, 1.5, FIELD_W - 1.5) })), end: offPlay.rb.end, i: 0 };
     } else if (rt) {
@@ -250,7 +252,17 @@ function update(dt) {
   } else if (G.phase === 'live') {
     livePlay(dt);
   } else if (G.phase === 'dead') {
-    for (const p of G.players) { p.dvx = 0; p.dvy = 0; applyMove(p, dt); }
+    for (const p of G.players) { p.dvx = 0; p.dvy = 0; applyMove(p, dt); if (p.celly) p.celly.t += dt; }
+    const cg = G.cellyGuy;
+    if (cg) {
+      const moves = { ArrowUp: 'leap', KeyW: 'leap', ArrowDown: 'griddy', KeyS: 'griddy', ArrowLeft: 'spike', KeyA: 'spike', ArrowRight: 'dab', KeyD: 'dab' };
+      for (const k in moves) if (Input.hit(k)) {
+        cg.celly = { type: moves[k], t: 0 }; cg.celebrate = 3;
+        addText(cg.x, cg.y - 2, { leap: 'LEAP!', griddy: 'THE GRIDDY!', spike: 'SPIKE IT!', dab: 'DAB!' }[moves[k]], '#ffd23f', 26, 1);
+        Sound.boing(); Sound.crowd(false); G.crowdHype = 1.5;
+        if (moves[k] === 'spike') { G.ball.holder = null; G.ball.x = cg.x + cg.face.dir * 0.6; G.ball.y = cg.y; G.ball.z = 2; G.ball.dead = { vx: cg.face.dir * 2, vy: rand(-1, 1) }; G.ball.bounce = 0.9; }
+      }
+    }
     updateBallPhysicsDead(dt);
     G.deadT -= dt;
     if (G.deadT <= 0) afterPlay();
@@ -318,9 +330,9 @@ function livePlay(dt) {
 
   // handoffs / pitches
   if (G.bstate === 'snap' && b.holder === G.O[0] && pl.off.type === 'run' && !pl.off.qbRun && !G.handedOff) {
-    const rb = G.O[1];
+    const rb = G.O[pl.off.carrier || 1];
     if (pl.off.toss && pl.t > 0.22) { G.handedOff = true; throwTo(G.O[0], rb, true); }
-    else if (!pl.off.toss && pl.t > 0.25 && (dist(G.O[0], rb) < 1.6 || pl.t > 0.9)) {
+    else if (!pl.off.toss && pl.t > 0.25 && (dist(G.O[0], rb) < 1.6 || pl.t > (pl.off.carrier ? 1.5 : 0.9))) {
       G.handedOff = true; b.holder = rb; G.bstate = 'run'; stat(rb); G.credit = { p: rb, kind: 'rush' };
     }
   }
@@ -541,7 +553,7 @@ function humanControl(p, dt) {
   const ax = Input.axis();
   const sprint = Input.held('ShiftLeft') && p.stamina > 0.05;
   if (sprint && ax.m > 0.1) p.stamina = Math.max(0, p.stamina - dt * 0.32); else p.stamina = Math.min(1, p.stamina + dt * 0.18);
-  const mul = (sprint ? 1.13 : 1) * (p.spin > 0 ? 0.8 : 1) * 1.06; // you're a little faster than the AI
+  const mul = (sprint ? 1.13 : 1) * (p.spin > 0 ? 0.8 : 1) * 1.06 * (p.stamina < 0.2 ? 0.9 : 1); // you're a little faster than the AI
   if (isCarrier) {
     if (Input.hit('KeyE') && p.jukeCd <= 0 && G.bstate !== 'snap') doJuke(p, ax);
     if (Input.hit('KeyF') && p.spinCd <= 0 && G.bstate !== 'snap') doSpin(p);
@@ -687,20 +699,22 @@ function ai(p, dt) {
   if (b.flight && !b.flight.pitch) {
     const f = b.flight, land = { x: f.tx, y: f.ty };
     const tgt = f.intended;
-    const near = dist(p, land) < 13 || (a.type === 'man' && G.O[a.t] === tgt);
+    const near = dist(p, land) < 15 || (a.type === 'man' && G.O[a.t] === tgt);
     if (near && a.type !== 'rush') {
       const ttl = f.T - f.t;
       const reach = p.spd * ttl;
+      // sometimes a defender leaps for it
+      if (!p.isHuman && !p.jumpTried && dist(p, land) < 2.2 && ttl < 0.4) { p.jumpTried = true; if (chance([0.04, 0.07, 0.1, 0.15][G.diff])) doJump(p); }
       if (dist(p, land) <= reach + 1.2) steer(p, land.x, land.y, 1.05, 0.3);
       else steer(p, lerp(tgt.x, land.x, 0.6), lerp(tgt.y, land.y, 0.6), 1.05);
       return;
     }
     if (a.type === 'rush') { steer(p, land.x, land.y, 0.6); return; }
   }
-  if (b.flight && b.flight.pitch) return pursue(p, G.O[1]);
+  if (b.flight && b.flight.pitch) return pursue(p, b.flight.intended);
   const holder = carrier || qb;
   switch (a.type) {
-    case 'rush': steer(p, holder.x, holder.y, (p.pos === 'DL' ? 0.95 : 0.97) * (G.play.t < 0.45 ? 0.55 : 1) * (G.poss === G.human ? [0.88, 0.94, 1][G.diff] : 1), 0.2); break;
+    case 'rush': steer(p, holder.x, holder.y, (p.pos === 'DL' ? 0.95 : 0.97) * (G.play.t < 0.45 ? 0.55 : 1) * (G.poss === G.human ? [0.88, 0.94, 1, 1.06][G.diff] : 1), 0.2); break;
     case 'spy': {
       if (G.qbScramble || d * (holder.x - G.los) > 0) return pursue(p, holder);
       steer(p, G.los + d * 5, lerp(p.y, holder.y, 0.6), 0.8); break;
@@ -711,7 +725,7 @@ function ai(p, dt) {
         if (G.play.off.type === 'run') return pursue(p, carrier || G.O[1]);
         steer(p, G.los + d * 4, lerp(p.y, holder.y, 0.5), 0.8); break;
       }
-      const lag = 0.11 + (99 - p.ovr) * 0.003;
+      const lag = 0.07 + (99 - p.ovr) * 0.0025;
       const old = pastOf(t, lag);
       const tx = old.x + old.vx * lag * 0.8 + d * 0.9, ty = old.y + old.vy * lag * 0.8;
       steer(p, tx, ty, 1, 0.4);
@@ -788,22 +802,25 @@ function cpuQB(dt) {
   const pl = G.play, qb = G.O[0];
   if (pl.off.type === 'run' || G.qbScramble) return;
   G.qbThink -= dt; if (G.qbThink > 0) return; G.qbThink = 0.15;
-  const minT = (pl.off.fake ? 1.35 : pl.off.screen ? 0.65 : 1.0) + [0.15, 0, -0.1][G.diff];
+  const minT = (pl.off.fake ? 1.35 : pl.off.screen || pl.off.quick ? 0.6 : 1.0) + [0.15, 0, -0.1, -0.2][G.diff];
   if (pl.t < minT) return;
   const d = dirOf(G.poss);
   let best = null, bs = -1e9;
   for (const s of [1, 2, 3, 4]) {
     const r = G.O[s]; if (!eligible(r)) continue;
-    const op = Math.min(6, openness(r));
+    const op = Math.min(4.5, openness(r));
     const down = d * (r.x - G.los);
-    let sc = op + clamp(down, -3, 30) * 0.06 + (r.route && r.route.i >= r.route.pts.length && r.route.end === 'sit' ? 0.3 : 0);
+    let sc = op + clamp(down, -3, 35) * 0.13 + (r.route && r.route.i >= r.route.pts.length && r.route.end === 'sit' ? 0.3 : 0);
+    if (s === 1 && !pl.off.screen) sc -= 1.4 - Math.min(1, (pl.t - minT) * 0.4); // check-down only when nothing else is there
     if (pl.off.screen && s === 1) sc += 3;
+    if (op < 1.2) sc -= 1.5; // don't throw into a defender
+    sc += [-0.6, 0, 0.3, 0.6][G.diff] * (op > 2 ? 1 : 0);
     if (down < Math.abs(G.firstDownX - G.los) && G.down >= 3) sc -= 0.8;
     sc += rand(-0.3, 0.3);
     if (sc > bs) { bs = sc; best = r; }
   }
   let pressure = 99; for (const df of G.D) if (!df.engaged && df.down <= 0) pressure = Math.min(pressure, dist(qb, df));
-  const need = 3.6 - (pl.t - minT) * 1.0;
+  const need = 4.6 - (pl.t - minT) * 1.2;
   if (best && (bs > need || (pressure < 1.6 && bs > 1.0 && chance(0.6)) || pl.t > 3.8)) { throwTo(qb, best); return; }
   if (pressure < 1.5 && chance(0.12 + (qb.spdR > 86 ? 0.2 : 0))) G.qbScramble = true;
 }
@@ -1036,6 +1053,7 @@ function throwTo(qb, r, pitch = false, aimed = null) {
   b.holder = null;
   b.flight = { sx: qb.x, sy: qb.y, tx, ty, t: 0, T: Math.max(T, len / spd), peak: pitch ? 0.4 : 0.6 + len * 0.1, intended: r, pitch, passer: qb };
   G.bstate = 'air'; G.intended = r;
+  for (const p of G.players) { p.laneChecked = false; p.jumpTried = false; }
   G.passPlay = !pitch;
   G.showTarget = true;
   if (!pitch && r.side === G.human) G.humanDef = r;
@@ -1047,7 +1065,20 @@ function updateFlight(dt) {
   const u = Math.min(1, f.t / f.T);
   b.x = lerp(f.sx, f.tx, u); b.y = lerp(f.sy, f.ty, u);
   b.z = 1.7 + f.peak * 4 * u * (1 - u) - u * 0.6;
-  b.spin = (b.spin || 0) + dt * 18;
+  b.spin = (b.spin || 0) + dt * 30;
+  // the ball can be picked off on the way: a defender in the passing lane (jumping = higher reach)
+  if (!f.pitch && u > 0.12 && u < 0.88) {
+    for (const p of G.players) {
+      if (p.side === f.passer.side || p.down > 0 || p.engaged || p.laneChecked) continue;
+      const jumping = p.jump > 0, reach = jumping ? 1.4 : 0.5, high = jumping ? 3.6 : 2.0;
+      if (b.z > high || Math.hypot(p.x - b.x, p.y - b.y) > reach) continue;
+      p.laneChecked = true;
+      const pInt = clamp((jumping ? (p.isHuman ? 0.75 : 0.5) : 0.7) + (p.ovr - 80) / 200 + (p.isHuman ? 0.05 : 0), 0.4, 0.9);
+      b.flight = null; G.showTarget = false;
+      if (chance(pInt)) { addText(p.x, p.y, jumping ? 'SKY HIGH!' : 'PICKED!', '#7fd3ff', 22, 0.9); return intercept(p); }
+      return incomplete(p, 'TIPPED!');
+    }
+  }
   if (u >= 1) resolveCatch();
 }
 
@@ -1067,21 +1098,25 @@ function resolveCatch() {
   const jumper = G.players.find(p => p.side !== offSide && p.jump > 0 && p.down <= 0 && dist(p, land) < 2.0);
   if (jumper) {
     const jd = dist(jumper, land);
-    const pInt = clamp(0.62 + (jumper.ovr - 75) / 90 - (rd < jd ? 0.25 : 0) - jd * 0.12, 0.15, 0.85);
+    const pInt = clamp((jumper.isHuman ? 0.62 : 0.4) + (jumper.ovr - 75) / 90 - (rd < jd ? 0.25 : 0) - jd * 0.12, 0.1, 0.85);
     if (chance(pInt)) return intercept(jumper);
     if (chance(0.6)) return incomplete(jumper, 'SWATTED!');
   }
   const humanDefBonus = def && def.isHuman ? 0.15 : 0;
   const R = 1.45;
+  if (def && dd < 0.5 && dd < rd - 0.3) { // ball hits the defender right in the body: 7 out of 10 get picked
+    if (chance(0.7)) return intercept(def);
+    return incomplete(def, 'BROKEN UP!');
+  }
   if (def && dd < 1.25 && dd < rd - 0.25) { // defender has inside position
-    const pInt = clamp(0.4 + (def.ovr - 75) / 100 + humanDefBonus - (rd < 1 ? 0.12 : 0), 0.1, 0.75);
+    const pInt = clamp(0.22 + (def.ovr - 75) / 120 + humanDefBonus + (G.diff === 3 && !def.isHuman ? 0.1 : 0) - (rd < 1 ? 0.12 : 0), 0.1, 0.8);
     if (chance(pInt)) return intercept(def);
     return incomplete(def, 'BROKEN UP!');
   }
   if (rcv && rd < R && def && dd < 1.0 && chance(0.03)) { throwFlag('DPI', def.side, land.x, land.y, def); return incomplete(def, 'INTERFERENCE!'); }
   if (rcv && rd < R) {
     let pc = 0.86 + (rcv.ovr - 78) / 140 - (rd > 0.9 ? 0.12 : 0);
-    if (def && dd < 1.4) { pc -= 0.28 - (rcv.ovr - def.ovr) / 150; if (chance(0.07 + humanDefBonus * 0.5)) return intercept(def); }
+    if (def && dd < 1.4) { pc -= 0.28 - (rcv.ovr - def.ovr) / 150; if (chance(0.03 + humanDefBonus * 0.5)) return intercept(def); }
     if (chance(clamp(pc, 0.25, 0.97))) {
       b.holder = rcv; G.bstate = 'run'; Sound.catch(); G.catchX = rcv.x;
       rcv.mouth = 'O'; rcv.mouthT = 0.4;
@@ -1092,7 +1127,7 @@ function resolveCatch() {
     }
     return incomplete(rcv, 'DROPPED!');
   }
-  if (def && dd < 1.0) return chance(0.25) ? intercept(def) : incomplete(def, 'BROKEN UP!');
+  if (def && dd < 1.0) return chance(0.18) ? intercept(def) : incomplete(def, 'BROKEN UP!');
   incomplete(null, 'INCOMPLETE');
 }
 
@@ -1132,7 +1167,7 @@ function checkTackles() {
     if (df.dive > 0) p += 0.15;
     if (car.pos === 'QB' && G.bstate === 'snap') p += 0.12;
     if (car.pos === 'OL' || car.pos === 'DL') p += 0.2;
-    if (car.side === G.human) p += [-0.08, 0, 0.06][G.diff];
+    if (car.side === G.human) p += [-0.08, 0, 0.06, 0.13][G.diff];
     p = clamp(p, 0.1, 0.94);
     if (chance(p)) return tackle(car, df, hitters);
     // broken tackle
@@ -1224,7 +1259,8 @@ function endPlay(res) {
     G.twoPt = false; G.patSide = null;
     next = { drive: 1 - off, own: 25 };
   } else if (res.type === 'td') {
-    G.score[cs] += 6; G.deadT = 2.5;
+    G.score[cs] += 6; G.deadT = cs === G.human ? 3.8 : 2.5;
+    if (cs === G.human) { G.cellyGuy = car; car.down = 0; car.dive = 0; }
     showBanner('TOUCHDOWN!', `${car.name} • ${G.teams[cs].city} ${G.teams[cs].name}`, cs === G.human ? '#ffd23f' : '#ff6040', 2.6);
     Sound.td(); G.crowdHype = 1.5; stat(car).td++; G.slowmo = 0.9;
     for (const q of G.players) if (q.side === cs) q.celebrate = 2.6;
@@ -1273,6 +1309,7 @@ function advanceDown(x, moved) {
 
 function afterPlay() {
   const n = G.next; G.next = null;
+  if (G.cellyGuy) { G.cellyGuy.celly = null; G.cellyGuy = null; }
   if (G.runoff && G.clock > 0) { G.clock = Math.max(0, G.clock - G.runoff); G.runoff = 0; }
   // overtime is sudden death
   if (G.quarter >= 5 && G.score[0] !== G.score[1]) return gameOver();
@@ -1316,7 +1353,7 @@ function gameOver() {
 // ---------------- kicks (punt, field goal, extra point) ----------------
 function kickerOf(side, kind) {
   const t = G.teams[side], k = kind === 'punt' ? t.p : t.k;
-  return k ? { name: k[0], num: k[1], ovr: k[2] } : { name: t.name + (kind === 'punt' ? ' Punter' : ' Kicker'), num: kind === 'punt' ? 4 : 3, ovr: 74 };
+  return k ? { name: k[0], num: k[1], ovr: k[2], skin: k[3] } : { name: t.name + (kind === 'punt' ? ' Punter' : ' Kicker'), num: kind === 'punt' ? 4 : 3, ovr: 74 };
 }
 const fgRange = ovr => 42 + (ovr - 60) * 0.6;   // 90 OVR kicker ≈ 60 yards, 70 OVR ≈ 48
 function fgTol(yds, ovr) { return clamp(0.3 - (yds - 20) * 0.0045, 0.07, 0.3) * (0.75 + (ovr - 60) / 120); }
@@ -1327,6 +1364,7 @@ function doKick(kind) {
   const kk = kickerOf(s, kind);
   const kicker = G.O[0];
   Object.assign(kicker, { name: kk.name, num: kk.num, ovr: kk.ovr, pos: kind === 'punt' ? 'P' : 'K' });
+  if (kk.skin != null) kicker.face.skin = kk.skin;
   kicker.x = G.los - d * (kind === 'punt' ? 12 : 8.5); kicker.y = G.ballY - (kind === 'punt' ? 0 : 1.2);
   if (kind !== 'punt') { const h = G.O[1]; h.x = G.los - d * 7; h.y = G.ballY; h.face.dir = -d; }
   // everybody lines up tight for the kick
@@ -1427,7 +1465,8 @@ function updateKick(dt) {
 function updateBallPhysicsDead(dt) {
   const b = G.ball; if (!b || !b.dead || b.holder) return;
   b.x += b.dead.vx * dt; b.y += b.dead.vy * dt; b.dead.vx *= 0.94; b.dead.vy *= 0.94;
-  b.z = Math.max(0, b.z - dt * 4);
+  if (b.bounce) { b.bounce -= dt; b.z = Math.abs(Math.sin(b.bounce * 9)) * b.bounce * 2.2; b.spin = (b.spin || 0) + dt * 20; }
+  else b.z = Math.max(0, b.z - dt * 4);
 }
 
 // ---------------- fx / camera / hints ----------------
@@ -1462,6 +1501,7 @@ function updateCamera(dt) {
 function updateHint() {
   if (!G.teams) return;
   if (G.phase === 'kickmeter') { G.hint = ''; return; }
+  if (G.cellyGuy && G.phase === 'dead') { G.hint = G.mode === 'mobile' ? 'CELEBRATE! Tap a celly button' : 'CELEBRATE!  ↑ Leap  •  ↓ Griddy  •  ← Spike  •  → Dab'; return; }
   if (G.mode === 'mobile') return updateHintMobile();
   const humanOff = G.poss === G.human;
   const b = G.ball;

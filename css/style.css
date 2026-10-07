@@ -169,3 +169,11 @@ body.mobile #vsCol .vs { font-size: 34px; } body.mobile #vsCol { min-width: 150p
   #vsCol .vs { font-size: 28px !important; } #vsCol button { padding: 6px 12px; } #vsCol button.big { font-size: 18px; padding: 8px 20px; }
   #selHint { margin-top: 4px; }
 }
+
+/* play-call pages */
+#pcHint { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; }
+.pgbtn { margin: 0; padding: 6px 14px; font-size: 14px; background: #ffd23f; color: #111; border-color: #111; }
+.pgbtn:hover { background: #ffe57a; }
+.pgtxt { font-weight: 900; color: #ffd23f; font-family: 'Arial Black', Arial; letter-spacing: 1px; }
+.pgtip { opacity: .75; font-size: 13px; }
+body.mobile .pgbtn { padding: 8px 16px; font-size: 15px; }

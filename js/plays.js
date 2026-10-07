@@ -31,7 +31,36 @@ const OFF_PLAYS = [
     routes: { 2: { r: [[6, 0]], end: 'block' }, 3: { r: [[6, 0]], end: 'block' }, 4: { r: [[4, 0]], end: 'block' },
               1: { r: [[-1, 4], [-2, 9]], end: 'sit' } } },
   { key: 'qbdraw', name: 'QB Draw', type: 'run', desc: 'Fake pass, then the QB takes off.', qbRun: true,
-    routes: { 2: { r: [[15, 0]], end: 'go' }, 3: { r: [[15, 0]], end: 'go' }, 4: { r: [[8, 0]], end: 'block' } } }
+    routes: { 2: { r: [[15, 0]], end: 'go' }, 3: { r: [[15, 0]], end: 'go' }, 4: { r: [[8, 0]], end: 'block' } } },
+  // ---- page 2+ ----
+  { key: 'dive', name: 'HB Dive', type: 'run', desc: 'Quick hit straight ahead. Short yardage.',
+    rb: { path: [[-3.4, 0.4], [1, 0.2], [10, 0]], end: 'go' }, wr: 'block' },
+  { key: 'counter', name: 'Counter', type: 'run', desc: 'Step one way, cut back the other.',
+    rb: { path: [[-4.6, 4.5], [-3.6, 1], [0.5, -3.5], [9, -5]], end: 'go' }, wr: 'block' },
+  { key: 'jet', name: 'Jet Sweep', type: 'run', desc: 'Slot WR flies across and takes it.', carrier: 4,
+    rb: { path: [[-3.4, 2.2], [-3.4, -2], [-1, -10], [6, -15], [14, -16]], end: 'go' }, wr: 'block' },
+  { key: 'outs', name: 'Quick Outs', type: 'pass', desc: 'Fast outs to the sideline. Safe.',
+    routes: { 2: { r: [[5, 0], [5, 6]], end: 'sit' }, 3: { r: [[5, 0], [5, 6]], end: 'sit' }, 4: { r: [[6, 0], [6, -6]], end: 'sit' },
+              1: { r: [[0, 5], [1, 10]], end: 'sit' } } },
+  { key: 'bubble', name: 'Bubble Screen', type: 'pass', desc: 'Toss it to the slot, WRs block.', quick: true,
+    routes: { 2: { r: [[3, 0]], end: 'block' }, 3: { r: [[3, 0]], end: 'block' }, 4: { r: [[-1, 3], [0, 6]], end: 'sit' } } },
+  { key: 'smash', name: 'Smash', type: 'pass', desc: 'Hitches + a corner route over the top.',
+    routes: { 2: { r: [[5, 0], [4, 0]], end: 'sit' }, 3: { r: [[5, 0], [4, 0]], end: 'sit' }, 4: { r: [[10, 0], [20, 9]], end: 'go' },
+              1: { r: [[1, 5], [2, 10]], end: 'sit' } } },
+  { key: 'ycross', name: 'Y-Cross', type: 'pass', desc: 'Deep crosser + post. Beats zone.',
+    routes: { 2: { r: [[10, 0], [24, -8]], end: 'go' }, 3: { r: [[12, 0], [10, -1]], end: 'sit' }, 4: { r: [[8, 0], [16, -24]], end: 'go' },
+              1: { r: [[2, -2], [4, -3]], end: 'sit' } } },
+  { key: 'drive', name: 'Drive', type: 'pass', desc: 'Shallow cross under a dig.',
+    routes: { 2: { r: [[12, 0], [12, -12]], end: 'sit' }, 3: { r: [[40, 0]], end: 'go' }, 4: { r: [[2, 0], [3, -22]], end: 'go' },
+              1: { r: [[1, 5], [3, 9]], end: 'sit' } } },
+  { key: 'flood', name: 'Flood', type: 'pass', desc: 'Three levels to one side.',
+    routes: { 2: { r: [[8, 0], [18, -20]], end: 'go' }, 3: { r: [[40, 0]], end: 'go' }, 4: { r: [[12, 0], [12, 8]], end: 'sit' },
+              1: { r: [[1, 6], [3, 12]], end: 'sit' } } },
+  { key: 'stopgo', name: 'Stop & Go', type: 'pass', desc: 'Fake the hitch, then go deep. Double move!',
+    routes: { 2: { r: [[6, 0], [5, 0], [40, 0]], end: 'go' }, 3: { r: [[6, 0], [5, 0], [40, 0]], end: 'go' }, 4: { r: [[30, -1]], end: 'go' },
+              1: { r: [[1, -2], [3, -3]], end: 'sit' } } },
+  { key: 'hail', name: 'Hail Mary', type: 'pass', desc: 'Everybody to the end zone. Pray.',
+    routes: { 2: { r: [[50, 6]], end: 'go' }, 3: { r: [[50, 6]], end: 'go' }, 4: { r: [[50, -2]], end: 'go' } } }
 ];
 
 // Defensive calls. Assignment kinds:
@@ -53,7 +82,20 @@ const DEF_PLAYS = [
   { key: 'cb', name: 'Corner Blitz', desc: 'Surprise heat off the edge.',
     a: ['rush', 'rush', 'rush', 'man:1', 'man:4', 'rush', 'man:3', 'man:2'] },
   { key: 'prevent', name: 'Prevent', desc: 'Nothing deep. Give up short stuff.',
-    a: ['rush', 'rush', 'zone:4:mid', 'zone:10:-10', 'zone:10:10', 'zone:22:thirdT', 'zone:22:thirdB', 'zone:28:mid'] }
+    a: ['rush', 'rush', 'zone:4:mid', 'zone:10:-10', 'zone:10:10', 'zone:22:thirdT', 'zone:22:thirdB', 'zone:28:mid'] },
+  { key: 'alldrop', name: 'All Drop', desc: 'Nobody rushes. Everyone drops into coverage. 4th down lock!',
+    a: ['zone:4:-5', 'zone:4:5', 'zone:6:mid', 'zone:9:-10', 'zone:9:10', 'zone:16:thirdT', 'zone:16:thirdB', 'zone:22:mid'] },
+  // ---- page 2 ----
+  { key: 'c1', name: 'Cover 1', desc: 'Man everywhere, one safety deep.',
+    a: ['rush', 'rush', 'rush', 'man:1', 'man:4', 'man:2', 'man:3', 'zone:18:mid'] },
+  { key: 'c4', name: 'Cover 4', desc: 'Four deep quarters. Stops the bomb.',
+    a: ['rush', 'rush', 'rush', 'zone:6:-8', 'zone:6:8', 'zone:15:thirdT', 'zone:15:thirdB', 'zone:17:mid'] },
+  { key: 'tampa', name: 'Tampa 2', desc: 'Middle LB runs deep down the seam.',
+    a: ['rush', 'rush', 'rush', 'zone:12:mid', 'zone:6:9', 'zone:5:edgeT', 'zone:5:edgeB', 'zone:18:-6'] },
+  { key: 'fire', name: 'Fire Zone', desc: 'A DL drops, LBs blitz. Confuse him!',
+    a: ['rush', 'zone:5:-6', 'rush', 'rush', 'rush', 'zone:14:thirdT', 'zone:14:thirdB', 'zone:16:mid'] },
+  { key: 'c0', name: 'Cover 0', desc: 'Everybody blitzes, pure man. All or nothing.',
+    a: ['rush', 'rush', 'rush', 'rush', 'man:1', 'man:2', 'man:3', 'man:4'] }
 ];
 
 const SPECIAL_PLAYS = [
@@ -91,9 +133,10 @@ function drawPlayDiagram(cv, play, isOff) {
     }
     const runner = play.rb && play.rb.path;
     if (runner) {
+      const jet = play.carrier === 4, sgn = jet ? -1 : 1;
       g.strokeStyle = play.fake ? '#fff8' : '#ff8a3d'; g.setLineDash(play.fake ? [3, 3] : []); g.lineWidth = 2.5;
-      g.beginPath(); let [x0, y0] = P(-4, 6); g.moveTo(x0, y0);
-      for (const [d, w] of runner) { const [px, py] = P(Math.min(d, 26), w * 1.4); g.lineTo(px, py); }
+      g.beginPath(); let [x0, y0] = jet ? P(-1.5, -14) : P(-4, 6); g.moveTo(x0, y0);
+      for (const [d, w] of runner) { const [px, py] = P(Math.min(d, 26), sgn * w * 1.4); g.lineTo(px, py); }
       g.stroke(); g.setLineDash([]);
     }
     if (play.qbRun) { g.strokeStyle = '#ff8a3d'; g.lineWidth = 2.5; g.beginPath(); let [a, b] = P(-4, 0); g.moveTo(a, b); [a, b] = P(16, 0); g.lineTo(a, b); g.stroke(); }

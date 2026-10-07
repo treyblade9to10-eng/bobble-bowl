@@ -193,7 +193,10 @@ function drawPlayer(g, p, G, at) {
   const carrying = G.ball && G.ball.holder === p;
   const celebrate = p.celebrate > 0;
   const jumping = p.jump > 0;
-  const hop = (celebrate ? Math.abs(Math.sin(G.time * 10 + p.slot)) * 14 : 0) + (jumping ? Math.sin((0.55 - p.jump) / 0.55 * Math.PI) * 30 : 0);
+  const cel = p.celly, ct = cel ? cel.t : 0;
+  let hop = (celebrate && !cel ? Math.abs(Math.sin(G.time * 10 + p.slot)) * 14 : 0) + (jumping ? Math.sin((0.55 - p.jump) / 0.55 * Math.PI) * 30 : 0);
+  if (cel && cel.type === 'leap') hop = ct < 1 ? Math.sin(ct / 1 * Math.PI) * 60 : Math.abs(Math.sin(G.time * 8)) * 10;
+  if (cel && cel.type === 'griddy') { hop = Math.abs(Math.sin(ct * 16)) * 7; p.anim += 0.35; p.speedNow = 6; }
 
   // ground marks
   if (p.isHuman && !at && G.phase !== 'kick' && G.phase !== 'kickmeter') {
@@ -202,8 +205,16 @@ function drawPlayer(g, p, G, at) {
     g.beginPath(); g.ellipse(x, y, 22 * pulse, 9 * pulse, 0, 0, 7); g.stroke();
   }
   g.fillStyle = '#00000055'; g.beginPath(); g.ellipse(x, y, big ? 19 : 15, 6, 0, 0, 7); g.fill();
+  // stamina bar under the player you control
+  if (p.isHuman && !at && G.phase === 'live' && p.stamina != null) {
+    const w = 40, st = clamp(p.stamina, 0, 1);
+    g.fillStyle = '#000a'; roundRect(g, x - w / 2 - 2, y + 11, w + 4, 8, 4); g.fill();
+    g.fillStyle = st > 0.5 ? '#2fd06b' : st > 0.2 ? '#ffd23f' : '#ff4040'; roundRect(g, x - w / 2, y + 13, w * st, 4, 2); g.fill();
+  }
 
   g.save(); g.translate(x, y - hop);
+  if (cel && cel.type === 'leap' && ct < 1) g.rotate(Math.sin(ct * Math.PI) * 0.25 * dir);
+  if (cel && cel.type === 'dab') g.rotate(-0.12 * dir);
   if (p.down > 0) { g.translate(0, -6); g.rotate(p.downDir * 1.45); }
   else if (p.dive > 0) { g.rotate(dir * 1.0); }
   const spinScale = p.spin > 0 ? Math.cos(p.spin * 20) : 1;
@@ -240,6 +251,9 @@ function drawPlayer(g, p, G, at) {
     let ex, ey, hx, hy;
     if (carrying && front) { ex = shx + 4; ey = shy + 10; hx = shx + 10; hy = shy + 8; }
     else if (p.throwAnim > 0 && front) { const t = p.throwAnim; ex = shx - 6 + (1 - t) * 14; ey = shy - 10; hx = shx - 4 + (1 - t) * 22; hy = shy - 18 + (1 - t) * 10; }
+    else if (cel && cel.type === 'griddy') { const sw2 = Math.sin(ct * 16) * (front ? 1 : -1); ex = shx + sw2 * 9; ey = shy + 7; hx = shx + sw2 * 16; hy = shy + 4; }
+    else if (cel && cel.type === 'spike') { const t2 = Math.min(1, ct * 4); ex = shx + 5; ey = shy - 10 + t2 * 20; hx = shx + 8; hy = shy - 20 + t2 * 38; }
+    else if (cel && cel.type === 'dab') { if (front) { ex = shx + 9; ey = shy - 8; hx = shx + 17; hy = shy - 16; } else { ex = shx + 10; ey = shy - 4; hx = shx + 16; hy = shy - 12; } }
     else if (celebrate || jumping) { ex = shx + (front ? 4 : -4); ey = shy - 11; hx = shx + (front ? 6 : -6); hy = shy - 22; }
     else if (p.stiff > 0 && front) { ex = shx + 9; ey = shy + 1; hx = shx + 19; hy = shy; }
     else if (p.engaged && front) { ex = shx + 8; ey = shy + 4; hx = shx + 15; hy = shy + 2; }
@@ -281,7 +295,7 @@ function drawPlayer(g, p, G, at) {
   const hx = p.head.ox * dir, hy = -TH - R + 4 + p.head.oy;
   g.fillStyle = SKIN[p.face.skin]; g.strokeStyle = OUT; g.lineWidth = 2;
   g.fillRect(-3, -TH - 6, 6, 6);
-  g.save(); g.translate(hx, hy); g.rotate(p.head.rot * dir + (p.down > 0 ? 0 : -lean * 0.4));
+  g.save(); g.translate(hx, hy); g.rotate(p.head.rot * dir + (p.down > 0 ? 0 : -lean * 0.4) + (cel && cel.type === 'dab' ? 0.5 : 0));
   drawHead(g, R, team, p, look);
   g.restore();
   g.restore(); // torso
@@ -407,6 +421,27 @@ function drawFootball(g, x, y, s = 1, rot = 0) {
   g.stroke(); g.restore();
 }
 
+function drawSpiral(g, x, y, ang, phase, s) {
+  g.save(); g.translate(x, y); g.rotate(ang); g.scale(s, s);
+  const bg = g.createLinearGradient(0, -6, 0, 6); bg.addColorStop(0, '#a65d27'); bg.addColorStop(1, '#5b2c0e');
+  g.fillStyle = bg; g.strokeStyle = OUT; g.lineWidth = 1.8;
+  g.beginPath(); g.ellipse(0, 0, 9.5, 5.2, 0, 0, 7); g.fill(); g.stroke();
+  // laces roll around the ball = spiral
+  const ly = Math.sin(phase) * 3.4, vis = Math.cos(phase);
+  if (vis > -0.2) {
+    g.globalAlpha = clamp(vis + 0.3, 0, 1);
+    g.strokeStyle = '#fff'; g.lineWidth = 1.4;
+    g.beginPath(); g.moveTo(-3.5, ly); g.lineTo(3.5, ly);
+    for (let i = -2; i <= 2; i += 2) { g.moveTo(i, ly - 1.4); g.lineTo(i, ly + 1.4); }
+    g.stroke(); g.globalAlpha = 1;
+  }
+  // white stripes near the tips
+  g.strokeStyle = '#ffffffaa'; g.lineWidth = 1.2;
+  g.beginPath(); g.moveTo(-6.5, -3.4); g.lineTo(-6.5, 3.4); g.moveTo(6.5, -3.4); g.lineTo(6.5, 3.4); g.stroke();
+  // spin blur
+  g.strokeStyle = '#ffffff30'; g.lineWidth = 2; g.beginPath(); g.ellipse(-12, 0, 4, 2, 0, 0, 7); g.stroke();
+  g.restore();
+}
 function drawBallFree(g, G) {
   const b = G.ball; if (!b || b.holder) return;
   const x = sx(b.x), y = sy(b.y);
@@ -416,7 +451,12 @@ function drawBallFree(g, G) {
     for (let i = 0; i < 6; i++) { const u = Math.max(0, b.flight.t / b.flight.T - i * 0.03); const tx = lerp(b.flight.sx, b.flight.tx, u), ty = lerp(b.flight.sy, b.flight.ty, u), tz = 1.7 + b.flight.peak * 4 * u * (1 - u) - u * 0.6; const px = sx(tx), py = sy(ty) - tz * PX * 0.9; i ? g.lineTo(px, py) : g.moveTo(px, py); }
     g.stroke();
   }
-  drawFootball(g, x, y - b.z * PX * 0.9, 1.3, b.spin || 0);
+  if (b.flight) {
+    const f = b.flight, u = Math.min(1, f.t / f.T);
+    const dz = (f.peak * 4 * (1 - 2 * u) - 0.6) / f.T;            // height change per second
+    const vxs = (f.tx - f.sx) / f.T * PX, vys = (f.ty - f.sy) / f.T * PY - dz * PX * 0.9;
+    drawSpiral(g, x, y - b.z * PX * 0.9, Math.atan2(vys, vxs), b.spin || 0, 1.35);
+  } else drawFootball(g, x, y - b.z * PX * 0.9, 1.3, b.spin || 0);
   if (b.flight && G.showTarget && !b.flight.pitch) {
     const tx = sx(b.flight.tx), ty = sy(b.flight.ty), pulse = 1 + Math.sin(G.time * 12) * 0.1;
     g.strokeStyle = '#ffe14d'; g.lineWidth = 3; g.setLineDash([5, 5]);
