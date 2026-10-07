@@ -212,6 +212,16 @@ function drawPlayer(g, p, G, at) {
     g.fillStyle = st > 0.5 ? '#2fd06b' : st > 0.2 ? '#ffd23f' : '#ff4040'; roundRect(g, x - w / 2, y + 13, w * st, 4, 2); g.fill();
   }
 
+  // speed streaks when sprinting
+  if (p.sprinting && p.speedNow > 6 && !at) {
+    const ang = Math.atan2(p.vy * PY, p.vx * PX), ux = Math.cos(ang), uy = Math.sin(ang);
+    g.strokeStyle = '#ffffffaa'; g.lineWidth = 2.5; g.lineCap = 'round';
+    for (let i = 0; i < 3; i++) {
+      const off = (i - 1) * 12, sx0 = x - ux * 26 - uy * off, sy0 = y - 28 - uy * 26 + ux * off * 0.5;
+      const len = 16 + ((G.time * 60 + i * 7) % 10);
+      g.beginPath(); g.moveTo(sx0, sy0); g.lineTo(sx0 - ux * len, sy0 - uy * len); g.stroke();
+    }
+  }
   g.save(); g.translate(x, y - hop);
   if (cel && cel.type === 'leap' && ct < 1) g.rotate(Math.sin(ct * Math.PI) * 0.25 * dir);
   if (cel && cel.type === 'dab') g.rotate(-0.12 * dir);

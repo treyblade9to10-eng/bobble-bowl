@@ -192,7 +192,8 @@ function setupPlay(offPlay, defPlay, preview) {
     } else if (rt) {
       const out = Math.sign(p.y - by) || ws;
       p.role = rt.end === 'block' ? 'stalk' : 'route';
-      p.route = { pts: rt.r.map(([dd, oo]) => ({ x: p.x + d * dd, y: clamp(p.y + out * oo, 1.2, FIELD_W - 1.2) })), end: rt.end, i: 0 };
+      const deepX = goalX(o) + d * 7.5; // 2.5 yards in front of the end line
+      p.route = { pts: rt.r.map(([dd, oo]) => { const x = p.x + d * dd; return { x: d > 0 ? Math.min(x, deepX) : Math.max(x, deepX), y: clamp(p.y + out * oo, 1.2, FIELD_W - 1.2) }; }), end: rt.end, i: 0 };
       if (rt.end === 'block') p.route.blockAfter = true;
     } else {
       p.role = s === 1 ? 'passblock' : 'stalk';
@@ -313,7 +314,7 @@ function livePlay(dt) {
     if (p.mouthT > 0) { p.mouthT -= dt; if (p.mouthT <= 0) p.mouth = ''; }
     if (p.down > 0 || p.stun > 0) { p.dvx = p.dvy = 0; continue; }
     if (p.dive > 0) continue; // dive keeps its velocity
-    p.humanDriven = false;
+    p.humanDriven = false; p.sprinting = false;
     if (p.isHuman && humanControl(p, dt)) { p.humanDriven = Input.axis().m > 0.1 || Input.stick.m > 0.15 || Input.pointer.down || p.dive > 0; p.sdx = p.dvx; p.sdy = p.dvy; continue; }
     ai(p, dt);
     // smooth AI steering so players don't twitch
@@ -553,7 +554,8 @@ function humanControl(p, dt) {
   const ax = Input.axis();
   const sprint = Input.held('ShiftLeft') && p.stamina > 0.05;
   if (sprint && ax.m > 0.1) p.stamina = Math.max(0, p.stamina - dt * 0.32); else p.stamina = Math.min(1, p.stamina + dt * 0.18);
-  const mul = (sprint ? 1.13 : 1) * (p.spin > 0 ? 0.8 : 1) * 1.06 * (p.stamina < 0.2 ? 0.9 : 1); // you're a little faster than the AI
+  p.sprinting = sprint && ax.m > 0.1;
+  const mul = (sprint ? sprintBoost(p) : 1) * (p.spin > 0 ? 0.8 : 1) * 1.06 * (p.stamina < 0.2 ? 0.9 : 1); // you're a little faster than the AI
   if (isCarrier) {
     if (Input.hit('KeyE') && p.jukeCd <= 0 && G.bstate !== 'snap') doJuke(p, ax);
     if (Input.hit('KeyF') && p.spinCd <= 0 && G.bstate !== 'snap') doSpin(p);
@@ -605,7 +607,8 @@ function mobileControl(p, dt, isCarrier) {
   const st = Input.stick;
   if (st.m > 0.15) { // joystick
     if (sprint) p.stamina = Math.max(0, p.stamina - dt * 0.15);
-    const mul = (st.m > 0.9 && sprint ? 1.08 : 1) * (p.spin > 0 ? 0.8 : 1) * 1.06;
+    p.sprinting = st.m > 0.9 && sprint;
+    const mul = (p.sprinting ? sprintBoost(p) : 1) * (p.spin > 0 ? 0.8 : 1) * 1.06;
     p.dvx = st.x * p.spd * mul; p.dvy = st.y * p.spd * mul;
     return true;
   }
@@ -614,7 +617,8 @@ function mobileControl(p, dt, isCarrier) {
   if (held) {
     const tx = wx(P.x), ty = wy(P.y);
     if (sprint) p.stamina = Math.max(0, p.stamina - dt * 0.2);
-    steer(p, tx, ty, (sprint ? 1.08 : 1) * (p.spin > 0 ? 0.8 : 1) * 1.06, 0.4);
+    p.sprinting = sprint;
+    steer(p, tx, ty, (sprint ? sprintBoost(p) : 1) * (p.spin > 0 ? 0.8 : 1) * 1.06, 0.4);
     return true;
   }
   p.stamina = Math.min(1, p.stamina + dt * 0.25);
@@ -626,6 +630,8 @@ function qbTakeOff(qb) {
   addText(qb.x, qb.y, 'QB RUN!', '#7fd3ff', 22, 0.9);
   qb.vx += dirOf(qb.side) * 3;
 }
+// faster guys get a bigger burst: 99 SPD ≈ +18%, 80 ≈ +11%, 65 ≈ +6%
+function sprintBoost(p) { return 1.02 + clamp((p.spdR || 80) - 50, 0, 50) * 0.0033; }
 function doStiff(p) { p.stiff = 0.4; p.stiffCd = 1.4; Sound.tone(160, 0.12, 'sawtooth', 0.08); }
 function doJuke(p, ax) {
   const sp = Math.hypot(p.vx, p.vy) || 1;
@@ -828,6 +834,8 @@ function cpuQB(dt) {
 function followRoute(p, dt) {
   const r = p.route, d = dirOf(G.poss);
   if (!r) { p.dvx = p.dvy = 0; return; }
+  // deep in the end zone: don't run out the back — shuffle side to side to get open
+  if (p.role === 'route' && G.ball.holder !== p && d * (p.x - (goalX(G.poss) + d * 6)) > 0) return endZoneDrill(p, d);
   if (p.role === 'runpath' && G.ball.holder !== p && G.handedOff) return stalk(p, 6); // after the fake
   if (r.i < r.pts.length) {
     const t = r.pts[r.i];
@@ -853,6 +861,19 @@ function followRoute(p, dt) {
   }
 }
 
+function endZoneDrill(p, d) {
+  const back = goalX(G.poss) + d * 10;
+  if (!p.drill) p.drill = { dir: p.y < MID ? 1 : -1, y0: p.y, t: 0 };
+  const dr = p.drill;
+  dr.t += 1 / 60;
+  // slide away from the closest defender, otherwise go back and forth
+  let near = null, nd = 3;
+  for (const df of G.D) { if (df.down > 0) continue; const dd = dist(p, df); if (dd < nd) { nd = dd; near = df; } }
+  if (near && dr.t > 0.3 && Math.sign(near.y - p.y) === dr.dir) { dr.dir *= -1; dr.t = 0; }
+  if (Math.abs(p.y - dr.y0) > 5.5 || p.y < 3 || p.y > FIELD_W - 3) { if (dr.t > 0.3) { dr.dir = p.y < 3 ? 1 : p.y > FIELD_W - 3 ? -1 : -dr.dir; dr.t = 0; } }
+  const tx = back - d * (3.5 + Math.sin(G.play.t * 2) * 0.8);
+  steer(p, tx, p.y + dr.dir * 4, 0.72, 0.5);
+}
 function passBlock(p) {
   const qb = G.O[0], d = dirOf(G.poss);
   const free = df => df && df.down <= 0 && df.shedCd <= 0 && (!df.engaged || df.engaged === p) && (df.assign.type === 'rush' || G.qbScramble);
@@ -915,7 +936,10 @@ function aiRunner(p, dt) {
     if (sc > bs) { bs = sc; best = r; }
   }
   const vx = Math.cos(best) * d, vy = Math.sin(best);
-  p.dvx = vx * p.spd; p.dvy = vy * p.spd;
+  let open = 99; for (const f of foes) open = Math.min(open, dist(f, p));
+  p.sprinting = open > 4 && d * (p.x - G.los) > 0;
+  const boost = p.sprinting ? 1 + (sprintBoost(p) - 1) * 0.7 : 1;
+  p.dvx = vx * p.spd * boost; p.dvy = vy * p.spd * boost;
   let nd = 99; for (const f of foes) nd = Math.min(nd, dist(f, p));
   if (nd < 1.9 && nd > 0.9 && p.jukeCd <= 0 && chance(0.022 + (p.ovr - 70) * 0.001)) {
     if (chance(0.7)) doJuke(p, null); else doSpin(p);
