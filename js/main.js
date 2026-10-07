@@ -128,13 +128,25 @@ function onPlayCall(c) {
   } else {
     $('pcHead').innerHTML = `${humanOff ? '🏈 OFFENSE' : '🛡️ DEFENSE'} — ${G.downText()}`;
     pcList = humanOff ? OFF_PLAYS.slice() : DEF_PLAYS.slice();
-    if (c.fourth && humanOff) pcList = SPECIAL_PLAYS.map(s => s.key === 'fg' ? { ...s, desc: `${c.fgDist}-yard kick. ${c.fgDist > 50 ? 'Long shot!' : ''}` } : s).concat(pcList);
+    if (humanOff && !c.twoPt) {
+      const sp = [];
+      if (c.fourth) sp.push(SPECIAL_PLAYS[0]);
+      // field goal: any down, as long as it's not hopeless
+      if (c.fgDist <= c.fgMax + 8) sp.push({ ...SPECIAL_PLAYS[1], name: `${c.fgDist} yd FG`, desc: c.fgDist > c.fgMax ? 'Past his range — long shot!' : c.fgDist > c.fgMax - 8 ? 'Long kick. Nail the meter!' : 'Kick it through for 3.' });
+      pcList = sp.concat(pcList);
+    }
   }
+  const coach = coachPick(c, pcList);
   const box = $('pcCards'); box.innerHTML = '';
+  const cols = Math.ceil(pcList.length / 2);
+  box.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
+  box.style.width = `min(${cols * 200}px, calc(100vw - 20px))`;
   pcList.forEach((p, i) => {
     const el = document.createElement('div');
-    el.className = 'pcard' + (p.special ? ' special' : '');
-    el.innerHTML = `<span class="k">${G.mode === 'mobile' ? (p.type === 'run' ? 'RUN' : p.type === 'pass' ? 'PASS' : '') : i + 1}</span><div class="t">${p.name}</div>`;
+    el.className = 'pcard' + (p.special ? ' special' : '') + (p.key === coach ? ' coach' : '');
+    const kind = p.type === 'run' ? 'run' : p.type === 'pass' ? 'pass' : p.special ? 'kick' : '';
+    const label = G.mode === 'mobile' ? (kind === 'run' ? 'RUN' : kind === 'pass' ? 'PASS' : kind === 'kick' ? 'KICK' : 'D') : i + 1;
+    el.innerHTML = `${p.key === coach ? '<span class="cp">⭐ COACH PICK</span>' : ''}<span class="k ${kind}">${label}</span><div class="t">${p.name}</div>`;
     const mini = document.createElement('canvas'); mini.width = 120; mini.height = 72;
     if (p.key === 'xp' || p.key === 'two') { const g = mini.getContext('2d'); g.fillStyle = '#3a8a3c'; g.fillRect(0, 0, 120, 72); g.font = 'bold 30px sans-serif'; g.textAlign = 'center'; g.fillText(p.key === 'xp' ? '🦶' : '✌️', 60, 48); }
     else drawPlayDiagram(mini, p, humanOff);
@@ -145,10 +157,26 @@ function onPlayCall(c) {
     el.addEventListener('click', e => { if (Math.abs(e.clientX - sx0) < 12) choose(i); });
     box.appendChild(el);
   });
-  $('pcHint').textContent = G.mode === 'mobile' ? 'Tap a play (swipe for more)' : 'Click a play or press its number';
+  $('pcHint').textContent = G.mode === 'mobile' ? 'Tap a play  •  ⭐ = what the coach would call' : 'Click a play or press its number  •  ⭐ = what the coach would call';
   show('playcall');
 }
 G.hooks.onPlayCall = c => { if (!G.demo) onPlayCall(c); };
+// a simple suggestion so new players always have a good default
+function coachPick(c, list) {
+  const has = k => list.some(p => p.key === k);
+  if (c.mode === 'pat') return 'xp';
+  if (c.mode === 'off') {
+    if (c.fourth) { if (has('fg') && c.fgDist <= c.fgMax - 2) return 'fg'; if (c.toGo <= 1) return 'zone'; return has('punt') ? 'punt' : 'slants'; }
+    if (c.toGo <= 2) return 'zone';
+    if (c.toGo >= 12) return pick(['verts', 'pa']);
+    if (c.toGo >= 7) return pick(['curls', 'mesh', 'slants']);
+    return pick(['slants', 'toss', 'screen', 'zone']);
+  }
+  if (c.toGo <= 2) return 'run';
+  if (c.toGo >= 15) return 'prevent';
+  if (c.down === 3) return pick(['blitz', 'man']);
+  return pick(['c3', 'c2', 'man']);
+}
 function choose(i) {
   const p = pcList[i]; if (!p || G.phase !== 'playcall') return;
   Sound.click();

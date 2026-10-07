@@ -50,13 +50,18 @@ h2 { font-size: 40px; margin: 6px 0 14px; text-shadow: 3px 3px 0 #000; letter-sp
 
 #playcall { background: linear-gradient(to top, #000e 0%, #000a 55%, #0000 100%); justify-content: flex-end; padding-bottom: 16px; }
 #pcHead { font-size: 24px; margin-bottom: 10px; text-shadow: 2px 2px 0 #000; text-align: center; }
-#pcCards { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; max-width: 1200px; }
-.pcard { width: 136px; background: #f4f1e6; color: #111; border-radius: 10px; padding: 6px; cursor: pointer; border: 3px solid #333;
+#pcCards { display: grid; gap: 8px; width: min(1180px, calc(100vw - 20px)); }
+.pcard { min-width: 0; position: relative; background: #f4f1e6; color: #111; border-radius: 10px; padding: 5px; cursor: pointer; border: 3px solid #333;
   box-shadow: 0 4px 0 #000a; transition: transform .1s; }
 .pcard:hover, .pcard.sel { transform: translateY(-6px); border-color: #ffd23f; }
 .pcard .k { float: left; background: #111; color: #ffd23f; border-radius: 5px; padding: 0 6px; font-size: 13px; }
 .pcard .t { font-size: 14px; font-weight: 900; text-align: right; }
-.pcard canvas { width: 120px; height: 72px; background: #3a8a3c; border-radius: 6px; margin-top: 4px; display: block; }
+.pcard canvas { width: 100%; height: auto; aspect-ratio: 5 / 3; max-height: 18vh; object-fit: contain; background: #3a8a3c; border-radius: 6px; margin-top: 3px; display: block; }
+.pcard .t { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pcard .k.run { background: #c2381a; color: #fff; } .pcard .k.pass { background: #1f5fd1; color: #fff; } .pcard .k.kick { background: #111; color: #ffd23f; }
+.pcard.coach { border-color: #ffd23f; box-shadow: 0 0 0 3px #ffd23f, 0 4px 0 #000a; }
+.pcard .cp { position: absolute; top: -11px; left: 50%; transform: translateX(-50%); background: #ffd23f; color: #111; font-size: 10px; font-weight: 900;
+  padding: 1px 8px; border-radius: 8px; white-space: nowrap; font-family: Arial, sans-serif; }
 .pcard .d { font-size: 11px; font-family: Arial, sans-serif; margin-top: 3px; min-height: 26px; }
 .pcard.special { background: #ffe7a8; }
 #pcHint { margin-top: 10px; font-size: 14px; opacity: .8; font-family: Arial, sans-serif; }
@@ -87,10 +92,7 @@ body.mobile #mbtns { display: flex; }
 @media (orientation: portrait) and (max-width: 900px) { #rotate { display: flex; } }
 
 /* phone-friendly menus */
-body.mobile .pcard { width: 118px; padding: 5px; }
-body.mobile .pcard canvas { width: 104px; height: 62px; }
-body.mobile .pcard .d { display: none; }
-body.mobile #pcCards { flex-wrap: nowrap; overflow-x: auto; max-width: 100vw; justify-content: flex-start; padding: 8px 10px; -webkit-overflow-scrolling: touch; touch-action: pan-x; }
+@media (max-height: 560px) { .pcard .d { display: none; } .pcard .t { font-size: 12px; } .pcard { padding: 3px 4px; border-width: 2px; } #pcCards { gap: 10px 6px; } .pcard canvas { max-height: 21vh; } }
 body.mobile #playcall { padding-bottom: 6px; }
 body.mobile #pcHead { font-size: 18px; margin-bottom: 4px; }
 body.mobile #teamGrid { grid-template-columns: repeat(8, 1fr); gap: 5px; }

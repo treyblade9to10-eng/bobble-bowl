@@ -69,7 +69,8 @@ function toPlayCall() {
     else { const two = chance(0.12) || (G.quarter >= 4 && G.score[G.patSide] - G.score[1 - G.patSide] === -2); setTimeout(() => choosePAT(two ? 'two' : 'xp'), 700); }
     return;
   }
-  const ctx = { mode: humanOff ? 'off' : 'def', fourth: G.down === 4 && !G.twoPt, fgDist: Math.round(Math.abs(goalX(G.poss) - G.los) + 17) };
+  const ctx = { mode: humanOff ? 'off' : 'def', fourth: G.down === 4 && !G.twoPt, twoPt: G.twoPt, fgDist: Math.round(Math.abs(goalX(G.poss) - G.los) + 17),
+    fgMax: Math.round(fgRange(kickerOf(G.poss, 'fg').ovr)), toGo: Math.round(Math.abs(G.firstDownX - G.los)), down: G.down };
   G.hooks.onPlayCall(ctx);
 }
 
@@ -124,12 +125,14 @@ function makePlayer(side, isOff, slot, tuple) {
   const ovr = clamp(ovr0 + (cpu ? [-7, 0, 5][G.diff] : 0), 40, 99);
   const big = pos === 'OL' || pos === 'DL';
   const spdR = spd0 || POS_SPD[pos] || 80;
-  // Madden speed matters a lot: 99 SPD ≈ 13.7 yd/s, 85 ≈ 10.4, 70 ≈ 7.3, 60 ≈ 5.3
-  const yps = Math.max(4.5, 2.0 + (spdR - 50) * 0.2) * GAME_SPEED;
+  // Madden speed matters: 99 SPD ≈ 12 yd/s, 85 ≈ 9.4, 70 ≈ 6.7
+  const yps = Math.max(4.8, 2.6 + (spdR - 50) * 0.16) * GAME_SPEED;
+  const skill = isOff && (pos === 'WR' || pos === 'TE' || pos === 'RB');
+  const cpuMul = cpu ? (skill ? [0.85, 0.91, 0.96] : [0.92, 0.98, 1.02])[G.diff] : 1;
   return {
     side, off: isOff, slot, pos, name, num, ovr,
     x: 0, y: 0, vx: 0, vy: 0, dvx: 0, dvy: 0,
-    spd: yps * (cpu ? [0.93, 1, 1.03][G.diff] : 1), spdR, acc: (big ? 20 : 30) * GAME_SPEED,
+    spd: yps * cpuMul, spdR, acc: (big ? 20 : 30) * GAME_SPEED,
     face: { skin: h % 6, beard: ((h >> 5) % 4) === 0, visor: ((h >> 7) % 5) === 0, dir: dirOf(side) },
     stiff: 0, stiffCd: 0, throwAnim: 0, celebrate: 0, dizzy: 0,
     head: { ox: 0, oy: 0, vx: 0, vy: 0, rot: 0 }, headScale: 1 + ((h >> 9) % 5) * 0.035 + (pos === 'QB' ? 0.06 : 0),
@@ -538,7 +541,7 @@ function humanControl(p, dt) {
   const ax = Input.axis();
   const sprint = Input.held('ShiftLeft') && p.stamina > 0.05;
   if (sprint && ax.m > 0.1) p.stamina = Math.max(0, p.stamina - dt * 0.32); else p.stamina = Math.min(1, p.stamina + dt * 0.18);
-  const mul = (sprint ? 1.13 : 1) * (p.spin > 0 ? 0.8 : 1);
+  const mul = (sprint ? 1.13 : 1) * (p.spin > 0 ? 0.8 : 1) * 1.06; // you're a little faster than the AI
   if (isCarrier) {
     if (Input.hit('KeyE') && p.jukeCd <= 0 && G.bstate !== 'snap') doJuke(p, ax);
     if (Input.hit('KeyF') && p.spinCd <= 0 && G.bstate !== 'snap') doSpin(p);
@@ -590,7 +593,7 @@ function mobileControl(p, dt, isCarrier) {
   const st = Input.stick;
   if (st.m > 0.15) { // joystick
     if (sprint) p.stamina = Math.max(0, p.stamina - dt * 0.15);
-    const mul = (st.m > 0.9 && sprint ? 1.08 : 1) * (p.spin > 0 ? 0.8 : 1);
+    const mul = (st.m > 0.9 && sprint ? 1.08 : 1) * (p.spin > 0 ? 0.8 : 1) * 1.06;
     p.dvx = st.x * p.spd * mul; p.dvy = st.y * p.spd * mul;
     return true;
   }
@@ -599,7 +602,7 @@ function mobileControl(p, dt, isCarrier) {
   if (held) {
     const tx = wx(P.x), ty = wy(P.y);
     if (sprint) p.stamina = Math.max(0, p.stamina - dt * 0.2);
-    steer(p, tx, ty, (sprint ? 1.08 : 1) * (p.spin > 0 ? 0.8 : 1), 0.4);
+    steer(p, tx, ty, (sprint ? 1.08 : 1) * (p.spin > 0 ? 0.8 : 1) * 1.06, 0.4);
     return true;
   }
   p.stamina = Math.min(1, p.stamina + dt * 0.25);
@@ -1448,7 +1451,9 @@ function updateCamera(dt) {
     else if (b) tx = b.x;
   }
   const half = CW / 2 / PX;
-  tx = clamp(tx, half - 5, 125 - half);
+  const kicking = G.phase === 'kick' || G.phase === 'kickmeter';
+  if (G.phase === 'kickmeter' && G.km && G.km.kind !== 'punt') tx = lerp(G.los, goalX(G.poss) + dirOf(G.poss) * 10, 0.6); // show the posts while you aim
+  tx = clamp(tx, half - (kicking ? 9 : 5), (kicking ? 129 : 125) - half);
   cam.x = lerp(cam.x, tx, 1 - Math.exp(-dt * 4));
   let ty = MID;
   if (b && (G.phase === 'live' || G.phase === 'dead')) ty = lerp(MID, b.holder ? b.holder.y : b.y, 0.4);

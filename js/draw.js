@@ -3,6 +3,7 @@ const CW = 1280, CH = 720;
 const PX = 24;          // pixels per yard (left/right)
 const PY = 14;          // pixels per yard (up/down) - squished = tilted camera look
 const FIELD_W = 53.33;
+const MID_Y = FIELD_W / 2;
 const cam = { x: 60, y: FIELD_W / 2, shake: 0, zoom: 1 };
 const SKIN = ['#f6d3b3', '#e8b48f', '#c98e62', '#a26a42', '#7a4a2a', '#5a3620'];
 const OUT = '#14110f'; // cartoon outline color
@@ -76,6 +77,21 @@ function buildField(G) {
   g.strokeStyle = '#ffffff55'; g.lineWidth = 4; g.beginPath(); g.ellipse(fx(60), fy(FIELD_W / 2), 4 * PX, 4 * PY, 0, 0, 7); g.stroke();
   // sidelines
   g.strokeStyle = '#fff'; g.lineWidth = 7; g.strokeRect(fx(0), fy(0), 120 * PX, FIELD_W * PY);
+  // goal posts at the back of each end zone (fake 3D: height goes up and leans outward)
+  for (const [ex, side] of [[0, -1], [120, 1]]) {
+    const P = (y, z) => [fx(ex) + side * z * PX * 0.12, fy(y) - z * PX * 0.75];
+    const half = 3.1, bar = 3.4, top = 12;
+    const seg = (a, b, w, col) => { g.strokeStyle = col; g.lineWidth = w; g.lineCap = 'round'; g.beginPath(); g.moveTo(...a); g.lineTo(...b); g.stroke(); };
+    g.fillStyle = '#00000040'; g.beginPath(); g.ellipse(fx(ex), fy(MID_Y), 10, 4, 0, 0, 7); g.fill();
+    for (const [w, col] of [[11, '#3a2c00'], [7, '#ffd400']]) {
+      seg(P(MID_Y, 0), P(MID_Y, bar * 0.7), w, col);                       // post
+      seg(P(MID_Y, bar * 0.7), P(MID_Y - 0.6, bar), w, col);               // gooseneck
+      seg(P(MID_Y - half, bar), P(MID_Y + half, bar), w, col);            // crossbar
+      seg(P(MID_Y - half, bar), P(MID_Y - half, top), w - 1, col);        // uprights
+      seg(P(MID_Y + half, bar), P(MID_Y + half, top), w - 1, col);
+    }
+    g.fillStyle = '#ff3b30'; for (const yy of [MID_Y - half, MID_Y + half]) { const [px, py] = P(yy, top); g.fillRect(px - 2, py - 10, 5, 10); }
+  }
   // team benches area
   g.fillStyle = '#ffffff10'; g.fillRect(fx(35), fy(FIELD_W) + 10, 50 * PX, 3 * PY);
 }
@@ -180,7 +196,7 @@ function drawPlayer(g, p, G, at) {
   const hop = (celebrate ? Math.abs(Math.sin(G.time * 10 + p.slot)) * 14 : 0) + (jumping ? Math.sin((0.55 - p.jump) / 0.55 * Math.PI) * 30 : 0);
 
   // ground marks
-  if (p.isHuman && !at) {
+  if (p.isHuman && !at && G.phase !== 'kick' && G.phase !== 'kickmeter') {
     const pulse = 1 + Math.sin(G.time * 8) * 0.08;
     g.strokeStyle = '#ffe14d'; g.lineWidth = 3.5;
     g.beginPath(); g.ellipse(x, y, 22 * pulse, 9 * pulse, 0, 0, 7); g.stroke();
@@ -281,7 +297,7 @@ function drawPlayer(g, p, G, at) {
   }
   // labels
   const headTop = y - hop - (big ? 85 : 92);
-  if (at) return;
+  if (at || G.phase === 'kick' || G.phase === 'kickmeter') return;
   const showName = p.isHuman || carrying || (G.phase === 'presnap' && p.off && p.slot <= 4 && p.side === G.human);
   let ly = headTop;
   if (showName && p.down <= 0) {
