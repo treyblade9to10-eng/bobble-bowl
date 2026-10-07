@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <title>Bobble Bowl 🏈</title>
 <link rel="stylesheet" href="css/style.css">
 </head>
@@ -13,29 +15,33 @@
   <!-- Title -->
   <div id="title" class="screen show">
     <div class="logo">BOBBLE<span>BOWL</span></div>
-    <div class="tag">8 on 8 • 32 teams • big heads</div>
+    <div class="tag">8 on 8 • 32 NFL teams • Madden 27 ratings • big heads</div>
     <button class="big" id="btnPlay">PLAY</button>
-    <button id="btnHow">HOW TO PLAY</button>
+    <div class="row">
+      <button id="btnHow">HOW TO PLAY</button>
+      <button id="btnMode">MODE: <span id="modeLabel">?</span></button>
+    </div>
+  </div>
+
+  <!-- Mode select -->
+  <div id="mode" class="screen">
+    <h2>How are you playing?</h2>
+    <div class="modes">
+      <div class="modecard" data-mode="mobile">
+        <div class="mi">📱</div><div class="mt">MOBILE</div>
+        <div class="md">Phone or tablet.<br>Drag back to throw.<br>Hold to steer, tap to juke.</div>
+      </div>
+      <div class="modecard" data-mode="computer">
+        <div class="mi">💻</div><div class="mt">COMPUTER</div>
+        <div class="md">Keyboard + mouse.<br>WASD to move, 1-4 or mouse drag to throw.<br>Sprint, juke, spin, stiff arm.</div>
+      </div>
+    </div>
   </div>
 
   <!-- How to play -->
   <div id="how" class="screen">
     <h2>How to Play</h2>
-    <div class="howgrid">
-      <div><h3>🏈 Offense</h3>
-        <p><b>Pick a play</b>, then hit <b>SPACE</b> to snap.</p>
-        <p>Move the QB with <b>WASD / Arrows</b>.</p>
-        <p>Throw with <b>1 2 3 4</b>, or <b>click</b> a receiver.</p>
-        <p>Running with the ball: <b>SHIFT</b> = sprint, <b>E</b> = juke, <b>F</b> = spin.</p></div>
-      <div><h3>🛡️ Defense</h3>
-        <p>Pick a coverage, then the CPU snaps.</p>
-        <p>You control the player with the <b>yellow ring</b>.</p>
-        <p><b>Q</b> = switch to the defender closest to the ball.</p>
-        <p><b>SPACE</b> = dive tackle. <b>SHIFT</b> = sprint.</p></div>
-      <div><h3>📱 Touch</h3>
-        <p>Left stick moves. Tap a receiver to throw.</p>
-        <p>Buttons on the right do snap, sprint, juke and dive.</p></div>
-    </div>
+    <div class="howgrid" id="howGrid"></div>
     <button id="btnHowBack">BACK</button>
   </div>
 
@@ -53,7 +59,6 @@
     </div>
   </div>
 
-  <!-- Roster preview (shows on hover/tap in select) -->
   <div id="rosterPeek"></div>
 
   <!-- Play call -->
@@ -68,12 +73,11 @@
     <h2 id="overTitle">FINAL</h2>
     <div id="overScore"></div>
     <div id="overStats"></div>
-    <button class="big" id="btnAgain">PLAY AGAIN</button>
-    <button id="btnNewTeams">NEW TEAMS</button>
+    <div class="row">
+      <button class="big" id="btnAgain">REMATCH</button>
+      <button id="btnNewTeams">NEW TEAMS</button>
+    </div>
   </div>
-
-  <button id="btnMute" title="Sound">🔊</button>
-  <button id="btnPause" title="Menu">⏸</button>
 
   <!-- Pause -->
   <div id="pause" class="screen">
@@ -82,16 +86,19 @@
     <button id="btnQuit">QUIT GAME</button>
   </div>
 
-  <!-- Touch controls -->
-  <div id="touch">
-    <div id="stick"><div id="knob"></div></div>
-    <div id="tbtns">
-      <button data-k="Space">SNAP / DIVE</button>
-      <button data-k="ShiftLeft">SPRINT</button>
-      <button data-k="KeyE">JUKE</button>
-      <button data-k="KeyQ">SWITCH</button>
-    </div>
+  <button id="btnMute" title="Sound">🔊</button>
+  <button id="btnPause" title="Menu">⏸</button>
+
+  <!-- Mobile action buttons (shown when they're useful) -->
+  <div id="mbtns">
+    <button data-k="KeyX" data-show="qb">🏃 RUN</button>
+    <button data-k="KeyF" data-show="carrier">🌀 SPIN</button>
+    <button data-k="KeyR" data-show="carrier">✋ STIFF</button>
+    <button data-k="KeyQ" data-show="def">🔄 SWITCH</button>
+    <button data-k="Space" data-show="def">💥 DIVE</button>
   </div>
+
+  <div id="rotate">📱↻<br>Turn your phone sideways to play</div>
 </div>
 
 <script src="js/teams.js"></script>

@@ -65,13 +65,43 @@ h2 { font-size: 40px; margin: 6px 0 14px; text-shadow: 3px 3px 0 #000; letter-sp
 #overStats { font-family: Arial, sans-serif; font-size: 15px; background: #0008; padding: 12px 20px; border-radius: 12px; margin-bottom: 14px;
   max-width: 700px; line-height: 1.6; }
 
-#btnMute, #btnPause { position: absolute; top: 8px; z-index: 30; padding: 4px 10px; font-size: 18px; margin: 0; }
+#btnMute, #btnPause { position: absolute; top: 8px; z-index: 30; opacity: .85; padding: 4px 10px; font-size: 18px; margin: 0; }
 #btnMute { right: 8px; } #btnPause { right: 66px; display: none; }
 
-#touch { display: none; position: absolute; inset: 0; pointer-events: none; z-index: 5; }
-body.touch #touch { display: block; }
-#stick { position: absolute; left: 24px; bottom: 24px; width: 150px; height: 150px; border-radius: 50%; background: #fff2;
-  border: 3px solid #fff5; pointer-events: auto; }
-#knob { position: absolute; left: 45px; top: 45px; width: 60px; height: 60px; border-radius: 50%; background: #fff8; }
-#tbtns { position: absolute; right: 16px; bottom: 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; pointer-events: auto; }
-#tbtns button { width: 110px; height: 64px; font-size: 13px; padding: 4px; opacity: .85; background: #000a; }
+
+.row { display: flex; flex-wrap: wrap; justify-content: center; }
+.modes { display: flex; gap: 24px; flex-wrap: wrap; justify-content: center; }
+.modecard { width: 280px; padding: 24px 18px; border-radius: 20px; background: #0009; border: 4px solid #fff5; text-align: center; cursor: pointer;
+  transition: transform .12s, border-color .12s; box-shadow: 0 6px 0 #000a; }
+.modecard:hover, .modecard.sel { transform: translateY(-6px) scale(1.03); border-color: #ffd23f; }
+.modecard .mi { font-size: 70px; }
+.modecard .mt { font-size: 30px; font-weight: 900; color: #ffd23f; margin: 6px 0; }
+.modecard .md { font-family: Arial, sans-serif; font-size: 15px; line-height: 1.45; opacity: .9; }
+
+#mbtns { display: none; position: absolute; right: 14px; bottom: 50px; z-index: 6; flex-direction: column; gap: 10px; }
+body.mobile #mbtns { display: flex; }
+#mbtns button { display: none; width: 104px; height: 64px; margin: 0; font-size: 16px; border-radius: 18px; background: #000b; border-color: #fff9; }
+#mbtns button.on { display: block; }
+#rotate { display: none; position: absolute; inset: 0; z-index: 50; background: #0b1410; align-items: center; justify-content: center;
+  text-align: center; font-size: 26px; line-height: 1.8; }
+@media (orientation: portrait) and (max-width: 900px) { #rotate { display: flex; } }
+
+/* phone-friendly menus */
+body.mobile .pcard { width: 118px; padding: 5px; }
+body.mobile .pcard canvas { width: 104px; height: 62px; }
+body.mobile .pcard .d { display: none; }
+body.mobile #pcCards { flex-wrap: nowrap; overflow-x: auto; max-width: 100vw; justify-content: flex-start; padding: 8px 10px; -webkit-overflow-scrolling: touch; touch-action: pan-x; }
+body.mobile #playcall { padding-bottom: 6px; }
+body.mobile #pcHead { font-size: 18px; margin-bottom: 4px; }
+body.mobile #teamGrid { grid-template-columns: repeat(8, 1fr); gap: 5px; }
+body.mobile .tcard { min-height: 46px; padding: 4px 2px; }
+body.mobile .tcard .ab { font-size: 16px; }
+body.mobile .tcard .nm { font-size: 9px; }
+body.mobile #select { touch-action: pan-y; }
+@media (max-height: 500px) {
+  .logo { font-size: 64px; } .tag { margin: 12px 0 10px; font-size: 14px; }
+  h2 { font-size: 26px; margin: 2px 0 8px; }
+  button.big { font-size: 20px; padding: 10px 28px; }
+  .modecard { width: 230px; padding: 12px; } .modecard .mi { font-size: 44px; }
+}
+body:not(.mobile) #teamGrid { width: min(960px, calc(100vw - 300px)); margin-right: 270px; }

@@ -36,11 +36,13 @@ const lastName = n => { const p = n.split(' '); return p.length > 1 ? p.slice(1)
 const Input = {
   down: {},      // key code -> held
   pressed: {},   // key code -> pressed this frame
-  stick: { x: 0, y: 0 }, // touch joystick
-  clicks: [],    // canvas clicks in world coords are resolved by engine
+  // mouse / finger on the game canvas (screen coords in 1280x720 space)
+  pointer: { down: false, x: 0, y: 0, x0: 0, y0: 0, t: 0, moved: false, aiming: false },
+  taps: [],      // quick taps/clicks this frame
+  release: null, // drag-back vector released this frame
   press(code) { if (!this.down[code]) this.pressed[code] = true; this.down[code] = true; },
-  release(code) { this.down[code] = false; },
-  endFrame() { this.pressed = {}; this.clicks.length = 0; },
+  release_(code) { this.down[code] = false; },
+  endFrame() { this.pressed = {}; this.taps.length = 0; this.release = null; },
   hit(...codes) { return codes.some(c => this.pressed[c]); },
   held(...codes) { return codes.some(c => this.down[c]); },
   axis() {
@@ -49,7 +51,6 @@ const Input = {
     if (this.held('KeyD', 'ArrowRight')) x += 1;
     if (this.held('KeyW', 'ArrowUp')) y -= 1;
     if (this.held('KeyS', 'ArrowDown')) y += 1;
-    x += this.stick.x; y += this.stick.y;
     const m = Math.hypot(x, y);
     if (m > 1) { x /= m; y /= m; }
     return { x, y, m: Math.min(1, m) };
@@ -64,35 +65,8 @@ window.addEventListener('keydown', e => {
 });
 window.addEventListener('keyup', e => {
   if (e.code === 'Space') e.preventDefault();
-  Input.release(e.code);
-  if (e.code === 'ShiftRight') Input.release('ShiftLeft');
+  Input.release_(e.code);
+  if (e.code === 'ShiftRight') Input.release_('ShiftLeft');
 });
 window.addEventListener('blur', () => { Input.down = {}; });
 
-// touch joystick + buttons
-(function setupTouch() {
-  const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-  if (isTouch) document.body.classList.add('touch');
-  const stick = document.getElementById('stick'), knob = document.getElementById('knob');
-  if (!stick) return;
-  let sid = null;
-  const move = t => {
-    const r = stick.getBoundingClientRect();
-    let dx = (t.clientX - (r.left + r.width / 2)) / (r.width / 2);
-    let dy = (t.clientY - (r.top + r.height / 2)) / (r.height / 2);
-    const m = Math.hypot(dx, dy); if (m > 1) { dx /= m; dy /= m; }
-    Input.stick.x = Math.abs(dx) < 0.15 ? 0 : dx; Input.stick.y = Math.abs(dy) < 0.15 ? 0 : dy;
-    knob.style.left = (45 + dx * 45) + 'px'; knob.style.top = (45 + dy * 45) + 'px';
-  };
-  stick.addEventListener('touchstart', e => { e.preventDefault(); sid = e.changedTouches[0].identifier; move(e.changedTouches[0]); }, { passive: false });
-  stick.addEventListener('touchmove', e => { e.preventDefault(); for (const t of e.changedTouches) if (t.identifier === sid) move(t); }, { passive: false });
-  const end = e => { for (const t of e.changedTouches) if (t.identifier === sid) { sid = null; Input.stick.x = Input.stick.y = 0; knob.style.left = knob.style.top = '45px'; } };
-  stick.addEventListener('touchend', end); stick.addEventListener('touchcancel', end);
-  document.querySelectorAll('#tbtns button').forEach(b => {
-    const k = b.dataset.k;
-    b.addEventListener('touchstart', e => { e.preventDefault(); Input.press(k); }, { passive: false });
-    b.addEventListener('touchend', e => { e.preventDefault(); Input.release(k); }, { passive: false });
-    b.addEventListener('mousedown', () => Input.press(k));
-    b.addEventListener('mouseup', () => Input.release(k));
-  });
-})();

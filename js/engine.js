@@ -10,6 +10,8 @@ const goalX = s => (s === 0 ? 110 : 10);      // goal line this side is attackin
 const ownGoal = s => (s === 0 ? 10 : 110);    // goal line this side defends
 const fromOwn = (s, x) => dirOf(s) * (x - ownGoal(s));
 const MID = FIELD_W / 2;
+const GAME_SPEED = 1.3; // everything moves faster than real life = arcade feel
+const POS_SPD = { QB: 80, RB: 89, WR: 91, TE: 82, OL: 66, DL: 76, LB: 84, CB: 91, S: 88 };
 
 G.downText = function () {
   if (G.patSide != null && !G.twoPt) return 'EXTRA POINT';
@@ -99,7 +101,7 @@ function choosePlay(key) {
   if (offKey === 'punt' || offKey === 'fg') { doKick(offKey); return; }
   setupPlay(OFF_PLAYS.find(p => p.key === offKey), DEF_PLAYS.find(p => p.key === defKey));
   G.phase = 'presnap';
-  G.snapTimer = humanOff ? Infinity : 1.3;
+  G.snapTimer = humanOff ? Infinity : 0.9;
   if (!humanOff) addText(G.los + dirOf(G.poss) * -2, G.ballY - 8, G.play.off.name.toUpperCase() + '?', '#fff', 16, 1.2);
 }
 
@@ -113,17 +115,19 @@ function choosePAT(kind) {
 
 // ---------------- formations ----------------
 function makePlayer(side, isOff, slot, tuple) {
-  const [pos, name, num, ovr0] = tuple;
+  const [pos, name, num, ovr0, spd0] = tuple;
   const h = hashStr(name);
   const cpu = side !== G.human;
   const ovr = clamp(ovr0 + (cpu ? [-7, 0, 5][G.diff] : 0), 40, 99);
-  const base = { QB: 7.5, RB: 8.7, WR: 8.9, TE: 8.1, OL: 6.0, DL: 6.9, LB: 7.9, CB: 8.9, S: 8.6 }[pos] || 8;
   const big = pos === 'OL' || pos === 'DL';
+  const spdR = spd0 || POS_SPD[pos] || 80;
+  const yps = (5.0 + (spdR - 50) * 0.105) * GAME_SPEED; // Madden 99 speed ≈ 13 yd/s
   return {
     side, off: isOff, slot, pos, name, num, ovr,
     x: 0, y: 0, vx: 0, vy: 0, dvx: 0, dvy: 0,
-    spd: base * (0.8 + ovr * 0.0023) * (cpu ? [0.94, 1, 1.03][G.diff] : 1), acc: big ? 15 : 24,
-    face: { skin: h % 6, beard: ((h >> 5) % 4) === 0, angry: !isOff || big, dir: dirOf(side) },
+    spd: yps * (cpu ? [0.93, 1, 1.03][G.diff] : 1), spdR, acc: (big ? 20 : 30) * GAME_SPEED,
+    face: { skin: h % 6, beard: ((h >> 5) % 4) === 0, visor: ((h >> 7) % 5) === 0, dir: dirOf(side) },
+    stiff: 0, stiffCd: 0, throwAnim: 0, celebrate: 0, dizzy: 0,
     head: { ox: 0, oy: 0, vx: 0, vy: 0, rot: 0 }, headScale: 1 + ((h >> 9) % 5) * 0.035 + (pos === 'QB' ? 0.06 : 0),
     anim: (h % 100) / 10, speedNow: 0, stamina: 1, down: 0, downDir: 1, stun: 0, spin: 0, juke: 0, jukeCd: 0, spinCd: 0,
     dive: 0, tackleCd: 0, engaged: null, shed: 0, shedCd: 0, mouth: '', mouthT: 0, isHuman: false, throwKey: 0, openness: null,
@@ -160,11 +164,11 @@ function setupPlay(offPlay, defPlay, preview) {
   const O = P.slice(0, 8), D = P.slice(8);
   const at = (p, x, y) => { p.x = x; p.y = y; p.hx = x; p.hy = y; };
   at(O[0], L - d * 4, by);
-  at(O[1], L - d * 4, by + ws * 2.2);
+  at(O[1], L - d * 5, by + ws * 3.4);
   at(O[2], L - d * 0.8, Math.max(4, by - 16));
   at(O[3], L - d * 0.8, Math.min(FIELD_W - 4, by + 16));
   at(O[4], L - d * 1.5, by + ws * 8);
-  at(O[5], L - d * 0.7, by - 1.7); at(O[6], L - d * 0.7, by); at(O[7], L - d * 0.7, by + 1.7);
+  at(O[5], L - d * 0.7, by - 2.4); at(O[6], L - d * 0.7, by); at(O[7], L - d * 0.7, by + 2.4);
 
   // offense roles
   for (const p of O) p.role = 'idle';
@@ -188,7 +192,7 @@ function setupPlay(offPlay, defPlay, preview) {
 
   // defense alignment + assignments
   D.forEach((p, i) => { p.assign = parseAssign(defPlay.a[i]); });
-  at(D[0], L + d * 1.2, by - 2.2); at(D[1], L + d * 1.2, by); at(D[2], L + d * 1.2, by + 2.2);
+  at(D[0], L + d * 1.3, by - 2.8); at(D[1], L + d * 1.3, by); at(D[2], L + d * 1.3, by + 2.8);
   at(D[3], L + d * 5, by - 4.5); at(D[4], L + d * 5, by + 4.5);
   at(D[5], L + d * 6, O[2].y); at(D[6], L + d * 6, O[3].y); at(D[7], L + d * 12, by);
   for (const p of D) {
@@ -203,7 +207,7 @@ function setupPlay(offPlay, defPlay, preview) {
   G.ball = { x: L, y: by, z: 0, holder: preview ? null : O[0], flight: null, loose: null };
   if (!preview) G.ball.holder = O[0];
   else G.ball.holder = O[6]; // center holds it while we pick
-  G.bstate = 'snap'; G.qbScramble = false; G.qbThink = 0; G.handedOff = false; G.intended = null;
+  G.bstate = 'snap'; G.qbScramble = false; G.humanScramble = false; G.aim = null; G.qbThink = 0; G.handedOff = false; G.intended = null;
   G.runoff = 0; G.passPlay = offPlay.type === 'pass';
   // human control
   for (const p of P) p.isHuman = false;
@@ -219,11 +223,13 @@ function snap() {
 }
 
 function update(dt) {
-  G.time += dt;
   if (G.paused) return;
+  if (G.slowmo > 0) { G.slowmo -= dt; dt *= 0.35; }
+  G.time += dt;
+  for (const p of G.players) { p.throwAnim = Math.max(0, p.throwAnim - dt); p.celebrate = Math.max(0, p.celebrate - dt); if (p.down <= 0) p.dizzy = 0; }
   G.crowdHype = Math.max(0, G.crowdHype - dt * 0.4);
   if (G.phase === 'presnap') {
-    if (G.poss === G.human) { if (Input.hit('Space')) snap(); }
+    if (G.poss === G.human) { if (Input.hit('Space') || Input.taps.length) snap(); }
     else { G.snapTimer -= dt; if (Input.hit('KeyQ')) cycleHumanDef(); if (G.snapTimer <= 0) snap(); }
     idlePlayers(dt);
   } else if (G.phase === 'live') {
@@ -256,6 +262,7 @@ function livePlay(dt) {
   for (const p of G.players) {
     p.tackleCd = Math.max(0, p.tackleCd - dt); p.shedCd = Math.max(0, p.shedCd - dt);
     p.jukeCd = Math.max(0, p.jukeCd - dt); p.spinCd = Math.max(0, p.spinCd - dt);
+    p.stiffCd = Math.max(0, p.stiffCd - dt); p.stiff = Math.max(0, p.stiff - dt);
     p.stun = Math.max(0, p.stun - dt); p.juke = Math.max(0, p.juke - dt); p.spin = Math.max(0, p.spin - dt);
     if (p.mouthT > 0) { p.mouthT -= dt; if (p.mouthT <= 0) p.mouth = ''; }
     if (p.down > 0 || p.stun > 0) { p.dvx = p.dvy = 0; continue; }
@@ -283,6 +290,7 @@ function livePlay(dt) {
     G.bstate = 'run'; G.credit = { p: b.holder, kind: 'rush' };
   }
   if (G.bstate === 'snap' && b.holder === G.O[0] && !G.O[0].isHuman) cpuQB(dt);
+  if (G.humanScramble && G.bstate === 'snap' && b.holder === G.O[0]) { G.qbScramble = true; }
 
   // ball
   if (b.flight) updateFlight(dt);
@@ -296,13 +304,24 @@ function livePlay(dt) {
     const r = G.O[s];
     if (eligible(r)) { r.throwKey = s === 1 ? 4 : s - 1; r.openness = openness(r); }
   }
+  G.aim = null;
   if (canThrow) {
+    const qb = G.O[0];
     const keys = { Digit1: 2, Digit2: 3, Digit3: 4, Digit4: 1, Numpad1: 2, Numpad2: 3, Numpad3: 4, Numpad4: 1 };
-    for (const k in keys) if (Input.hit(k)) { const r = G.O[keys[k]]; if (eligible(r)) { throwTo(G.O[0], r); break; } }
-    for (const c of Input.clicks) {
-      let best = null, bd = 50;
-      for (const r of G.O) if (r.throwKey) { const dd = Math.hypot(sx(r.x) - c.x, sy(r.y) - 30 - c.y); if (dd < bd) { bd = dd; best = r; } }
-      if (best) { throwTo(G.O[0], best); break; }
+    for (const k in keys) if (Input.hit(k)) { const r = G.O[keys[k]]; if (eligible(r)) { throwTo(qb, r); break; } }
+    const P = Input.pointer;
+    if (G.ball.holder === qb && P.down && P.moved) {
+      P.aiming = true;
+      const t = aimTarget(qb, P.x0 - P.x, P.y0 - P.y);
+      G.aim = { tx: t.x, ty: t.y, target: receiverFor(qb, t.x, t.y), from: { x: P.x0, y: P.y0 }, to: { x: P.x, y: P.y } };
+    }
+    if (G.ball.holder === qb && Input.release) {
+      const v = Input.release; if (Math.hypot(v.x, v.y) > 28) { const t = aimTarget(qb, v.x, v.y); throwAt(qb, t.x, t.y); }
+    }
+    if (G.ball.holder === qb) for (const c of Input.taps) {
+      let best = null, bd = 60;
+      for (const r of G.O) if (r.throwKey) { const dd = Math.min(Math.hypot(sx(r.x) - c.x, sy(r.y) - 40 - c.y), Math.hypot(sx(r.x) - c.x, sy(r.y) - 120 - c.y)); if (dd < bd) { bd = dd; best = r; } }
+      if (best) { throwTo(qb, best); break; }
     }
   }
 
@@ -312,6 +331,11 @@ function livePlay(dt) {
   checkBounds();
 }
 
+// screen drag vector -> where the ball lands (pull back further = throw further)
+function aimTarget(qb, vx, vy) {
+  const k = 3.3;
+  return { x: clamp(qb.x + vx / PX * k, -2, 122), y: clamp(qb.y + vy / PX * k * 1.6, 0, FIELD_W) };
+}
 function eligible(r) {
   if (!r || r.slot < 1 || r.slot > 4) return false;
   if (r.role === 'route' || (r.slot === 1 && G.play.off.screen)) return true;
@@ -325,7 +349,7 @@ function openness(r) {
 function humanCanThrow() {
   const b = G.ball, qb = G.O && G.O[0];
   return G.phase === 'live' && G.bstate === 'snap' && b.holder === qb && qb.isHuman && G.passPlay !== false && G.play.off.type === 'pass' &&
-    dirOf(G.poss) * (qb.x - G.los) < 0.5;
+    dirOf(G.poss) * (qb.x - G.los) < 0.5 && !G.humanScramble;
 }
 
 // who the human is driving right now
@@ -361,16 +385,18 @@ function cycleHumanDef() {
 
 // returns true if human input drove this player
 function humanControl(p, dt) {
-  const ax = Input.axis();
   const b = G.ball;
   const isCarrier = b.holder === p;
   if (Input.hit('KeyQ') && !isCarrier) { cycleHumanDef(); }
+  if (G.mode === 'mobile') return mobileControl(p, dt, isCarrier);
+  const ax = Input.axis();
   const sprint = Input.held('ShiftLeft') && p.stamina > 0.05;
   if (sprint && ax.m > 0.1) p.stamina = Math.max(0, p.stamina - dt * 0.32); else p.stamina = Math.min(1, p.stamina + dt * 0.18);
   const mul = (sprint ? 1.13 : 1) * (p.spin > 0 ? 0.8 : 1);
   if (isCarrier) {
     if (Input.hit('KeyE') && p.jukeCd <= 0 && G.bstate !== 'snap') doJuke(p, ax);
     if (Input.hit('KeyF') && p.spinCd <= 0 && G.bstate !== 'snap') doSpin(p);
+    if (Input.hit('KeyR') && p.stiffCd <= 0) doStiff(p);
   }
   const chasing = b.holder ? b.holder.side !== p.side : p.side !== G.poss;
   if (!isCarrier && chasing && Input.hit('Space') && p.dive <= 0) { doDive(p, ax); return true; }
@@ -385,6 +411,41 @@ function humanControl(p, dt) {
   return true;
 }
 
+function mobileControl(p, dt, isCarrier) {
+  const b = G.ball, P = Input.pointer;
+  const qbHolding = p === G.O[0] && G.bstate === 'snap' && b.holder === p;
+  if (qbHolding && Input.hit('KeyX')) { G.humanScramble = true; Sound.click(); }
+  if (qbHolding && !G.humanScramble) return false; // QB moves himself in the pocket; you just aim + throw
+  // taps = moves
+  for (const c of Input.taps) {
+    if (isCarrier) { if (p.jukeCd <= 0) doJuke(p, { x: 0, y: wy(c.y) < p.y ? -1 : 1, m: 1 }); }
+    else if (p.side !== G.poss || (b.holder && b.holder.side !== p.side)) {
+      const w = { x: wx(c.x), y: wy(c.y) };
+      const mate = G.players.find(q => q.side === p.side && q !== p && Math.hypot(q.x - w.x, q.y - w.y) < 2.5);
+      if (mate) { G.humanDef = mate; Sound.click(); return true; }
+      const car = b.holder;
+      if (car && dist(p, car) < 4.5 && p.dive <= 0) { doDive(p, { x: car.x - p.x, y: car.y - p.y, m: 1 }); return true; }
+      cycleHumanDef();
+    }
+  }
+  if (isCarrier) {
+    if (Input.hit('KeyF') && p.spinCd <= 0) doSpin(p);
+    if (Input.hit('KeyR') && p.stiffCd <= 0) doStiff(p);
+    if (Input.hit('KeyE') && p.jukeCd <= 0) doJuke(p, null);
+  } else if (Input.hit('Space') && p.dive <= 0) { const car = b.holder || b; doDive(p, { x: car.x - p.x, y: car.y - p.y, m: 1 }); return true; }
+  const sprint = p.stamina > 0.05;
+  const held = P.down && !P.aiming && P.t > 0.12;
+  if (held) {
+    const tx = wx(P.x), ty = wy(P.y);
+    if (sprint) p.stamina = Math.max(0, p.stamina - dt * 0.2);
+    steer(p, tx, ty, (sprint ? 1.08 : 1) * (p.spin > 0 ? 0.8 : 1), 0.4);
+    return true;
+  }
+  p.stamina = Math.min(1, p.stamina + dt * 0.25);
+  if (isCarrier) { aiRunner(p, dt); return true; } // auto-run forward, you steer by holding
+  return false; // defenders: AI helps when you're not touching
+}
+function doStiff(p) { p.stiff = 0.4; p.stiffCd = 1.4; Sound.tone(160, 0.12, 'sawtooth', 0.08); }
 function doJuke(p, ax) {
   const sp = Math.hypot(p.vx, p.vy) || 1;
   let fx = p.vx / sp, fy = p.vy / sp;
@@ -456,7 +517,7 @@ function ai(p, dt) {
   if (b.flight && b.flight.pitch) return pursue(p, G.O[1]);
   const holder = carrier || qb;
   switch (a.type) {
-    case 'rush': steer(p, holder.x, holder.y, (p.pos === 'DL' ? 0.95 : 0.97) * (G.play.t < 0.45 ? 0.55 : 1), 0.2); break;
+    case 'rush': steer(p, holder.x, holder.y, (p.pos === 'DL' ? 0.95 : 0.97) * (G.play.t < 0.45 ? 0.55 : 1) * (G.poss === G.human ? [0.88, 0.94, 1][G.diff] : 1), 0.2); break;
     case 'spy': {
       if (G.qbScramble || d * (holder.x - G.los) > 0) return pursue(p, holder);
       steer(p, G.los + d * 5, lerp(p.y, holder.y, 0.6), 0.8); break;
@@ -467,7 +528,7 @@ function ai(p, dt) {
         if (G.play.off.type === 'run') return pursue(p, carrier || G.O[1]);
         steer(p, G.los + d * 4, lerp(p.y, holder.y, 0.5), 0.8); break;
       }
-      const lag = 0.15 + (99 - p.ovr) * 0.004;
+      const lag = 0.11 + (99 - p.ovr) * 0.003;
       const old = pastOf(t, lag);
       const tx = old.x + old.vx * lag * 0.8 + d * 0.9, ty = old.y + old.vy * lag * 0.8;
       steer(p, tx, ty, 1, 0.4);
@@ -505,13 +566,13 @@ function pursue(p, t) {
   if (!t) return;
   const dd = dist(p, t);
   // aim for the spot where we can cut him off (pursuit angle)
-  const sp = p.spd * 1.07, rx = t.x - p.x, ry = t.y - p.y;
+  const sp = p.spd * 1.09, rx = t.x - p.x, ry = t.y - p.y;
   const a = t.vx * t.vx + t.vy * t.vy - sp * sp, bq = 2 * (rx * t.vx + ry * t.vy), c = rx * rx + ry * ry;
   let T = dd / sp * 0.5;
   const disc = bq * bq - 4 * a * c;
   if (Math.abs(a) > 1e-3 && disc >= 0) { const r1 = (-bq - Math.sqrt(disc)) / (2 * a), r2 = (-bq + Math.sqrt(disc)) / (2 * a); const r = [r1, r2].filter(v => v > 0).sort((x, y) => x - y)[0]; if (r != null) T = r; }
   T = Math.min(T, 1.6);
-  steer(p, t.x + t.vx * T, t.y + t.vy * T, 1.07, 0.1);
+  steer(p, t.x + t.vx * T, t.y + t.vy * T, 1.09, 0.1);
   // AI dive at the ball carrier
   if (!p.isHuman && dd < 1.7 && dd > 0.85 && p.dive <= 0 && t === G.ball.holder && chance(0.035)) {
     doDive(p, { x: t.x + t.vx * 0.15 - p.x, y: t.y + t.vy * 0.15 - p.y, m: 1 });
@@ -539,7 +600,7 @@ function cpuQB(dt) {
   const pl = G.play, qb = G.O[0];
   if (pl.off.type === 'run' || G.qbScramble) return;
   G.qbThink -= dt; if (G.qbThink > 0) return; G.qbThink = 0.15;
-  const minT = pl.off.fake ? 1.2 : pl.off.screen ? 0.55 : 0.7;
+  const minT = pl.off.fake ? 0.95 : pl.off.screen ? 0.45 : 0.55;
   if (pl.t < minT) return;
   const d = dirOf(G.poss);
   let best = null, bs = -1e9;
@@ -554,8 +615,8 @@ function cpuQB(dt) {
     if (sc > bs) { bs = sc; best = r; }
   }
   let pressure = 99; for (const df of G.D) if (!df.engaged && df.down <= 0) pressure = Math.min(pressure, dist(qb, df));
-  const need = 3.3 - (pl.t - minT) * 0.9;
-  if (best && (bs > need || (pressure < 2.2 && bs > 1.2) || pl.t > 3.6)) { throwTo(qb, best); return; }
+  const need = 3.3 - (pl.t - minT) * 1.2;
+  if (best && (bs > need || (pressure < 2.2 && bs > 1.2) || pl.t > 2.9)) { throwTo(qb, best); return; }
   if (pressure < 2.0 && chance(0.25 + (qb.pos === 'QB' && qb.spd > 7.6 ? 0.2 : 0))) G.qbScramble = true;
 }
 
@@ -679,7 +740,7 @@ function resolveBlocks(dt) {
     let rate = (big ? 0.42 : 0.85) * Math.pow(df.ovr / bl.ovr, 2.2) * rand(0.4, 1.4);
     if (bl.role === 'screenblock') rate *= 1.8;
     if (df.isHuman && Input.axis().m > 0.3) rate *= 1.7;
-    if (G.bstate === 'run') rate *= big ? 1.3 : 1.8;
+    if (G.bstate === 'run') rate *= big ? 1.4 : 2.8;
     df.shed += rate * dt;
     // the defender pushes slowly toward where he wants to go
     const push = clamp(df.ovr / bl.ovr, 0.6, 1.4) * 0.22;
@@ -743,12 +804,29 @@ function separate() {
 }
 
 // ---------------- passing ----------------
-function throwTo(qb, r, pitch = false) {
+// drag-back throw: ball goes where you aimed, the closest receiver goes for it
+function receiverFor(qb, tx, ty) {
+  let best = null, bd = 7;
+  for (const r of G.O) {
+    if (!eligible(r)) continue;
+    const T = Math.hypot(tx - qb.x, ty - qb.y) / (24 * GAME_SPEED);
+    const d = Math.hypot(r.x + r.vx * T - tx, r.y + r.vy * T - ty);
+    if (d < bd) { bd = d; best = r; }
+  }
+  return best;
+}
+function throwAt(qb, tx, ty) {
+  const r = receiverFor(qb, tx, ty) || nearestTo(G.O.filter(eligible), { x: tx, y: ty });
+  if (!r) return;
+  throwTo(qb, r, false, { x: tx, y: clamp(ty, -0.5, FIELD_W + 0.5) });
+}
+function throwTo(qb, r, pitch = false, aimed = null) {
   const b = G.ball;
-  const spd = pitch ? 13 : 19 + (qb.ovr - 70) * 0.12;
+  const spd = (pitch ? 13 : 19 + (qb.ovr - 70) * 0.14) * GAME_SPEED;
   let tx = r.x, ty = r.y, T = 0.3;
   const sitting = r.route && r.route.end === 'sit' && r.route.i >= r.route.pts.length;
-  for (let k = 0; k < 4; k++) {
+  if (aimed) { tx = aimed.x; ty = aimed.y; T = Math.max(0.3, Math.hypot(tx - qb.x, ty - qb.y) / spd); }
+  else for (let k = 0; k < 4; k++) {
     T = Math.max(pitch ? 0.3 : 0.35, Math.hypot(tx - qb.x, ty - qb.y) / spd);
     if (sitting) break;
     tx = r.x + r.vx * T; ty = r.y + r.vy * T;
@@ -758,12 +836,13 @@ function throwTo(qb, r, pitch = false) {
     let pressure = false; for (const df of G.D) if (!df.engaged && dist(df, qb) < 2.4) pressure = true;
     let err = (1.4 - (qb.ovr - 60) / 60) * (0.4 + len / 24);
     if (pressure) err += 0.9;
-    if (qb.speedNow > 3) err += 0.4;
+    if (qb.speedNow > 4) err += 0.4;
+    if (aimed) err *= 0.45; // you aimed it yourself
     const a = rand(0, Math.PI * 2), m = Math.abs(rand(-1, 1) + rand(-1, 1)) / 2 * err * 2;
     tx += Math.cos(a) * m; ty += Math.sin(a) * m;
     stat(qb).att++;
     Sound.throw();
-    qb.mouth = 'O'; qb.mouthT = 0.5;
+    qb.mouth = 'O'; qb.mouthT = 0.5; qb.throwAnim = 0.3;
   } else Sound.tone(400, 0.1, 'triangle', 0.08, 200);
   ty = clamp(ty, -0.5, FIELD_W + 0.5);
   b.holder = null;
@@ -844,13 +923,15 @@ function checkTackles() {
   let hitters = 0;
   for (const df of G.players) {
     if (df.side === car.side || df.down > 0 || df.engaged || df.stun > 0 || df.tackleCd > 0) continue;
-    const reach = 0.85 + (df.dive > 0 ? 0.75 : 0);
+    const reach = 0.95 + (df.dive > 0 ? 0.8 : 0);
     if (dist(df, car) > reach) continue;
     hitters++;
     df.tackleCd = 0.5;
-    let p = 0.72 + (df.ovr - car.ovr) / 110;
+    let p = 0.79 + (df.ovr - car.ovr) / 110;
     if (car.juke > 0) p -= 0.42;
     if (car.spin > 0) p -= 0.48;
+    const front = dirOf(car.side) * (df.x - car.x) > -0.3;
+    if (car.stiff > 0 && front) p -= 0.38;
     if (df.dive > 0) p += 0.15;
     if (car.pos === 'QB' && G.bstate === 'snap') p += 0.12;
     if (car.pos === 'OL' || car.pos === 'DL') p += 0.2;
@@ -860,7 +941,8 @@ function checkTackles() {
     // broken tackle
     df.down = 0.75; df.downDir = car.x > df.x ? 1 : -1; df.vx *= 0.3; df.vy *= 0.3; df.dive = 0;
     car.vx *= 0.55; car.vy *= 0.55;
-    addText(car.x, car.y, car.juke > 0 ? 'JUKED!' : car.spin > 0 ? 'SPUN AWAY!' : 'BROKE IT!', '#ffe14d', 17, 0.9);
+    if (car.stiff > 0 && front) { df.down = 1.1; df.vx = dirOf(car.side) * 5; df.dizzy = 1; }
+    addText(car.x, car.y, car.stiff > 0 && front ? 'STIFF ARM!' : car.juke > 0 ? 'JUKED!' : car.spin > 0 ? 'SPUN AWAY!' : 'BROKE IT!', '#ffe14d', 22, 0.9);
     df.head.vx += 300; Sound.boing(); G.crowdHype = Math.min(1, G.crowdHype + 0.4);
   }
 }
@@ -868,6 +950,8 @@ function checkTackles() {
 function tackle(car, df, hitters) {
   const b = G.ball;
   Sound.tackle(); cam.shake = 7;
+  const boom = df.speedNow > 8.5 || df.dive > 0 && df.speedNow > 7;
+  if (boom) { cam.shake = 15; G.slowmo = 0.45; car.dizzy = 1; addText(car.x, car.y, pick(['BOOM!', 'WHAM!', 'CRUNCH!', 'POW!']), '#ff7a3d', 30, 0.9); Sound.boing(); }
   car.down = 1.2; car.downDir = dirOf(df.side); car.vx = df.vx * 0.4; car.vy = df.vy * 0.4; car.mouth = 'O'; car.mouthT = 1.2;
   df.down = 0.9; df.downDir = car.downDir; df.dive = 0;
   car.head.vx += rand(-400, 400); car.head.vy -= 200;
@@ -917,7 +1001,7 @@ function checkBounds() {
 // ---------------- end of a play ----------------
 function endPlay(res) {
   if (G.phase !== 'live') return;
-  G.phase = 'dead'; G.deadT = 1.6; G.showTarget = false;
+  G.phase = 'dead'; G.deadT = 1.15; G.showTarget = false; G.aim = null;
   Sound.whistle();
   for (const p of G.players) { p.throwKey = 0; p.engaged = null; }
   const off = G.poss, d = dirOf(off);
@@ -941,9 +1025,11 @@ function endPlay(res) {
     G.twoPt = false; G.patSide = null;
     next = { drive: 1 - off, own: 25 };
   } else if (res.type === 'td') {
-    G.score[cs] += 6; G.deadT = 2.6;
+    G.score[cs] += 6; G.deadT = 2.5;
     showBanner('TOUCHDOWN!', `${car.name} • ${G.teams[cs].city} ${G.teams[cs].name}`, cs === G.human ? '#ffd23f' : '#ff6040', 2.6);
-    Sound.td(); G.crowdHype = 1.5; stat(car).td++;
+    Sound.td(); G.crowdHype = 1.5; stat(car).td++; G.slowmo = 0.9;
+    for (const q of G.players) if (q.side === cs) q.celebrate = 2.6;
+    for (let i = 0; i < 70; i++) G.fx.push({ kind: 'confetti', px: rand(0, CW), py: rand(-200, 0), vy: rand(120, 260), vx: rand(-40, 40), z: 0, vz: 0, color: pick([G.teams[cs].c1, G.teams[cs].c2, '#fff']), life: 2.6, max: 2.6 });
     if (G.credit && G.credit.passer && cs === off) stat(G.credit.passer).td++;
     for (let i = 0; i < 25; i++) G.fx.push({ kind: 'star', x: car.x + rand(-4, 4), y: car.y + rand(-4, 4), z: rand(0, 40), vz: rand(20, 60), life: 1.4, max: 1.4 });
     next = { pat: cs };
@@ -1091,13 +1177,14 @@ function addDust(x, y, n) { for (let i = 0; i < n; i++) G.fx.push({ kind: 'dust'
 function addStars(x, y) { for (let i = 0; i < 5; i++) G.fx.push({ kind: 'star', x: x + rand(-1, 1), y: y + rand(-1, 1), z: 20 + rand(0, 20), vz: rand(20, 50), life: 0.8, max: 0.8 }); addDust(x, y, 6); }
 function showBanner(text, sub, color, dur) { G.banner = { text, sub, color, t: 0, dur }; }
 function updateFx(dt) {
-  for (const f of G.fx) { f.life -= dt; f.z += f.vz * dt; }
+  for (const f of G.fx) { f.life -= dt; f.z += f.vz * dt; if (f.kind === 'confetti') { f.px += f.vx * dt; f.py += f.vy * dt; } }
   G.fx = G.fx.filter(f => f.life > 0);
   if (G.banner) { G.banner.t += dt; if (G.banner.t > G.banner.dur) G.banner = null; }
   cam.shake *= Math.pow(0.02, dt);
 }
 function updateCamera(dt) {
   if (!G.teams) return;
+  if (!isFinite(cam.x) || !isFinite(cam.y)) { cam.x = 60; cam.y = MID; }
   const b = G.ball;
   let tx = G.los != null ? G.los + dirOf(G.poss) * 8 : 60;
   if (G.phase === 'live' || G.phase === 'dead' || G.phase === 'kick') {
@@ -1106,17 +1193,32 @@ function updateCamera(dt) {
   }
   const half = CW / 2 / PX;
   tx = clamp(tx, half - 5, 125 - half);
-  cam.x = lerp(cam.x, tx, 1 - Math.exp(-dt * 3.5));
+  cam.x = lerp(cam.x, tx, 1 - Math.exp(-dt * 4));
+  let ty = MID;
+  if (b && (G.phase === 'live' || G.phase === 'dead')) ty = lerp(MID, b.holder ? b.holder.y : b.y, 0.4);
+  cam.y = lerp(cam.y, clamp(ty, MID - 6, MID + 6), 1 - Math.exp(-dt * 3));
 }
 function updateHint() {
   if (!G.teams) return;
+  if (G.mode === 'mobile') return updateHintMobile();
   const humanOff = G.poss === G.human;
   const b = G.ball;
   if (G.phase === 'presnap') G.hint = humanOff ? (G.play.off.type === 'run' ? 'SPACE = snap  (run play: you take the handoff)' : 'SPACE = snap  •  then 1-4 or click a receiver to throw') : 'Get ready…  Q = switch player';
   else if (G.phase === 'live') {
     const h = G.humanPlayer;
-    if (h && b.holder === h && h.side === G.human) G.hint = humanCanThrow() ? '1 2 3 4 / click = throw  •  WASD move  •  run past the line to scramble' : 'WASD move  •  SHIFT sprint  •  E juke  •  F spin';
+    if (h && b.holder === h && h.side === G.human) G.hint = humanCanThrow() ? '1-4 / click receiver / drag back with mouse = throw  •  WASD move' : 'WASD move  •  SHIFT sprint  •  E juke  •  F spin  •  R stiff arm';
     else if (h && h.side !== G.poss || (b.holder && b.holder.side !== G.human)) G.hint = 'WASD move  •  SHIFT sprint  •  SPACE dive  •  Q switch player';
     else G.hint = 'Steer to the ball marker to catch it!';
+  } else G.hint = '';
+}
+
+function updateHintMobile() {
+  const humanOff = G.poss === G.human, b = G.ball, h = G.humanPlayer;
+  if (G.phase === 'presnap') G.hint = humanOff ? 'TAP to snap' : 'Get ready…';
+  else if (G.phase === 'live') {
+    if (humanCanThrow()) G.hint = 'DRAG BACK & release to throw  •  or tap a receiver';
+    else if (h && b.holder === h) G.hint = 'Hold to steer  •  TAP = juke';
+    else if (h && (h.side !== G.poss || (b.holder && b.holder.side !== G.human))) G.hint = 'Hold to move  •  TAP near runner = dive  •  TAP a teammate = switch';
+    else G.hint = '';
   } else G.hint = '';
 }
