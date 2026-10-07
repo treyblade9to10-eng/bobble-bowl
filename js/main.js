@@ -2,7 +2,7 @@
 const cv = document.getElementById('game');
 const ctx = cv.getContext('2d');
 const $ = id => document.getElementById(id);
-const screens = ['title', 'mode', 'how', 'select', 'playcall', 'over', 'pause', 'seasonNew', 'seasonHub'];
+const screens = ['title', 'mode', 'how', 'select', 'playcall', 'over', 'pause', 'seasonNew', 'seasonHub', 'modes', 'miniOver'];
 function show(id) {
   if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
   for (const s of screens) $(s).classList.toggle('show', s === id);
@@ -113,7 +113,7 @@ $('btnKick').onclick = startGame;
 function startGame() {
   Sound.init(); Sound.whistle(); Sound.crowd(false);
   if (G.mode === 'mobile') goFullscreen();
-  G.demo = false; G.season = false; show(null);
+  G.demo = false; G.season = false; G.challenge = null; G.mini = null; show(null);
   newGame(TEAMS[sel.idx[0]], TEAMS[sel.idx[1]], { qtr: +$('optQtr').value, diff: +$('optDiff').value, humanSide: sel.you });
 }
 
@@ -121,7 +121,12 @@ function startGame() {
 let pcList = [];
 function onPlayCall(c) {
   const humanOff = c.mode === 'off';
-  if (c.mode === 'pat') {
+  pcCtx = c;
+  if (c.mode === 'kickoff') {
+    $('pcHead').innerHTML = '🦶 KICKOFF — you kick it to them';
+    pcList = [{ key: 'ko', name: 'Kickoff', desc: 'Boom it deep, then cover the return!', special: true },
+              { key: 'onside', name: 'Onside Kick', desc: 'Short hop — try to steal the ball back!', special: true }];
+  } else if (c.mode === 'pat') {
     $('pcHead').innerHTML = 'TOUCHDOWN! Go for one or two?';
     pcList = [{ key: 'xp', name: 'Extra Point', desc: 'Easy kick for 1 point.', special: true },
               { key: 'two', name: 'Go For 2', desc: 'One play from the 3-yard line.', special: true }];
@@ -131,6 +136,8 @@ function onPlayCall(c) {
     if (humanOff && !c.twoPt) {
       const sp = [];
       if (c.fourth) sp.push(SPECIAL_PLAYS[0]);
+      if (c.fourth) sp.push(FAKE_PLAYS[0]);
+      if (c.fourth && c.fgDist <= c.fgMax + 8) sp.push(FAKE_PLAYS[1]);
       // field goal: any down, as long as it's not hopeless
       if (c.fgDist <= c.fgMax + 8) sp.push({ ...SPECIAL_PLAYS[1], name: `${c.fgDist} yd FG`, desc: c.fgDist > c.fgMax ? 'Past his range — long shot!' : c.fgDist > c.fgMax - 8 ? 'Long kick. Nail the meter!' : 'Kick it through for 3.' });
       pcList = sp.concat(pcList);
@@ -144,7 +151,7 @@ function onPlayCall(c) {
   renderCards();
   show('playcall');
 }
-let pcPage = 0, pcCoach = null, pcOff = true;
+let pcPage = 0, pcCoach = null, pcOff = true, pcCtx = {};
 const PER_PAGE = 10;
 function renderCards() {
   const pages = Math.max(1, Math.ceil(pcList.length / PER_PAGE));
@@ -178,6 +185,13 @@ function renderCards() {
     const t = document.createElement('span'); t.className = 'pgtxt'; t.textContent = `PAGE ${pcPage + 1} / ${pages}`; hint.appendChild(t);
     hint.appendChild(mk('NEXT ▶', 1));
   }
+  // clock tools
+  const tool = (txt, fn) => { const b = document.createElement('button'); b.className = 'pgbtn tool'; b.textContent = txt; b.onclick = fn; hint.appendChild(b); };
+  if ((pcCtx.mode === 'off' || pcCtx.mode === 'def') && G.timeouts && G.timeouts[G.human] > 0 && G.pendingRunoff > 0) tool(`⏱ TIMEOUT (${G.timeouts[G.human]})`, () => { if (callTimeout(G.human)) renderCards(); });
+  if (pcCtx.mode === 'off' && G.down < 4 && G.pendingRunoff > 0) tool('⬇ SPIKE', () => { show(null); spikeBall(); });
+  const last = pcCtx.mode === 'off' ? G.lastOffKey : pcCtx.mode === 'def' ? G.lastDefKey : null;
+  const li = last ? pcList.findIndex(p => p.key === last) : -1;
+  if (li >= 0) tool('⚡ SAME PLAY', () => choose(li));
   const tip = document.createElement('span'); tip.className = 'pgtip';
   tip.textContent = G.mode === 'mobile' ? '⭐ = coach pick' : `1-${Math.min(PER_PAGE, list.length) % 10 || 0} pick  •  ←/→ pages  •  ⭐ = coach pick`;
   hint.appendChild(tip);
@@ -187,6 +201,7 @@ G.hooks.onPlayCall = c => { if (!G.demo) onPlayCall(c); };
 function coachPick(c, list) {
   const has = k => list.some(p => p.key === k);
   if (c.mode === 'pat') return 'xp';
+  if (c.mode === 'kickoff') return G.quarter >= 4 && G.clock < 150 && G.score[1 - G.human] - G.score[G.human] > 0 && G.score[1 - G.human] - G.score[G.human] <= 16 ? 'onside' : 'ko';
   if (c.mode === 'off') {
     if (c.fourth) { if (has('fg') && c.fgDist <= c.fgMax - 2) return 'fg'; if (c.toGo <= 1) return 'zone'; return has('punt') ? 'punt' : 'slants'; }
     if (c.toGo <= 2) return 'zone';
@@ -203,6 +218,7 @@ function coachPick(c, list) {
 function choose(i) {
   const p = pcList[i]; if (!p || G.phase !== 'playcall') return;
   if (G.patSide == null && p.key === 'xp') return;
+  if (p.key === 'ko' || p.key === 'onside') { show(null); Sound.click(); return chooseKickoff(p.key); }
   Sound.click();
   show(null);
   if (p.key === 'xp' || p.key === 'two') choosePAT(p.key);
@@ -210,6 +226,8 @@ function choose(i) {
 }
 window.addEventListener('keydown', e => {
   if (!$('playcall').classList.contains('show')) return;
+  if (e.code === 'KeyT' && G.timeouts && G.pendingRunoff > 0) { if (callTimeout(G.human)) renderCards(); return; }
+  if (e.code === 'Enter') { const last = pcCtx.mode === 'off' ? G.lastOffKey : G.lastDefKey; const li = pcList.findIndex(p => p.key === last); if (li >= 0) choose(li); return; }
   if (e.code === 'ArrowRight' || e.code === 'ArrowLeft') { const pages = Math.ceil(pcList.length / PER_PAGE); pcPage = (pcPage + (e.code === 'ArrowRight' ? 1 : -1) + pages) % pages; renderCards(); return; }
   const n = parseInt(e.key, 10);
   if (isNaN(n)) return;
@@ -251,6 +269,12 @@ G.hooks.onGameOver = s => {
   }
   Sound[won ? 'td' : 'bad']();
   const inSeason = !!G.season;
+  const ch = challengeResult(s);
+  $('overChal').textContent = ch ? ch.text : '';
+  $('overChal').style.color = ch ? (ch.ok ? '#9cff9c' : '#ff8a8a') : '';
+  if (ch && ch.ok) $('overTitle').textContent = G.challenge.type === '2min' ? 'DRIVE COMPLETE!' : 'CHALLENGE COMPLETE!';
+  $('btnAgain').textContent = G.challenge ? 'TRY AGAIN' : 'REMATCH';
+  $('btnNewTeams').textContent = G.challenge ? 'CHALLENGES' : 'NEW TEAMS';
   if (inSeason) seasonGameDone(s.score);
   $('btnSeasonCont').style.display = inSeason ? '' : 'none';
   $('btnAgain').style.display = $('btnNewTeams').style.display = inSeason ? 'none' : '';
@@ -282,8 +306,8 @@ function drawMvp(st, side) {
   };
   setTimeout(loop, 1450);
 }
-$('btnAgain').onclick = () => { show(null); startGame(); };
-$('btnNewTeams').onclick = () => { G.teams = null; renderSelect(); show('select'); };
+$('btnAgain').onclick = () => { const c = G.challenge; show(null); if (c) runChallenge(c.type); else startGame(); };
+$('btnNewTeams').onclick = () => { const c = G.challenge; G.teams = null; G.challenge = null; if (c) openModes(); else { renderSelect(); show('select'); } };
 
 // ---------- pause ----------
 function togglePause() {
@@ -294,7 +318,10 @@ function togglePause() {
 }
 $('btnPause').onclick = togglePause;
 $('btnResume').onclick = togglePause;
-$('btnQuit').onclick = () => { G.paused = false; G.teams = null; G.phase = 'idle'; if (G.season) { G.season = false; openSeason(); } else show('title'); };
+$('btnQuit').onclick = () => {
+  G.paused = false; G.teams = null; G.phase = 'idle';
+  if (G.season) { G.season = false; openSeason(); } else if (G.challenge || G.mini) { G.challenge = null; G.mini = null; openModes(); } else show('title');
+};
 window.addEventListener('keydown', e => { if (e.code === 'Escape' || e.code === 'KeyP') togglePause(); });
 
 // ---------- mouse / finger on the field ----------
@@ -319,7 +346,7 @@ const endPointer = e => {
   activeId = null;
   const P = Input.pointer;
   const quick = performance.now() - P.start < 260;
-  if (P.aiming) Input.release = { x: P.x0 - P.x, y: P.y0 - P.y };
+  if (P.aiming) { Input.release = { x: P.x0 - P.x, y: P.y0 - P.y }; Input.flick = performance.now() - P.start < 330; }
   else if (!P.moved && quick) Input.taps.push({ x: P.x, y: P.y });
   P.down = false; P.moved = false; P.aiming = false;
 };
@@ -361,6 +388,7 @@ function updateMobileButtons() {
     else if (h.side !== G.poss || (b.holder && b.holder.side !== h.side)) st = 'def';
   }
   if (G.phase === 'dead' && G.cellyGuy && !G.demo) st = 'celly';
+  if (G.phase === 'presnap' && !G.demo) st = 'presnap';
   const joyOn = G.phase === 'live' && !G.demo && h && (st === 'def' || st === 'carrier');
   $('joy').classList.toggle('on', !!joyOn);
   if (!joyOn && Input.stick.m) { Input.stick.x = Input.stick.y = Input.stick.m = 0; }
@@ -370,6 +398,7 @@ function updateMobileButtons() {
   document.querySelectorAll('#mbtns button').forEach(x => x.classList.toggle('on', x.dataset.show === st));
   $('mbDive').textContent = b && b.flight ? '🙌 JUMP' : '💥 DIVE';
   $('mbSwim').style.display = st === 'def' && h && h.engaged ? 'block' : 'none';
+  $('mbTO').style.display = st === 'presnap' && G.timeouts && G.timeouts[G.human] > 0 && G.pendingRunoff > 0 ? 'block' : 'none';
 }
 
 // ---------- SEASON MODE ----------
@@ -458,6 +487,47 @@ function seasonGameDone(score) {
 }
 $('btnSeasonCont').onclick = () => { G.season = false; G.teams = null; G.phase = 'idle'; renderHub(); };
 
+// ---------- CHALLENGES & MINI-GAMES ----------
+const myIdx = () => sel.idx[sel.you];
+$('btnModes').onclick = () => { Sound.init(); Sound.click(); openModes(); };
+$('mdBack').onclick = () => show('title');
+$('mdPrev').onclick = () => { sel.idx[sel.you] = (myIdx() + 31) % 32; if (sel.idx[0] === sel.idx[1]) sel.idx[sel.you] = (myIdx() + 31) % 32; Sound.click(); openModes(); };
+$('mdNext').onclick = () => { sel.idx[sel.you] = (myIdx() + 1) % 32; if (sel.idx[0] === sel.idx[1]) sel.idx[sel.you] = (myIdx() + 1) % 32; Sound.click(); openModes(); };
+function openModes() {
+  G.mini = null; G.challenge = null;
+  const R = Records.get(), d = dailyToday(), t = TEAMS[myIdx()];
+  $('mdTeamName').textContent = `Your team: ${t.city} ${t.name}`;
+  const done = R.daily && R.daily.done && R.daily.done[d.date];
+  const cards = [
+    ['2min', '⏱', 'TWO-MINUTE DRILL', 'Down by up to a touchdown, 2:00 left, ball on your 25. Win it!', R.twoMin ? `Record: ${R.twoMin.wins}/${R.twoMin.tries}` : ''],
+    ['daily', '📅', 'DAILY CHALLENGE', `${TEAMS[d.mine].name} vs ${TEAMS[d.opp].name}: ${d.goal.text}`, done ? '✅ Done today!' + (R.daily.streak ? ` Streak ${R.daily.streak} 🔥` : '') : (R.daily && R.daily.streak ? `Streak: ${R.daily.streak} 🔥` : 'New every day!')],
+    ['qb', '🎯', 'QB TARGETS', '45 seconds. Hit the targets downfield. Bullseyes = 300!', R.qb ? `High score: ${R.qb}` : ''],
+    ['kick', '🦶', 'KICKING CONTEST', 'Start at 25 yards, back up 5 every make. 2 misses = out.', R.kick ? `Longest: ${R.kick} yds` : ''],
+    ['dash', '💨', '40-YARD DASH', 'Mash ← → (or tap) to race your fastest player!', R.dash && R.dash < 99 ? `Best: ${R.dash}s` : '']
+  ];
+  $('mdCards').innerHTML = cards.map(([k, i, tt, dd, rr]) => `<div class="mdcard" data-k="${k}"><div class="mi">${i}</div><div class="mt">${tt}</div><div class="md">${dd}</div><div class="mr">${rr}</div></div>`).join('');
+  document.querySelectorAll('.mdcard').forEach(c => c.onclick = () => runChallenge(c.dataset.k));
+  show('modes');
+}
+function runChallenge(k) {
+  Sound.init(); Sound.whistle();
+  if (G.mode === 'mobile') goFullscreen();
+  G.demo = false; G.season = false; G.challenge = null; G.mini = null; show(null);
+  if (k === '2min') startTwoMinute(myIdx());
+  else if (k === 'daily') startDaily();
+  else if (k === 'qb') startQBTargets(myIdx());
+  else if (k === 'kick') startKickContest(myIdx());
+  else if (k === 'dash') startDash(myIdx());
+  G.lastMini = k;
+}
+G.hooks.onMiniOver = r => {
+  $('moTitle').textContent = r.title; $('moBig').textContent = r.big; $('moSub').textContent = r.sub; $('moBest').textContent = r.best;
+  if (r.best.includes('NEW')) Sound.td(); else Sound.click();
+  setTimeout(() => show('miniOver'), 600);
+};
+$('moRetry').onclick = () => runChallenge(G.lastMini);
+$('moBack').onclick = () => { G.mini = null; G.teams = null; openModes(); };
+
 // ---------- title screen background: a fake game ----------
 function demoSetup() {
   const a = pick(TEAMS); let b; do { b = pick(TEAMS); } while (b === a);
@@ -477,7 +547,7 @@ function frame(now) {
 function step(now) {
   const dt = clamp((now - last) / 1000, 0, 0.033); last = now;
   if (Input.pointer.down) Input.pointer.t += dt;
-  const inMenu = ['title', 'how', 'select', 'mode', 'seasonNew', 'seasonHub'].some(id => $(id).classList.contains('show'));
+  const inMenu = ['title', 'how', 'select', 'mode', 'seasonNew', 'seasonHub', 'modes', 'miniOver'].some(id => $(id).classList.contains('show')) && !(G.mini && $('miniOver').classList.contains('show'));
   if (inMenu) {
     if (!G.demo || G.phase === 'over') demoSetup();
     if (G.phase === 'live' && G.play.t > 7) G.phase = 'dead';
@@ -504,12 +574,13 @@ function render() {
     drawRoutes(ctx, G);
     const ps = G.players.concat(G.refs || []).sort((a, b) => a.y - b.y);
     for (const p of ps) p.slot === undefined ? drawRef(ctx, p, G) : drawPlayer(ctx, p, G);
+    if (G.mini) drawMini(ctx, G);
     if (G.ball) drawBallFree(ctx, G);
     drawAim(ctx, G);
     drawFx(ctx, G);
   }
   ctx.restore();
-  if (G.teams && !G.demo) { drawBanner(ctx, G); drawHUD(ctx, G); drawKickMeter(ctx, G); }
+  if (G.teams && !G.demo) { drawBanner(ctx, G); if (G.mini) drawMiniHUD(ctx, G); else drawHUD(ctx, G); drawKickMeter(ctx, G); }
 }
 
 requestAnimationFrame(frame);

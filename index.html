@@ -21,6 +21,9 @@
       <button class="big gold" id="btnSeason">🏆 SEASON</button>
     </div>
     <div class="row">
+      <button class="big" id="btnModes">🎯 CHALLENGES</button>
+    </div>
+    <div class="row">
       <button id="btnHow">HOW TO PLAY</button>
       <button id="btnMode">MODE: <span id="modeLabel">?</span></button>
     </div>
@@ -119,6 +122,21 @@
     </div>
   </div>
 
+  <!-- Challenges & mini-games -->
+  <div id="modes" class="screen">
+    <h2>🎯 Challenges</h2>
+    <div id="mdTeam"><button class="pgbtn" id="mdPrev">◀</button><span id="mdTeamName"></span><button class="pgbtn" id="mdNext">▶</button></div>
+    <div id="mdCards"></div>
+    <button id="mdBack">BACK</button>
+  </div>
+  <div id="miniOver" class="screen">
+    <h2 id="moTitle"></h2>
+    <div id="moBig"></div>
+    <div id="moSub"></div>
+    <div id="moBest"></div>
+    <div class="row"><button class="big" id="moRetry">TRY AGAIN</button><button id="moBack">CHALLENGES</button></div>
+  </div>
+
   <!-- Play call -->
   <div id="playcall" class="screen">
     <div id="pcHead"></div>
@@ -132,6 +150,7 @@
     <div id="trophy">🏆</div>
     <h2 id="overTitle">FINAL</h2>
     <div id="overScore"></div>
+    <div id="overChal"></div>
     <div id="overMain">
       <div id="mvpBox"><div class="mvpTag">GAME MVP</div><canvas id="mvpCv" width="260" height="300"></canvas><div id="mvpText"></div></div>
       <div id="overStats"></div>
@@ -161,6 +180,9 @@
     <button data-k="KeyQ" data-show="def">🔄 SWITCH</button>
     <button data-k="KeyE" data-show="def" id="mbSwim">🏊 SWIM</button>
     <button data-k="Space" data-show="def" id="mbDive">💥 DIVE</button>
+    <button data-k="KeyC" data-show="def">🔨 HIT</button>
+    <button data-k="KeyZ" data-show="presnap">📢 AUDIBLE</button>
+    <button data-k="KeyT" data-show="presnap" id="mbTO">⏱ TIMEOUT</button>
     <button data-k="ArrowUp" data-show="celly">⬆️ LEAP</button>
     <button data-k="ArrowDown" data-show="celly">🕺 GRIDDY</button>
     <button data-k="ArrowLeft" data-show="celly">💥 SPIKE</button>
@@ -178,7 +200,9 @@
 <script src="js/plays.js"></script>
 <script src="js/draw.js"></script>
 <script src="js/engine.js"></script>
+<script src="js/special.js"></script>
 <script src="js/season.js"></script>
+<script src="js/modes.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

@@ -119,7 +119,7 @@ function drawField(g, G) {
 }
 
 function drawLines(g, G) {
-  if (G.los == null || G.phase === 'kick') return;
+  if (G.los == null || G.phase === 'kick' || G.phase === 'mini') return;
   const lx = sx(G.los);
   g.lineWidth = 5; g.strokeStyle = '#2f8cff';
   g.beginPath(); g.moveTo(lx, sy(0)); g.lineTo(lx, sy(FIELD_W)); g.stroke();
@@ -333,6 +333,10 @@ function drawPlayer(g, p, G, at) {
     if (p.isHuman || carrying) { g.font = 'bold 10px Arial'; g.fillStyle = '#fff'; g.strokeStyle = '#000'; g.lineWidth = 3; const r = `${p.pos} • ${p.ovr} OVR`; g.strokeText(r, x, ly - 17); g.fillText(r, x, ly - 17); }
     ly -= 30;
   }
+  if (p.hot && G.phase === 'presnap') {
+    g.font = 'bold 11px Arial'; g.textAlign = 'center'; const w = g.measureText(p.hot).width + 12;
+    g.fillStyle = '#ffe14d'; roundRect(g, x - w / 2, ly - 8, w, 16, 8); g.fill(); g.fillStyle = '#111'; g.fillText(p.hot, x, ly + 4); ly -= 22;
+  }
   if (p.throwKey) {
     const col = ['#2f7bff', '#ff3b3b', '#2fd06b', '#ffb02e'][p.throwKey - 1];
     const tgt = G.aim && G.aim.target === p;
@@ -496,6 +500,7 @@ function drawAim(g, G) {
   g.stroke(); g.setLineDash([]);
   g.fillStyle = a.target ? '#ffe14d55' : '#ffffff33'; g.strokeStyle = a.target ? '#ffe14d' : '#fff'; g.lineWidth = 3;
   g.beginPath(); g.ellipse(x1, y1, 22, 10, 0, 0, 7); g.fill(); g.stroke();
+  if (a.style && a.style !== 'normal') { g.font = '900 14px Arial Black, Arial'; g.textAlign = 'center'; g.fillStyle = '#7fd3ff'; g.fillText(a.style.toUpperCase(), x1, y1 - 16); }
   // pull-back line from the finger
   if (a.from) { g.strokeStyle = '#ffffff66'; g.lineWidth = 3; g.beginPath(); g.moveTo(a.from.x, a.from.y); g.lineTo(a.to.x, a.to.y); g.stroke(); g.fillStyle = '#fff8'; g.beginPath(); g.arc(a.from.x, a.from.y, 10, 0, 7); g.fill(); }
 }
@@ -557,6 +562,8 @@ function drawHUD(g, G) {
     g.fillText(t.id, x + 10, y0 + H / 2);
     if (poss) drawFootball(g, x + 10 + g.measureText(t.id).width + 16, y0 + H / 2, 0.9);
     g.font = '900 30px Arial Black, Arial'; g.textAlign = 'right'; g.fillText(s, x + 192, y0 + H / 2 + 1);
+    const side = G.teams.indexOf(t);
+    if (G.timeouts) for (let i = 0; i < 3; i++) { g.fillStyle = i < G.timeouts[side] ? '#ffd23f' : '#ffffff30'; g.fillRect(x + 10 + i * 16, y0 + H - 15, 12, 4); }
   };
   cell(G.teams[1], G.score[1], x0 + 5, G.poss === 1);
   cell(G.teams[0], G.score[0], x0 + 210, G.poss === 0);
@@ -636,12 +643,12 @@ function drawRef(g, r, G) {
 
 // ---------- field goal / punt meter ----------
 function drawKickMeter(g, G) {
-  const km = G.km; if (!km || G.phase !== 'kickmeter') return;
+  const km = G.km; if (!km || G.phase !== 'kickmeter' || km.side !== G.human || km.cpuT != null) return;
   const W = 560, H = 196, x0 = (CW - W) / 2, y0 = CH - H - 46;
   g.fillStyle = '#0b0f16ee'; roundRect(g, x0, y0, W, H, 18); g.fill();
   g.strokeStyle = '#ffd23f'; g.lineWidth = 3; roundRect(g, x0, y0, W, H, 18); g.stroke();
   g.fillStyle = '#ffd23f'; g.font = '900 22px Arial Black, Arial'; g.textAlign = 'center';
-  const title = km.kind === 'punt' ? 'PUNT' : km.kind === 'xp' ? 'EXTRA POINT' : `${km.yds}-YARD FIELD GOAL`;
+  const title = km.kind === 'punt' ? 'PUNT' : km.kind === 'ko' ? 'KICKOFF' : km.kind === 'onside' ? 'ONSIDE KICK' : km.kind === 'xp' ? 'EXTRA POINT' : `${km.yds}-YARD FIELD GOAL`;
   g.fillText(title, CW / 2, y0 + 30);
   g.fillStyle = '#fff'; g.font = 'bold 14px Arial';
   g.fillText(`${km.kk.name}  •  ${km.kind === 'punt' ? 'P' : 'K'}  •  ${km.kk.ovr} OVR`, CW / 2, y0 + 50);
@@ -651,7 +658,7 @@ function drawKickMeter(g, G) {
   bar(y0 + 80, '1) POWER', km.stage === 0);
   const pg = g.createLinearGradient(bx, 0, bx + bw, 0); pg.addColorStop(0, '#2fd06b'); pg.addColorStop(0.7, '#ffd23f'); pg.addColorStop(1, '#ff4040');
   g.fillStyle = pg; roundRect(g, bx + 2, y0 + 82, Math.max(4, (bw - 4) * km.power), 18, 9); g.fill();
-  if (km.kind !== 'punt') {
+  if (km.kind === 'fg' || km.kind === 'xp') {
     const nx = bx + bw * Math.min(1, km.need);
     g.strokeStyle = '#fff'; g.lineWidth = 3; g.beginPath(); g.moveTo(nx, y0 + 76); g.lineTo(nx, y0 + 106); g.stroke();
     g.fillStyle = '#fff'; g.font = 'bold 11px Arial'; g.textAlign = 'center'; g.fillText(km.need > 1 ? 'OUT OF RANGE!' : 'NEED', Math.min(nx, bx + bw - 30), y0 + 118);
@@ -659,8 +666,9 @@ function drawKickMeter(g, G) {
   // aim bar
   bar(y0 + 146, '2) AIM', km.stage === 1);
   const cx = bx + bw / 2, zw = bw / 2 * km.tol;
-  g.fillStyle = km.kind === 'punt' ? '#2fd06b55' : '#2fd06b'; g.fillRect(cx - zw, y0 + 148, zw * 2, 18);
-  if (km.kind === 'punt') { g.fillStyle = '#ff404077'; g.fillRect(bx + 2, y0 + 148, bw / 2 * 0.25, 18); g.fillRect(bx + bw - 2 - bw / 2 * 0.25, y0 + 148, bw / 2 * 0.25, 18); }
+  const soft = km.kind === 'punt' || km.kind === 'ko' || km.kind === 'onside';
+  g.fillStyle = soft ? '#2fd06b55' : '#2fd06b'; g.fillRect(cx - zw, y0 + 148, zw * 2, 18);
+  if (soft) { g.fillStyle = '#ff404077'; g.fillRect(bx + 2, y0 + 148, bw / 2 * 0.25, 18); g.fillRect(bx + bw - 2 - bw / 2 * 0.25, y0 + 148, bw / 2 * 0.25, 18); }
   if (km.stage >= 1) {
     const ax = cx + km.aim * (bw / 2 - 4);
     g.fillStyle = '#fff'; g.beginPath(); g.moveTo(ax, y0 + 144); g.lineTo(ax - 8, y0 + 134); g.lineTo(ax + 8, y0 + 134); g.fill();

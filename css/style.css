@@ -216,3 +216,19 @@ button.big.gold:hover { background: #ffe57a; }
   #shSched { max-height: 110px; } #shStand { font-size: 11px; max-height: 230px; overflow-y: auto; }
   #snOpts { gap: 5px; } #seasonHub { padding-top: 6px; }
 }
+.pgbtn.tool { background: #1f2b3a; color: #fff; border-color: #ffd23f; }
+
+/* ---- challenges ---- */
+#mdTeam { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-size: 18px; font-weight: 900; }
+#mdCards { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; width: min(1150px, 96vw); margin-bottom: 12px; }
+.mdcard { background: #0009; border: 3px solid #fff5; border-radius: 16px; padding: 12px 10px; text-align: center; cursor: pointer; transition: transform .1s; box-shadow: 0 5px 0 #000a; }
+.mdcard:hover { transform: translateY(-5px); border-color: #ffd23f; }
+.mdcard .mi { font-size: 44px; } .mdcard .mt { font-weight: 900; color: #ffd23f; font-size: 17px; margin: 4px 0; }
+.mdcard .md { font-family: Arial, sans-serif; font-size: 12px; opacity: .9; min-height: 44px; }
+.mdcard .mr { font-family: Arial, sans-serif; font-size: 12px; margin-top: 6px; color: #9cff9c; font-weight: bold; }
+#moBig { font-size: 64px; font-weight: 900; color: #ffd23f; text-shadow: 4px 4px 0 #000; }
+#moSub { font-family: Arial, sans-serif; font-size: 18px; margin: 6px 0; }
+#moBest { font-size: 20px; font-weight: 900; margin-bottom: 14px; }
+#overChal { font-family: Arial, sans-serif; font-size: 18px; font-weight: bold; margin: 4px 0 8px; padding: 6px 14px; border-radius: 10px; background: #0009; }
+#overChal:empty { display: none; }
+@media (max-width: 900px) { #mdCards { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; } .mdcard { padding: 6px; } .mdcard .mi { font-size: 28px; } .mdcard .mt { font-size: 13px; } .mdcard .md { font-size: 10px; min-height: 0; } #moBig { font-size: 40px; } }
