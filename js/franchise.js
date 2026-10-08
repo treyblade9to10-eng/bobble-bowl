@@ -117,7 +117,7 @@ function renderDraft(myTurn) {
     board = dr.pool.slice(0, 24).map((pr, k) => {
       const f = Season.fit(d.team, Object.assign(pr.t.slice(), { pot: pr.pot }));
       const note = f ? (pr.t[3] > f.cur[3] ? `<span class="up">starts over ${lastName(f.cur[1])} (${f.cur[3]})</span>` : `<span>backup to ${lastName(f.cur[1])} (${f.cur[3]})</span>`) : '';
-      return `<div class="dRow" data-k="${k}"><span class="pos">${pr.t[0]}</span><b>${pr.t[3]}</b><span class="nm">${pr.t[1]}<i>${pr.school}  •  SPD ${pr.t[4]}  •  POT ${pr.pot}</i></span>${note}</div>`;
+      return `<div class="dRow" tabindex="0" data-k="${k}"><span class="pos">${pr.t[0]}</span><b>${pr.t[3]}</b><span class="nm">${pr.t[1]}<i>${pr.school}  •  SPD ${pr.t[4]}  •  POT ${pr.pot}</i></span>${note}</div>`;
     }).join('');
   } else {
     const mineP = dr.picks.find(p => p.team === d.team);

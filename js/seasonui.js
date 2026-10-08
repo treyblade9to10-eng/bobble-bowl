@@ -147,7 +147,7 @@ function trList(teamId, el, pickMine) {
     const key = side + ':' + i;
     const selKey = pickMine ? tr.mine : tr.theirs;
     const blocked = !pickMine && tr.mine && (tr.side !== side || Season.team(Season.data.team)[side][+tr.mine.split(':')[1]][0] !== p[0]);
-    rows.push(`<div class="trRow${selKey === key ? ' on' : ''}${blocked ? ' off' : ''}" data-k="${key}"><span class="pos">${p[0]}</span><b>${p[3]}</b><span>#${p[2]} ${p[1]}</span></div>`);
+    rows.push(`<div tabindex="0" class="trRow${selKey === key ? ' on' : ''}${blocked ? ' off' : ''}" data-k="${key}"><span class="pos">${p[0]}</span><b>${p[3]}</b><span>#${p[2]} ${p[1]}</span></div>`);
   });
   el.innerHTML = rows.join('');
   el.querySelectorAll('.trRow').forEach(r => r.onclick = () => {

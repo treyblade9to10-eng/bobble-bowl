@@ -209,7 +209,7 @@ function renderCards() {
   list.forEach((p, j) => {
     const i = pcPage * PER_PAGE + j;
     const el = document.createElement('div');
-    el.className = 'pcard' + (p.special ? ' special' : '') + (p.key === pcCoach ? ' coach' : '');
+    el.className = 'pcard' + (p.special ? ' special' : '') + (p.key === pcCoach ? ' coach' : ''); el.tabIndex = 0;
     const kind = p.type === 'run' ? 'run' : p.type === 'pass' ? 'pass' : p.special ? 'kick' : '';
     const label = G.mode === 'mobile' ? (kind === 'run' ? 'RUN' : kind === 'pass' ? 'PASS' : kind === 'kick' ? 'KICK' : 'D') : (j + 1) % 10;
     el.innerHTML = `${p.key === pcCoach ? '<span class="cp">COACH PICK</span>' : ''}<span class="k ${kind}">${label}</span><div class="t">${p.name}</div>`;
@@ -492,7 +492,7 @@ function openModes() {
     ['kick', '04', 'KICKING CONTEST', 'Start at 25 yards, back up 5 every make. 2 misses = out.', R.kick ? `Longest: ${R.kick} yds` : ''],
     ['dash', '05', '40-YARD DASH', 'Mash ← → (or tap) to race your fastest player.', R.dash && R.dash < 99 ? `Best: ${R.dash}s` : '']
   ];
-  $('mdCards').innerHTML = cards.map(([k, i, tt, dd, rr]) => `<div class="mdcard" data-k="${k}"><div class="mi">${i}</div><div class="mt">${tt}</div><div class="md">${dd}</div><div class="mr">${rr}</div></div>`).join('');
+  $('mdCards').innerHTML = cards.map(([k, i, tt, dd, rr]) => `<div class="mdcard" tabindex="0" data-k="${k}"><div class="mi">${i}</div><div class="mt">${tt}</div><div class="md">${dd}</div><div class="mr">${rr}</div></div>`).join('');
   document.querySelectorAll('.mdcard').forEach(c => c.onclick = () => runChallenge(c.dataset.k));
   show('modes');
 }
@@ -535,6 +535,7 @@ function frame(now) {
 function step(now) {
   const dt = clamp((now - last) / 1000, 0, 0.033); last = now;
   if (Input.pointer.down) Input.pointer.t += dt;
+  Pad.poll(dt);
   Input.versus = !!G.versus && !G.demo; if (!Input.versus) Input.ctl = 0;
   const inMenu = menuScreens.some(id => $(id).classList.contains('show')) && !(G.mini && $('miniOver').classList.contains('show'));
   if (inMenu) {

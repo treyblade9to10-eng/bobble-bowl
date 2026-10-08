@@ -54,7 +54,10 @@ const Input = {
   map(c) { if (!this.versus) return c; if (this.ctl === 1) return P2KEYS[c] || '-'; return P1BLOCK.has(c) ? '-' : c; },
   hit(...codes) { return codes.some(c => this.pressed[this.map(c)]); },
   held(...codes) { return codes.some(c => this.down[this.map(c)]); },
+  pads: [null, null], // controller left sticks (see gamepad.js)
   axis() {
+    const pd = this.pads[this.versus ? this.ctl : 0];
+    if (pd) return pd;
     let x = 0, y = 0;
     if (this.held('KeyA', 'ArrowLeft')) x -= 1;
     if (this.held('KeyD', 'ArrowRight')) x += 1;
