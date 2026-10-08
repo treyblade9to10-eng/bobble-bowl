@@ -189,7 +189,12 @@ function onPlayCall(c) {
       if (c.fourth) sp.push(FAKE_PLAYS[0]);
       if (c.fourth && c.fgDist <= c.fgMax + 8) sp.push(FAKE_PLAYS[1]);
       // field goal: any down, as long as it's not hopeless
-      if (c.fgDist <= c.fgMax + 8) sp.push({ ...SPECIAL_PLAYS[1], name: `${c.fgDist} yd FG`, desc: c.fgDist > c.fgMax ? 'Past his range. Long shot.' : c.fgDist > c.fgMax - 8 ? 'Long kick. Nail the meter!' : 'Kick it through for 3.' });
+      // the range depends on YOUR kicker (big legs can hit it from farther)
+      if (c.fgDist <= c.fgMax + 8) {
+        const rng = c.fgDist > c.fgMax ? 'out' : c.fgDist > c.fgMax - 8 ? 'long' : 'in', kk = kickerOf(G.poss, 'fg');
+        sp.push({ ...SPECIAL_PLAYS[1], name: `${c.fgDist} yd FG`, range: rng,
+          desc: `${kk.name} max: ${c.fgMax} yd. ` + (rng === 'out' ? 'Out of his range. Long shot.' : rng === 'long' ? 'Long one. Nail the meter!' : 'In his range.') });
+      }
       pcList = sp.concat(pcList);
     }
   }
@@ -231,6 +236,7 @@ function renderCards() {
     if (p.key === 'xp' || p.key === 'two') { const g = mini.getContext('2d'); g.fillStyle = '#3a8a3c'; g.fillRect(0, 0, 120, 72); g.font = "italic 900 34px 'Barlow Condensed', sans-serif"; g.textAlign = 'center'; g.fillStyle = '#fff'; g.fillText(p.key === 'xp' ? '+1' : '+2', 60, 48); }
     else drawPlayDiagram(mini, p, pcOff);
     el.appendChild(mini);
+    if (p.range) { const r = document.createElement('div'); r.className = 'rng ' + p.range; r.textContent = p.range === 'in' ? 'IN RANGE' : p.range === 'long' ? 'AT HIS MAX' : 'OUT OF RANGE'; el.appendChild(r); }
     const d = document.createElement('div'); d.className = 'd'; d.textContent = p.desc; el.appendChild(d);
     let sx0 = 0;
     el.addEventListener('pointerdown', e => { sx0 = e.clientX; });

@@ -77,6 +77,8 @@ h2::after { content: ''; position: absolute; left: 50%; bottom: 0; width: 56px; 
   letter-spacing: .08em; padding: 1px 8px; white-space: nowrap; }
 .pcard .d { font-size: 11px; margin-top: 3px; min-height: 26px; line-height: 1.25; }
 .pcard.special { background: #f4e2b0; }
+.pcard .rng { font-family: var(--hd); font-weight: 800; font-size: 12px; letter-spacing: .05em; text-align: center; color: #fff; padding: 2px 0; margin-top: 3px; }
+.pcard .rng.in { background: #1f9d55; } .pcard .rng.long { background: #c27a12; } .pcard .rng.out { background: #c0262c; }
 #pcHint { margin-top: 10px; font-size: 13px; color: var(--dim); display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; }
 
 /* game over */
