@@ -465,7 +465,8 @@ function drawBallFree(g, G) {
     for (let i = 0; i < 6; i++) { const u = Math.max(0, b.flight.t / b.flight.T - i * 0.03); const tx = lerp(b.flight.sx, b.flight.tx, u), ty = lerp(b.flight.sy, b.flight.ty, u), tz = 1.7 + b.flight.peak * 4 * u * (1 - u) - u * 0.6; const px = sx(tx), py = sy(ty) - tz * PX * 0.9; i ? g.lineTo(px, py) : g.moveTo(px, py); }
     g.stroke();
   }
-  if (b.flight) {
+  if (b.flight && b.flight.duck && !b.flight.kick) drawFootball(g, x, y - b.z * PX * 0.9, 1.3, Math.sin(G.time * 9) * 0.9 + G.time * 2); // wobbly duck
+  else if (b.flight) {
     const f = b.flight, u = Math.min(1, f.t / f.T);
     const dz = (f.peak * 4 * (1 - 2 * u) - 0.6) / f.T;            // height change per second
     const vxs = (f.tx - f.sx) / f.T * PX, vys = (f.ty - f.sy) / f.T * PY - dz * PX * 0.9;
@@ -492,14 +493,17 @@ function drawAim(g, G) {
     if (a.from) { g.strokeStyle = '#ffffff66'; g.lineWidth = 3; g.beginPath(); g.moveTo(a.from.x, a.from.y); g.lineTo(a.to.x, a.to.y); g.stroke(); }
     return;
   }
-  const x0 = sx(qb.x), y0 = sy(qb.y) - 50, x1 = sx(a.tx), y1 = sy(a.ty);
-  const len = Math.hypot(a.tx - qb.x, a.ty - qb.y), peak = 0.6 + len * 0.1;
-  g.strokeStyle = a.target ? '#ffe14d' : '#ffffffaa'; g.lineWidth = 4; g.setLineDash([2, 10]); g.lineCap = 'round';
+  const reach = qbArm(qb).range, want = Math.hypot(a.tx - qb.x, a.ty - qb.y), far = want > reach;
+  const k = far ? reach / want : 1, ax = qb.x + (a.tx - qb.x) * k, ay = qb.y + (a.ty - qb.y) * k;
+  const x0 = sx(qb.x), y0 = sy(qb.y) - 50, x1 = sx(ax), y1 = sy(ay);
+  const len = Math.min(want, reach), peak = 0.6 + len * 0.1;
+  g.strokeStyle = far ? '#ff6a5a' : a.target ? '#ffe14d' : '#ffffffaa'; g.lineWidth = 4; g.setLineDash([2, 10]); g.lineCap = 'round';
   g.beginPath();
   for (let i = 0; i <= 24; i++) { const u = i / 24; const px = lerp(x0, x1, u), py = lerp(y0, y1, u) - peak * 4 * u * (1 - u) * PX * 0.9; i ? g.lineTo(px, py) : g.moveTo(px, py); }
   g.stroke(); g.setLineDash([]);
-  g.fillStyle = a.target ? '#ffe14d55' : '#ffffff33'; g.strokeStyle = a.target ? '#ffe14d' : '#fff'; g.lineWidth = 3;
+  g.fillStyle = far ? '#ff6a5a44' : a.target ? '#ffe14d55' : '#ffffff33'; g.strokeStyle = far ? '#ff6a5a' : a.target ? '#ffe14d' : '#fff'; g.lineWidth = 3;
   g.beginPath(); g.ellipse(x1, y1, 22, 10, 0, 0, 7); g.fill(); g.stroke();
+  if (far) { g.font = '900 15px "Barlow Condensed", "Arial Black", sans-serif'; g.textAlign = 'center'; g.lineWidth = 4; g.strokeStyle = '#000'; g.strokeText('MAX RANGE', x1, y1 - 18); g.fillStyle = '#ff6a5a'; g.fillText('MAX RANGE', x1, y1 - 18); }
   if (a.style && a.style !== 'normal') { g.font = '900 14px "Barlow Condensed", "Arial Black", sans-serif'; g.textAlign = 'center'; g.fillStyle = '#7fd3ff'; g.fillText(a.style.toUpperCase(), x1, y1 - 16); }
   // pull-back line from the finger
   if (a.from) { g.strokeStyle = '#ffffff66'; g.lineWidth = 3; g.beginPath(); g.moveTo(a.from.x, a.from.y); g.lineTo(a.to.x, a.to.y); g.stroke(); g.fillStyle = '#fff8'; g.beginPath(); g.arc(a.from.x, a.from.y, 10, 0, 7); g.fill(); }

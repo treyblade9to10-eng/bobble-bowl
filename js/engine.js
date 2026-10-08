@@ -128,7 +128,6 @@ function choosePlay(key) {
   else setupPlay(OFF_PLAYS.find(p => p.key === offKey), DEF_PLAYS.find(p => p.key === defKey));
   G.phase = 'presnap';
   G.snapTimer = humanOff ? Infinity : 1.6;
-  if (!humanOff) addText(G.los + dirOf(G.poss) * -2, G.ballY - 8, G.play.off.name.toUpperCase() + '?', '#fff', 16, 1.2);
 }
 
 function choosePAT(kind) {
@@ -144,7 +143,7 @@ function makePlayer(side, isOff, slot, tuple) {
   const [pos, name, num, ovr0, spd0, skin0] = tuple;
   const h = hashStr(name);
   const cpu = side !== G.human;
-  const ovr = clamp(ovr0 + (cpu ? [-7, 0, 5, 10][G.diff] : 0), 40, 99);
+  const ovr = clamp(ovr0 + (cpu && !G.versus ? [-7, 0, 5, 10][G.diff] : 0), 20, 99);
   const big = pos === 'OL' || pos === 'DL';
   const spdR = spd0 || POS_SPD[pos] || 80;
   // Madden speed matters: 99 SPD ≈ 12 yd/s, 85 ≈ 9.4, 70 ≈ 6.7
@@ -225,6 +224,7 @@ function setupPlay(offPlay, defPlay, preview) {
   at(D[0], L + d * 1.3, by - 2.8); at(D[1], L + d * 1.3, by); at(D[2], L + d * 1.3, by + 2.8);
   at(D[3], L + d * 5, by - 4.5); at(D[4], L + d * 5, by + 4.5);
   at(D[5], L + d * 6, O[2].y); at(D[6], L + d * 6, O[3].y); at(D[7], L + d * 12, by);
+  const base = D.map(p => ({ x: p.x, y: p.y }));
   for (const p of D) {
     const a = p.assign;
     if (a.type === 'man' && p.slot >= 5) { const t = O[a.t]; at(p, t.x + d * (p.pos === 'CB' ? 2 : 4), t.y + (t.y > by ? -0.6 : 0.6)); }
@@ -232,6 +232,14 @@ function setupPlay(offPlay, defPlay, preview) {
     if (a.type === 'zone' && p.slot >= 5 && a.d > 10) { at(p, L + d * Math.min(a.d - 4, 14), lerp(p.y, zoneY(a.y), 0.4)); }
   }
 
+  // the CPU defense disguises its call: blitzers sometimes hide in base spots, cover guys sometimes walk up like they're coming
+  if (!preview && dsd !== G.human && G.human >= 0 && !G.versus) {
+    D.forEach((p, i) => {
+      if ((p.x !== base[i].x || p.y !== base[i].y) && chance(0.5)) at(p, base[i].x, base[i].y);
+      else if (p.assign.type !== 'rush' && p.slot >= 3 && p.slot <= 6 && chance(0.22)) at(p, L + d * 2.6, lerp(p.y, by, 0.35));
+    });
+    if (D[7].assign.type === 'zone' && D[7].assign.d > 10 && chance(0.3)) at(D[7], L + d * 7, by + rand(-5, 5)); // safety rotates late
+  }
   G.players = P; G.O = O; G.D = D;
   G.refs = [{ x: L - d * 11, y: clamp(by + 7, 3, FIELD_W - 3), face: -d, anim: 0, throwT: 0 },
             { x: L + d * 17, y: clamp(by - 6, 3, FIELD_W - 3), face: -d, anim: 0, throwT: 0 }];
@@ -1105,10 +1113,16 @@ function throwAt(qb, tx, ty, style) {
   if (!r) return;
   throwTo(qb, r, false, { x: tx, y: clamp(ty, -0.5, FIELD_W + 0.5) }, style);
 }
+// QB arm: throw power sets how far and how fast, accuracy sets how close it lands to where you wanted
+function qbArm(qb) {
+  const thp = qb.thp || qb.ovr, acc = qb.tha || qb.ovr; // thp = throw power, tha = throw accuracy (created players have their own)
+  return { thp, acc, range: 18 + thp * 0.52, accF: Math.pow(clamp((100 - acc) / 30, 0, 4), 1.3) };
+}
 function throwTo(qb, r, pitch = false, aimed = null, style = 'normal', lead = null) {
   const b = G.ball;
+  const arm = qbArm(qb);
   const sMul = style === 'bullet' ? 1.3 : style === 'lob' ? 0.72 : 1;
-  const spd = (pitch ? 13 : 19 + (qb.ovr - 70) * 0.14) * GAME_SPEED * (pitch ? 1 : sMul);
+  const spd = (pitch ? 13 : Math.max(11, 19 + (arm.thp - 70) * 0.16)) * GAME_SPEED * (pitch ? 1 : sMul);
   let tx = r.x, ty = r.y, T = 0.3;
   const sitting = r.route && r.route.end === 'sit' && r.route.i >= r.route.pts.length;
   if (aimed) { tx = aimed.x; ty = aimed.y; T = Math.max(0.3, Math.hypot(tx - qb.x, ty - qb.y) / spd); }
@@ -1118,14 +1132,26 @@ function throwTo(qb, r, pitch = false, aimed = null, style = 'normal', lead = nu
     tx = r.x + r.vx * T; ty = r.y + r.vy * T;
   }
   if (lead && lead.m > 0.1 && !pitch) { tx += lead.x * 2.6; ty += lead.y * 2.6; } // lead him away from the defender
-  const len = Math.hypot(tx - qb.x, ty - qb.y);
+  let len = Math.hypot(tx - qb.x, ty - qb.y);
+  let duck = false;
   if (!pitch) {
+    // past his range the ball dies short of the spot
+    const reach = arm.range * (style === 'lob' ? 0.92 : style === 'bullet' ? 0.85 : 1) * (G.weather === 'rain' || G.weather === 'snow' ? 0.93 : 1);
+    if (len > reach) {
+      const k = reach * rand(0.9, 1) / len; tx = qb.x + (tx - qb.x) * k; ty = qb.y + (ty - qb.y) * k;
+      len = Math.hypot(tx - qb.x, ty - qb.y); duck = true;
+      addText(qb.x, qb.y - 2, 'NOT ENOUGH ARM', '#ff8a8a', 15, 0.9);
+    }
     let pressure = false; for (const df of G.D) if (!df.engaged && dist(df, qb) < 2.4) pressure = true;
-    let err = (1.4 - (qb.ovr - 60) / 60) * (0.4 + len / 24);
-    if (pressure) err += 0.9;
-    if (qb.speedNow > 4) err += 0.4;
-    if (aimed) err *= 0.45; // you aimed it yourself
+    let err = (0.4 + arm.accF) * (0.35 + len / 22);
+    if (len > reach * 0.75) err *= 1 + (len / reach - 0.75) * 2; // straining for distance
+    if (pressure) err += 0.6 + arm.accF * 0.45;
+    if (qb.speedNow > 4) err += (0.3 + arm.accF * 0.3) * Math.min(1, qb.speedNow / 8);
+    if (aimed) err *= lerp(0.45, 0.85, clamp(arm.accF / 2.5, 0, 1)); // you aimed it, but a bad QB still sprays it
     if (style === 'bullet') err *= 1.15; else if (style === 'lob') err *= 0.9;
+    if (qb.xf && qb.xf.on && qb.xf.kind === 'dimes') err *= 0.35;
+    if (G.weather === 'rain' || G.weather === 'snow') err *= 1.15;
+    if (arm.thp < 62 || err > 3.5) duck = true;
     if (style !== 'normal') addText(qb.x, qb.y, style === 'bullet' ? 'BULLET!' : 'LOB!', '#7fd3ff', 15, 0.6);
     const a = rand(0, Math.PI * 2), m = Math.abs(rand(-1, 1) + rand(-1, 1)) / 2 * err * 2;
     tx += Math.cos(a) * m; ty += Math.sin(a) * m;
@@ -1136,7 +1162,7 @@ function throwTo(qb, r, pitch = false, aimed = null, style = 'normal', lead = nu
   ty = clamp(ty, -0.5, FIELD_W + 0.5);
   b.holder = null;
   const pk = pitch ? 0.4 : (0.6 + len * 0.1) * (style === 'bullet' ? 0.45 : style === 'lob' ? 1.9 : 1) + (style === 'lob' ? 1.5 : 0);
-  b.flight = { sx: qb.x, sy: qb.y, tx, ty, t: 0, T: Math.max(T, len / spd), peak: pk, intended: r, pitch, passer: qb, style };
+  b.flight = { sx: qb.x, sy: qb.y, tx, ty, t: 0, T: Math.max(T, len / spd), peak: pk, intended: r, pitch, passer: qb, style, duck };
   G.bstate = 'air'; G.intended = r;
   for (const p of G.players) { p.laneChecked = false; p.jumpTried = false; }
   G.passPlay = !pitch;
