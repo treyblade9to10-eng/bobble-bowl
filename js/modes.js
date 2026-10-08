@@ -76,7 +76,7 @@ function miniShell(teamIdx, type) {
   const me = TEAMS[teamIdx]; let oi = (teamIdx + 11) % 32;
   Object.assign(G, { teams: [me, TEAMS[oi]], human: 0, diff: 1, score: [0, 0], quarter: 0, clock: 0, poss: 0, los: 30, ballY: MID, down: 1,
     fx: [], banner: null, flags: [], timeouts: null, special: null, playClock: 0, patSide: null, twoPt: false, demo: false, paused: false, season: false, challenge: null,
-    pstats: {}, tstats: [{ pass: 0, rush: 0, to: 0 }, { pass: 0, rush: 0, to: 0 }], refs: [], km: null });
+    pstats: {}, tstats: [{ pass: 0, rush: 0, to: 0 }, { pass: 0, rush: 0, to: 0 }], refs: [], km: null, xf: null, weather: 'clear', night: false, uni: null, versus: false, pbp: [], pbpShow: null });
   G.mini = { type, t: 0, score: 0 };
   setFirstDown();
 }

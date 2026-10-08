@@ -30,6 +30,7 @@ function spotText(s, x) {
 
 // ---------------- game setup ----------------
 function newGame(home, away, opts) {
+  home = Career.withCAP(home); away = Career.withCAP(away);
   Object.assign(G, {
     teams: [home, away], human: opts.humanSide || 0, diff: opts.diff, flags: [], playClock: 0, playoff: !!opts.playoff, qtrLen: opts.qtr, score: [0, 0], quarter: 1, clock: opts.qtr,
     fx: [], banner: null, players: [], ball: null, patSide: null, twoPt: false, next: null, firstPoss: 1, paused: false,
@@ -37,6 +38,7 @@ function newGame(home, away, opts) {
     timeouts: [3, 3], special: null, pendingRunoff: 0, mini: null, scenario: opts.scenario || null,
     weather: opts.weather || 'clear', night: !!opts.night, uni: opts.uni || null, pbp: [], pbpShow: null, lastResult: null
   });
+  setupXFactors();
   if (opts.scenario) { // e.g. the Two-Minute Challenge
     const sc = opts.scenario;
     Object.assign(G, { quarter: sc.quarter, clock: sc.clock, score: sc.score.slice() });
@@ -141,7 +143,7 @@ function choosePAT(kind) {
 
 // ---------------- formations ----------------
 function makePlayer(side, isOff, slot, tuple) {
-  const [pos, name, num, ovr0, spd0, skin0] = tuple;
+  const [pos, name, num, ovr0, spd0, skin0, ex] = tuple;
   const h = hashStr(name);
   const cpu = side !== G.human;
   const ovr = clamp(ovr0 + (cpu && !G.versus ? [-7, 0, 5, 10][G.diff] : 0), 20, 99);
@@ -160,7 +162,9 @@ function makePlayer(side, isOff, slot, tuple) {
     head: { ox: 0, oy: 0, vx: 0, vy: 0, rot: 0 }, headScale: 1 + ((h >> 9) % 5) * 0.035 + (pos === 'QB' ? 0.06 : 0),
     anim: (h % 100) / 10, speedNow: 0, stamina: 1, down: 0, downDir: 1, stun: 0, spin: 0, juke: 0, jukeCd: 0, spinCd: 0,
     dive: 0, tackleCd: 0, engaged: null, shed: 0, shedCd: 0, mouth: '', mouthT: 0, isHuman: false, throwKey: 0, openness: null,
-    role: 'idle', route: null, assign: null, aiIdle: 0
+    role: 'idle', route: null, assign: null, aiIdle: 0,
+    xf: (G.xf && G.xf[side + ':' + name]) || null,
+    cap: !!(ex && ex.cap), thp: ex && ex.thp || null, tha: ex && ex.tha || null
   };
 }
 
@@ -252,7 +256,7 @@ function setupPlay(offPlay, defPlay, preview) {
   G.runoff = 0; G.passPlay = offPlay.type === 'pass';
   // human control
   for (const p of P) p.isHuman = false;
-  if (o !== G.human) G.humanDef = D[3];
+  if (o !== G.human) G.humanDef = D.find(p => p.cap) || D[3];
   updateHuman();
 }
 
@@ -1041,6 +1045,7 @@ function resolveBlocks(dt) {
     let rate = (big ? 0.42 : 0.85) * Math.pow(df.ovr / bl.ovr, 2.2) * rand(0.4, 1.4);
     if (bl.role === 'screenblock') rate *= 1.8;
     if (df.isHuman && Input.axis().m > 0.3) rate *= 1.7;
+    if (xfOn(df, 'unstoppable')) rate *= 2.6;
     if (G.bstate === 'run') rate *= big ? 1.4 : 2.8;
     df.shed += rate * dt;
     // the defender pushes slowly toward where he wants to go
@@ -1192,7 +1197,7 @@ function updateFlight(dt) {
       const jumping = p.jump > 0, reach = jumping ? 1.4 : 0.5, high = jumping ? 3.6 : 2.0;
       if (b.z > high || Math.hypot(p.x - b.x, p.y - b.y) > reach) continue;
       p.laneChecked = true;
-      const pInt = clamp((jumping ? (p.isHuman ? 0.75 : 0.5) : 0.7) + (p.ovr - 80) / 200 + (p.isHuman ? 0.05 : 0), 0.4, 0.9);
+      const pInt = clamp((jumping ? (p.isHuman ? 0.75 : 0.5) : 0.7) + (p.ovr - 80) / 200 + (p.isHuman ? 0.05 : 0) + (xfOn(p, 'lurker') ? 0.1 : 0), 0.4, 0.95);
       b.flight = null; G.showTarget = false;
       if (chance(pInt)) { addText(p.x, p.y, jumping ? 'SKY HIGH!' : 'PICKED!', '#7fd3ff', 22, 0.9); return intercept(p); }
       return incomplete(p, 'TIPPED!');
@@ -1221,13 +1226,14 @@ function resolveCatch() {
     if (chance(pInt)) return intercept(jumper);
     if (chance(0.6)) return incomplete(jumper, 'SWATTED!');
   }
-  const humanDefBonus = def && def.isHuman ? 0.15 : 0;
+  const humanDefBonus = (def && def.isHuman ? 0.15 : 0) + (xfOn(def, 'lurker') ? 0.2 : 0);
   const R = 1.45;
-  if (def && dd < 0.5 && dd < rd - 0.3) { // ball hits the defender right in the body: 7 out of 10 get picked
+  const hands = xfOn(rcv, 'hands') && rd < 1.6; // a "Double Me" guy usually wins the 50-50 ball
+  if (def && dd < 0.5 && dd < rd - 0.3 && !(hands && chance(0.7))) { // ball hits the defender right in the body: 7 out of 10 get picked
     if (chance(0.7)) return intercept(def);
     return incomplete(def, 'BROKEN UP!');
   }
-  if (def && dd < 1.25 && dd < rd - 0.25) { // defender has inside position
+  if (def && dd < 1.25 && dd < rd - 0.25 && !(hands && chance(0.7))) { // defender has inside position
     const pInt = clamp(0.22 + (def.ovr - 75) / 120 + humanDefBonus + (G.diff === 3 && !def.isHuman ? 0.1 : 0) - (rd < 1 ? 0.12 : 0), 0.1, 0.8);
     if (chance(pInt)) return intercept(def);
     return incomplete(def, 'BROKEN UP!');
@@ -1235,7 +1241,8 @@ function resolveCatch() {
   if (rcv && rd < R && def && dd < 1.0 && chance(0.03)) { throwFlag('DPI', def.side, land.x, land.y, def); return incomplete(def, 'INTERFERENCE!'); }
   if (rcv && rd < R) {
     let pc = 0.86 + (rcv.ovr - 78) / 140 - (rd > 0.9 ? 0.12 : 0) - Weather.catchPenalty();
-    if (def && dd < 1.4) { pc -= 0.28 - (rcv.ovr - def.ovr) / 150; if (chance(0.03 + humanDefBonus * 0.5)) return intercept(def); }
+    if (hands) pc += 0.15;
+    if (def && dd < 1.4) { pc -= (hands ? 0.1 : 0.28) - (rcv.ovr - def.ovr) / 150; if (chance(0.03 + humanDefBonus * 0.5)) return intercept(def); }
     if (chance(clamp(pc, 0.25, 0.97))) {
       b.holder = rcv; G.bstate = 'run'; Sound.catch(); G.catchX = rcv.x;
       rcv.mouth = 'O'; rcv.mouthT = 0.4;
@@ -1288,7 +1295,9 @@ function checkTackles() {
     if (df.hit > 0) p = 0.5 + (df.ovr - car.ovr) / 100 - (car.juke > 0 ? 0.3 : 0);
     if (car.pos === 'QB' && G.bstate === 'snap') p += 0.12;
     if (car.pos === 'OL' || car.pos === 'DL') p += 0.2;
-    if (car.side === G.human) p += [-0.08, 0, 0.06, 0.13][G.diff];
+    if (car.side === G.human && !G.versus) p += [-0.08, 0, 0.06, 0.13][G.diff];
+    if (xfOn(car, 'freight')) p -= 0.25;
+    if (xfOn(df, 'unstoppable')) p += 0.1;
     p = clamp(p, 0.1, 0.94);
     if (chance(p)) return tackle(car, df, hitters);
     if (df.hit > 0) { df.hit = 0; df.down = 1.1; df.downDir = car.x > df.x ? 1 : -1; addText(df.x, df.y, 'WHIFF!', '#ccc', 18, 0.8); continue; }
@@ -1363,6 +1372,7 @@ function endPlay(res) {
   G.flagNote = null; G.pendingRunoff = 0;
   if (G.special) { G.flags = []; return endReturn(res); }
   G.lastResult = pbpPlay(res);
+  xfAfterPlay(res, G.lastResult);
   if (G.flags && G.flags.length) { if (G.twoPt) G.flags = []; else if (enforcePenalty(res)) return; }
   const off = G.poss, d = dirOf(off);
   const car = res.carrier;
@@ -1494,7 +1504,7 @@ function doKick(kind) {
   setupPlay(OFF_PLAYS[2], DEF_PLAYS[0], true);
   const kk = kickerOf(s, kind);
   const kicker = G.O[0];
-  Object.assign(kicker, { name: kk.name, num: kk.num, ovr: kk.ovr, pos: kind === 'punt' ? 'P' : 'K' });
+  Object.assign(kicker, { name: kk.name, num: kk.num, ovr: kk.ovr, pos: kind === 'punt' ? 'P' : 'K', cap: false, xf: null });
   if (kk.skin != null) kicker.face.skin = kk.skin;
   kicker.x = G.los - d * (kind === 'punt' ? 12 : 8.5); kicker.y = G.ballY - (kind === 'punt' ? 0 : 1.2);
   if (kind !== 'punt') { const h = G.O[1]; h.x = G.los - d * 7; h.y = G.ballY; h.face.dir = -d; }

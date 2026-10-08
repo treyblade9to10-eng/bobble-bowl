@@ -23,9 +23,11 @@
     </div>
     <div class="row">
       <button class="big" id="btnModes">CHALLENGES</button>
+      <button class="big" id="btnCap">MY PLAYER</button>
     </div>
     <div class="row">
       <button id="btnHow">HOW TO PLAY</button>
+      <button id="btnTrophies">TROPHY CASE</button>
       <button id="btnMode">MODE: <span id="modeLabel">?</span></button>
     </div>
   </div>
@@ -130,6 +132,19 @@
     </div>
   </div>
 
+  <!-- My Player (create-a-player) -->
+  <div id="cap" class="screen">
+    <h2>My Player</h2>
+    <div id="capBody"></div>
+  </div>
+
+  <!-- Trophy case -->
+  <div id="trophies" class="screen">
+    <h2>Trophy Case</h2>
+    <div id="troBody"></div>
+    <button id="troBack">BACK</button>
+  </div>
+
   <!-- Challenges & mini-games -->
   <div id="modes" class="screen">
     <h2>Challenges</h2>
@@ -159,6 +174,7 @@
     <h2 id="overTitle">FINAL</h2>
     <div id="overScore"></div>
     <div id="overChal"></div>
+    <div id="overCap"></div>
     <div id="overMain">
       <div id="mvpBox"><div class="mvpTag">GAME MVP</div><canvas id="mvpCv" width="260" height="300"></canvas><div id="mvpText"></div></div>
       <div id="overStats"></div>
@@ -211,10 +227,13 @@
 <script src="js/weather.js"></script>
 <script src="js/pbp.js"></script>
 <script src="js/replay.js"></script>
+<script src="js/xfactor.js"></script>
+<script src="js/career.js"></script>
 <script src="js/engine.js"></script>
 <script src="js/special.js"></script>
 <script src="js/season.js"></script>
 <script src="js/modes.js"></script>
 <script src="js/main.js"></script>
+<script src="js/careerui.js"></script>
 </body>
 </html>

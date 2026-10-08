@@ -73,11 +73,14 @@ function teamOvr(t) { const all = t.off.concat(t.def); return Math.round(all.red
 const sel = { idx: [TEAMS.findIndex(t => t.id === 'KC'), TEAMS.findIndex(t => t.id === 'PHI')], you: 0 }; // idx[0] = home, idx[1] = away
 try { const saved = JSON.parse(localStorage.getItem('bobbleSel') || 'null'); if (saved) Object.assign(sel, saved); } catch (e) {}
 function teamCard(t) {
+  t = Career.withCAP(t);
+  const xfs = teamXFactors(t);
   const ovr = teamOvr(t), offO = Math.round(t.off.reduce((a, p) => a + p[3], 0) / 8), defO = Math.round(t.def.reduce((a, p) => a + p[3], 0) / 8);
   const stars = t.off.concat(t.def).slice().sort((a, b) => b[3] - a[3]).slice(0, 5);
   return `<div class="ab">${t.id}</div><div class="nm">${t.city}<br>${t.name}</div>
     <div class="ov">${ovr} OVR</div><div style="font-size:12px;margin-bottom:6px;text-shadow:1px 1px 0 #000">OFF ${offO} • DEF ${defO}</div>
     <div class="stars">${stars.map(p => `<div>${p[0]} <b>${p[3]}</b> #${p[2]} ${p[1]}</div>`).join('')}</div>
+    ${xfs.length ? `<div class="xfl"><span>X-FACTOR</span> ${xfs.map(x => lastName(x.name)).join(', ')}</div>` : ''}
     <div class="cnt">${TEAMS.indexOf(t) + 1} / ${TEAMS.length}</div>`;
 }
 function renderSelect(bumpSide) {
@@ -263,6 +266,10 @@ G.hooks.onGameOver = s => {
       line('Tackles', L.tkl, 'tkl', '') + line('Sacks', L.sack, 'sack', '') + line('INTs', L.int, 'int', '') + '</div>';
   }
   $('overStats').innerHTML = html;
+  // my player XP + trophy case
+  const cr = !G.challenge && !G.mini ? Career.afterGame(s) : null;
+  Career.gameDone(s);
+  $('overCap').innerHTML = cr ? `MY PLAYER <b>${Career.cap.name}</b>: ${cr.line}. <b>+${cr.xp} XP</b>${cr.ups ? `<span class="lvl">OVR ${cr.before} → ${cr.after}</span>` : ''}` : '';
   // MVP: best performer on the winning team (or yours if tied)
   const mvpSide = won || tie ? me : them;
   const score = p => p.pass / 20 + p.rush / 8 + p.rec / 8 + p.td * 6 + p.tkl * 1.5 + p.sack * 4 + p.int * 6;
@@ -543,7 +550,7 @@ $('moBack').onclick = () => { G.mini = null; G.teams = null; openModes(); };
 // ---------- title screen background: a fake game ----------
 function demoSetup() {
   const a = pick(TEAMS); let b; do { b = pick(TEAMS); } while (b === a);
-  Object.assign(G, { teams: [a, b], human: -1, diff: 1, poss: 0, los: rand(30, 70), ballY: MID, down: 1, score: [0, 0], quarter: 1, clock: 180, demo: true, fx: [], weather: 'clear', night: false, uni: null, versus: false,
+  Object.assign(G, { teams: [a, b], human: -1, diff: 1, poss: 0, los: rand(30, 70), ballY: MID, down: 1, score: [0, 0], quarter: 1, clock: 180, demo: true, fx: [], weather: 'clear', night: false, uni: null, versus: false, xf: null,
     pstats: {}, tstats: [{ pass: 0, rush: 0, to: 0 }, { pass: 0, rush: 0, to: 0 }], patSide: null, twoPt: false, next: null, paused: false, slowmo: 0, banner: null });
   setFirstDown();
   setupPlay(pick(OFF_PLAYS), pick(DEF_PLAYS));
@@ -551,6 +558,7 @@ function demoSetup() {
 }
 
 // ---------- main loop ----------
+const menuScreens = ['title', 'how', 'select', 'mode', 'seasonNew', 'seasonHub', 'modes', 'miniOver', 'cap', 'trophies'];
 let last = performance.now();
 function frame(now) {
   requestAnimationFrame(frame); // schedule first so one bad frame can't freeze the game
@@ -559,7 +567,7 @@ function frame(now) {
 function step(now) {
   const dt = clamp((now - last) / 1000, 0, 0.033); last = now;
   if (Input.pointer.down) Input.pointer.t += dt;
-  const inMenu = ['title', 'how', 'select', 'mode', 'seasonNew', 'seasonHub', 'modes', 'miniOver'].some(id => $(id).classList.contains('show')) && !(G.mini && $('miniOver').classList.contains('show'));
+  const inMenu = menuScreens.some(id => $(id).classList.contains('show')) && !(G.mini && $('miniOver').classList.contains('show'));
   if (inMenu) {
     if (!G.demo || G.phase === 'over') demoSetup();
     if (G.phase === 'live' && G.play.t > 7) G.phase = 'dead';

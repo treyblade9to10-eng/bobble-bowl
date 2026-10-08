@@ -230,6 +230,7 @@ function drawPlayer(g, p, G, at) {
     g.strokeStyle = '#ffe14d'; g.lineWidth = 3.5;
     g.beginPath(); g.ellipse(x, y, 22 * pulse, 9 * pulse, 0, 0, 7); g.stroke();
   }
+  if (!at) drawXFRing(g, p, x, y);
   g.fillStyle = '#00000055'; g.beginPath(); g.ellipse(x, y, big ? 19 : 15, 6, 0, 0, 7); g.fill();
   // stamina bar under the player you control
   if (p.isHuman && !at && G.phase === 'live' && p.stamina != null) {
@@ -348,13 +349,15 @@ function drawPlayer(g, p, G, at) {
   // labels
   const headTop = y - hop - (big ? 85 : 92);
   if (at || G.phase === 'kick' || G.phase === 'kickmeter') return;
-  const showName = p.isHuman || carrying || (G.phase === 'presnap' && p.off && p.slot <= 4 && p.side === G.human);
+  if (p.xf && p.xf.on && p.down <= 0) { drawXFBadge(g, p, x, headTop - (p.isHuman || carrying ? 44 : 4)); }
+  const showName = p.isHuman || carrying || p.cap || (G.phase === 'presnap' && p.off && p.slot <= 4 && p.side === G.human);
   let ly = headTop;
   if (showName && p.down <= 0) {
     g.font = 'bold 13px Barlow, Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
     const label = (p.isHuman || carrying) ? `${p.name}` : lastName(p.name);
     const w = g.measureText(label).width + 14;
     g.fillStyle = p.isHuman ? '#ffe14d' : '#000000c0'; roundRect(g, x - w / 2, ly - 10, w, 20, 10); g.fill();
+    if (p.cap) { g.strokeStyle = '#f6c31c'; g.lineWidth = 2; g.stroke(); }
     g.fillStyle = p.isHuman ? '#111' : '#fff'; g.fillText(label, x, ly + 1);
     if (p.isHuman || carrying) { g.font = 'bold 10px Barlow, Arial, sans-serif'; g.fillStyle = '#fff'; g.strokeStyle = '#000'; g.lineWidth = 3; const r = `${p.pos} • ${p.ovr} OVR`; g.strokeText(r, x, ly - 17); g.fillText(r, x, ly - 17); }
     ly -= 30;

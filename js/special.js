@@ -31,7 +31,7 @@ function setupReturn(kind, k) {
   const at = (p, x, y) => { p.x = x; p.y = clamp(y, 2, FIELD_W - 2); p.hx = p.x; p.hy = p.y; p.role = 'ret'; p.face.dir = dirOf(p.side); };
   // the kicker / punter joins the coverage team
   const kk = kickerOf(k, kind === 'punt' ? 'punt' : 'fg');
-  Object.assign(D[1], { name: kk.name, num: kk.num, ovr: kk.ovr, pos: kind === 'punt' ? 'P' : 'K' });
+  Object.assign(D[1], { name: kk.name, num: kk.num, ovr: kk.ovr, pos: kind === 'punt' ? 'P' : 'K', cap: false, xf: null });
   if (kk.skin != null) D[1].face.skin = kk.skin;
   if (kind === 'punt') {
     D.forEach((p, i) => at(p, spot - dk * 0.8, MID + (i - 3.5) * 3.2));
@@ -182,7 +182,7 @@ function setupFake(play) {
   setupPlay(play, KICK_RUSH);
   const qb = G.O[0], d = dirOf(G.poss);
   const kk = kickerOf(G.poss, play.fakeKind === 'punt' ? 'punt' : 'fg');
-  if (play.fakeKind === 'punt') { Object.assign(qb, { name: kk.name, num: kk.num, ovr: Math.min(qb.ovr, kk.ovr - 5), pos: 'P' }); if (kk.skin != null) qb.face.skin = kk.skin; qb.x = G.los - d * 9; qb.hx = qb.x; }
+  if (play.fakeKind === 'punt') { Object.assign(qb, { name: kk.name, num: kk.num, ovr: Math.min(qb.ovr, kk.ovr - 5), pos: 'P', cap: false, xf: null, thp: null, tha: null }); if (kk.skin != null) qb.face.skin = kk.skin; qb.x = G.los - d * 9; qb.hx = qb.x; }
   else { qb.x = G.los - d * 7; qb.hx = qb.x; qb.ovr = Math.min(qb.ovr, 72); }
   G.fake = play.fakeKind;
 }
