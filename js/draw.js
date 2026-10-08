@@ -18,7 +18,7 @@ function wy(py) { return (py - CH / 2 - VY) / PY + cam.y; }
 const FIELD_PAD_X = 6, FIELD_PAD_TOP = 8, FIELD_PAD_BOT = 5;
 let fieldCv = null, fieldKey = '';
 function buildField(G) {
-  const key = G.teams[0].id + G.teams[1].id;
+  const key = G.teams[0].id + G.teams[1].id + (G.demo ? 'd' : '');
   if (fieldKey === key && fieldCv) return;
   fieldKey = key;
   const W = Math.ceil((120 + FIELD_PAD_X * 2) * PX), H = Math.ceil((FIELD_W + FIELD_PAD_TOP + FIELD_PAD_BOT) * PY);
@@ -26,10 +26,12 @@ function buildField(G) {
   const g = fieldCv.getContext('2d');
   const fx = x => (x + FIELD_PAD_X) * PX, fy = y => (y + FIELD_PAD_TOP) * PY;
   // stands
+  const stad = stadiumOf(G.teams[0]);
   const st = g.createLinearGradient(0, 0, 0, fy(-1.2));
-  st.addColorStop(0, '#0e1420'); st.addColorStop(1, '#253147');
+  st.addColorStop(0, stad.dome ? '#07090d' : '#0e1420'); st.addColorStop(1, stad.dome ? '#1b2230' : '#253147');
   g.fillStyle = st; g.fillRect(0, 0, W, fy(-1.2));
-  const cols = [G.teams[0].c1, G.teams[0].c2, G.teams[1].c1, '#e8e8e8', '#9aa3ad', G.teams[0].c1];
+  // home crowd: mostly home colors, a few away fans
+  const cols = [G.teams[0].c1, G.teams[0].c2, G.teams[0].c1, G.teams[1].c1, '#e8e8e8', G.teams[0].c1, G.teams[0].c2];
   for (let row = 0; row < 6; row++) for (let i = 0; i < W / 13; i++) {
     const h = hashStr(row + ':' + i);
     g.fillStyle = cols[h % cols.length];
@@ -38,17 +40,19 @@ function buildField(G) {
   }
   // ad wall
   g.fillStyle = '#10151d'; g.fillRect(0, fy(-1.9), W, 0.9 * PY);
-  g.fillStyle = '#ffffff22'; g.font = 'bold 9px Barlow, Arial, sans-serif'; g.textAlign = 'left';
-  for (let x = 0; x < W; x += 260) g.fillText('BOBBLE BOWL  •  8 ON 8  •  BIG HEADS ONLY', x + 10, fy(-1.35));
+  if (stad.dome) { g.fillStyle = '#ffffff10'; for (let x = 0; x < W; x += 90) g.fillRect(x, 0, 3, 8); } // roof trusses
+  g.fillStyle = '#ffffff30'; g.font = 'bold 9px Barlow, Arial, sans-serif'; g.textAlign = 'left';
+  const wall = `${stad.name.toUpperCase()}  •  ${G.teams[0].city.toUpperCase()}  •  BOBBLE BOWL`;
+  for (let x = 0; x < W; x += 300) g.fillText(wall, x + 10, fy(-1.35));
   // apron + grass
   g.fillStyle = '#2b6b2e'; g.fillRect(0, fy(-1.2), W, H - fy(-1.2));
   for (let yd = -FIELD_PAD_X; yd < 120 + FIELD_PAD_X; yd += 5) {
     const inField = yd >= 0 && yd < 120;
-    g.fillStyle = !inField ? '#2b6b2e' : (Math.floor(yd / 5) % 2 === 0) ? '#3d9a43' : '#378f3c';
+    g.fillStyle = !inField ? (stad.turf ? '#23743a' : '#2b6b2e') : stad.turf ? ((Math.floor(yd / 5) % 2 === 0) ? '#34a04f' : '#2f9749') : (Math.floor(yd / 5) % 2 === 0) ? '#3d9a43' : '#378f3c';
     g.fillRect(fx(yd), fy(0), 5 * PX + 1, FIELD_W * PY);
   }
   // mowing texture
-  g.globalAlpha = 0.05; g.fillStyle = '#000';
+  g.globalAlpha = stad.turf ? 0.02 : 0.05; g.fillStyle = '#000';
   for (let y = 0; y < FIELD_W; y += 2) g.fillRect(fx(0), fy(y), 120 * PX, PY * 0.5);
   g.globalAlpha = 1;
   // end zones
@@ -74,7 +78,13 @@ function buildField(G) {
     for (const ny of [8.5, 44.8]) { g.fillStyle = '#ffffffd8'; g.fillText(String(n), fx(yd), fy(ny)); }
   }
   // midfield circle
-  g.strokeStyle = '#ffffff55'; g.lineWidth = 4; g.beginPath(); g.ellipse(fx(60), fy(FIELD_W / 2), 4 * PX, 4 * PY, 0, 0, 7); g.stroke();
+  // home team logo at midfield
+  const ht = G.teams[0];
+  g.fillStyle = ht.c1 + 'd0'; g.beginPath(); g.ellipse(fx(60), fy(FIELD_W / 2), 4.4 * PX, 4.4 * PY, 0, 0, 7); g.fill();
+  g.strokeStyle = ht.c2; g.lineWidth = 5; g.stroke();
+  g.font = 'italic 900 56px "Barlow Condensed", "Arial Black", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.lineWidth = 6; g.strokeStyle = shade(ht.c1, -0.5); g.strokeText(ht.id, fx(60), fy(FIELD_W / 2) + 2);
+  g.fillStyle = ht.c2 === '#000000' ? '#fff' : ht.c2; g.fillText(ht.id, fx(60), fy(FIELD_W / 2) + 2);
   // sidelines
   g.strokeStyle = '#fff'; g.lineWidth = 7; g.strokeRect(fx(0), fy(0), 120 * PX, FIELD_W * PY);
   // goal posts at the back of each end zone (fake 3D: height goes up and leans outward)

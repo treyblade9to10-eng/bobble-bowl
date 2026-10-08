@@ -371,6 +371,7 @@ $('btnNewTeams').onclick = () => { const c = G.challenge; G.teams = null; G.chal
 function togglePause() {
   if (!G.teams || G.phase === 'over' || G.demo) return;
   G.paused = !G.paused;
+  if (G.paused && Commentary.ok) speechSynthesis.cancel();
   if (G.paused) { G.pauseFrom = $('playcall').classList.contains('show') ? 'playcall' : null; $('pausePbp').innerHTML = pbpHtml(8); show('pause'); }
   else show(G.pauseFrom);
 }
@@ -379,6 +380,9 @@ $('btnResume').onclick = togglePause;
 const replayLabel = () => { $('btnReplayOpt').textContent = 'INSTANT REPLAYS: ' + (Replay.enabled ? 'ON' : 'OFF'); };
 replayLabel();
 $('btnReplayOpt').onclick = () => { Replay.setEnabled(!Replay.enabled); replayLabel(); };
+const talkLabel = () => { $('btnTalkOpt').textContent = 'COMMENTARY: ' + (Commentary.enabled ? 'ON' : 'OFF'); $('btnTalkOpt').style.display = Commentary.ok ? '' : 'none'; };
+talkLabel();
+$('btnTalkOpt').onclick = () => { Commentary.set(!Commentary.enabled); talkLabel(); };
 $('btnQuit').onclick = () => {
   SaveGame.clear();
   G.paused = false; G.teams = null; G.phase = 'idle';
@@ -458,10 +462,11 @@ function updateMobileButtons() {
   $('joy').classList.toggle('on', !!joyOn);
   if (!joyOn && Input.stick.m) { Input.stick.x = Input.stick.y = Input.stick.m = 0; $('joyKnob').style.left = $('joyKnob').style.top = '43px'; }
   const side = G.poss === G.human ? 'off' : 'def';
-  const key = st + side + (b && b.flight ? 'air' : '') + (h && h.engaged ? 'eng' : '');
+  const po = G.play && G.play.off, canMotion = !!po && (po.type === 'pass' || po.toss || po.carrier === 4);
+  const key = st + side + canMotion + (b && b.flight ? 'air' : '') + (h && h.engaged ? 'eng' : '');
   if (key === mbState) return;
   mbState = key;
-  document.querySelectorAll('#mbtns button').forEach(x => x.classList.toggle('on', x.dataset.show === st && (!x.dataset.side || x.dataset.side === side)));
+  document.querySelectorAll('#mbtns button').forEach(x => x.classList.toggle('on', x.dataset.show === st && (!x.dataset.side || x.dataset.side === side) && (x.dataset.k !== 'KeyM' || canMotion)));
   $('mbDive').textContent = b && b.flight ? 'JUMP' : 'DIVE';
   $('mbSwim').style.display = st === 'def' && h && h.engaged ? 'block' : 'none';
   $('mbTO').style.display = st === 'presnap' && G.timeouts && G.timeouts[G.human] > 0 && G.pendingRunoff > 0 ? 'block' : 'none';

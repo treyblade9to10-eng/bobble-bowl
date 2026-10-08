@@ -51,7 +51,7 @@ function newGame(home, away, opts) {
     showBanner(sc.title, sc.sub, '#ffd23f', 2.6);
     return toPlayCall();
   }
-  showBanner('KICKOFF!', `${away.city} ${away.name} get the ball first`, '#fff', 2.2);
+  showBanner('KICKOFF!', `Live from ${G.stadium.name}  •  ${away.name} get the ball first`, '#fff', 2.4);
   startKickoff(0);
 }
 function initGame(home, away, opts) {
@@ -60,7 +60,7 @@ function initGame(home, away, opts) {
     fx: [], banner: null, players: [], ball: null, patSide: null, twoPt: false, next: null, firstPoss: 1, paused: false,
     pstats: {}, tstats: [{ pass: 0, rush: 0, to: 0 }, { pass: 0, rush: 0, to: 0 }],
     timeouts: [3, 3], special: null, pendingRunoff: 0, twoMinQ: 0, twoMinAfterPlay: false, runFrom: 0, mini: null, scenario: opts.scenario || null,
-    weather: opts.weather || 'clear', night: !!opts.night, uni: opts.uni || null, pbp: [], pbpShow: null, lastResult: null,
+    weather: stadiumOf(home).dome ? 'clear' : (opts.weather || 'clear'), night: !!opts.night, stadium: stadiumOf(home), uni: opts.uni || null, pbp: [], pbpShow: null, lastResult: null,
     versus: !!opts.versus, p1: opts.humanSide || 0, hd: [null, null], hp: [null, null], humanDef: null
   });
   if (G.versus) G.diff = 1;
