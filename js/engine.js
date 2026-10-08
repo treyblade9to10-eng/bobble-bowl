@@ -993,7 +993,14 @@ function ai(p, dt) {
         const dd = Math.hypot(r.x - zx, r.y - zy);
         if (dd < td) { td = dd; threat = r; }
       }
-      if (threat) {
+      // deep zones never let anyone get behind them: stay on top of the deepest guy in your half
+      const deepTh = a.d >= 12 ? deepestIn(zy, a.d >= 14 ? 14 : 8, G.los + d * (a.d - 6)) : null;
+      // short zones "carry" a receiver running straight past them (sideline or seam) when no deep help is over there
+      let carry = !deepTh && a.d <= 8 ? deepestIn(zy, a.y === 'edgeT' || a.y === 'edgeB' ? 7 : 6, p.x - d * 2) : null;
+      if (carry && d * (carry.x - G.los) < 6 && d * carry.vx < 4) carry = null; // only carry guys who are actually going deep
+      if (deepTh) steer(p, deepTh.x + d * 2.5, clamp(deepTh.y, zy - 14, zy + 14), 1, 0.4);
+      else if (carry && !deepHelp(carry, p) && d * (carry.x - G.los) < 26) steer(p, carry.x + d * 2, carry.y + (carry.y < MID ? 0.8 : -0.8), 1, 0.4);
+      else if (threat) {
         const tx = clamp(threat.x + d * 1.5, Math.min(zx - 7, zx + 7), Math.max(zx - 7, zx + 7));
         const ty = clamp(threat.y, zy - 7, zy + 7);
         steer(p, tx, ty, 0.95, 0.5);
@@ -1006,6 +1013,17 @@ function ai(p, dt) {
   if (G.qbScramble && dist(p, holder) < 9) pursue(p, holder);
 }
 
+// deepest receiver within `w` yards (sideways) of lane y, past depth x0
+function deepestIn(y, w, x0) {
+  const d = dirOf(G.poss); let best = null;
+  for (const r of G.O) { if (!eligible(r) || Math.abs(r.y - y) > w || d * (r.x - x0) < 0) continue; if (!best || d * (r.x - best.x) > 0) best = r; }
+  return best;
+}
+// is another defender (not p) already over the top of receiver r?
+function deepHelp(r, p) {
+  const d = dirOf(G.poss);
+  return G.D.some(df => df !== p && df.assign.type === 'zone' && df.assign.d >= 12 && d * (df.x - r.x) > -1 && Math.abs(df.y - r.y) < 9);
+}
 // where a player was `ago` seconds back (for late reactions)
 // how long a defender takes to diagnose a run (better players read it faster)
 function readTime(p) { return 0.55 + clamp(92 - p.ovr, 0, 30) * 0.018 + (p.isHuman ? 0 : 0.1); }
