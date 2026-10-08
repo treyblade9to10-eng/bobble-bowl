@@ -421,3 +421,25 @@ body.pad button:focus, body.pad .pcard:focus, body.pad .mdcard:focus, body.pad .
 #onStatus { max-width: 640px; text-align: center; margin: 14px 0; font-size: 16px; color: #dfe6ee; min-height: 22px; }
 #onWait { display: none; position: absolute; left: 50%; top: 46%; transform: translate(-50%, -50%); z-index: 25; background: #0b0f16e8; border-left: 5px solid var(--gold); padding: 14px 26px; font-family: var(--hd); font-weight: 800; font-size: 22px; letter-spacing: .05em; }
 @media (max-height: 560px) { #onCode { font-size: 72px; } #onCodeIn { font-size: 40px; width: 180px; } }
+
+/* uniform locker */
+.uniBtn { font-size: 13px; padding: 5px 14px; margin: 0; background: var(--panel2); }
+.uniBtn b { color: var(--gold); font-weight: 800; }
+#locker h2 { margin: 0 0 4px; }
+#lkStyles { display: flex; gap: 4px; margin-bottom: 6px; }
+.lkStyle { font-size: 14px; padding: 6px 14px; margin: 0; }
+.lkStyle.on { background: var(--gold); color: #111; }
+#lkWrap { display: flex; gap: 14px; align-items: stretch; max-height: 70vh; }
+#lkStage { display: flex; flex-direction: column; align-items: center; }
+#lkCv { width: auto; height: min(62vh, 460px); aspect-ratio: 420 / 460; background: #0c1016; border: 1px solid var(--line2); touch-action: none; cursor: grab; }
+#lkSpin { display: flex; align-items: center; gap: 10px; font-family: var(--hd); font-weight: 800; font-size: 12px; letter-spacing: .1em; color: var(--dim); }
+.lkRot { padding: 4px 10px; margin: 2px; }
+.lkRot .chev { width: 18px; height: 18px; display: block; fill: none; stroke: #fff; stroke-width: 3; }
+#lkParts { display: flex; flex-direction: column; gap: 6px; justify-content: center; }
+.lkPart { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; text-align: left; margin: 0; padding: 7px 14px; min-width: 230px; clip-path: none; border-left: 4px solid transparent; }
+.lkPart.on { border-left-color: var(--gold); background: #2a3544; }
+.lkPart b { font-size: 16px; }
+.lkSws { display: flex; flex-wrap: wrap; gap: 4px 10px; font-family: var(--bd); font-weight: 500; font-size: 11px; letter-spacing: 0; text-transform: none; color: var(--dim); }
+.lkSw { display: inline-flex; align-items: center; gap: 4px; }
+.lkSw i { width: 12px; height: 12px; border: 1px solid #fff6; display: inline-block; }
+@media (max-height: 500px) { #lkWrap { max-height: 64vh; } #lkCv { height: 58vh; } .lkPart { padding: 4px 10px; min-width: 200px; } .lkPart b { font-size: 13px; } .lkSws { font-size: 10px; } #locker h2 { font-size: 20px; } .lkStyle { font-size: 12px; padding: 4px 10px; } }
