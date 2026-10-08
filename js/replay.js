@@ -16,7 +16,7 @@ const Replay = {
       cam: [cam.x, cam.y], time: G.time
     });
   },
-  want() { return this.enabled && !G.demo && !G.mini && G.lastResult && G.lastResult.big && this.frames.length > 40; },
+  want() { return this.enabled && !G.demo && !G.online && !G.mini && G.lastResult && G.lastResult.big && this.frames.length > 40; },
   start() {
     this.rec = false; this.on = true; this.hold = 0.6;
     this.save = this.frames[this.frames.length - 1];

@@ -13,10 +13,13 @@ function withSide(s, fn) {
   G.hd[G.human] = G.humanDef;
   const h = G.human, ctl = Input.ctl;
   G.human = s; G.humanDef = G.hd[s]; Input.ctl = s === G.p1 ? 0 : 1;
-  try { return fn(); } finally { G.hd[s] = G.humanDef; G.human = h; G.humanDef = G.hd[h]; Input.ctl = ctl; }
+  if (G.online) Input.use(Input.ctl);
+  try { return fn(); } finally { G.hd[s] = G.humanDef; G.human = h; G.humanDef = G.hd[h]; Input.ctl = ctl; if (G.online) Input.use(ctl); }
 }
 function setHD(side, p) { if (G.versus) G.hd[side] = p; if (side === G.human) G.humanDef = p; }
-const pName = s => G.versus ? (s === G.p1 ? 'P1' : 'P2') : (s === G.human ? 'YOU' : 'CPU');
+const pName = s => G.online ? (s === G.human ? 'YOU' : 'OPP') : G.versus ? (s === G.p1 ? 'P1' : 'P2') : (s === G.human ? 'YOU' : 'CPU');
+// mobile or computer controls for whoever is acting right now (online: each player's own device)
+const ctlMobile = () => (G.online && G.netModes ? G.netModes[Input.ctl] : G.mode) === 'mobile';
 const goalX = s => (s === 0 ? 110 : 10);      // goal line this side is attacking
 const ownGoal = s => (s === 0 ? 10 : 110);    // goal line this side defends
 const fromOwn = (s, x) => dirOf(s) * (x - ownGoal(s));
@@ -92,7 +95,7 @@ function toPlayCall() {
   G.flags = [];
   G.fx = G.fx.filter(f => f.kind !== 'flag');
   previewFormation();
-  G.playClock = (isHumanSide(G.poss) && !(G.patSide != null && !G.twoPt)) ? (G.versus ? 40 : G.mode === 'mobile' ? 25 : 20) : 0;
+  G.playClock = (isHumanSide(G.poss) && !(G.patSide != null && !G.twoPt)) ? (G.online ? 30 : G.versus ? 40 : G.mode === 'mobile' ? 25 : 20) : 0;
   G.koPending = false; G.special = null; G.kickoffSide = null; G.callStart = G.time; G.timeoutCalled = false;
   if (G.patSide != null && !G.twoPt) {
     if (isHumanSide(G.patSide)) G.hooks.onPlayCall({ mode: 'pat', side: G.patSide });
@@ -569,14 +572,14 @@ function humanQBInput() {
       P.aiming = true;
       const t = aimTarget(qb, P.x0 - P.x, P.y0 - P.y);
       const back = dirOf(G.poss) * (t.x - qb.x) < -1.5;
-      G.aim = { style: G.mode === 'mobile' ? '' : style, tx: t.x, ty: t.y, run: back, target: back ? null : receiverFor(qb, t.x, t.y), from: { x: P.x0, y: P.y0 }, to: { x: P.x, y: P.y } };
+      G.aim = { style: ctlMobile() ? '' : style, tx: t.x, ty: t.y, run: back, target: back ? null : receiverFor(qb, t.x, t.y), from: { x: P.x0, y: P.y0 }, to: { x: P.x, y: P.y } };
     }
     if (G.ball.holder === qb && Input.release) {
       const v = Input.release;
       if (Math.hypot(v.x, v.y) > 28) {
         const t = aimTarget(qb, v.x, v.y);
         if (dirOf(G.poss) * (t.x - qb.x) < -1.5) qbTakeOff(qb); // aimed backwards = QB runs it
-        else throwAt(qb, t.x, t.y, G.mode === 'mobile' ? (Input.flick ? 'bullet' : 'normal') : style);
+        else throwAt(qb, t.x, t.y, ctlMobile() ? (Input.flick ? 'bullet' : 'normal') : style);
       }
     }
     if (G.ball.holder === qb) for (const c of Input.taps) {
@@ -760,7 +763,7 @@ function humanControl(p, dt) {
   const b = G.ball;
   const isCarrier = b.holder === p;
   if (Input.hit('KeyQ') && !isCarrier) { cycleHumanDef(); }
-  if (G.mode === 'mobile') return mobileControl(p, dt, isCarrier);
+  if (ctlMobile()) return mobileControl(p, dt, isCarrier);
   const ax = Input.axis();
   const sprint = Input.held('ShiftLeft') && p.stamina > 0.05;
   if (sprint && ax.m > 0.1) p.stamina = Math.max(0, p.stamina - dt * 0.32); else p.stamina = Math.min(1, p.stamina + dt * 0.18);
@@ -1849,16 +1852,16 @@ function updateCamera(dt) {
 function updateHint() {
   if (!G.teams) return;
   if (G.phase === 'kickmeter' || G.mini) { G.hint = ''; return; }
-  if (G.cellyGuy && G.phase === 'dead') { G.hint = G.versus ? `${pName(G.cellyGuy.side)}: CELEBRATE!` : G.mode === 'mobile' ? 'CELEBRATE! Tap a celly button' : 'CELEBRATE!  ↑ Leap  •  ↓ Griddy  •  ← Spike  •  → Dab'; return; }
+  if (G.cellyGuy && G.phase === 'dead') { G.hint = G.versus && !G.online ? `${pName(G.cellyGuy.side)}: CELEBRATE!` : G.mode === 'mobile' ? 'CELEBRATE! Tap a celly button' : 'CELEBRATE!  ↑ Leap  •  ↓ Griddy  •  ← Spike  •  → Dab'; return; }
   if (G.mode === 'mobile') return updateHintMobile();
-  if (G.versus) {
+  if (G.versus && !G.online) {
     const k = s => s === G.p1 ? 'SPACE' : 'ENTER';
     G.hint = G.phase === 'presnap' ? `${pName(G.poss)} snaps with ${k(G.poss)}  •  ${pName(1 - G.poss)} picks a defender with ${G.poss === G.p1 ? 'L' : 'Q'}` : '';
     return;
   }
   const humanOff = G.poss === G.human;
   const b = G.ball;
-  if (G.phase === 'presnap') G.hint = humanOff ? (G.play.off.type === 'run' ? 'SPACE snap  •  Z audible  •  T timeout' : 'SPACE snap  •  1-4 hot route  •  M motion  •  Z audible  •  T timeout') : 'Q / TAB pick defender  •  V press  •  B show blitz  •  Z audible  •  T timeout';
+  if (G.phase === 'presnap') G.hint = humanOff ? (G.play.off.type === 'run' ? 'SPACE snap  •  Z audible  •  T timeout' : `SPACE snap  •  1-4 hot route  •  M motion${G.versus ? '' : '  •  Z audible'}  •  T timeout`) : `Q / TAB pick defender  •  V press  •  B show blitz${G.versus ? '' : '  •  Z audible'}  •  T timeout`;
   else if (G.phase === 'live') {
     const h = G.humanPlayer;
     if (h && b.holder === h && h.side === G.human) G.hint = humanCanThrow() ? '1-4 throw (SHIFT = bullet, CTRL = lob, hold WASD to lead)  •  or drag back with mouse' : 'WASD move  •  SHIFT sprint  •  E juke  •  F spin  •  R stiff arm';

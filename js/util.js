@@ -51,10 +51,20 @@ const Input = {
   endFrame() { this.pressed = {}; this.taps.length = 0; this.release = null; },
   // 2-player on one keyboard: the engine always asks for P1's keys, and we translate them for whoever is acting
   versus: false, ctl: 0,
-  map(c) { if (!this.versus) return c; if (this.ctl === 1) return P2KEYS[c] || '-'; return P1BLOCK.has(c) ? '-' : c; },
+  map(c) { if (!this.versus || this.online) return c; if (this.ctl === 1) return P2KEYS[c] || '-'; return P1BLOCK.has(c) ? '-' : c; },
   hit(...codes) { return codes.some(c => this.pressed[this.map(c)]); },
   held(...codes) { return codes.some(c => this.down[this.map(c)]); },
   pads: [null, null], // controller left sticks (see gamepad.js)
+  // online play: the host swaps in the other player's input while the engine runs their side
+  online: false, cur: 0, store: [{}, null],
+  remote() { return { down: {}, pressed: {}, stick: { x: 0, y: 0, m: 0 }, pointer: { down: false, x: 0, y: 0, x0: 0, y0: 0, t: 0, moved: false, aiming: false }, taps: [], release: null, flick: false, pads: [null, null] }; },
+  use(i) {
+    if (this.cur === i || !this.store[i]) return;
+    const K = ['down', 'pressed', 'stick', 'pointer', 'taps', 'release', 'flick', 'pads'], a = this.store[this.cur] || (this.store[this.cur] = {}), b = this.store[i];
+    for (const k of K) a[k] = this[k];
+    for (const k of K) this[k] = b[k];
+    this.cur = i;
+  },
   axis() {
     const pd = this.pads[this.versus ? this.ctl : 0];
     if (pd) return pd;

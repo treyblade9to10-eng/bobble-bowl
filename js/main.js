@@ -72,7 +72,13 @@ function buildHow() {
       <p>Stars have a special ability. String together big plays and they get <b>in the zone</b> (orange glow).</p>
       <p>A bad play, or 8 snaps, knocks them out of it.</p></div>
     <div><h3>My Player</h3>
-      <p>Create your own guy, put him on any team, and play games with that team to earn XP and level him up.</p></div>`;
+      <p>Create your own guy, put him on any team, and play games with that team to earn XP and level him up.</p></div>
+    <div><h3>Online</h3>
+      <p>Tap <b>ONLINE</b>. One player hits <b>HOST</b> and gets a 4-letter code, the other hits <b>JOIN</b> and types it in. Each of you picks plays on your own screen.</p></div>
+    <div><h3>Before the snap</h3>
+      <p><b>MOTION</b> (M) sends a receiver across. If a defender follows him, it's man coverage. On defense: <b>PRESS</b> (V) jams receivers, <b>SHOW BLITZ</b> (B) fakes a blitz.</p></div>
+    <div><h3>Controller</h3>
+      <p>Plug in an Xbox or PlayStation controller. Stick moves, <b>A</b> snap / dive, <b>B</b> juke, <b>X</b> spin, <b>Y</b> stiff arm, <b>RT</b> sprint. Passing: A B X Y throw to receivers 1-4.</p></div>`;
 }
 
 // ---------- title ----------
@@ -188,7 +194,7 @@ function onPlayCall(c) {
   show('playcall');
   // 2-player: hide the cards until the right player is looking
   const cover = $('pcCover');
-  if (G.versus) {
+  if (G.versus && !G.online) {
     const other = pName(1 - c.side);
     cover.innerHTML = `<div class="vsTag big p${c.side === G.p1 ? 1 : 2}">${pName(c.side)}</div><div class="cvT">${c.mode === 'off' ? 'OFFENSE' : c.mode === 'def' ? 'DEFENSE' : c.mode === 'pat' ? 'EXTRA POINT' : 'KICKOFF'}: YOUR CALL</div>
       <div class="cvS">${other}, look away.</div><button class="big" id="pcReveal">SHOW MY PLAYS</button>`;
@@ -233,16 +239,17 @@ function renderCards() {
   // clock tools
   const tool = (txt, fn) => { const b = document.createElement('button'); b.className = 'pgbtn tool'; b.textContent = txt; b.onclick = fn; hint.appendChild(b); };
   const tos = pcCtx.side != null ? pcCtx.side : G.human;
-  if ((pcCtx.mode === 'off' || pcCtx.mode === 'def') && G.timeouts && G.timeouts[tos] > 0 && G.pendingRunoff > 0) tool(`TIMEOUT (${G.timeouts[tos]})`, () => { if (callTimeout(tos)) renderCards(); });
-  if (pcCtx.mode === 'off' && G.down < 4 && G.pendingRunoff > 0) tool('SPIKE', () => { show(null); spikeBall(); });
-  const last = G.versus ? (pcCtx.mode === 'off' ? (G.lastOffKeys || [])[pcCtx.side] : pcCtx.mode === 'def' ? (G.lastDefKeys || [])[pcCtx.side] : null) : pcCtx.mode === 'off' ? G.lastOffKey : pcCtx.mode === 'def' ? G.lastDefKey : null;
+  const guest = G.online && Net.role === 'guest';
+  if ((pcCtx.mode === 'off' || pcCtx.mode === 'def') && G.timeouts && G.timeouts[tos] > 0 && (G.pendingRunoff > 0 || guest)) tool(`TIMEOUT (${G.timeouts[tos]})`, () => { if (guest) { Net.send({ t: 'tool', k: 'timeout' }); Sound.click(); } else if (callTimeout(tos)) renderCards(); });
+  if (pcCtx.mode === 'off' && G.down < 4 && G.pendingRunoff > 0 && !G.online) tool('SPIKE', () => { show(null); spikeBall(); });
+  const last = G.versus && !G.online ? (pcCtx.mode === 'off' ? (G.lastOffKeys || [])[pcCtx.side] : pcCtx.mode === 'def' ? (G.lastDefKeys || [])[pcCtx.side] : null) : pcCtx.mode === 'off' ? G.lastOffKey : pcCtx.mode === 'def' ? G.lastDefKey : null;
   const li = last ? pcList.findIndex(p => p.key === last) : -1;
   if (li >= 0) tool('LAST PLAY', () => choose(li));
   const tip = document.createElement('span'); tip.className = 'pgtip';
   tip.textContent = G.mode === 'mobile' ? '' : `1-${Math.min(PER_PAGE, list.length) % 10 || 0} to pick     ← → pages`;
   hint.appendChild(tip);
 }
-G.hooks.onPlayCall = c => { if (!G.demo) onPlayCall(c); };
+G.hooks.onPlayCall = c => { if (G.demo) return; if (G.online && Net.role === 'host') return Net.onPlayCall(c); onPlayCall(c); };
 G.hooks.onClockOut = () => { if ($('playcall').classList.contains('show')) show(null); };
 // a simple suggestion so new players always have a good default
 function coachPick(c, list) {
@@ -267,6 +274,13 @@ function coachPick(c, list) {
 function choose(i) {
   const p = pcList[i]; if (!p || G.phase !== 'playcall') return;
   if (G.patSide == null && p.key === 'xp') return;
+  if (G.online) { // online: send your pick, the host starts the play when both picks are in
+    Sound.click(); show(null);
+    if (pcCtx.mode === 'off') G.lastOffKey = p.key; else if (pcCtx.mode === 'def') G.lastDefKey = p.key;
+    if (Net.role === 'host') Net.pick(0, pcCtx.mode, p.key, pcCtx.id);
+    else { Net.send({ t: 'pick', mode: pcCtx.mode, key: p.key, id: pcCtx.id }); onlineWait('Waiting for your opponent to pick...'); }
+    return;
+  }
   if (p.key === 'ko' || p.key === 'onside') { show(null); Sound.click(); return chooseKickoff(p.key); }
   Sound.click();
   show(null);
@@ -332,10 +346,12 @@ G.hooks.onGameOver = s => {
   $('overChal').style.color = ch ? (ch.ok ? '#9cff9c' : '#ff8a8a') : '';
   if (ch && ch.ok) $('overTitle').textContent = G.challenge.type === '2min' ? 'DRIVE COMPLETE!' : 'CHALLENGE COMPLETE!';
   $('btnAgain').textContent = G.challenge ? 'TRY AGAIN' : 'REMATCH';
-  $('btnNewTeams').textContent = G.challenge ? 'CHALLENGES' : 'NEW TEAMS';
+  $('btnNewTeams').textContent = G.challenge ? 'CHALLENGES' : G.online ? 'MAIN MENU' : 'NEW TEAMS';
+  if (G.online && Net.role === 'host') Net.over(s);
   if (inSeason) { Season.addPlayedStats(G.pstats, G.teams); seasonGameDone(s.score); }
   $('btnSeasonCont').style.display = inSeason ? '' : 'none';
   $('btnAgain').style.display = $('btnNewTeams').style.display = inSeason ? 'none' : '';
+  if (G.online) $('btnAgain').style.display = 'none';
   if (inSeason && G.playoff && won) $('overTitle').textContent = Season.data.phase === 'done' ? 'CHAMPIONS' : 'YOU ADVANCE!';
   setTimeout(() => show('over'), 1400);
 };
@@ -365,11 +381,12 @@ function drawMvp(st, side) {
   setTimeout(loop, 1450);
 }
 $('btnAgain').onclick = () => { const c = G.challenge; show(null); if (c) runChallenge(c.type); else startGame(); };
-$('btnNewTeams').onclick = () => { const c = G.challenge; G.teams = null; G.challenge = null; if (c) openModes(); else { renderSelect(); show('select'); } };
+$('btnNewTeams').onclick = () => { if (G.online) { Net.leave(); G.teams = null; G.online = false; show('title'); return; } const c = G.challenge; G.teams = null; G.challenge = null; if (c) openModes(); else { renderSelect(); show('select'); } };
 
 // ---------- pause ----------
 function togglePause() {
   if (!G.teams || G.phase === 'over' || G.demo) return;
+  if (G.online) { const on = !$('pause').classList.contains('show'); if (on) { $('pausePbp').innerHTML = '<div class="pbpHead">ONLINE GAME KEEPS GOING WHILE THIS IS OPEN</div>' + pbpHtml(6); show('pause'); } else show(null); return; }
   G.paused = !G.paused;
   if (G.paused && Commentary.ok) speechSynthesis.cancel();
   if (G.paused) { G.pauseFrom = $('playcall').classList.contains('show') ? 'playcall' : null; $('pausePbp').innerHTML = pbpHtml(8); show('pause'); }
@@ -384,6 +401,7 @@ const talkLabel = () => { $('btnTalkOpt').textContent = 'COMMENTARY: ' + (Commen
 talkLabel();
 $('btnTalkOpt').onclick = () => { Commentary.set(!Commentary.enabled); talkLabel(); };
 $('btnQuit').onclick = () => {
+  if (G.online) { Net.leave(); G.online = false; G.teams = null; G.phase = 'idle'; show('title'); return; }
   SaveGame.clear();
   G.paused = false; G.teams = null; G.phase = 'idle';
   if (G.season) { G.season = false; openSeason(); } else if (G.challenge || G.mini) { G.challenge = null; G.mini = null; openModes(); } else show('title');
@@ -412,7 +430,7 @@ const endPointer = e => {
   activeId = null;
   const P = Input.pointer;
   const quick = performance.now() - P.start < 260;
-  if (P.aiming) { Input.release = { x: P.x0 - P.x, y: P.y0 - P.y }; Input.flick = performance.now() - P.start < 330; }
+  if (P.aiming || (G.online && Net.role === 'guest' && P.moved)) { Input.release = { x: P.x0 - P.x, y: P.y0 - P.y }; Input.flick = performance.now() - P.start < 330; }
   else if (!P.moved && quick) Input.taps.push({ x: P.x, y: P.y });
   P.down = false; P.moved = false; P.aiming = false;
 };
@@ -456,7 +474,7 @@ function updateMobileButtons() {
     else if (b.holder === h) st = 'carrier';
     else if (h.side !== G.poss || (b.holder && b.holder.side !== h.side)) st = 'def';
   }
-  if (G.phase === 'dead' && G.cellyGuy && !G.demo) st = 'celly';
+  if (G.phase === 'dead' && G.cellyGuy && !G.demo && (!G.online || G.cellyGuy.side === G.human)) st = 'celly';
   if (G.phase === 'presnap' && !G.demo) st = 'presnap';
   const joyOn = G.phase === 'live' && !G.demo && !!h; // stays up the whole play so your thumb never loses it
   $('joy').classList.toggle('on', !!joyOn);
@@ -545,9 +563,13 @@ function step(now) {
     G.next = null;
     Input.taps.length = 0; Input.release = null;
     update(dt);
+  } else if (G.online && Net.role === 'guest') {
+    Net.guestFrame(dt); // the host runs the game; we just draw it and send our controls
   } else {
     if (G.demo) G.demo = false;
+    if (G.online) Net.prepRemote();
     update(dt);
+    if (G.online) Net.hostFrame(dt);
   }
   updateMobileButtons();
   render();
@@ -586,3 +608,39 @@ let installEvt = null;
 window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; $('btnInstall').style.display = ''; });
 $('btnInstall').onclick = async () => { if (!installEvt) return; installEvt.prompt(); try { await installEvt.userChoice; } catch (e) {} installEvt = null; $('btnInstall').style.display = 'none'; };
 window.addEventListener('appinstalled', () => { $('btnInstall').style.display = 'none'; });
+
+// ---------- ONLINE: host a game (get a code) or join with your friend's code ----------
+screens.push('online'); menuScreens.push('online');
+function renderOnlineTeam() {
+  const t = TEAMS[sel.idx[sel.you]];
+  $('onTeam').innerHTML = `<span class="dot" style="background:${t.c1}"></span>${t.city} ${t.name}  <b>${teamOvr(t)} OVR</b>`;
+}
+function openOnline(msg) {
+  $('onCodeBox').style.display = 'none'; $('onJoinBox').style.display = 'none'; $('onPick').style.display = '';
+  $('onStatus').textContent = msg || 'Play a friend on another phone or computer. One of you hosts and gets a code, the other types it in.';
+  renderOnlineTeam(); show('online');
+}
+function onlineMsg(t) { onlineWait(null); openOnline(t); }
+function onlineWait(t) { const el = $('onWait'); el.textContent = t || ''; el.style.display = t ? 'block' : 'none'; }
+$('btnOnline').onclick = () => { Sound.init(); Sound.click(); openOnline(); };
+$('onPrev').onclick = () => { sel.idx[sel.you] = (sel.idx[sel.you] + 31) % 32; Sound.click(); renderOnlineTeam(); };
+$('onNext').onclick = () => { sel.idx[sel.you] = (sel.idx[sel.you] + 1) % 32; Sound.click(); renderOnlineTeam(); };
+$('onBack').onclick = () => { Net.reset(); show('title'); };
+$('onHost').onclick = () => {
+  Sound.click(); if (G.mode === 'mobile') goFullscreen();
+  if (typeof Peer === 'undefined') { $('onStatus').textContent = "Online play couldn't load. Check your internet and refresh."; return; }
+  $('onPick').style.display = 'none'; $('onCodeBox').style.display = ''; $('onCode').textContent = '....';
+  $('onStatus').textContent = 'Getting a code...';
+  Net.host(code => { $('onCode').textContent = code; $('onStatus').textContent = 'Tell your friend this code. The game starts when they join. Keep this screen open.'; },
+    st => { $('onStatus').textContent = st; });
+};
+$('onJoin').onclick = () => { Sound.click(); $('onPick').style.display = 'none'; $('onJoinBox').style.display = ''; $('onCodeIn').value = ''; $('onCodeIn').focus(); $('onStatus').textContent = 'Type the 4-letter code from your friend\'s screen.'; };
+$('onGo').onclick = () => {
+  const code = $('onCodeIn').value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (code.length !== 4) { $('onStatus').textContent = 'Codes are 4 letters/numbers.'; return; }
+  if (typeof Peer === 'undefined') { $('onStatus').textContent = "Online play couldn't load. Check your internet and refresh."; return; }
+  Sound.click(); if (G.mode === 'mobile') goFullscreen();
+  $('onStatus').textContent = 'Connecting...';
+  Net.join(code, st => { $('onStatus').textContent = st; });
+};
+$('onCodeIn').addEventListener('keydown', e => { if (e.code === 'Enter') $('onGo').onclick(); e.stopPropagation(); });

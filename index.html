@@ -31,6 +31,7 @@
     <div class="row">
       <button class="big" id="btnModes">CHALLENGES</button>
       <button class="big" id="btnCap">MY PLAYER</button>
+      <button class="big gold" id="btnOnline">ONLINE</button>
     </div>
     <div class="row">
       <button id="btnHow">HOW TO PLAY</button>
@@ -38,7 +39,7 @@
       <button id="btnMode">MODE: <span id="modeLabel">?</span></button>
     </div>
     <button id="btnInstall" style="display:none">INSTALL APP</button>
-    <div class="ver">v3.0</div>
+    <div class="ver">v4.0</div>
   </div>
 
   <!-- Mode select -->
@@ -152,6 +153,17 @@
     <button class="big gold" id="osGo">TO THE SEASON</button>
   </div>
 
+  <!-- Online play -->
+  <div id="online" class="screen">
+    <h2>Online</h2>
+    <div id="onTeamRow"><button class="arrB" id="onPrev">‹</button><div id="onTeam"></div><button class="arrB" id="onNext">›</button></div>
+    <div id="onPick" class="row"><button class="big gold" id="onHost">HOST GAME</button><button class="big" id="onJoin">JOIN GAME</button></div>
+    <div id="onCodeBox" style="display:none"><div class="onLbl">YOUR CODE</div><div id="onCode">....</div></div>
+    <div id="onJoinBox" style="display:none"><input id="onCodeIn" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="CODE"><button class="big gold" id="onGo">JOIN</button></div>
+    <div id="onStatus"></div>
+    <button id="onBack">BACK</button>
+  </div>
+
   <!-- Franchise: rookie draft -->
   <div id="draft" class="screen">
     <h2>Rookie Draft</h2>
@@ -261,6 +273,7 @@
     <button data-k="ArrowRight" data-show="celly">DAB</button>
   </div>
 
+  <div id="onWait"></div>
   <div id="joy"><div id="joyKnob"></div></div>
 
   <div id="rotate"><div class="rot"><svg viewBox="0 0 48 48" class="ico"><rect x="6" y="13" width="36" height="22" rx="3"/><circle cx="37" cy="24" r="1.6"/></svg></div>Turn your phone sideways</div>
@@ -284,6 +297,8 @@
 <script src="js/modes.js"></script>
 <script src="js/savegame.js"></script>
 <script src="js/gamepad.js"></script>
+<script src="js/lib/peerjs.min.js"></script>
+<script src="js/net.js"></script>
 <script src="js/main.js"></script>
 <script src="js/careerui.js"></script>
 <script src="js/seasonui.js"></script>

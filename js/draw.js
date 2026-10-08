@@ -141,7 +141,7 @@ function drawLines(g, G) {
 
 // planned routes before the snap (only for the human's offense)
 function drawRoutes(g, G) {
-  if (!G.O || !G.play || G.versus) return; // 2-player: no peeking at routes
+  if (!G.O || !G.play || (G.versus && !G.online)) return; // 2-player on one screen: no peeking at routes
   if (G.poss !== G.human) return drawDefJob(g, G);
   const live = G.phase === 'live';
   if (!(G.phase === 'presnap' || (live && G.bstate === 'snap'))) return;
@@ -605,7 +605,7 @@ function drawHUD(g, G) {
     const ny = y0 + 18;
     g.fillStyle = textOn(t.c1); g.font = 'italic 900 23px "Barlow Condensed", "Arial Black", sans-serif'; g.textAlign = 'left'; g.textBaseline = 'middle';
     g.fillText(t.id, x + 10, ny);
-    if (G.versus) { const tg = G.teams.indexOf(t) === G.p1 ? 'P1' : 'P2'; g.font = '800 12px "Barlow Condensed", Arial, sans-serif'; g.fillStyle = tg === 'P1' ? '#ffe14d' : '#5ad1ff'; g.fillText(tg, x + 10, y0 + 9); g.font = 'italic 900 23px "Barlow Condensed", "Arial Black", sans-serif'; g.fillStyle = textOn(t.c1); }
+    if (G.versus) { const tg = G.online ? (G.teams.indexOf(t) === G.human ? 'YOU' : 'OPP') : G.teams.indexOf(t) === G.p1 ? 'P1' : 'P2'; g.font = '800 12px "Barlow Condensed", Arial, sans-serif'; g.fillStyle = tg === 'P1' || tg === 'YOU' ? '#ffe14d' : '#5ad1ff'; g.fillText(tg, x + 10, y0 + 9); g.font = 'italic 900 23px "Barlow Condensed", "Arial Black", sans-serif'; g.fillStyle = textOn(t.c1); }
     if (poss) drawFootball(g, x + 10 + g.measureText(t.id).width + 16, ny, 0.9);
     g.font = 'italic 900 36px "Barlow Condensed", "Arial Black", sans-serif'; g.textAlign = 'right'; g.fillText(s, x + 192, y0 + H / 2 + 1);
     const side = G.teams.indexOf(t);
@@ -632,7 +632,7 @@ function drawHUD(g, G) {
     g.fillText(`:${String(pc).padStart(2, '0')}`, CW / 2, y0 + H + 22);
   }
   // your play
-  if (G.play && (G.phase === 'presnap' || G.phase === 'live') && !G.demo && !G.versus) {
+  if (G.play && (G.phase === 'presnap' || G.phase === 'live') && !G.demo && (!G.versus || G.online)) {
     const mine = G.poss === G.human ? G.play.off : G.play.def;
     const t = mine.name.toUpperCase();
     g.font = 'bold 14px Barlow, Arial, sans-serif'; const w = g.measureText(t).width + 22;
@@ -725,6 +725,6 @@ function drawKickMeter(g, G) {
     g.fillRect(ax - 2, y0 + 146, 4, 22);
   }
   g.fillStyle = '#ffd23f'; g.font = 'bold 14px Barlow, Arial, sans-serif'; g.textAlign = 'center';
-  const tap = G.mode === 'mobile' ? 'TAP' : G.versus && km.side !== G.p1 ? 'P2: ENTER' : G.versus ? 'P1: SPACE' : 'SPACE';
+  const tap = G.mode === 'mobile' ? 'TAP' : G.online ? 'SPACE' : G.versus && km.side !== G.p1 ? 'P2: ENTER' : G.versus ? 'P1: SPACE' : 'SPACE';
   g.fillText(km.stage === 0 ? `${tap} to lock the POWER` : km.stage === 1 ? `${tap} when the needle is in the GREEN` : '', CW / 2, y0 + H - 6);
 }

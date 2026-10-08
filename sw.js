@@ -1,5 +1,5 @@
 // ---- Offline support: network first (so updates show up right away), saved copy when there's no signal ----
-const CACHE = 'bobble-v3.1';
+const CACHE = 'bobble-v4.0';
 const FILES = [
   './',
   'index.html',
@@ -7,6 +7,7 @@ const FILES = [
   'manifest.webmanifest',
   'icons/icon-192.png',
   'icons/icon-512.png',
+  'icons/apple-180.png',
   'js/teams.js',
   'js/util.js',
   'js/audio.js',
@@ -25,6 +26,8 @@ const FILES = [
   'js/modes.js',
   'js/savegame.js',
   'js/gamepad.js',
+  'js/lib/peerjs.min.js',
+  'js/net.js',
   'js/main.js',
   'js/careerui.js',
   'js/seasonui.js',
