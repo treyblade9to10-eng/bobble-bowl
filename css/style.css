@@ -40,6 +40,7 @@ h2::after { content: ''; position: absolute; left: 50%; bottom: 0; width: 56px; 
 
 /* title */
 #title { background: linear-gradient(100deg, #0c1016f7 0%, #0c1016e0 55%, #0c101690 100%); }
+#title .ver { position: absolute; left: 18px; bottom: 14px; font-family: var(--hd); font-weight: 800; font-size: 15px; letter-spacing: .12em; color: var(--dim); }
 .logo { font-family: var(--hd); font-style: italic; font-weight: 900; line-height: .82; text-align: center; letter-spacing: -.01em; }
 .logo span { display: block; }
 .logo .l1 { font-size: min(13vw, 132px); color: #fff; }

@@ -591,13 +591,19 @@ function drawHUD(g, G) {
     const cg = g.createLinearGradient(x, 0, x + 200, 0); cg.addColorStop(0, t.c1); cg.addColorStop(1, shade(t.c1, -0.3));
     g.fillStyle = cg; roundRect(g, x, y0 + 4, 200, H - 8, 2); g.fill();
     g.fillStyle = t.c2; g.fillRect(x, y0 + H - 8, 200, 4);
-    g.fillStyle = textOn(t.c1); g.font = 'italic 900 26px "Barlow Condensed", "Arial Black", sans-serif'; g.textAlign = 'left'; g.textBaseline = 'middle';
-    g.fillText(t.id, x + 10, y0 + H / 2);
-    if (G.versus) { const tg = G.teams.indexOf(t) === G.p1 ? 'P1' : 'P2'; g.font = '800 12px "Barlow Condensed", Arial, sans-serif'; g.fillStyle = tg === 'P1' ? '#ffe14d' : '#5ad1ff'; g.fillText(tg, x + 10, y0 + 9); g.font = 'italic 900 26px "Barlow Condensed", "Arial Black", sans-serif'; g.fillStyle = textOn(t.c1); }
-    if (poss) drawFootball(g, x + 10 + g.measureText(t.id).width + 16, y0 + H / 2, 0.9);
+    // team name sits high so the timeout bars underneath get their own space
+    const ny = y0 + 18;
+    g.fillStyle = textOn(t.c1); g.font = 'italic 900 23px "Barlow Condensed", "Arial Black", sans-serif'; g.textAlign = 'left'; g.textBaseline = 'middle';
+    g.fillText(t.id, x + 10, ny);
+    if (G.versus) { const tg = G.teams.indexOf(t) === G.p1 ? 'P1' : 'P2'; g.font = '800 12px "Barlow Condensed", Arial, sans-serif'; g.fillStyle = tg === 'P1' ? '#ffe14d' : '#5ad1ff'; g.fillText(tg, x + 10, y0 + 9); g.font = 'italic 900 23px "Barlow Condensed", "Arial Black", sans-serif'; g.fillStyle = textOn(t.c1); }
+    if (poss) drawFootball(g, x + 10 + g.measureText(t.id).width + 16, ny, 0.9);
     g.font = 'italic 900 36px "Barlow Condensed", "Arial Black", sans-serif'; g.textAlign = 'right'; g.fillText(s, x + 192, y0 + H / 2 + 1);
     const side = G.teams.indexOf(t);
-    if (G.timeouts) for (let i = 0; i < 3; i++) { g.fillStyle = i < G.timeouts[side] ? '#ffd23f' : '#ffffff30'; g.fillRect(x + 10 + i * 16, y0 + H - 15, 12, 4); }
+    if (G.timeouts) for (let i = 0; i < 3; i++) {
+      const tx = x + 10 + i * 20, ty = y0 + H - 16;
+      g.fillStyle = '#00000059'; g.fillRect(tx - 1, ty - 1, 16, 6);
+      g.fillStyle = i < G.timeouts[side] ? '#ffd23f' : '#ffffff38'; g.fillRect(tx, ty, 14, 4);
+    }
   };
   cell(G.teams[1], G.score[1], x0 + 5, G.poss === 1);
   cell(G.teams[0], G.score[0], x0 + 210, G.poss === 0);

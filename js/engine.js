@@ -278,12 +278,16 @@ function setupPlay(offPlay, defPlay, preview) {
 }
 
 // ---------------- snap & live play ----------------
+// the clock hit 0:00 while you were in the huddle: quarter's over, no snap
+function clockRanOut() {
+  G.pendingRunoff = 0; G.playClock = 0;
+  G.phase = 'dead'; G.deadT = 0.9; G.next = null; G.ball = G.ball || { x: G.los, y: G.ballY, z: 0 };
+  showBanner('TIME EXPIRES', '', '#fff', 1.2); Sound.whistle();
+  if (G.hooks.onClockOut) G.hooks.onClockOut();
+}
+
 function snap() {
-  const had = G.clock > 0;
   burnHuddleClock();
-  if (had && G.clock <= 0 && !G.twoPt && G.quarter < 5) { // time ran out in the huddle
-    G.phase = 'dead'; G.deadT = 0.9; G.next = null; showBanner('TIME EXPIRES', '', '#fff', 1.2); Sound.whistle(); return;
-  }
   G.phase = 'live'; G.play.t = 0; Sound.hike(); G.throwT = null; G.playClock = 0;
   G.credit = null; G.lastTackler = null; G.intBy = null; G.breakup = null; G.lastResult = null;
   if (typeof Replay !== 'undefined') Replay.begin();
@@ -300,6 +304,11 @@ function update(dt) {
   G.time += dt;
   for (const p of G.players) { p.throwAnim = Math.max(0, p.throwAnim - dt); p.celebrate = Math.max(0, p.celebrate - dt); if (p.down <= 0) p.dizzy = 0; }
   G.crowdHype = Math.max(0, G.crowdHype - dt * 0.4);
+  // game clock keeps running between plays after a tackle in bounds (dead ball, play call, pre-snap) until the snap or a timeout
+  if (G.pendingRunoff > 0 && G.clock > 0 && !G.demo && !G.mini && (G.phase === 'dead' || G.phase === 'playcall' || G.phase === 'presnap')) {
+    G.clock = Math.max(0, G.clock - dt);
+    if (G.clock <= 0 && G.phase !== 'dead') return clockRanOut();
+  }
   // play clock (only when you have the ball)
   if ((G.phase === 'playcall' || G.phase === 'presnap') && G.playClock > 0 && !G.demo) {
     G.playClock -= dt;
@@ -570,6 +579,7 @@ function enforcePenalty(res) {
 
 function delayOfGame() {
   const d = dirOf(G.poss);
+  G.pendingRunoff = 0; // penalty stops the clock
   G.los = clamp(G.los - d * Math.min(5, d * (G.los - ownGoal(G.poss)) / 2), 11, 109);
   showBanner('DELAY OF GAME', `${G.teams[G.poss].name} • 5 yards • Replay the down`, '#ffe14d', 2.2);
   addPbp(`Delay of game on ${G.teams[G.poss].name}, 5 yards.`);
@@ -711,7 +721,7 @@ function mobileControl(p, dt, isCarrier) {
   } else if (Input.hit('Space') && p.dive <= 0) { const car = b.holder || b; doDive(p, { x: car.x - p.x, y: car.y - p.y, m: 1 }); return true; }
   const sprint = p.stamina > 0.05;
   const st = Input.stick;
-  if (st.m > 0.15) { // joystick
+  if (st.m > 0.15 && isFinite(st.x) && isFinite(st.y)) { // joystick
     if (sprint) p.stamina = Math.max(0, p.stamina - dt * 0.15);
     p.sprinting = st.m > 0.9 && sprint;
     const mul = (p.sprinting ? sprintBoost(p) : 1) * (p.spin > 0 ? 0.8 : 1) * 1.06;
@@ -1107,6 +1117,11 @@ function unlink(a, b) { if (a) a.engaged = null; if (b) b.engaged = null; }
 
 // ---------------- movement physics ----------------
 function applyMove(p, dt) {
+  // safety net: a bad input value must never turn a player into NaN (that breaks the spot, the camera and every play after)
+  if (!isFinite(p.dvx) || !isFinite(p.dvy)) { p.dvx = 0; p.dvy = 0; }
+  if (!isFinite(p.vx) || !isFinite(p.vy)) { p.vx = 0; p.vy = 0; }
+  if (!isFinite(p.x) || !isFinite(p.y)) { p.x = isFinite(p.lx) ? p.lx : (G.los != null ? G.los : 60); p.y = isFinite(p.ly) ? p.ly : MID; }
+  p.lx = p.x; p.ly = p.y;
   if (p.down > 0) {
     p.down -= dt; p.vx *= 0.88; p.vy *= 0.88; p.x += p.vx * dt; p.y += p.vy * dt;
     headPhysics(p, 0, 0, dt); return;
@@ -1408,6 +1423,8 @@ function checkBounds() {
 // ---------------- end of a play ----------------
 function endPlay(res) {
   if (G.phase !== 'live') return;
+  if (res.x != null && !isFinite(res.x)) res.x = G.los; // never let a broken spot become the new line of scrimmage
+  if (res.y != null && !isFinite(res.y)) res.y = G.ballY;
   G.phase = 'dead'; G.deadT = 1.15; G.showTarget = false; G.aim = null;
   Sound.whistle();
   for (const p of G.players) { p.throwKey = 0; p.engaged = null; }
@@ -1502,6 +1519,7 @@ function afterPlay() {
 }
 
 function endQuarter() {
+  G.pendingRunoff = 0; // new quarter: clock waits for the snap
   if (G.quarter === 2) {
     G.quarter = 3; G.clock = G.qtrLen; G.timeouts = [3, 3];
     showBanner('HALFTIME', `${G.teams[1].id} ${G.score[1]}  -  ${G.teams[0].id} ${G.score[0]}`, '#fff', 2.5);

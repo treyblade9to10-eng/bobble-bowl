@@ -235,6 +235,7 @@ function renderCards() {
   hint.appendChild(tip);
 }
 G.hooks.onPlayCall = c => { if (!G.demo) onPlayCall(c); };
+G.hooks.onClockOut = () => { if ($('playcall').classList.contains('show')) show(null); };
 // a simple suggestion so new players always have a good default
 function coachPick(c, list) {
   const has = k => list.some(p => p.key === k);
@@ -409,7 +410,9 @@ cv.addEventListener('contextmenu', e => e.preventDefault());
   const joy = $('joy'), knob = $('joyKnob'); let id = null;
   const set = e => {
     const r = joy.getBoundingClientRect();
+    if (!(r.width > 0 && r.height > 0)) return; // stick is hidden (pitch / pass in the air): a 0-wide box would divide by zero = NaN players
     let x = (e.clientX - (r.left + r.width / 2)) / (r.width / 2), y = (e.clientY - (r.top + r.height / 2)) / (r.height / 2);
+    if (!isFinite(x) || !isFinite(y)) return;
     const m = Math.hypot(x, y); if (m > 1) { x /= m; y /= m; }
     Input.stick.x = x; Input.stick.y = y; Input.stick.m = Math.min(1, m);
     knob.style.left = (43 + x * 45) + 'px'; knob.style.top = (43 + y * 45) + 'px';
@@ -419,6 +422,7 @@ cv.addEventListener('contextmenu', e => e.preventDefault());
   joy.addEventListener('pointermove', e => { if (e.pointerId === id) set(e); });
   joy.addEventListener('pointerup', e => { if (e.pointerId === id) reset(); });
   joy.addEventListener('pointercancel', reset);
+  joy.addEventListener('lostpointercapture', reset);
 })();
 
 // mobile buttons
@@ -441,7 +445,7 @@ function updateMobileButtons() {
   if (G.phase === 'presnap' && !G.demo) st = 'presnap';
   const joyOn = G.phase === 'live' && !G.demo && h && (st === 'def' || st === 'carrier');
   $('joy').classList.toggle('on', !!joyOn);
-  if (!joyOn && Input.stick.m) { Input.stick.x = Input.stick.y = Input.stick.m = 0; }
+  if (!joyOn && Input.stick.m) { Input.stick.x = Input.stick.y = Input.stick.m = 0; $('joyKnob').style.left = $('joyKnob').style.top = '43px'; }
   const key = st + (b && b.flight ? 'air' : '') + (h && h.engaged ? 'eng' : '');
   if (key === mbState) return;
   mbState = key;

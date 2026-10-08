@@ -205,12 +205,8 @@ function cpuTimeoutCheck() {
   const behind = G.score[G.human] - G.score[cpu];
   if ((G.poss === cpu && behind >= 0) || (G.poss === G.human && behind > 0 && behind <= 16)) callTimeout(cpu);
 }
-// run the clock down for the time spent in the huddle (hurry up = less time burned)
+// the clock already ran live during the huddle (see update()); snapping or spiking just stops it running
 function burnHuddleClock() {
-  if (G.pendingRunoff > 0 && G.clock > 0) {
-    const used = Math.min(G.pendingRunoff, 2 + Math.max(0, G.time - (G.callStart || G.time)) * 1.1);
-    G.clock = Math.max(0, G.clock - used);
-  }
   G.pendingRunoff = 0;
 }
 function spikeBall() {
