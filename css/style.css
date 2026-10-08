@@ -403,3 +403,5 @@ body.mobile .optPl { display: none; }
 
 /* controller focus ring */
 body.pad button:focus, body.pad .pcard:focus, body.pad .mdcard:focus, body.pad .modecard:focus, body.pad .dRow:focus, body.pad .trRow:focus, body.pad select:focus { outline: 4px solid var(--gold); outline-offset: 3px; }
+
+#btnInstall { position: absolute; right: 18px; bottom: 12px; font-size: 14px; padding: 8px 16px; }

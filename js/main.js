@@ -579,3 +579,10 @@ function render() {
 }
 
 requestAnimationFrame(frame);
+
+// ---------- install as an app (home screen icon, full screen, works offline) ----------
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
+let installEvt = null;
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; $('btnInstall').style.display = ''; });
+$('btnInstall').onclick = async () => { if (!installEvt) return; installEvt.prompt(); try { await installEvt.userChoice; } catch (e) {} installEvt = null; $('btnInstall').style.display = 'none'; };
+window.addEventListener('appinstalled', () => { $('btnInstall').style.display = 'none'; });
