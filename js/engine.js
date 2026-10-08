@@ -240,6 +240,16 @@ function setupPlay(offPlay, defPlay, preview) {
     }
   }
 
+  // run plays: the slot guy (when he isn't carrying it) blocks down on a linebacker
+  if (offPlay.type === 'run' && !offPlay.qbRun && (offPlay.carrier || 1) !== 4) {
+    O[4].role = 'runblock'; O[4].route = null; O[4].crack = true;
+    const pth = offPlay.rb && offPlay.rb.path, w = pth ? pth[pth.length - 1][1] : 0;
+    O[4].crackY = Math.abs(w) > 2 ? by + ws * Math.sign(w) * 5 : null; // seal the linebacker on the side the play is going
+    if (offPlay.pull && O[4].crackY != null) { // counter: the backside guard pulls and kicks out the playside linebacker
+      const g = Math.sign(O[4].crackY - by) > 0 ? O[5] : O[7];
+      g.crack = true; g.crackY = O[4].crackY; O[4].crackY = null;
+    }
+  }
   // defense alignment + assignments
   D.forEach((p, i) => { p.assign = parseAssign(defPlay.a[i]); });
   at(D[0], L + d * 1.3, by - 2.8); at(D[1], L + d * 1.3, by); at(D[2], L + d * 1.3, by + 2.8);
@@ -269,7 +279,7 @@ function setupPlay(offPlay, defPlay, preview) {
   if (!preview) G.ball.holder = O[0];
   else G.ball.holder = O[6]; // center holds it while we pick
   G.bstate = 'snap'; G.qbScramble = false; G.humanScramble = false; G.aim = null; G.fake = null; G.special = null; G.qbThink = 0; G.handedOff = false; G.intended = null;
-  G.runoff = 0; G.passPlay = offPlay.type === 'pass';
+  G.runoff = 0; G.passPlay = offPlay.type === 'pass'; G.thrownAway = false;
   // human control
   for (const p of P) p.isHuman = false;
   if (G.versus) { G.hd[dsd] = D[3]; G.hd[o] = null; G.humanDef = G.hd[G.human]; }
@@ -425,7 +435,7 @@ function livePlay(dt) {
   // handoffs / pitches
   if (G.bstate === 'snap' && b.holder === G.O[0] && pl.off.type === 'run' && !pl.off.qbRun && !G.handedOff) {
     const rb = G.O[pl.off.carrier || 1];
-    if (pl.off.toss && pl.t > 0.22) { G.handedOff = true; throwTo(G.O[0], rb, true); }
+    if (pl.off.toss && pl.t > 0.18) { G.handedOff = true; throwTo(G.O[0], rb, true); }
     else if (!pl.off.toss && pl.t > 0.25 && (dist(G.O[0], rb) < 1.6 || pl.t > (pl.off.carrier ? 1.5 : 0.9))) {
       G.handedOff = true; b.holder = rb; G.bstate = 'run'; stat(rb); G.credit = { p: rb, kind: 'rush' };
     }
@@ -807,6 +817,10 @@ function ai(p, dt) {
   if (G.bstate === 'run' || (carrier && carrier.side !== G.poss)) {
     if (carrier === p) return aiRunner(p, dt);
     if (carrier && p.side === carrier.side) return aiEscort(p, carrier);
+    // run fits: until he reads it, a back-seven defender fills his gap at the line instead of beelining to the ball
+    if (carrier && !p.off && p.pos !== 'DL' && G.play.off.type === 'run' && G.play.t < readTime(p) + 0.15 && d * (carrier.x - G.los) < 0 && dist(p, carrier) > 2.2) {
+      return steer(p, G.los + d * 1.2, lerp(p.y, carrier.y, 0.45), 0.85, 0.4);
+    }
     if (carrier) return pursue(p, carrier);
   }
   if (b.loose) { steer(p, b.x, b.y, 1.05); return; }
@@ -854,7 +868,7 @@ function ai(p, dt) {
     }
     case 'man': {
       const t = G.O[a.t];
-      if (!eligible(t) && G.play.t > 0.6) { // target stayed in to block: go get the QB
+      if (!eligible(t) && G.play.t > readTime(p)) { // target stayed in to block: go get the QB
         if (G.play.off.type === 'run') return pursue(p, carrier || G.O[1]);
         steer(p, G.los + d * 4, lerp(p.y, holder.y, 0.5), 0.8); break;
       }
@@ -878,7 +892,7 @@ function ai(p, dt) {
         steer(p, tx, ty, 0.95, 0.5);
       } else steer(p, zx, lerp(zy, holder.y, 0.25), 0.8, 1.2);
       // read run
-      if (G.play.off.type === 'run' && G.play.t > 0.6) return pursue(p, carrier || G.O[1]);
+      if (G.play.off.type === 'run' && G.play.t > readTime(p)) return pursue(p, carrier || G.O[1]);
       break;
     }
   }
@@ -886,6 +900,8 @@ function ai(p, dt) {
 }
 
 // where a player was `ago` seconds back (for late reactions)
+// how long a defender takes to diagnose a run (better players read it faster)
+function readTime(p) { return 0.55 + clamp(92 - p.ovr, 0, 30) * 0.018 + (p.isHuman ? 0 : 0.1); }
 function pastOf(p, ago) {
   const h = p.hist; if (!h || !h.length) return { x: p.x, y: p.y, vx: p.vx, vy: p.vy };
   const want = G.play.t - ago;
@@ -896,13 +912,13 @@ function pursue(p, t) {
   if (!t) return;
   const dd = dist(p, t);
   // aim for the spot where we can cut him off (pursuit angle)
-  const sp = p.spd * 1.09, rx = t.x - p.x, ry = t.y - p.y;
+  const sp = p.spd * (G.play.off.type === 'run' ? 1.03 : 1.09), rx = t.x - p.x, ry = t.y - p.y;
   const a = t.vx * t.vx + t.vy * t.vy - sp * sp, bq = 2 * (rx * t.vx + ry * t.vy), c = rx * rx + ry * ry;
   let T = dd / sp * 0.5;
   const disc = bq * bq - 4 * a * c;
   if (Math.abs(a) > 1e-3 && disc >= 0) { const r1 = (-bq - Math.sqrt(disc)) / (2 * a), r2 = (-bq + Math.sqrt(disc)) / (2 * a); const r = [r1, r2].filter(v => v > 0).sort((x, y) => x - y)[0]; if (r != null) T = r; }
   T = Math.min(T, 1.6);
-  steer(p, t.x + t.vx * T, t.y + t.vy * T, 1.09, 0.1);
+  steer(p, t.x + t.vx * T, t.y + t.vy * T, G.play.off.type === 'run' ? 1.03 : 1.09, 0.1);
   // AI dive at the ball carrier
   if (!p.isHuman && dd < 1.7 && dd > 0.85 && p.dive <= 0 && t === G.ball.holder && chance(0.035)) {
     doDive(p, { x: t.x + t.vx * 0.15 - p.x, y: t.y + t.vy * 0.15 - p.y, m: 1 });
@@ -916,7 +932,10 @@ function aiQBMove(p, dt) {
   }
   if (pl.off.qbRun && pl.t > 0.35) { G.qbScramble = true; return aiRunner(p, dt); }
   if (G.qbScramble) return aiRunner(p, dt);
-  if (pl.off.type === 'run') { steer(p, G.los - d * 4.5, G.ballY, 0.4); return; }
+  if (pl.off.type === 'run') {
+    if (pl.off.jet && !G.handedOff) { const c = G.O[pl.off.carrier]; steer(p, c.x - d * 0.6, c.y - Math.sign(c.y - p.y) * 0.9, 0.9, 0.3); return; } // meet the jet guy
+    steer(p, G.los - d * 4.5, G.ballY, 0.4); return;
+  }
   const depth = pl.off.fake ? 6.5 : 5.8;
   // re-think where to stand a few times a second (not every frame = no twitching)
   p.pocketT = (p.pocketT || 0) - dt;
@@ -954,8 +973,21 @@ function cpuQB(dt) {
   }
   let pressure = 99; for (const df of G.D) if (!df.engaged && df.down <= 0) pressure = Math.min(pressure, dist(qb, df));
   const need = 4.6 - (pl.t - minT) * 1.2;
+  // hot read: a free rusher is coming, so take what's there
+  if (best && pressure < 3.2 && bs > 0.6 + (pressure < 1.8 ? -0.6 : 0) && chance(0.5)) { throwTo(qb, best); return; }
   if (best && (bs > need || (pressure < 1.6 && bs > 1.0 && chance(0.6)) || pl.t > 3.8)) { throwTo(qb, best); return; }
+  // nothing open and about to get hit: smart QBs throw it away instead of taking the sack
+  if (pressure < 1.5 && pl.t > 0.9 && chance(0.25 + (qb.ovr - 70) / 100)) { throwAway(qb); return; }
   if (pressure < 1.5 && chance(0.12 + (qb.spdR > 86 ? 0.2 : 0))) G.qbScramble = true;
+}
+// launch it out of bounds (or into the dirt) so nobody can catch it
+function throwAway(qb) {
+  const d = dirOf(G.poss), side = qb.y < MID ? -3 : FIELD_W + 3;
+  const r = G.O.filter(eligible).sort((a, b) => Math.abs(a.y - side) - Math.abs(b.y - side))[0];
+  if (!r) return;
+  addText(qb.x, qb.y - 2, 'THROWN AWAY', '#cfe3ff', 14, 0.9);
+  G.thrownAway = true;
+  throwTo(qb, r, false, { x: qb.x + d * 8, y: side }, 'normal');
 }
 
 function followRoute(p, dt) {
@@ -1018,9 +1050,13 @@ function passBlock(p) {
 }
 function runBlock(p) {
   const d = dirOf(G.poss);
-  let t = null, td = 7;
-  for (const df of G.D) { if (df.engaged || df.down > 0) continue; const ahead = d * (df.x - p.x); if (ahead < -1) continue; const dd = dist(p, df); if (dd < td) { td = dd; t = df; } }
-  if (t) steer(p, t.x, t.y, 1, 0.1); else steer(p, p.x + d * 3, p.y, 0.8);
+  let t = null, td = p.crack ? 20 : 7;
+  for (const df of G.D) {
+    if (df.engaged || df.down > 0) continue; const ahead = d * (df.x - p.x); if (ahead < -1) continue;
+    const dd = dist(p, df) + (p.crack && df.pos !== 'LB' ? 6 : 0) + (p.crack && p.crackY != null ? Math.abs(df.y - p.crackY) * 0.8 : 0); // crack blocker hunts a linebacker
+    if (dd < td) { td = dd; t = df; }
+  }
+  if (t) steer(p, t.x, t.y, p.crack ? 1.05 : 1, 0.1); else steer(p, p.x + d * 3, p.y, 0.8);
 }
 function stalk(p, range) {
   const b = G.ball, car = b.holder || G.O[1];
@@ -1049,22 +1085,30 @@ function aiRunner(p, dt) {
   if (p.role === 'runpath' && p.route && p.route.i < p.route.pts.length && d * (p.x - G.los) < 1) {
     const t = p.route.pts[p.route.i];
     if (Math.hypot(t.x - p.x, t.y - p.y) < 1) p.route.i++;
-    steer(p, t.x, t.y, 1, 0.1); return;
+    steer(p, t.x, t.y, p.route.i >= 1 ? 1.06 : 1, 0.1); return;
   }
   const foes = G.players.filter(q => q.side !== p.side && q.down <= 0 && !q.engaged);
   let best = 0, bs = -1e9;
-  for (let a = -80; a <= 80; a += 16) {
+  for (let a = -80; a <= 80; a += 10) {
     const r = a * Math.PI / 180;
     const vx = Math.cos(r) * d, vy = Math.sin(r);
-    const px = p.x + vx * 3, py = p.y + vy * 3;
-    let sc = Math.cos(r) * 2.6;
-    for (const f of foes) { const dd = Math.hypot(f.x - px, f.y - py); if (dd < 7) sc -= 2.2 / (dd + 0.4); }
-    if (py < 1.5 || py > FIELD_W - 1.5) sc -= 6;
+    // north-south runner: get upfield, read the defenders in FRONT (guys chasing from behind barely matter)
+    let sc = Math.cos(r) * 3.6 - Math.abs(r - (p.runAng || 0)) * 0.35;
+    for (const L of [2.2, 5]) {
+      const px = p.x + vx * L, py = p.y + vy * L;
+      for (const f of foes) {
+        const behind = d * (f.x - p.x) < -0.8;
+        const dd = Math.hypot(f.x - px, f.y - py);
+        if (dd < 6) sc -= (behind ? 0.5 : 1.6) / (dd + 0.5) * (L > 3 ? 0.6 : 1);
+      }
+      if (py < 1.5 || py > FIELD_W - 1.5) sc -= 5;
+    }
     if (sc > bs) { bs = sc; best = r; }
   }
+  p.runAng = best;
   const vx = Math.cos(best) * d, vy = Math.sin(best);
   let open = 99; for (const f of foes) open = Math.min(open, dist(f, p));
-  p.sprinting = open > 4 && d * (p.x - G.los) > 0;
+  p.sprinting = open > 2.5 || (open > 1.5 && d * (p.x - G.los) > 0);
   const boost = p.sprinting ? 1 + (sprintBoost(p) - 1) * 0.7 : 1;
   p.dvx = vx * p.spd * boost; p.dvy = vy * p.spd * boost;
   let nd = 99; for (const f of foes) nd = Math.min(nd, dist(f, p));
@@ -1247,13 +1291,13 @@ function updateFlight(dt) {
   b.z = 1.7 + f.peak * 4 * u * (1 - u) - u * 0.6;
   b.spin = (b.spin || 0) + dt * 30;
   // the ball can be picked off on the way: a defender in the passing lane (jumping = higher reach)
-  if (!f.pitch && !f.kick && u > 0.12 && u < 0.88) {
+  if (!f.pitch && !f.kick && !G.thrownAway && u > 0.12 && u < 0.88) {
     for (const p of G.players) {
       if (p.side === f.passer.side || p.down > 0 || p.engaged || p.laneChecked) continue;
       const jumping = p.jump > 0, reach = jumping ? 1.4 : 0.5, high = jumping ? 3.6 : 2.0;
       if (b.z > high || Math.hypot(p.x - b.x, p.y - b.y) > reach) continue;
       p.laneChecked = true;
-      const pInt = clamp((jumping ? (p.isHuman ? 0.75 : 0.5) : 0.7) + (p.ovr - 80) / 200 + (p.isHuman ? 0.05 : 0) + (xfOn(p, 'lurker') ? 0.1 : 0), 0.4, 0.95);
+      const pInt = clamp((jumping ? (p.isHuman ? 0.7 : 0.4) : 0.45) + (p.ovr - 80) / 200 + (p.isHuman ? 0.05 : 0) + (xfOn(p, 'lurker') ? 0.1 : 0), 0.25, 0.9);
       b.flight = null; G.showTarget = false;
       if (chance(pInt)) { addText(p.x, p.y, jumping ? 'SKY HIGH!' : 'PICKED!', '#7fd3ff', 22, 0.9); return intercept(p); }
       return incomplete(p, 'TIPPED!');
@@ -1267,6 +1311,7 @@ function resolveCatch() {
   b.flight = null; G.showTarget = false;
   if (f.pitch) { b.holder = f.intended; G.bstate = 'run'; G.credit = { p: f.intended, kind: 'rush' }; Sound.catch(); return; }
   const offSide = f.passer.side;
+  if (G.thrownAway) { G.thrownAway = false; return incomplete(null, 'THROWN AWAY'); }
   let rcv = null, rd = 99, def = null, dd = 99;
   for (const p of G.players) {
     if (p.down > 0 || p.engaged) continue;
@@ -1286,19 +1331,19 @@ function resolveCatch() {
   const R = 1.45;
   const hands = xfOn(rcv, 'hands') && rd < 1.6; // a "Double Me" guy usually wins the 50-50 ball
   if (def && dd < 0.5 && dd < rd - 0.3 && !(hands && chance(0.7))) { // ball hits the defender right in the body: 7 out of 10 get picked
-    if (chance(0.7)) return intercept(def);
+    if (chance(def.isHuman ? 0.55 : 0.4)) return intercept(def);
     return incomplete(def, 'BROKEN UP!');
   }
   if (def && dd < 1.25 && dd < rd - 0.25 && !(hands && chance(0.7))) { // defender has inside position
-    const pInt = clamp(0.22 + (def.ovr - 75) / 120 + humanDefBonus + (G.diff === 3 && !def.isHuman ? 0.1 : 0) - (rd < 1 ? 0.12 : 0), 0.1, 0.8);
+    const pInt = clamp(0.12 + (def.ovr - 75) / 140 + humanDefBonus + (G.diff === 3 && !def.isHuman ? 0.08 : 0) - (rd < 1 ? 0.08 : 0), 0.05, 0.6);
     if (chance(pInt)) return intercept(def);
     return incomplete(def, 'BROKEN UP!');
   }
   if (rcv && rd < R && def && dd < 1.0 && chance(0.03)) { throwFlag('DPI', def.side, land.x, land.y, def); return incomplete(def, 'INTERFERENCE!'); }
   if (rcv && rd < R) {
-    let pc = 0.86 + (rcv.ovr - 78) / 140 - (rd > 0.9 ? 0.12 : 0) - Weather.catchPenalty();
+    let pc = 0.93 + (rcv.ovr - 78) / 160 - (rd > 0.9 ? 0.08 : 0) - Weather.catchPenalty();
     if (hands) pc += 0.15;
-    if (def && dd < 1.4) { pc -= (hands ? 0.1 : 0.28) - (rcv.ovr - def.ovr) / 150; if (chance(0.03 + humanDefBonus * 0.5)) return intercept(def); }
+    if (def && dd < 1.4) { pc -= (hands ? 0.06 : 0.2) - (rcv.ovr - def.ovr) / 150; if (chance(0.03 + humanDefBonus * 0.5)) return intercept(def); }
     if (chance(clamp(pc, 0.25, 0.97))) {
       b.holder = rcv; G.bstate = 'run'; Sound.catch(); G.catchX = rcv.x;
       rcv.mouth = 'O'; rcv.mouthT = 0.4;
@@ -1309,7 +1354,7 @@ function resolveCatch() {
     }
     return incomplete(rcv, 'DROPPED!');
   }
-  if (def && dd < 1.0) return chance(0.18) ? intercept(def) : incomplete(def, 'BROKEN UP!');
+  if (def && dd < 1.0) return chance(0.1) ? intercept(def) : incomplete(def, 'BROKEN UP!');
   incomplete(null, 'INCOMPLETE');
 }
 
