@@ -620,17 +620,27 @@ function checkFouls() {
       df.rtpChecked = true;
     }
   }
-  // pass interference: laying out a receiver before he has the ball
+  // pass interference: ONLY when the ball is in the air to that receiver, he could have caught it, and you knocked him off it.
+  // Going up for the ball yourself is legal. Bumping a guy before the throw (or one the ball isn't going to) is just a bump.
   const h = G.versus ? G.hp[1 - off] : G.humanPlayer;
-  if (h && h.side !== off && (G.bstate === 'snap' || G.bstate === 'air') && h.down <= 0) {
+  if (h && h.side !== off && (G.bstate === 'snap' || G.bstate === 'air') && h.down <= 0 && h.humanDriven) {
+    const f = b.flight;
     for (const r of G.O) {
-      if (!eligible(r) || r === b.holder || r.down > 0) continue;
-      if (h.humanDriven && dist(h, r) < 0.95 && (h.dive > 0 || h.speedNow > 8.5)) {
+      if (!eligible(r) || r === b.holder || r.down > 0 || r.bumpCd > pl.t) continue;
+      if (dist(h, r) > 0.95 || !(h.dive > 0 || h.speedNow > 7.5)) continue;
+      const land = f && !f.pitch && !f.kick ? { x: f.tx, y: f.ty } : null;
+      const target = land && f.intended === r && f.t / f.T > 0.3;
+      const catchable = target && dist(r, land) < 3;
+      const playingBall = h.jump > 0 && land && dist(h, land) <= dist(r, land) + 0.5;
+      if (catchable && !playingBall) {
         const x = dirOf(off) * (r.x - G.los) > 0 ? r.x : G.los;
         throwFlag('DPI', h.side, x, r.y, h);
         r.down = 0.9; r.downDir = dirOf(h.side); r.dizzy = 1; h.dive = 0; h.down = 0.5; Sound.tackle();
         break;
       }
+      // legal contact: he stumbles a little, no flag
+      r.stun = Math.max(r.stun, 0.25); r.bumpCd = pl.t + 0.8; r.vx *= 0.6; r.vy *= 0.6;
+      addText(r.x, r.y, 'BUMPED', '#cfe3ff', 13, 0.5);
     }
   }
   // random holding on run plays
@@ -1436,7 +1446,7 @@ function resolveCatch() {
     if (chance(pInt)) return intercept(def);
     return incomplete(def, 'BROKEN UP!');
   }
-  if (rcv && rd < R && def && dd < 1.0 && chance(0.03)) { throwFlag('DPI', def.side, land.x, land.y, def); return incomplete(def, 'INTERFERENCE!'); }
+  if (rcv && rd < R && def && dd < 0.8 && def.jump <= 0 && chance(0.015)) { throwFlag('DPI', def.side, land.x, land.y, def); return incomplete(def, 'INTERFERENCE!'); }
   if (rcv && rd < R) {
     let pc = 0.93 + (rcv.ovr - 78) / 160 - (rd > 0.9 ? 0.08 : 0) - Weather.catchPenalty();
     if (hands) pc += 0.15;
