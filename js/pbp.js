@@ -20,7 +20,9 @@ function pbpPlay(res) {
   const c = G.credit, tk = G.lastTackler;
   const flag = G.flags && G.flags.length ? ' Flag on the play.' : '';
   let s = '', hype = '';
-  if (res.type === 'inc') {
+  if (res.kneel) {
+    s = `${ln(car)} takes a knee.`;
+  } else if (res.type === 'inc') {
     const qb = G.O && G.O[0], tgt = G.intended;
     s = `${ln(qb)} pass incomplete${tgt ? `, intended for ${ln(tgt)}` : ''}.`;
     if (res.text === 'DROPPED!') s = `${ln(tgt)} drops it.`;

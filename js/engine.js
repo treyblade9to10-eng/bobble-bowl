@@ -46,7 +46,7 @@ function newGame(home, away, opts) {
     teams: [home, away], human: opts.humanSide || 0, diff: opts.diff, flags: [], playClock: 0, playoff: !!opts.playoff, qtrLen: opts.qtr, score: [0, 0], quarter: 1, clock: opts.qtr,
     fx: [], banner: null, players: [], ball: null, patSide: null, twoPt: false, next: null, firstPoss: 1, paused: false,
     pstats: {}, tstats: [{ pass: 0, rush: 0, to: 0 }, { pass: 0, rush: 0, to: 0 }],
-    timeouts: [3, 3], special: null, pendingRunoff: 0, mini: null, scenario: opts.scenario || null,
+    timeouts: [3, 3], special: null, pendingRunoff: 0, twoMinQ: 0, twoMinAfterPlay: false, runFrom: 0, mini: null, scenario: opts.scenario || null,
     weather: opts.weather || 'clear', night: !!opts.night, uni: opts.uni || null, pbp: [], pbpShow: null, lastResult: null,
     versus: !!opts.versus, p1: opts.humanSide || 0, hd: [null, null], hp: [null, null], humanDef: null
   });
@@ -100,14 +100,21 @@ function toPlayCall() {
   if (G.versus) return G.hooks.onPlayCall({ ...withSide(G.poss, playCallCtx), side: G.poss });
   G.hooks.onPlayCall(playCallCtx());
 }
+// leading late and the defense can't stop the clock enough: take a knee and end it
+function canKneelOut() {
+  if (G.twoPt || G.quarter < 4 || G.score[G.poss] <= G.score[1 - G.poss]) return false;
+  const kneels = 4 - G.down + 1, tos = G.timeouts ? G.timeouts[1 - G.poss] : 0;
+  return G.clock <= Math.max(0, kneels - tos) * 38 + 2;
+}
 function playCallCtx() {
   const humanOff = G.poss === G.human;
   return { mode: humanOff ? 'off' : 'def', fourth: G.down === 4 && !G.twoPt, twoPt: G.twoPt, fgDist: Math.round(Math.abs(goalX(G.poss) - G.los) + 17),
     fgMax: Math.round(fgRange(kickerOf(G.poss, 'fg').ovr)), toGo: Math.round(Math.abs(G.firstDownX - G.los)), down: G.down,
-    timeouts: G.timeouts ? G.timeouts[G.human] : 0, canSpike: humanOff && G.down < 4 && !G.twoPt && G.pendingRunoff > 0, lastKey: humanOff ? G.lastOffKey : G.lastDefKey };
+    timeouts: G.timeouts ? G.timeouts[G.human] : 0, kneel: G.poss === G.human && canKneelOut(), canSpike: humanOff && G.down < 4 && !G.twoPt && G.pendingRunoff > 0, lastKey: humanOff ? G.lastOffKey : G.lastDefKey };
 }
 
 function cpuOffCall() {
+  if (canKneelOut()) return 'kneel';
   if (G.down === 4 && !G.twoPt) {
     const fg = Math.abs(goalX(G.poss) - G.los) + 17;
     const toGo = Math.abs(G.firstDownX - G.los);
@@ -122,7 +129,8 @@ function cpuOffCall() {
   }
   const toGo = Math.abs(G.firstDownX - G.los);
   const runW = toGo <= 3 ? 0.55 : toGo >= 8 ? 0.15 : 0.35;
-  if (chance(runW)) return pick(['zone', 'zone', 'toss', 'qbdraw', 'dive', 'counter', 'jet']);
+  if (toGo <= 1 && chance(0.35)) return 'sneak';
+  if (chance(runW)) return pick(['zone', 'zone', 'toss', 'qbdraw', 'dive', 'counter', 'jet', 'power', 'power']);
   if (G.clock < 8 && G.quarter % 2 === 0 && fromOwn(G.poss, G.los) > 45) return 'hail';
   return toGo >= 12 ? pick(['verts', 'pa', 'mesh', 'curls', 'verts', 'ycross', 'flood', 'stopgo', 'drive']) : pick(['slants', 'mesh', 'curls', 'screen', 'pa', 'verts', 'slants', 'outs', 'bubble', 'smash', 'drive', 'ycross']);
 }
@@ -212,11 +220,8 @@ function setupPlay(offPlay, defPlay, preview) {
   defT.def.forEach((t, i) => P.push(makePlayer(dsd, false, i, t)));
   const O = P.slice(0, 8), D = P.slice(8);
   const at = (p, x, y) => { p.x = x; p.y = y; p.hx = x; p.hy = y; };
-  at(O[0], L - d * 4, by);
-  at(O[1], L - d * 5, by + ws * 3.4);
-  at(O[2], L - d * 0.8, Math.max(4, by - 16));
-  at(O[3], L - d * 0.8, Math.min(FIELD_W - 4, by + 16));
-  at(O[4], L - d * 1.5, by + ws * 8);
+  const form = FORMATIONS[preview ? 'gun' : formationFor(offPlay)] || FORMATIONS.gun;
+  for (let k = 0; k <= 4; k++) { const [bk, w] = form.spots[k]; at(O[k], L - d * bk, clamp(by + ws * w, 4, FIELD_W - 4)); }
   at(O[5], L - d * 0.7, by - 2.4); at(O[6], L - d * 0.7, by); at(O[7], L - d * 0.7, by + 2.4);
 
   // offense roles
@@ -274,7 +279,7 @@ function setupPlay(offPlay, defPlay, preview) {
   G.players = P; G.O = O; G.D = D;
   G.refs = [{ x: L - d * 11, y: clamp(by + 7, 3, FIELD_W - 3), face: -d, anim: 0, throwT: 0 },
             { x: L + d * 17, y: clamp(by - 6, 3, FIELD_W - 3), face: -d, anim: 0, throwT: 0 }];
-  G.play = { off: offPlay, def: defPlay, t: 0 };
+  G.play = { off: offPlay, def: defPlay, t: 0, form };
   G.ball = { x: L, y: by, z: 0, holder: preview ? null : O[0], flight: null, loose: null };
   if (!preview) G.ball.holder = O[0];
   else G.ball.holder = O[6]; // center holds it while we pick
@@ -288,6 +293,15 @@ function setupPlay(offPlay, defPlay, preview) {
 }
 
 // ---------------- snap & live play ----------------
+// two-minute warning: once per half (2nd and 4th quarter), the clock stops at 2:00
+function crossedTwoMin(c0) {
+  return (G.quarter === 2 || G.quarter === 4) && G.qtrLen > 150 && c0 > 120 && G.clock <= 120 && G.twoMinQ !== G.quarter && !G.mini;
+}
+function twoMinWarning() {
+  G.twoMinQ = G.quarter; G.twoMinAfterPlay = false;
+  showBanner('TWO-MINUTE WARNING', '', '#ffd23f', 1.8); Sound.whistle();
+  addPbp('Two-minute warning.');
+}
 // the clock hit 0:00 while you were in the huddle: quarter's over, no snap
 function clockRanOut() {
   G.pendingRunoff = 0; G.playClock = 0;
@@ -297,6 +311,15 @@ function clockRanOut() {
 }
 
 function snap() {
+  // the CPU offense takes its time in the huddle (you see the clock jump); way more when it's protecting a lead late
+  if (G.pendingRunoff > 0 && !isHumanSide(G.poss) && !G.twoPt && G.clock > 0) {
+    const lead = G.score[G.poss] - G.score[1 - G.poss], milk = lead > 0 && G.quarter >= 4;
+    const extra = Math.max(0, (milk || G.play.off.kneel ? 32 : 9) - (G.time - (G.runFrom || G.time)));
+    const c0 = G.clock;
+    G.clock = Math.max(0, G.clock - extra);
+    if (crossedTwoMin(c0)) { G.clock = 120; G.pendingRunoff = 0; twoMinWarning(); }
+    if (G.clock <= 0) return clockRanOut();
+  }
   burnHuddleClock();
   G.phase = 'live'; G.play.t = 0; Sound.hike(); G.throwT = null; G.playClock = 0;
   G.credit = null; G.lastTackler = null; G.intBy = null; G.breakup = null; G.lastResult = null;
@@ -316,8 +339,10 @@ function update(dt) {
   G.crowdHype = Math.max(0, G.crowdHype - dt * 0.4);
   // game clock keeps running between plays after a tackle in bounds (dead ball, play call, pre-snap) until the snap or a timeout
   if (G.pendingRunoff > 0 && G.clock > 0 && !G.demo && !G.mini && (G.phase === 'dead' || G.phase === 'playcall' || G.phase === 'presnap')) {
+    const c0 = G.clock;
     G.clock = Math.max(0, G.clock - dt);
-    if (G.clock <= 0 && G.phase !== 'dead') return clockRanOut();
+    if (crossedTwoMin(c0)) { G.clock = 120; G.pendingRunoff = 0; twoMinWarning(); }
+    else if (G.clock <= 0 && G.phase !== 'dead') return clockRanOut();
   }
   // play clock (only when you have the ball)
   if ((G.phase === 'playcall' || G.phase === 'presnap') && G.playClock > 0 && !G.demo) {
@@ -401,7 +426,7 @@ function idlePlayers(dt) { for (const p of G.players) { p.dvx = 0; p.dvy = 0; ap
 
 function livePlay(dt) {
   const pl = G.play; pl.t += dt;
-  if (G.clock > 0) G.clock = Math.max(0, G.clock - dt);
+  if (G.clock > 0) { const c0 = G.clock; G.clock = Math.max(0, G.clock - dt); if (crossedTwoMin(c0)) G.twoMinAfterPlay = true; }
   const b = G.ball;
   updateHuman();
 
@@ -440,6 +465,11 @@ function livePlay(dt) {
       G.handedOff = true; b.holder = rb; G.bstate = 'run'; stat(rb); G.credit = { p: rb, kind: 'rush' };
     }
   }
+  // victory formation: QB takes a knee
+  if (pl.off.kneel && b.holder === G.O[0]) {
+    if (pl.t > 0.45) { const qb = G.O[0]; qb.down = 1.5; qb.downDir = -dirOf(G.poss); G.credit = { p: qb, kind: 'rush' }; return endPlay({ type: 'tackle', carrier: qb, x: G.los - dirOf(G.poss) * 1, y: qb.y, kneel: true }); }
+    for (const p of G.players) if (!p.off) { p.dvx *= 0.2; p.dvy *= 0.2; }
+  }
   // QB crosses the line = runner
   if (G.bstate === 'snap' && b.holder === G.O[0] && dirOf(G.poss) * (b.holder.x - G.los) > 0.5) {
     G.bstate = 'run'; G.credit = { p: b.holder, kind: 'rush' };
@@ -457,7 +487,7 @@ function livePlay(dt) {
 
   if (G.phase !== 'live') return;
   checkFouls();
-  checkTackles();
+  if (!G.play.off.kneel) checkTackles();
   if (G.phase !== 'live') return;
   checkBounds();
 }
@@ -691,6 +721,8 @@ function humanControl(p, dt) {
   if (p.hit > 0) return true;
   if (p.jump > 0 && b.flight && ax.m < 0.1) { steer(p, b.flight.tx, b.flight.ty, 1.08, 0.2); return true; }
   if (ax.m < 0.1 && isCarrier && G.humanScramble && p === G.O[0]) { aiRunner(p, dt); return true; }
+  // under center: the QB takes his drop on his own until you grab the controls
+  if (ax.m < 0.1 && isCarrier && p === G.O[0] && G.bstate === 'snap' && G.play.form && G.play.form.under && G.play.off.type === 'pass' && G.play.t < 0.9) { aiQBMove(p, dt); return true; }
   if (ax.m < 0.1) {
     if (!isCarrier && !(p === G.O[0] && G.bstate === 'snap')) { // idle defender / receiver: let AI help
       if (b.flight && b.flight.intended === p) { steer(p, b.flight.tx, b.flight.ty, 1); return true; }
@@ -930,7 +962,7 @@ function aiQBMove(p, dt) {
   if (G.ball.holder !== p) { // handed it off / threw it: drift
     steer(p, p.x + d * 2, p.y, 0.4); return;
   }
-  if (pl.off.qbRun && pl.t > 0.35) { G.qbScramble = true; return aiRunner(p, dt); }
+  if (pl.off.qbRun && pl.t > (pl.off.sneak ? 0.05 : 0.35)) { G.qbScramble = true; return aiRunner(p, dt); }
   if (G.qbScramble) return aiRunner(p, dt);
   if (pl.off.type === 'run') {
     if (pl.off.jet && !G.handedOff) { const c = G.O[pl.off.carrier]; steer(p, c.x - d * 0.6, c.y - Math.sign(c.y - p.y) * 0.9, 0.9, 0.3); return; } // meet the jet guy
@@ -1522,7 +1554,7 @@ function endPlay(res) {
   } else {
     G.ballY = clamp(res.y != null ? res.y : G.ballY, 20, FIELD_W - 20);
     next = advanceDown(x, true);
-    if (res.type !== 'oob') G.pendingRunoff = 9;
+    if (res.type !== 'oob') { G.pendingRunoff = 9; G.runFrom = G.time; }
   }
   G.next = next;
 }
@@ -1551,6 +1583,7 @@ function afterPlay() {
   const n = G.next; G.next = null;
   if (G.cellyGuy) { G.cellyGuy.celly = null; G.cellyGuy = null; }
   G.runoff = 0;
+  if (G.twoMinAfterPlay) { G.pendingRunoff = 0; if (G.quarter === G.twoMinQ || G.clock <= 0) G.twoMinAfterPlay = false; else twoMinWarning(); }
   if (G.mini && typeof miniAfterPlay === 'function') return miniAfterPlay();
   // overtime is sudden death
   if (G.quarter >= 5 && G.score[0] !== G.score[1]) return gameOver();

@@ -8,60 +8,78 @@
 // RB "path" uses field spots: [yards from line of scrimmage (negative = backfield), wide-side offset].
 
 const OFF_PLAYS = [
-  { key: 'zone', name: 'Inside Zone', type: 'run', desc: 'Handoff right up the gut.',
+  { key: 'zone', form: 'iform', name: 'Inside Zone', type: 'run', desc: 'Handoff right up the gut.',
     rb: { path: [[-3.6, 0.6], [0.5, 0.4], [10, 0]], end: 'go' }, wr: 'block' },
-  { key: 'toss', name: 'Toss Sweep', type: 'run', desc: 'Pitch it outside and race the edge.',
+  { key: 'toss', form: 'gun', name: 'Toss Sweep', type: 'run', desc: 'Pitch it outside and race the edge.',
     rb: { path: [[-3.6, 6], [-1.2, 11], [3, 14], [12, 15]], end: 'go' }, wr: 'block', toss: true },
-  { key: 'slants', name: 'Slants', type: 'pass', desc: 'Quick slants. Get it out fast!',
+  { key: 'slants', form: 'gun', name: 'Slants', type: 'pass', desc: 'Quick slants. Get it out fast!',
     routes: { 2: { r: [[2, 0], [9, -7]], end: 'go' }, 3: { r: [[2, 0], [9, -7]], end: 'go' }, 4: { r: [[5, 0], [6, 5]], end: 'sit' },
               1: { r: [[1, 4], [2, 9]], end: 'sit' } } },
-  { key: 'verts', name: 'Four Verts', type: 'pass', desc: 'Everybody go deep. Big play hunting.',
+  { key: 'verts', form: 'empty', name: 'Four Verts', type: 'pass', desc: 'Everybody go deep. Big play hunting.',
     routes: { 2: { r: [[40, 0]], end: 'go' }, 3: { r: [[40, 0]], end: 'go' }, 4: { r: [[3, 0], [40, -2]], end: 'go' },
               1: { r: [[1, -2], [3, -3]], end: 'sit' } } },
-  { key: 'mesh', name: 'Mesh', type: 'pass', desc: 'Crossers pick off man defenders.',
+  { key: 'mesh', form: 'trips', name: 'Mesh', type: 'pass', desc: 'Crossers pick off man defenders.',
     routes: { 2: { r: [[2, 0], [4, -30]], end: 'go' }, 3: { r: [[3, 0], [5, -30]], end: 'go' }, 4: { r: [[10, 0], [18, 8]], end: 'go' },
               1: { r: [[1, 5], [25, 8]], end: 'go' } } },
-  { key: 'curls', name: 'Curl Flat', type: 'pass', desc: 'Curls vs zone, slot runs the seam.',
+  { key: 'curls', form: 'gun', name: 'Curl Flat', type: 'pass', desc: 'Curls vs zone, slot runs the seam.',
     routes: { 2: { r: [[12, 0], [10, -1]], end: 'sit' }, 3: { r: [[12, 0], [10, -1]], end: 'sit' }, 4: { r: [[30, -1]], end: 'go' },
               1: { r: [[1, 5], [2, 9]], end: 'sit' } } },
-  { key: 'pa', name: 'PA Deep Shot', type: 'pass', desc: 'Fake the run, then bomb it.', fake: true,
+  { key: 'pa', form: 'iform', name: 'PA Deep Shot', type: 'pass', desc: 'Fake the run, then bomb it.', fake: true,
     rb: { path: [[-3.6, 0.6], [0, 0.3]], end: 'block' },
     routes: { 2: { r: [[12, 0], [32, -10]], end: 'go' }, 3: { r: [[40, 0]], end: 'go' }, 4: { r: [[10, 0], [18, -14]], end: 'go' } } },
-  { key: 'screen', name: 'RB Screen', type: 'pass', desc: 'Let them rush, dump it to the RB.', screen: true,
+  { key: 'screen', form: 'gun', name: 'RB Screen', type: 'pass', desc: 'Let them rush, dump it to the RB.', screen: true,
     routes: { 2: { r: [[6, 0]], end: 'block' }, 3: { r: [[6, 0]], end: 'block' }, 4: { r: [[4, 0]], end: 'block' },
               1: { r: [[-1, 4], [-2, 9]], end: 'sit' } } },
-  { key: 'qbdraw', name: 'QB Draw', type: 'run', desc: 'Fake pass, then the QB takes off.', qbRun: true,
+  { key: 'qbdraw', form: 'gun', name: 'QB Draw', type: 'run', desc: 'Fake pass, then the QB takes off.', qbRun: true,
     routes: { 2: { r: [[15, 0]], end: 'go' }, 3: { r: [[15, 0]], end: 'go' }, 4: { r: [[8, 0]], end: 'block' } } },
+  { key: 'sneak', form: 'goal', name: 'QB Sneak', type: 'run', desc: 'Under center, QB pushes forward. Need 1 yard? This.', qbRun: true, sneak: true },
+  { key: 'power', form: 'iform', name: 'HB Power', type: 'run', desc: 'Guard pulls, RB follows him off tackle.', pull: true,
+    rb: { path: [[-5, 0.5], [-1.5, 2.5], [1, 4], [10, 5]], end: 'go' }, wr: 'block' },
   // ---- page 2+ ----
-  { key: 'dive', name: 'HB Dive', type: 'run', desc: 'Quick hit straight ahead. Short yardage.',
+  { key: 'dive', form: 'iform', name: 'HB Dive', type: 'run', desc: 'Quick hit straight ahead. Short yardage.',
     rb: { path: [[-3.4, 0.4], [1, 0.2], [10, 0]], end: 'go' }, wr: 'block' },
-  { key: 'counter', name: 'Counter', type: 'run', desc: 'Step one way, cut back the other.',
-    rb: { path: [[-4.2, 3.2], [-3, 0], [0.5, -3], [9, -4.5]], end: 'go' }, wr: 'block', pull: true },
-  { key: 'jet', name: 'Jet Sweep', type: 'run', desc: 'Slot WR flies across and takes it.', carrier: 4,
+  { key: 'counter', form: 'gun', name: 'Counter', type: 'run', desc: 'Step one way, cut back the other.',
+    rb: { path: [[-4.8, 4], [-3.6, 0.5], [0, -3], [9, -4.5]], end: 'go' }, wr: 'block', pull: true },
+  { key: 'jet', form: 'gun', name: 'Jet Sweep', type: 'run', desc: 'Slot WR flies across and takes it.', carrier: 4,
     rb: { path: [[-2.4, 3], [-0.5, 8], [5, 11], [14, 12]], end: 'go' }, wr: 'block', jet: true },
-  { key: 'outs', name: 'Quick Outs', type: 'pass', desc: 'Fast outs to the sideline. Safe.',
+  { key: 'outs', form: 'gun', name: 'Quick Outs', type: 'pass', desc: 'Fast outs to the sideline. Safe.',
     routes: { 2: { r: [[5, 0], [5, 6]], end: 'sit' }, 3: { r: [[5, 0], [5, 6]], end: 'sit' }, 4: { r: [[6, 0], [6, -6]], end: 'sit' },
               1: { r: [[0, 5], [1, 10]], end: 'sit' } } },
-  { key: 'bubble', name: 'Bubble Screen', type: 'pass', desc: 'Toss it to the slot, WRs block.', quick: true,
+  { key: 'bubble', form: 'trips', name: 'Bubble Screen', type: 'pass', desc: 'Toss it to the slot, WRs block.', quick: true,
     routes: { 2: { r: [[3, 0]], end: 'block' }, 3: { r: [[3, 0]], end: 'block' }, 4: { r: [[-1, 3], [0, 6]], end: 'sit' } } },
-  { key: 'smash', name: 'Smash', type: 'pass', desc: 'Hitches + a corner route over the top.',
+  { key: 'smash', form: 'gun', name: 'Smash', type: 'pass', desc: 'Hitches + a corner route over the top.',
     routes: { 2: { r: [[5, 0], [4, 0]], end: 'sit' }, 3: { r: [[5, 0], [4, 0]], end: 'sit' }, 4: { r: [[10, 0], [20, 9]], end: 'go' },
               1: { r: [[1, 5], [2, 10]], end: 'sit' } } },
-  { key: 'ycross', name: 'Y-Cross', type: 'pass', desc: 'Deep crosser + post. Beats zone.',
+  { key: 'ycross', form: 'trips', name: 'Y-Cross', type: 'pass', desc: 'Deep crosser + post. Beats zone.',
     routes: { 2: { r: [[10, 0], [24, -8]], end: 'go' }, 3: { r: [[12, 0], [10, -1]], end: 'sit' }, 4: { r: [[8, 0], [16, -24]], end: 'go' },
               1: { r: [[2, -2], [4, -3]], end: 'sit' } } },
-  { key: 'drive', name: 'Drive', type: 'pass', desc: 'Shallow cross under a dig.',
+  { key: 'drive', form: 'gun', name: 'Drive', type: 'pass', desc: 'Shallow cross under a dig.',
     routes: { 2: { r: [[12, 0], [12, -12]], end: 'sit' }, 3: { r: [[40, 0]], end: 'go' }, 4: { r: [[2, 0], [3, -22]], end: 'go' },
               1: { r: [[1, 5], [3, 9]], end: 'sit' } } },
-  { key: 'flood', name: 'Flood', type: 'pass', desc: 'Three levels to one side.',
+  { key: 'flood', form: 'trips', name: 'Flood', type: 'pass', desc: 'Three levels to one side.',
     routes: { 2: { r: [[8, 0], [18, -20]], end: 'go' }, 3: { r: [[40, 0]], end: 'go' }, 4: { r: [[12, 0], [12, 8]], end: 'sit' },
               1: { r: [[1, 6], [3, 12]], end: 'sit' } } },
-  { key: 'stopgo', name: 'Stop & Go', type: 'pass', desc: 'Fake the hitch, then go deep. Double move!',
+  { key: 'stopgo', form: 'empty', name: 'Stop & Go', type: 'pass', desc: 'Fake the hitch, then go deep. Double move!',
     routes: { 2: { r: [[6, 0], [5, 0], [40, 0]], end: 'go' }, 3: { r: [[6, 0], [5, 0], [40, 0]], end: 'go' }, 4: { r: [[30, -1]], end: 'go' },
               1: { r: [[1, -2], [3, -3]], end: 'sit' } } },
-  { key: 'hail', name: 'Hail Mary', type: 'pass', desc: 'Everybody to the end zone. Pray.',
-    routes: { 2: { r: [[50, 6]], end: 'go' }, 3: { r: [[50, 6]], end: 'go' }, 4: { r: [[50, -2]], end: 'go' } } }
+  { key: 'hail', form: 'gun', name: 'Hail Mary', type: 'pass', desc: 'Everybody to the end zone. Pray.',
+    routes: { 2: { r: [[50, 6]], end: 'go' }, 3: { r: [[50, 6]], end: 'go' }, 4: { r: [[50, -2]], end: 'go' } } },
+  { key: 'kneel', form: 'goal', name: 'Kneel', type: 'run', desc: 'Victory formation. QB takes a knee, clock keeps running.', kneel: true }
 ];
+
+// Formations: where each skill guy lines up. [yards behind the line, sideways offset] — positive offset = the wide side of the field.
+const FORMATIONS = {
+  gun:   { name: 'Shotgun', spots: { 0: [4, 0], 1: [5, 3.4], 2: [0.8, -16], 3: [0.8, 16], 4: [1.5, 8] } },
+  iform: { name: 'I-Form', under: true, spots: { 0: [1.2, 0], 1: [6.5, 0], 2: [0.8, -16], 3: [0.8, 16], 4: [0.8, 4.4] } },
+  trips: { name: 'Trips', spots: { 0: [4, 0], 1: [5, -3.4], 2: [1.5, 5.5], 3: [0.8, 16], 4: [1.5, 10.8] } },
+  empty: { name: 'Empty', spots: { 0: [4.5, 0], 1: [1.5, -9], 2: [0.8, -16], 3: [0.8, 16], 4: [1.5, 8] } },
+  goal:  { name: 'Goal Line', under: true, spots: { 0: [1.2, 0], 1: [5.5, 0], 2: [0.8, -6.5], 3: [0.8, 6.5], 4: [0.8, 3.6] } }
+};
+// near the goal line, runs come out in a heavy Goal Line set
+function formationFor(play) {
+  if (typeof G !== 'undefined' && G.goalToGo && G.los != null && play.type === 'run' && !play.toss && !play.jet && Math.abs(goalX(G.poss) - G.los) <= 4) return 'goal';
+  return play.form || 'gun';
+}
 
 // Defensive calls. Assignment kinds:
 //   rush            go after the QB / ball
@@ -117,7 +135,9 @@ function drawPlayDiagram(cv, play, isOff) {
     return;
   }
   if (isOff) {
-    const spots = { 0: [-4, 0], 1: [-4, 6], 2: [-0.6, -24], 3: [-0.6, 24], 4: [-1.5, -14], 5: [-0.7, -4], 6: [-0.7, 0], 7: [-0.7, 4] };
+    const F = FORMATIONS[play.form || 'gun'], spots = { 5: [-0.7, -4], 6: [-0.7, 0], 7: [-0.7, 4] };
+    for (const k in F.spots) spots[k] = [-F.spots[k][0], F.spots[k][1] * 1.5];
+    g.fillStyle = '#ffffffb0'; g.font = "800 10px 'Barlow Condensed', sans-serif"; g.textAlign = 'right'; g.fillText(F.name.toUpperCase(), W - 4, 10);
     g.lineWidth = 2;
     for (const s in spots) {
       const [d, y] = spots[s];
@@ -134,13 +154,13 @@ function drawPlayDiagram(cv, play, isOff) {
     }
     const runner = play.rb && play.rb.path;
     if (runner) {
-      const jet = play.carrier === 4, sgn = jet ? -1 : 1;
+      const c = spots[play.carrier || 1];
       g.strokeStyle = play.fake ? '#fff8' : '#ff8a3d'; g.setLineDash(play.fake ? [3, 3] : []); g.lineWidth = 2.5;
-      g.beginPath(); let [x0, y0] = jet ? P(-1.5, -14) : P(-4, 6); g.moveTo(x0, y0);
-      for (const [d, w] of runner) { const [px, py] = P(Math.min(d, 26), sgn * w * 1.4); g.lineTo(px, py); }
+      g.beginPath(); let [x0, y0] = P(c[0], c[1]); g.moveTo(x0, y0);
+      for (const [d, w] of runner) { const [px, py] = P(Math.min(d, 26), w * 1.5); g.lineTo(px, py); }
       g.stroke(); g.setLineDash([]);
     }
-    if (play.qbRun) { g.strokeStyle = '#ff8a3d'; g.lineWidth = 2.5; g.beginPath(); let [a, b] = P(-4, 0); g.moveTo(a, b); [a, b] = P(16, 0); g.lineTo(a, b); g.stroke(); }
+    if (play.qbRun) { g.strokeStyle = '#ff8a3d'; g.lineWidth = 2.5; g.beginPath(); let [a, b] = P(spots[0][0], 0); g.moveTo(a, b); [a, b] = P(16, 0); g.lineTo(a, b); g.stroke(); }
   } else {
     const spots = [[1.2, -4], [1.2, 0], [1.2, 4], [5, -6], [5, 6], [6, -24], [6, 24], [13, 0]];
     play.a.forEach((a, i) => {

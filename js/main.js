@@ -243,6 +243,8 @@ function coachPick(c, list) {
   if (c.mode === 'kickoff') return G.quarter >= 4 && G.clock < 150 && G.score[1 - G.human] - G.score[G.human] > 0 && G.score[1 - G.human] - G.score[G.human] <= 16 ? 'onside' : 'ko';
   if (c.mode === 'off') {
     if (c.fourth) { if (has('fg') && c.fgDist <= c.fgMax - 2) return 'fg'; if (c.toGo <= 1) return 'zone'; return has('punt') ? 'punt' : 'slants'; }
+    if (c.kneel) return 'kneel';
+    if (c.toGo <= 1) return pick(['sneak', 'power']);
     if (c.toGo <= 2) return 'zone';
     if (c.toGo >= 12) return pick(['verts', 'pa']);
     if (c.toGo >= 7) return pick(['curls', 'mesh', 'slants']);
