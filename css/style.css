@@ -376,3 +376,6 @@ input.bad { border-color: var(--red); }
 #pcCover.on { display: flex; }
 #pcCover .cvT { font-family: var(--hd); font-style: italic; font-weight: 900; font-size: 44px; }
 #pcCover .cvS { color: var(--dim); font-size: 18px; margin: 6px 0 16px; }
+#how { overflow-y: auto; justify-content: flex-start; }
+.howgrid > div { width: 300px; }
+body.mobile .optPl { display: none; }

@@ -58,7 +58,20 @@ function buildHow() {
       <p><b>E</b> juke, <b>F</b> spin, <b>R</b> stiff arm.</p></div>
     <div><h3>Defense</h3>
       <p>You control the player with the <b>yellow ring</b>.</p>
-      <p><b>Q</b> switch to the guy closest to the ball, <b>SPACE</b> dive tackle, <b>SHIFT</b> sprint.</p></div>`;
+      <p><b>Q</b> switch to the guy closest to the ball, <b>SPACE</b> dive tackle, <b>SHIFT</b> sprint.</p></div>
+    <div><h3>2 Players</h3>
+      <p>Pick <b>2 Players</b> on the matchup screen. Each of you calls a play in secret.</p>
+      <p><b>P1:</b> WASD, SPACE, SHIFT, 1-4 throw, E/F/R moves, Q switch, C hit stick.</p>
+      <p><b>P2:</b> ARROWS, ENTER, RIGHT SHIFT, 7 8 9 0 throw, / . , moves, L switch, K hit stick.</p></div>`;
+  $('howGrid').innerHTML += `
+    <div><h3>Arm strength</h3>
+      <p>Every QB has a <b>max range</b> based on his rating. Aim past it and the marker turns red, and the ball dies short.</p>
+      <p>Low-rated QBs miss more, especially deep, on the run, or with a rusher in their face.</p></div>
+    <div><h3>X-Factors</h3>
+      <p>Stars have a special ability. String together big plays and they get <b>in the zone</b> (orange glow).</p>
+      <p>A bad play, or 8 snaps, knocks them out of it.</p></div>
+    <div><h3>My Player</h3>
+      <p>Create your own guy, put him on any team, and play games with that team to earn XP and level him up.</p></div>`;
 }
 
 // ---------- title ----------
@@ -81,7 +94,7 @@ function teamCard(t) {
     <div class="ov">${ovr} OVR</div><div style="font-size:12px;margin-bottom:6px;text-shadow:1px 1px 0 #000">OFF ${offO} • DEF ${defO}</div>
     <div class="stars">${stars.map(p => `<div>${p[0]} <b>${p[3]}</b> #${p[2]} ${p[1]}</div>`).join('')}</div>
     ${xfs.length ? `<div class="xfl"><span>X-FACTOR</span> ${xfs.map(x => lastName(x.name)).join(', ')}</div>` : ''}
-    <div class="cnt">${TEAMS.indexOf(t) + 1} / ${TEAMS.length}</div>`;
+    <div class="cnt">${TEAMS.findIndex(x => x.id === t.id) + 1} / ${TEAMS.length}</div>`;
 }
 function renderSelect(bumpSide) {
   for (const [side, id] of [[0, 'pHome'], [1, 'pAway']]) {
