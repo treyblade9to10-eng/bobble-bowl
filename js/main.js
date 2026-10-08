@@ -457,10 +457,11 @@ function updateMobileButtons() {
   const joyOn = G.phase === 'live' && !G.demo && !!h; // stays up the whole play so your thumb never loses it
   $('joy').classList.toggle('on', !!joyOn);
   if (!joyOn && Input.stick.m) { Input.stick.x = Input.stick.y = Input.stick.m = 0; $('joyKnob').style.left = $('joyKnob').style.top = '43px'; }
-  const key = st + (b && b.flight ? 'air' : '') + (h && h.engaged ? 'eng' : '');
+  const side = G.poss === G.human ? 'off' : 'def';
+  const key = st + side + (b && b.flight ? 'air' : '') + (h && h.engaged ? 'eng' : '');
   if (key === mbState) return;
   mbState = key;
-  document.querySelectorAll('#mbtns button').forEach(x => x.classList.toggle('on', x.dataset.show === st));
+  document.querySelectorAll('#mbtns button').forEach(x => x.classList.toggle('on', x.dataset.show === st && (!x.dataset.side || x.dataset.side === side)));
   $('mbDive').textContent = b && b.flight ? 'JUMP' : 'DIVE';
   $('mbSwim').style.display = st === 'def' && h && h.engaged ? 'block' : 'none';
   $('mbTO').style.display = st === 'presnap' && G.timeouts && G.timeouts[G.human] > 0 && G.pendingRunoff > 0 ? 'block' : 'none';

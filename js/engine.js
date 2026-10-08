@@ -158,7 +158,7 @@ function choosePlay(key, defPick) {
   if (fake) setupFake(fake);
   else setupPlay(OFF_PLAYS.find(p => p.key === offKey), DEF_PLAYS.find(p => p.key === defKey));
   G.phase = 'presnap';
-  G.snapTimer = humanOff ? Infinity : 1.6;
+  G.snapTimer = humanOff ? Infinity : G.cpuMotion != null ? 2.4 : 1.6;
 }
 
 function choosePAT(kind) {
@@ -279,6 +279,7 @@ function setupPlay(offPlay, defPlay, preview) {
       else if (p.assign.type !== 'rush' && p.slot >= 3 && p.slot <= 6 && chance(0.22)) at(p, L + d * 2.6, lerp(p.y, by, 0.35));
     });
     if (D[7].assign.type === 'zone' && D[7].assign.d > 10 && chance(0.3)) at(D[7], L + d * 7, by + rand(-5, 5)); // safety rotates late
+    if (defPlay.a[5] && defPlay.a[5].startsWith('man') && chance(0.35)) { G.cpuPress = true; at(D[5], L + d * 1.1, O[2].y); at(D[6], L + d * 1.1, O[3].y); }
   }
   G.players = P; G.O = O; G.D = D;
   G.refs = [{ x: L - d * 11, y: clamp(by + 7, 3, FIELD_W - 3), face: -d, anim: 0, throwT: 0 },
@@ -287,6 +288,8 @@ function setupPlay(offPlay, defPlay, preview) {
   G.ball = { x: L, y: by, z: 0, holder: preview ? null : O[0], flight: null, loose: null };
   if (!preview) G.ball.holder = O[0];
   else G.ball.holder = O[6]; // center holds it while we pick
+  G.motion = null; G.press = !!G.cpuPress; G.cpuPress = false; G.showBlitz = false;
+  G.cpuMotion = (!preview && !isHumanSide(o) && G.human >= 0 && offPlay.type === 'pass' && chance(0.3)) ? 1.0 : null;
   G.bstate = 'snap'; G.qbScramble = false; G.humanScramble = false; G.aim = null; G.fake = null; G.special = null; G.qbThink = 0; G.handedOff = false; G.intended = null;
   G.runoff = 0; G.passPlay = offPlay.type === 'pass'; G.thrownAway = false;
   // human control
@@ -294,6 +297,51 @@ function setupPlay(offPlay, defPlay, preview) {
   if (G.versus) { G.hd[dsd] = D[3]; G.hd[o] = null; G.humanDef = G.hd[G.human]; }
   else if (o !== G.human) G.humanDef = D.find(p => p.cap) || D[3];
   updateHuman();
+}
+
+// ---------------- pre-snap motion + defensive shifts ----------------
+// send a receiver in motion across the formation: if a defender runs with him, it's man coverage
+function startMotion() {
+  if (G.phase !== 'presnap' || G.motion || G.play.off.type !== 'pass' && !G.play.off.toss && G.play.off.carrier !== 4) return;
+  const p = G.play.off.carrier === 4 ? G.O[4] : [G.O[4], G.O[2], G.O[3]].find(r => r.role === 'route');
+  if (!p) return;
+  const by = G.ballY, to = clamp(by - (p.hy - by) * 0.55, 5, FIELD_W - 5);
+  G.motion = { p, to, from: p.y };
+  if (isHumanSide(p.side)) addText(p.x, p.y, 'MOTION', '#ffe14d', 15, 0.7);
+  Sound.click();
+}
+function updateMotion(dt) {
+  const m = G.motion; if (!m) return;
+  const p = m.p, dy = m.to - p.y;
+  p.inMotion = true; p.dvx = 0; p.dvy = Math.abs(dy) > 0.3 ? Math.sign(dy) * Math.min(5.5, Math.abs(dy) * 4) : 0; applyMove(p, dt);
+  // man defender travels with him (that's the tell)
+  for (const df of G.D) if (df.assign.type === 'man' && G.O[df.assign.t] === p) { df.inMotion = true; df.dvx = 0; df.dvy = clamp((p.y + (p.y > G.ballY ? -0.6 : 0.6) - df.y) * 4, -6, 6); applyMove(df, dt); }
+}
+function snapMotion() {
+  const m = G.motion; G.motion = null; G.cpuMotion = null;
+  for (const p of G.players) p.inMotion = false;
+  if (m && m.p.route) { const sh = m.p.y - m.p.hy; for (const pt of m.p.route.pts) pt.y = clamp(pt.y + sh, 1.2, FIELD_W - 1.2); m.p.hy = m.p.y; }
+  if (G.press) for (const df of G.D) { // press coverage: jam the receiver at the line
+    if (df.slot < 5 || df.slot > 6) continue;
+    const r = G.O[df.slot - 3];
+    if (r && dist(r, df) < 3 && chance(clamp(0.5 + (df.ovr - r.ovr) / 60, 0.2, 0.8))) { r.stun = 0.35; addText(r.x, r.y, 'JAMMED', '#ff8a8a', 13, 0.6); }
+  }
+}
+// defense pre-snap: press the corners up, or walk the linebackers up to show blitz
+function defShift(kind) {
+  if (G.phase !== 'presnap') return;
+  const d = dirOf(G.poss), L = G.los, by = G.ballY;
+  const at = (p, x, y) => { p.x = x; p.y = y; p.hx = x; p.hy = y; };
+  if (kind === 'press') {
+    G.press = !G.press;
+    for (const i of [5, 6]) { const df = G.D[i], r = G.O[i - 3]; at(df, G.press ? L + d * 1.1 : L + d * 6, G.press ? r.y : df.y); }
+    addText(G.D[5].x, G.D[5].y, G.press ? 'PRESS' : 'OFF COVERAGE', '#7fd3ff', 15, 0.8);
+  } else {
+    G.showBlitz = !G.showBlitz;
+    for (const i of [3, 4]) { const df = G.D[i]; at(df, G.showBlitz ? L + d * 2.2 : L + d * 5, G.showBlitz ? lerp(df.y, by, 0.35) : by + (i === 3 ? -4.5 : 4.5)); }
+    addText(G.D[3].x, G.D[3].y, G.showBlitz ? 'SHOW BLITZ' : 'BACK OFF', '#7fd3ff', 15, 0.8);
+  }
+  Sound.click(); G.snapTimer = Math.max(G.snapTimer, 0.6);
 }
 
 // ---------------- snap & live play ----------------
@@ -331,6 +379,7 @@ function snap() {
   if (G.fake) { showBanner(G.fake === 'punt' ? 'FAKE PUNT!' : 'FAKE FIELD GOAL!', '', '#7fd3ff', 1.3); G.crowdHype = 1; }
   if (!G.twoPt && chance(0.012)) { const dl = pick(G.D.slice(0, 3)); throwFlag('OFFSIDE', dl.side, dl.x, dl.y, dl); }
   G.ball.holder = G.O[0]; G.bstate = 'snap';
+  snapMotion();
   addDust(G.los, G.ballY, 4);
 }
 
@@ -357,6 +406,7 @@ function update(dt) {
     if (G.versus) { withSide(G.poss, () => presnapInput(dt)); if (G.phase === 'presnap') withSide(1 - G.poss, () => presnapInput(dt)); }
     else if (presnapInput(dt) === 'audible') return;
     idlePlayers(dt);
+    if (G.phase === 'presnap') updateMotion(dt);
   } else if (G.phase === 'live') {
     livePlay(dt);
   } else if (G.phase === 'dead') {
@@ -396,6 +446,7 @@ function presnapInput(dt) {
   if (Input.hit('KeyT')) callTimeout(G.human);
   if (Input.hit('KeyZ') && !G.versus) { audible(); return 'audible'; }
   if (G.poss === G.human) {
+    if (Input.hit('KeyM')) startMotion();
     for (const [k, s2] of [['Digit1', 2], ['Digit2', 3], ['Digit3', 4], ['Digit4', 1]]) if (Input.hit(k)) hotRoute(s2);
     let tapped = false;
     for (const c of Input.taps) { // tap a receiver = hot route, tap anywhere else = snap
@@ -406,6 +457,9 @@ function presnapInput(dt) {
     if (Input.hit('Space') || (Input.taps.length && !tapped)) snap();
   } else {
     G.snapTimer -= dt;
+    if (Input.hit('KeyV')) defShift('press');
+    if (Input.hit('KeyB')) defShift('show');
+    if (G.cpuMotion != null && G.snapTimer < G.cpuMotion) { G.cpuMotion = null; startMotion(); }
     if (Input.hit('KeyQ') || Input.hit('Tab')) presnapSwitch();
     if (G.snapTimer <= 0) snap();
   }
@@ -426,7 +480,7 @@ function updateRefs(dt) {
   });
 }
 
-function idlePlayers(dt) { for (const p of G.players) { p.dvx = 0; p.dvy = 0; applyMove(p, dt); } }
+function idlePlayers(dt) { for (const p of G.players) { if (p.inMotion) continue; p.dvx = 0; p.dvy = 0; applyMove(p, dt); } }
 
 function livePlay(dt) {
   const pl = G.play; pl.t += dt;
@@ -1804,7 +1858,7 @@ function updateHint() {
   }
   const humanOff = G.poss === G.human;
   const b = G.ball;
-  if (G.phase === 'presnap') G.hint = humanOff ? (G.play.off.type === 'run' ? 'SPACE snap  •  Z audible  •  T timeout' : 'SPACE snap  •  1-4 = HOT ROUTE a receiver  •  Z audible  •  T timeout') : 'Q / TAB pick your defender  •  Z audible  •  T timeout';
+  if (G.phase === 'presnap') G.hint = humanOff ? (G.play.off.type === 'run' ? 'SPACE snap  •  Z audible  •  T timeout' : 'SPACE snap  •  1-4 hot route  •  M motion  •  Z audible  •  T timeout') : 'Q / TAB pick defender  •  V press  •  B show blitz  •  Z audible  •  T timeout';
   else if (G.phase === 'live') {
     const h = G.humanPlayer;
     if (h && b.holder === h && h.side === G.human) G.hint = humanCanThrow() ? '1-4 throw (SHIFT = bullet, CTRL = lob, hold WASD to lead)  •  or drag back with mouse' : 'WASD move  •  SHIFT sprint  •  E juke  •  F spin  •  R stiff arm';
