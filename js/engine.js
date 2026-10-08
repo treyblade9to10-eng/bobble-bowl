@@ -943,13 +943,13 @@ function ai(p, dt) {
   if (b.flight && !b.flight.pitch) {
     const f = b.flight, land = { x: f.tx, y: f.ty };
     const tgt = f.intended;
-    const near = dist(p, land) < 15 || (a.type === 'man' && G.O[a.t] === tgt);
+    const near = dist(p, land) < 17 || (a.type === 'man' && G.O[a.t] === tgt);
     if (near && a.type !== 'rush') {
       const ttl = f.T - f.t;
       const reach = p.spd * ttl;
       // sometimes a defender leaps for it
       if (!p.isHuman && !p.jumpTried && dist(p, land) < 2.2 && ttl < 0.4) { p.jumpTried = true; if (chance([0.04, 0.07, 0.1, 0.15][G.diff])) doJump(p); }
-      if (dist(p, land) <= reach + 1.2) steer(p, land.x, land.y, 1.05, 0.3);
+      if (dist(p, land) <= reach + 2.2) steer(p, land.x, land.y, 1.08, 0.3);
       else steer(p, lerp(tgt.x, land.x, 0.6), lerp(tgt.y, land.y, 0.6), 1.05);
       return;
     }
@@ -1009,13 +1009,13 @@ function pursue(p, t) {
   if (!t) return;
   const dd = dist(p, t);
   // aim for the spot where we can cut him off (pursuit angle)
-  const sp = p.spd * (G.play.off.type === 'run' ? 1.03 : 1.09), rx = t.x - p.x, ry = t.y - p.y;
+  const sp = p.spd * (G.play.off.type === 'run' ? 1.05 : 1.12), rx = t.x - p.x, ry = t.y - p.y;
   const a = t.vx * t.vx + t.vy * t.vy - sp * sp, bq = 2 * (rx * t.vx + ry * t.vy), c = rx * rx + ry * ry;
   let T = dd / sp * 0.5;
   const disc = bq * bq - 4 * a * c;
   if (Math.abs(a) > 1e-3 && disc >= 0) { const r1 = (-bq - Math.sqrt(disc)) / (2 * a), r2 = (-bq + Math.sqrt(disc)) / (2 * a); const r = [r1, r2].filter(v => v > 0).sort((x, y) => x - y)[0]; if (r != null) T = r; }
   T = Math.min(T, 1.6);
-  steer(p, t.x + t.vx * T, t.y + t.vy * T, G.play.off.type === 'run' ? 1.03 : 1.09, 0.1);
+  steer(p, t.x + t.vx * T, t.y + t.vy * T, G.play.off.type === 'run' ? 1.05 : 1.12, 0.1);
   // AI dive at the ball carrier
   if (!p.isHuman && dd < 1.7 && dd > 0.85 && p.dive <= 0 && t === G.ball.holder && chance(0.035)) {
     doDive(p, { x: t.x + t.vx * 0.15 - p.x, y: t.y + t.vy * 0.15 - p.y, m: 1 });
@@ -1353,7 +1353,7 @@ function throwTo(qb, r, pitch = false, aimed = null, style = 'normal', lead = nu
       addText(qb.x, qb.y - 2, 'NOT ENOUGH ARM', '#ff8a8a', 15, 0.9);
     }
     let pressure = false; for (const df of G.D) if (!df.engaged && dist(df, qb) < 2.4) pressure = true;
-    let err = (0.4 + arm.accF) * (0.35 + len / 22);
+    let err = (0.55 + arm.accF) * (0.42 + len / 20);
     if (len > reach * 0.75) err *= 1 + (len / reach - 0.75) * 2; // straining for distance
     if (pressure) err += 0.6 + arm.accF * 0.45;
     if (qb.speedNow > 4) err += (0.3 + arm.accF * 0.3) * Math.min(1, qb.speedNow / 8);
@@ -1440,7 +1440,7 @@ function resolveCatch() {
   if (rcv && rd < R) {
     let pc = 0.93 + (rcv.ovr - 78) / 160 - (rd > 0.9 ? 0.08 : 0) - Weather.catchPenalty();
     if (hands) pc += 0.15;
-    if (def && dd < 1.4) { pc -= (hands ? 0.06 : 0.2) - (rcv.ovr - def.ovr) / 150; if (chance(0.03 + humanDefBonus * 0.5)) return intercept(def); }
+    if (def && dd < 1.8) { pc -= (hands ? 0.08 : 0.24) - (rcv.ovr - def.ovr) / 150; if (chance(0.03 + humanDefBonus * 0.5)) return intercept(def); }
     if (chance(clamp(pc, 0.25, 0.97))) {
       b.holder = rcv; G.bstate = 'run'; Sound.catch(); G.catchX = rcv.x;
       rcv.mouth = 'O'; rcv.mouthT = 0.4;
@@ -1481,13 +1481,13 @@ function checkTackles() {
   let hitters = 0;
   for (const df of G.players) {
     if (df.side === car.side || df.down > 0 || df.engaged || df.stun > 0 || df.tackleCd > 0) continue;
-    const reach = 0.95 + (df.dive > 0 ? 0.8 : 0) + (df.hit > 0 ? 0.45 : 0);
+    const reach = 1.15 + (df.dive > 0 ? 0.8 : 0) + (df.hit > 0 ? 0.45 : 0);
     if (dist(df, car) > reach) continue;
     hitters++;
     df.tackleCd = 0.5;
-    let p = 0.79 + (df.ovr - car.ovr) / 110;
-    if (car.juke > 0) p -= 0.42;
-    if (car.spin > 0) p -= 0.48;
+    let p = 0.87 + (df.ovr - car.ovr) / 110;
+    if (car.juke > 0) p -= 0.34;
+    if (car.spin > 0) p -= 0.4;
     const front = dirOf(car.side) * (df.x - car.x) > -0.3;
     if (car.stiff > 0 && front) p -= 0.38;
     if (df.dive > 0) p += 0.15;

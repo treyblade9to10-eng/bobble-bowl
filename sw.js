@@ -1,5 +1,5 @@
 // ---- Offline support: network first (so updates show up right away), saved copy when there's no signal ----
-const CACHE = 'bobble-v4.0';
+const CACHE = 'bobble-v4.1';
 const FILES = [
   './',
   'index.html',
