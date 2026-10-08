@@ -121,63 +121,89 @@ const SPECIAL_PLAYS = [
   { key: 'fg', name: 'Field Goal', special: true, desc: 'Try for 3 points.' }
 ];
 
-// mini whiteboard drawings for the play cards
+// play art for the play cards (drawn at 4x so it stays sharp when the card is big)
+const ROUTE_COL = ['#3d8bff', '#ff4d4d', '#33d17a', '#ffb02e']; // same colors as the 1-4 throw icons in the game
+function pdArrow(g, x0, y0, x1, y1, col, s = 3.2) {
+  const a = Math.atan2(y1 - y0, x1 - x0);
+  g.fillStyle = col; g.beginPath(); g.moveTo(x1 + Math.cos(a) * 1.2, y1 + Math.sin(a) * 1.2);
+  g.lineTo(x1 - Math.cos(a - 0.5) * s, y1 - Math.sin(a - 0.5) * s); g.lineTo(x1 - Math.cos(a + 0.5) * s, y1 - Math.sin(a + 0.5) * s); g.closePath(); g.fill();
+}
+function pdPath(g, pts, col, w, end) {
+  g.strokeStyle = col; g.lineWidth = w; g.lineCap = 'round'; g.lineJoin = 'round';
+  g.beginPath(); g.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) g.lineTo(pts[i][0], pts[i][1]); g.stroke();
+  const n = pts.length; if (n < 2) return;
+  const [x0, y0] = pts[n - 2], [x1, y1] = pts[n - 1];
+  if (end === 'sit') { const a = Math.atan2(y1 - y0, x1 - x0); g.beginPath(); g.moveTo(x1 - Math.sin(a) * 2.6, y1 + Math.cos(a) * 2.6); g.lineTo(x1 + Math.sin(a) * 2.6, y1 - Math.cos(a) * 2.6); g.stroke(); }
+  else pdArrow(g, x0, y0, x1, y1, col, 3 + w * 0.4);
+}
 function drawPlayDiagram(cv, play, isOff) {
-  const g = cv.getContext('2d'), W = cv.width, H = cv.height;
-  g.clearRect(0, 0, W, H);
-  g.fillStyle = '#3a8a3c'; g.fillRect(0, 0, W, H);
-  const losX = 34, sx = 2.1, sy = 1.25, cy = H / 2;
-  const P = (d, y) => [losX + d * sx, cy + y * sy];
-  g.strokeStyle = '#fff6'; g.lineWidth = 1; g.beginPath(); g.moveTo(losX, 0); g.lineTo(losX, H); g.stroke();
+  const g = cv.getContext('2d'), S = cv.width / 120, W = 120, H = 72;
+  g.setTransform(S, 0, 0, S, 0, 0); g.clearRect(0, 0, W, H);
+  const bg = g.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, '#2f7436'); bg.addColorStop(1, '#265f2c'); g.fillStyle = bg; g.fillRect(0, 0, W, H);
+  const losX = 32, sx = 2.1, sy = 1.25, cy = H / 2;
+  const P = (d, y) => [losX + d * sx, clamp(cy + y * sy, 3.5, H - 3.5)]; // routes stay inside the card
+  // yard lines every 5 yards
+  g.strokeStyle = '#ffffff16'; g.lineWidth = 0.6;
+  for (let d = -10; d <= 40; d += 5) { const x = losX + d * sx; g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke(); }
+  g.strokeStyle = '#ffffff70'; g.lineWidth = 0.9; g.beginPath(); g.moveTo(losX, 2); g.lineTo(losX, H - 2); g.stroke();
   if (play.special) {
-    g.fillStyle = '#fff'; g.font = "italic 900 26px 'Barlow Condensed', sans-serif"; g.textAlign = 'center';
-    g.fillText({ punt: 'PUNT', ko: 'DEEP', onside: 'ONSIDE', fakepunt: 'FAKE', fakefg: 'FAKE' }[play.key] || 'FG', W / 2, H / 2 + 9);
+    const lbl = { punt: 'PUNT', ko: 'KICKOFF', onside: 'ONSIDE', fakepunt: 'FAKE PUNT', fakefg: 'FAKE FG', kneel: 'KNEEL' }[play.key] || 'FIELD GOAL';
+    if (lbl === 'FIELD GOAL') { // uprights
+      g.strokeStyle = '#f6c31c'; g.lineWidth = 2.2; g.lineCap = 'round';
+      g.beginPath(); g.moveTo(96, 48); g.lineTo(96, 36); g.moveTo(84, 36); g.lineTo(108, 36); g.moveTo(84, 36); g.lineTo(84, 16); g.moveTo(108, 36); g.lineTo(108, 16); g.stroke();
+      g.setLineDash([2, 2.5]); g.strokeStyle = '#ffffffb0'; g.lineWidth = 1.2; g.beginPath(); g.moveTo(26, 50); g.quadraticCurveTo(62, 2, 96, 24); g.stroke(); g.setLineDash([]);
+    }
+    g.fillStyle = '#fff'; g.font = "italic 900 17px 'Barlow Condensed', sans-serif"; g.textAlign = lbl === 'FIELD GOAL' ? 'left' : 'center'; g.textBaseline = 'middle';
+    g.fillText(lbl, lbl === 'FIELD GOAL' ? 6 : W / 2, lbl === 'FIELD GOAL' ? 62 : H / 2 + 1);
     return;
   }
+  const dot = (x, y, fill, sq) => { g.fillStyle = fill; g.strokeStyle = '#0b0f16'; g.lineWidth = 0.9; g.beginPath(); if (sq) g.rect(x - 2.6, y - 2.6, 5.2, 5.2); else g.arc(x, y, 2.9, 0, 7); g.fill(); g.stroke(); };
   if (isOff) {
-    const F = FORMATIONS[play.form || 'gun'], spots = { 5: [-0.7, -4], 6: [-0.7, 0], 7: [-0.7, 4] };
+    const F = FORMATIONS[play.form || 'gun'], spots = { 5: [-0.7, -4.8], 6: [-0.7, 0], 7: [-0.7, 4.8] };
     for (const k in F.spots) spots[k] = [-F.spots[k][0], F.spots[k][1] * 1.5];
-    g.font = "800 10px 'Barlow Condensed', sans-serif"; g.textAlign = 'right';
-    const fw = g.measureText(F.name.toUpperCase()).width + 6; g.fillStyle = '#0b0f16b0'; g.fillRect(W - fw - 1, 0, fw + 1, 12);
-    g.fillStyle = '#ffffffd0'; g.fillText(F.name.toUpperCase(), W - 4, 9);
-    g.lineWidth = 2;
+    // blockers: short T in front of them
+    const blockT = (x, y) => { g.strokeStyle = '#ffffff99'; g.lineWidth = 1; g.lineCap = 'round'; g.beginPath(); g.moveTo(x + 3, y); g.lineTo(x + 5.8, y); g.moveTo(x + 5.8, y - 1.8); g.lineTo(x + 5.8, y + 1.8); g.stroke(); };
     for (const s in spots) {
-      const [d, y] = spots[s];
+      const [d, y] = spots[s], [px, py] = P(d, y);
       const route = play.routes && play.routes[s];
-      if (route && route.end !== 'block') {
-        const out = y === 0 ? 1 : Math.sign(y);
-        g.strokeStyle = s == 1 ? '#7fd3ff' : '#ffe14d'; g.beginPath();
-        let [x0, y0] = P(d, y); g.moveTo(x0, y0); let cd = d, cyy = y;
-        for (const [dd, oo] of route.r) { cd = d + Math.min(dd, 30); cyy = y + oo * out; const [px, py] = P(cd, cyy); g.lineTo(px, py); }
-        g.stroke();
-      }
-      g.fillStyle = s == 0 ? '#ff5050' : '#fff';
-      const [px, py] = P(d, y); g.beginPath(); g.arc(px, py, 3.2, 0, 7); g.fill();
+      if (+s >= 5) blockT(px, py);
+      else if (+s >= 1 && route && route.end !== 'block') {
+        const out = y === 0 ? 1 : Math.sign(y), key = +s === 1 ? 4 : +s - 1;
+        const pts = [[px, py]];
+        for (const [dd, oo] of route.r) pts.push(P(d + Math.min(dd, 30), y + oo * out));
+        pdPath(g, pts, ROUTE_COL[key - 1], 1.5, route.end);
+      } else if (+s >= 2 && (play.wr === 'block' || (route && route.end === 'block'))) blockT(px, py);
     }
     const runner = play.rb && play.rb.path;
     if (runner) {
-      const c = spots[play.carrier || 1];
-      g.strokeStyle = play.fake ? '#fff8' : '#ff8a3d'; g.setLineDash(play.fake ? [3, 3] : []); g.lineWidth = 2.5;
-      g.beginPath(); let [x0, y0] = P(c[0], c[1]); g.moveTo(x0, y0);
-      for (const [d, w] of runner) { const [px, py] = P(Math.min(d, 26), w * 1.5); g.lineTo(px, py); }
-      g.stroke(); g.setLineDash([]);
+      const c = spots[play.carrier || 1], pts = [P(c[0], c[1])];
+      for (const [d, w] of runner) pts.push(P(Math.min(d, 26), w * 1.5));
+      if (play.fake) { g.setLineDash([2.5, 2]); pdPath(g, pts, '#ffffff90', 1.3, 'go'); g.setLineDash([]); }
+      else pdPath(g, pts, '#ff8a3d', 2.1, 'go');
     }
-    if (play.qbRun) { g.strokeStyle = '#ff8a3d'; g.lineWidth = 2.5; g.beginPath(); let [a, b] = P(spots[0][0], 0); g.moveTo(a, b); [a, b] = P(16, 0); g.lineTo(a, b); g.stroke(); }
+    if (play.qbRun) pdPath(g, [P(spots[0][0], 0), P(16, 0)], '#ff8a3d', 2.1, 'go');
+    for (const s in spots) { const [px, py] = P(...spots[s]); dot(px, py, +s === 0 ? '#f6c31c' : '#ffffff', +s >= 5); }
+    g.fillStyle = '#ffffffa0'; g.font = "800 7px 'Barlow Condensed', sans-serif"; g.textAlign = 'left'; g.textBaseline = 'alphabetic';
+    g.fillText(F.name.toUpperCase(), 3, H - 3);
   } else {
     const spots = [[1.2, -4], [1.2, 0], [1.2, 4], [5, -6], [5, 6], [6, -24], [6, 24], [13, 0]];
+    // zones first (under everything)
     play.a.forEach((a, i) => {
-      const [d, y] = spots[i]; const [px, py] = P(d, y);
-      g.lineWidth = 2;
-      if (a === 'rush') { g.strokeStyle = '#ff5050'; g.beginPath(); g.moveTo(px, py); const [qx, qy] = P(-4, y * 0.3); g.lineTo(qx, qy); g.stroke(); }
-      else if (a.startsWith('zone')) {
-        const z = a.split(':'); const zd = +z[1]; let zy = z[2];
-        zy = zy === 'mid' ? 0 : zy === 'edgeT' ? -20 : zy === 'edgeB' ? 20 : zy === 'thirdT' ? -16 : zy === 'thirdB' ? 16 : +zy;
-        const [zx, zz] = P(Math.min(zd, 30), zy);
-        g.strokeStyle = '#7fd3ff'; g.beginPath(); g.moveTo(px, py); g.lineTo(zx, zz); g.stroke();
-        g.fillStyle = '#7fd3ff55'; g.beginPath(); g.ellipse(zx, zz, 9, 6, 0, 0, 7); g.fill();
-      } else if (a === 'spy') { g.strokeStyle = '#d58cff'; g.beginPath(); g.arc(px, py, 6, 0, 7); g.stroke(); }
-      else { g.strokeStyle = '#ffe14d'; g.setLineDash([2, 2]); g.beginPath(); g.moveTo(px, py); g.lineTo(px + 8, py); g.stroke(); g.setLineDash([]); }
-      g.fillStyle = '#fff'; g.font = 'bold 9px sans-serif'; g.textAlign = 'center'; g.fillText('X', px, py + 3);
+      if (!a.startsWith('zone')) return;
+      const z = a.split(':'), zd = +z[1]; let zy = z[2];
+      zy = zy === 'mid' ? 0 : zy === 'edgeT' ? -20 : zy === 'edgeB' ? 20 : zy === 'thirdT' ? -16 : zy === 'thirdB' ? 16 : +zy;
+      const [zx, zz] = P(Math.min(zd, 30), zy), deep = zd >= 12, col = deep ? '61,139,255' : '255,210,63';
+      g.fillStyle = `rgba(${col},0.28)`; g.strokeStyle = `rgba(${col},0.9)`; g.lineWidth = 0.9;
+      g.beginPath(); g.ellipse(zx, zz, deep ? 11 : 9, deep ? 8 : 6.5, 0, 0, 7); g.fill(); g.stroke();
+      const [px, py] = P(...spots[i]); g.strokeStyle = `rgba(${col},0.9)`; g.lineWidth = 1.1; g.beginPath(); g.moveTo(px, py); g.lineTo(zx, zz); g.stroke();
+    });
+    play.a.forEach((a, i) => {
+      const [px, py] = P(...spots[i]);
+      if (a === 'rush') pdPath(g, [[px, py], P(-4.5, spots[i][1] * 0.3)], '#ff4d4d', 1.5, 'go');
+      else if (a === 'spy') { g.strokeStyle = '#c08cff'; g.lineWidth = 1.1; g.beginPath(); g.arc(px, py, 5.5, 0, 7); g.stroke(); }
+      else if (a.startsWith('man')) { g.setLineDash([1.8, 1.6]); pdPath(g, [[px, py], [px - 7, py]], '#c08cff', 1.2, 'go'); g.setLineDash([]); }
+      g.strokeStyle = '#fff'; g.lineWidth = 1.5; g.lineCap = 'round';
+      g.beginPath(); g.moveTo(px - 2.3, py - 2.3); g.lineTo(px + 2.3, py + 2.3); g.moveTo(px + 2.3, py - 2.3); g.lineTo(px - 2.3, py + 2.3); g.stroke();
     });
   }
 }

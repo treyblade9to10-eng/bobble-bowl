@@ -65,18 +65,18 @@ h2::after { content: ''; position: absolute; left: 50%; bottom: 0; width: 56px; 
 #pcHead { font-family: var(--hd); font-style: italic; font-weight: 900; font-size: 30px; letter-spacing: .02em; margin-bottom: 10px; text-align: center; text-transform: uppercase; }
 #pcHead .pcsub { font-style: normal; font-weight: 600; font-size: 20px; color: var(--gold); margin-left: 10px; letter-spacing: .04em; }
 #pcCards { display: grid; gap: 8px; width: min(1180px, calc(100vw - 20px)); }
-.pcard { min-width: 0; position: relative; background: #f2efe6; color: #111; border-radius: 3px; padding: 5px; cursor: pointer; border: 2px solid #2a2a2a;
-  transition: transform .1s, border-color .1s; }
-.pcard:hover, .pcard.sel { transform: translateY(-5px); border-color: var(--gold); }
-.pcard .k { float: left; background: #111; color: var(--gold); padding: 0 6px; font-family: var(--hd); font-weight: 800; font-size: 14px; }
-.pcard .t { font-family: var(--hd); font-weight: 800; font-size: 16px; text-transform: uppercase; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.pcard canvas { width: 100%; height: auto; aspect-ratio: 5 / 3; max-height: 18vh; object-fit: contain; background: #3a8a3c; margin-top: 3px; display: block; }
-.pcard .k.run { background: var(--red); color: #fff; } .pcard .k.pass { background: #1f5fd1; color: #fff; } .pcard .k.kick { background: #111; color: var(--gold); }
-.pcard.coach { border-color: var(--gold); box-shadow: 0 0 0 2px var(--gold); }
-.pcard .cp { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: var(--gold); color: #111; font-family: var(--hd); font-size: 11px; font-weight: 800;
-  letter-spacing: .08em; padding: 1px 8px; white-space: nowrap; }
-.pcard .d { font-size: 11px; margin-top: 3px; min-height: 26px; line-height: 1.25; }
-.pcard.special { background: #f4e2b0; }
+.pcard { min-width: 0; position: relative; background: #161d28; color: var(--text); border-radius: 4px; padding: 4px; cursor: pointer; border: 1px solid #ffffff24;
+  box-shadow: 0 4px 14px #0007; transition: transform .1s, border-color .1s, background .1s; }
+.pcard:hover, .pcard.sel { transform: translateY(-3px); border-color: var(--gold); background: #1d2633; }
+.pcard .ph { display: flex; align-items: center; gap: 6px; padding: 1px 2px 4px; min-width: 0; }
+.pcard .k { flex: none; padding: 1px 6px; border-radius: 2px; font-family: var(--hd); font-weight: 800; font-size: 12px; letter-spacing: .06em; background: #2a3442; color: var(--gold); }
+.pcard .t { flex: 1; min-width: 0; font-family: var(--hd); font-weight: 800; font-size: 16px; letter-spacing: .02em; text-transform: uppercase; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pcard canvas { width: 100%; height: auto; aspect-ratio: 5 / 3; max-height: 18vh; object-fit: contain; background: #2a6930; border-radius: 2px; display: block; }
+.pcard .k.run { background: #d63a1c; color: #fff; } .pcard .k.pass { background: #1f5fd1; color: #fff; } .pcard .k.kick { background: var(--gold); color: #111; }
+.pcard.coach { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold), 0 4px 14px #0007; }
+.pcard .cp { position: absolute; top: -9px; right: 6px; background: var(--gold); color: #111; font-family: var(--hd); font-size: 10px; font-weight: 800; letter-spacing: .08em; padding: 0 6px; border-radius: 2px; }
+.pcard .d { font-size: 11px; margin-top: 4px; min-height: 26px; line-height: 1.25; color: var(--dim); padding: 0 2px; }
+.pcard.special { background: #1f2430; }
 .pcard .rng { font-family: var(--hd); font-weight: 800; font-size: 12px; letter-spacing: .05em; text-align: center; color: #fff; padding: 2px 0; margin-top: 3px; }
 .pcard .rng.in { background: #1f9d55; } .pcard .rng.long { background: #c27a12; } .pcard .rng.out { background: #c0262c; }
 #pcHint { margin-top: 10px; font-size: 13px; color: var(--dim); display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; }
@@ -120,7 +120,7 @@ body.mobile #mbtns { display: flex; }
 @media (orientation: portrait) and (max-width: 900px) { #rotate { display: flex; } }
 
 /* phone-friendly menus */
-@media (max-height: 560px) { .pcard .d { display: none; } .pcard .t { font-size: 13px; } .pcard { padding: 3px 4px; border-width: 2px; } #pcCards { gap: 10px 6px; } .pcard canvas { max-height: 21vh; } }
+@media (max-height: 560px) { .pcard .d { display: none; } .pcard .t { font-size: 13px; } .pcard .k { font-size: 10px; padding: 0 4px; } .pcard { padding: 3px; } .pcard .ph { padding: 0 1px 3px; gap: 4px; } #pcCards { gap: 10px 6px; } .pcard canvas { max-height: 21vh; } }
 body.mobile #playcall { padding-bottom: 6px; }
 body.mobile #pcHead { font-size: 21px; margin-bottom: 4px; } body.mobile #pcHead .pcsub { font-size: 16px; }
 @media (max-height: 500px) {

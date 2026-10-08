@@ -231,9 +231,9 @@ function renderCards() {
     el.className = 'pcard' + (p.special ? ' special' : '') + (p.key === pcCoach ? ' coach' : ''); el.tabIndex = 0;
     const kind = p.type === 'run' ? 'run' : p.type === 'pass' ? 'pass' : p.special ? 'kick' : '';
     const label = G.mode === 'mobile' ? (kind === 'run' ? 'RUN' : kind === 'pass' ? 'PASS' : kind === 'kick' ? 'KICK' : 'D') : (j + 1) % 10;
-    el.innerHTML = `${p.key === pcCoach ? '<span class="cp">COACH PICK</span>' : ''}<span class="k ${kind}">${label}</span><div class="t">${p.name}</div>`;
-    const mini = document.createElement('canvas'); mini.width = 120; mini.height = 72;
-    if (p.key === 'xp' || p.key === 'two') { const g = mini.getContext('2d'); g.fillStyle = '#3a8a3c'; g.fillRect(0, 0, 120, 72); g.font = "italic 900 34px 'Barlow Condensed', sans-serif"; g.textAlign = 'center'; g.fillStyle = '#fff'; g.fillText(p.key === 'xp' ? '+1' : '+2', 60, 48); }
+    el.innerHTML = `${p.key === pcCoach ? '<span class="cp">COACH PICK</span>' : ''}<div class="ph"><span class="k ${kind}">${label}</span><div class="t">${p.name}</div></div>`;
+    const mini = document.createElement('canvas'); mini.width = 480; mini.height = 288; // 4x so the art stays sharp
+    if (p.key === 'xp' || p.key === 'two') { const g = mini.getContext('2d'); g.scale(4, 4); g.fillStyle = '#2b6b31'; g.fillRect(0, 0, 120, 72); g.font = "italic 900 34px 'Barlow Condensed', sans-serif"; g.textAlign = 'center'; g.fillStyle = '#fff'; g.fillText(p.key === 'xp' ? '+1' : '+2', 60, 48); }
     else drawPlayDiagram(mini, p, pcOff);
     el.appendChild(mini);
     if (p.range) { const r = document.createElement('div'); r.className = 'rng ' + p.range; r.textContent = p.range === 'in' ? 'IN RANGE' : p.range === 'long' ? 'AT HIS MAX' : 'OUT OF RANGE'; el.appendChild(r); }
