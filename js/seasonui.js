@@ -30,7 +30,7 @@ const dotFor = id => { const t = Season.team(id); return `<span class="dot" styl
 function renderHub() {
   const d = Season.data, me = Season.team(d.team), conf = me.conf;
   $('shTop').innerHTML = `<div class="big1" style="color:${me.c1 === '#000000' ? '#fff' : me.c1};-webkit-text-stroke:1px #fff">${me.city.toUpperCase()} ${me.name.toUpperCase()}</div>
-    <div class="rec">${d.year > 1 ? `YEAR ${d.year}  •  ` : ''}${recStr(d.team)}  •  ${d.phase === 'regular' ? `WEEK ${d.week + 1} of ${d.games}` : d.phase === 'playoffs' ? 'PLAYOFFS' : 'SEASON OVER'}</div>`;
+    <div class="rec">${d.year > 1 ? `YEAR ${d.year}  •  ` : ''}${recStr(d.team)}  •  ${d.phase === 'regular' ? `WEEK ${d.week + 1} of ${d.games}  •  ${Season.canTrade() ? `TRADE DEADLINE: WEEK ${Season.deadline()}` : 'TRADE DEADLINE PASSED'}` : d.phase === 'playoffs' ? 'PLAYOFFS' : 'SEASON OVER'}</div>`;
   // next game / season result
   const g = Season.myGame(), nx = $('shNext');
   const canPlay = !!g;
@@ -50,13 +50,13 @@ function renderHub() {
     const aw = (d.awards || []).map(a => `<div class="awLine"><b>${a.award}</b> ${a.name} <span>${a.pos}, ${a.team}  ·  ${a.line}</span></div>`).join('');
     nx.innerHTML = `<div class="mu">${msg}</div><div class="sub">${ch ? `Bobble Bowl champion: <b>${ch.city} ${ch.name}</b>` : ''}</div>
       ${aw ? `<div class="awards">${aw}</div>` : ''}
-      <div class="row"><button class="big gold" id="shNext2">START YEAR ${d.year + 1}</button><button id="shNew">NEW TEAM</button></div>`;
-    $('shNext2').onclick = () => { const ch2 = Season.nextYear(); Sound.whistle(); renderOffseason(ch2); };
+      <div class="row"><button class="big gold" id="shNext2">${d.draft ? 'BACK TO THE DRAFT' : `DRAFT + YEAR ${d.year + 1}`}</button><button id="shNew">NEW TEAM</button></div>`;
+    $('shNext2').onclick = () => { Sound.click(); openDraft(); };
     $('shNew').onclick = () => { if (confirm('Start over with a new team? This franchise will be deleted.')) { Season.clear(); renderSeasonNew(); } };
   }
   $('shPlay').style.display = $('shSim').style.display = canPlay ? '' : 'none';
   $('shQuit').style.display = canPlay ? '' : 'none';
-  $('shTrade').style.display = d.phase === 'regular' ? '' : 'none';
+  $('shTrade').style.display = Season.canTrade() ? '' : 'none';
   // schedule + playoff results
   let sched = '';
   d.weeks.forEach((wk, i) => {
@@ -88,6 +88,8 @@ function renderHubTab() {
     const cats = [['pass', 'PASSING YDS'], ['rush', 'RUSHING YDS'], ['rec', 'RECEIVING YDS'], ['td', 'TOUCHDOWNS'], ['sack', 'SACKS'], ['int', 'INTERCEPTIONS']];
     h = '<div class="leadGrid">' + cats.map(([k, lbl]) => `<div class="leadBox"><div class="leadHead">${lbl}</div>` +
       (Season.leaders(k).map((l, i) => `<div class="leadRow ${l.t === d.team ? 'me' : ''}"><span>${i + 1}. ${dotFor(l.t)}${lastName(l.name)} <i>${l.t}</i></span><b>${l[k]}</b></div>`).join('') || '<div class="note">No stats yet</div>') + '</div>').join('') + '</div>';
+  } else if (hubTab === 'news') {
+    h = (d.news || []).length ? d.news.map(n => `<div class="newsRow"><span>WK ${n.week}</span>${n.text}</div>`).join('') : '<div class="note">League news (CPU trades, the deadline, draft picks) shows up here.</div>';
   } else {
     const hist = (d.history || []).slice().reverse();
     h = hist.length ? `<table><tr><th>YEAR</th><th>TEAM</th><th>REC</th><th>FINISH</th><th>CHAMP</th></tr>${hist.map(x => `<tr><td>${x.year}</td><td>${x.team}</td><td>${x.rec}</td><td>${x.finish}</td><td>${x.champ || ''}</td></tr>`).join('')}</table>` : '<div class="note">Finish a season to start your franchise history. Then hit START YEAR 2 to keep going with the same team.</div>';

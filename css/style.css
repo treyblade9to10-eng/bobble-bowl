@@ -382,3 +382,21 @@ input.bad { border-color: var(--red); }
 body.mobile .optPl { display: none; }
 
 #resumeInfo { font-family: var(--hd); font-weight: 800; font-size: 15px; letter-spacing: .06em; color: var(--dim); align-self: center; margin-left: 4px; }
+
+/* ---- draft + news ---- */
+#drBody { width: min(1100px, 96vw); }
+.dHead { font-family: var(--hd); font-weight: 800; font-size: 18px; letter-spacing: .08em; color: var(--gold); margin-bottom: 8px; text-align: center; }
+.dWrap { display: flex; gap: 12px; max-height: 58vh; }
+.dBoard { flex: 2; overflow-y: auto; background: var(--panel); padding: 6px; }
+.dSide { flex: 1; overflow-y: auto; background: var(--panel); padding: 6px; }
+.dRow { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-bottom: 1px solid #ffffff14; cursor: pointer; font-size: 14px; }
+.dRow:hover { background: #ffffff12; }
+.dRow .pos { width: 30px; color: var(--dim); font-weight: 800; }
+.dRow b { width: 28px; font-family: var(--hd); font-size: 18px; color: var(--gold); }
+.dRow .nm { flex: 1; } .dRow .nm i { display: block; font-style: normal; font-size: 11px; color: var(--dim); }
+.dRow .up { color: #5cdd8a; font-size: 12px; } .dRow span:last-child { font-size: 12px; color: var(--dim); }
+.dpRow { display: flex; gap: 8px; font-size: 13px; padding: 4px 2px; border-bottom: 1px solid #ffffff10; } .dpRow b { flex: 1; } .dpRow i { color: var(--dim); font-style: normal; }
+.dDone { font-family: var(--hd); font-weight: 900; font-size: 26px; text-align: center; margin: 6px 0; }
+.dMine { text-align: center; margin-bottom: 10px; font-size: 15px; line-height: 1.5; }
+.newsRow { font-size: 13px; padding: 5px 2px; border-bottom: 1px solid #ffffff12; } .newsRow span { color: var(--gold); font-weight: 800; margin-right: 8px; }
+@media (max-height: 560px) { .dWrap { max-height: 50vh; } .dRow { padding: 3px 6px; } }
