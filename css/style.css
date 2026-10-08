@@ -380,3 +380,5 @@ input.bad { border-color: var(--red); }
 #how { overflow-y: auto; justify-content: flex-start; }
 .howgrid > div { width: 300px; }
 body.mobile .optPl { display: none; }
+
+#resumeInfo { font-family: var(--hd); font-weight: 800; font-size: 15px; letter-spacing: .06em; color: var(--dim); align-self: center; margin-left: 4px; }

@@ -42,6 +42,19 @@ function spotText(s, x) {
 // ---------------- game setup ----------------
 function newGame(home, away, opts) {
   home = Career.withCAP(home); away = Career.withCAP(away);
+  initGame(home, away, opts);
+  if (opts.scenario) { // e.g. the Two-Minute Challenge
+    const sc = opts.scenario;
+    Object.assign(G, { quarter: sc.quarter, clock: sc.clock, score: sc.score.slice() });
+    if (sc.timeouts) G.timeouts = sc.timeouts.slice();
+    setDrive(sc.poss, ownGoal(sc.poss) + dirOf(sc.poss) * sc.own);
+    showBanner(sc.title, sc.sub, '#ffd23f', 2.6);
+    return toPlayCall();
+  }
+  showBanner('KICKOFF!', `${away.city} ${away.name} get the ball first`, '#fff', 2.2);
+  startKickoff(0);
+}
+function initGame(home, away, opts) {
   Object.assign(G, {
     teams: [home, away], human: opts.humanSide || 0, diff: opts.diff, flags: [], playClock: 0, playoff: !!opts.playoff, qtrLen: opts.qtr, score: [0, 0], quarter: 1, clock: opts.qtr,
     fx: [], banner: null, players: [], ball: null, patSide: null, twoPt: false, next: null, firstPoss: 1, paused: false,
@@ -53,16 +66,6 @@ function newGame(home, away, opts) {
   if (G.versus) G.diff = 1;
   Input.versus = G.versus; Input.ctl = 0;
   setupXFactors();
-  if (opts.scenario) { // e.g. the Two-Minute Challenge
-    const sc = opts.scenario;
-    Object.assign(G, { quarter: sc.quarter, clock: sc.clock, score: sc.score.slice() });
-    if (sc.timeouts) G.timeouts = sc.timeouts.slice();
-    setDrive(sc.poss, ownGoal(sc.poss) + dirOf(sc.poss) * sc.own);
-    showBanner(sc.title, sc.sub, '#ffd23f', 2.6);
-    return toPlayCall();
-  }
-  showBanner('KICKOFF!', `${away.city} ${away.name} get the ball first`, '#fff', 2.2);
-  startKickoff(0);
 }
 
 function setDrive(side, x) {
@@ -97,6 +100,7 @@ function toPlayCall() {
     return;
   }
   cpuTimeoutCheck();
+  if (typeof SaveGame !== 'undefined') SaveGame.save();
   if (G.versus) return G.hooks.onPlayCall({ ...withSide(G.poss, playCallCtx), side: G.poss });
   G.hooks.onPlayCall(playCallCtx());
 }
@@ -1620,6 +1624,7 @@ function endQuarter() {
 
 function gameOver() {
   G.phase = 'over';
+  if (typeof SaveGame !== 'undefined') SaveGame.clear();
   const all = Object.values(G.pstats);
   const top = (k, side) => all.filter(s => s.side === side && s[k] > 0).sort((a, b) => b[k] - a[k])[0];
   G.hooks.onGameOver({

@@ -137,7 +137,9 @@ function drawPlayDiagram(cv, play, isOff) {
   if (isOff) {
     const F = FORMATIONS[play.form || 'gun'], spots = { 5: [-0.7, -4], 6: [-0.7, 0], 7: [-0.7, 4] };
     for (const k in F.spots) spots[k] = [-F.spots[k][0], F.spots[k][1] * 1.5];
-    g.fillStyle = '#ffffffb0'; g.font = "800 10px 'Barlow Condensed', sans-serif"; g.textAlign = 'right'; g.fillText(F.name.toUpperCase(), W - 4, 10);
+    g.font = "800 10px 'Barlow Condensed', sans-serif"; g.textAlign = 'right';
+    const fw = g.measureText(F.name.toUpperCase()).width + 6; g.fillStyle = '#0b0f16b0'; g.fillRect(W - fw - 1, 0, fw + 1, 12);
+    g.fillStyle = '#ffffffd0'; g.fillText(F.name.toUpperCase(), W - 4, 9);
     g.lineWidth = 2;
     for (const s in spots) {
       const [d, y] = spots[s];

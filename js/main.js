@@ -6,6 +6,7 @@ const screens = ['title', 'mode', 'how', 'select', 'playcall', 'over', 'pause', 
 function show(id) {
   if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
   for (const s of screens) $(s).classList.toggle('show', s === id);
+  if (id === 'title' && typeof SaveGame !== 'undefined') { const sv = SaveGame.get(); $('resumeRow').style.display = sv ? 'flex' : 'none'; if (sv) $('resumeInfo').textContent = SaveGame.summary(sv); }
   $('btnPause').style.display = (id === 'playcall' || id === null) && G.teams && !G.demo ? 'block' : 'none';
 }
 
@@ -78,6 +79,13 @@ function buildHow() {
 $('btnPlay').onclick = () => { Sound.init(); Sound.click(); modeAfter = 'select'; show('mode'); };
 $('btnMode').onclick = () => { Sound.init(); modeAfter = 'title'; show('mode'); };
 $('btnHow').onclick = () => { Sound.init(); show('how'); };
+$('btnResume2').onclick = () => {
+  Sound.init(); Sound.click();
+  if (G.mode === 'mobile') goFullscreen();
+  G.demo = false; G.challenge = null; G.mini = null; G.paused = false; show(null);
+  if (!SaveGame.resume()) show('title');
+};
+{ const sv = SaveGame.get(); if (sv) { $('resumeRow').style.display = 'flex'; $('resumeInfo').textContent = SaveGame.summary(sv); } }
 $('btnHowBack').onclick = () => show('title');
 $('btnMute').onclick = () => { Sound.muted = !Sound.muted; $('btnMute').classList.toggle('off', Sound.muted); };
 
@@ -372,6 +380,7 @@ const replayLabel = () => { $('btnReplayOpt').textContent = 'INSTANT REPLAYS: ' 
 replayLabel();
 $('btnReplayOpt').onclick = () => { Replay.setEnabled(!Replay.enabled); replayLabel(); };
 $('btnQuit').onclick = () => {
+  SaveGame.clear();
   G.paused = false; G.teams = null; G.phase = 'idle';
   if (G.season) { G.season = false; openSeason(); } else if (G.challenge || G.mini) { G.challenge = null; G.mini = null; openModes(); } else show('title');
 };

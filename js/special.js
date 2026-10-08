@@ -8,6 +8,7 @@ function startKickoff(k, from = 35) {
   G.kickoffSide = k; G.kickFrom = from; G.poss = 1 - k;
   G.phase = 'playcall'; G.flags = []; G.playClock = 0; G.pendingRunoff = 0; G.koPending = true;
   setupReturn('ko', k);
+  if (typeof SaveGame !== 'undefined') SaveGame.save();
   if (isHumanSide(k) && !G.demo) G.hooks.onPlayCall({ mode: 'kickoff', side: k });
   else setTimeout(() => { if (G.phase === 'playcall' && G.kickoffSide === k) chooseKickoff(cpuKickoffCall(k)); }, 900);
 }
