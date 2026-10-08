@@ -460,3 +460,21 @@ body.pad button:focus, body.pad .pcard:focus, body.pad .mdcard:focus, body.pad .
 #trOffer button { font-size: 12px; padding: 4px 10px; margin: 0; }
 #trOffer button.gold { background: var(--gold); color: #111; }
 @media (max-height: 500px) { #trMid { width: 210px; gap: 5px; } #trSum { font-size: 11px; } .trSumCol { min-height: 40px; padding: 4px; } #trGo { font-size: 20px; padding: 8px 20px; } }
+
+/* tutorial */
+#btnTut { background: var(--gold); color: #111; }
+#tuSub { color: var(--dim); max-width: 560px; text-align: center; margin-bottom: 8px; font-size: 14px; }
+#tuList { display: flex; flex-direction: column; gap: 4px; width: min(560px, 92vw); margin-bottom: 8px; }
+.tuRow { display: flex; align-items: center; gap: 12px; margin: 0; padding: 7px 14px; text-align: left; clip-path: none; }
+.tuRow .n { width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; background: var(--panel); color: var(--gold); font-size: 14px; }
+.tuRow b { font-size: 16px; min-width: 190px; }
+.tuRow .g { flex: 1; font-family: var(--bd); font-weight: 500; font-size: 12px; letter-spacing: 0; text-transform: none; color: var(--dim); }
+.tuRow .ck { color: #5cdd8a; font-size: 13px; }
+.tuRow.ok .n { background: #1f9d55; color: #fff; }
+#tuCard { display: none; position: absolute; left: 10px; top: 60px; z-index: 40; width: min(320px, 38vw); background: #0c1016e8; border-left: 4px solid var(--gold); padding: 7px 10px; pointer-events: none; }
+#tuCard.on { display: block; }
+#tuCard.low { top: 6px; width: min(300px, 34vw); }
+#tuCard .tuHead { font-family: var(--hd); font-weight: 800; font-size: 12px; letter-spacing: .1em; color: var(--dim); }
+#tuCard .tuGoal { font-family: var(--hd); font-weight: 800; font-size: 17px; color: var(--gold); letter-spacing: .03em; }
+#tuCard .tuHint { font-size: 13px; line-height: 1.3; margin-top: 2px; }
+@media (max-height: 500px) { #tuCard { top: 52px; width: min(280px, 36vw); padding: 5px 8px; } #tuCard.low { top: 4px; padding: 3px 8px; width: min(238px, 29vw); } #tuCard.low .tuHead { display: none; } #tuCard .tuGoal { font-size: 14px; } #tuCard .tuHint { font-size: 11.5px; } .tuRow { padding: 4px 10px; } .tuRow b { font-size: 14px; min-width: 160px; } #tuSub { font-size: 12px; margin-bottom: 4px; } }

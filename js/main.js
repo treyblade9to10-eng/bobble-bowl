@@ -36,7 +36,7 @@ setMode(savedMode || (looksTouch ? 'mobile' : 'computer'));
 document.querySelectorAll('.modecard').forEach(c => c.onclick = () => {
   Sound.init(); Sound.click(); setMode(c.dataset.mode);
   if (c.dataset.mode === 'mobile') goFullscreen();
-  if (modeAfter === 'select') { buildGrid(); show('select'); } else if (modeAfter === 'season') openSeason(); else show('title');
+  if (modeAfter === 'select') { buildGrid(); show('select'); } else if (modeAfter === 'season') openSeason(); else if (modeAfter === 'tutorial') Tutorial.menu(); else show('title');
 });
 function goFullscreen() {
   const el = document.documentElement;
