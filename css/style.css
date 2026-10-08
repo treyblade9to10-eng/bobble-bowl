@@ -443,3 +443,20 @@ body.pad button:focus, body.pad .pcard:focus, body.pad .mdcard:focus, body.pad .
 .lkSw { display: inline-flex; align-items: center; gap: 4px; }
 .lkSw i { width: 12px; height: 12px; border: 1px solid #fff6; display: inline-block; }
 @media (max-height: 500px) { #lkWrap { max-height: 64vh; } #lkCv { height: 58vh; } .lkPart { padding: 4px 10px; min-width: 200px; } .lkPart b { font-size: 13px; } .lkSws { font-size: 10px; } #locker h2 { font-size: 20px; } .lkStyle { font-size: 12px; padding: 4px 10px; } }
+
+/* trade center */
+.trGrp { font-family: var(--hd); font-weight: 800; font-size: 11px; letter-spacing: .12em; color: var(--dim); padding: 6px 6px 2px; }
+.trRow em { margin-left: auto; font-style: normal; font-family: var(--hd); font-weight: 800; font-size: 11px; letter-spacing: .05em; color: var(--dim); white-space: nowrap; }
+.trRow em.up { color: #5cdd8a; }
+#trMid { width: 260px; padding-top: 4px; }
+#trSum { display: flex; gap: 8px; width: 100%; text-align: left; font-size: 12px; }
+.trSumCol { flex: 1; background: var(--panel); padding: 6px; min-height: 58px; }
+.trSumCol .lbl { font-family: var(--hd); font-weight: 800; letter-spacing: .1em; color: var(--gold); font-size: 12px; margin-bottom: 2px; }
+.trSumCol .dim { color: var(--dim); }
+#trAsk { font-size: 13px; padding: 6px 14px; margin: 0; }
+#trOffer { display: flex; align-items: center; gap: 6px; background: var(--panel); border-left: 4px solid var(--gold); padding: 4px 8px; margin: 4px 0; font-size: 12px; }
+#trOffer .ofTxt { flex: 1; line-height: 1.25; }
+#trOffer .lbl { font-family: var(--hd); font-weight: 800; letter-spacing: .08em; color: var(--gold); margin-right: 4px; }
+#trOffer button { font-size: 12px; padding: 4px 10px; margin: 0; }
+#trOffer button.gold { background: var(--gold); color: #111; }
+@media (max-height: 500px) { #trMid { width: 210px; gap: 5px; } #trSum { font-size: 11px; } .trSumCol { min-height: 40px; padding: 4px; } #trGo { font-size: 20px; padding: 8px 20px; } }

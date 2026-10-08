@@ -111,7 +111,7 @@ function openDraft() {
 }
 function renderDraft(myTurn) {
   const d = Season.data, dr = d.draft, me = Season.team(d.team);
-  const recent = dr.picks.slice(-6).reverse().map(p => `<div class="dpRow"><span>#${p.n} ${dotFor(p.team)}${p.team}</span><b>${p.pos} ${p.name}</b><i>${p.ovr} OVR</i></div>`).join('');
+  const recent = dr.picks.slice(-6).reverse().map(p => `<div class="dpRow"><span>#${p.n} ${dotFor(p.team)}${p.team}${p.via ? ` <small>via ${p.via}</small>` : ''}</span><b>${p.pos} ${p.name}</b><i>${p.ovr} OVR</i></div>`).join('');
   let board = '';
   if (myTurn) {
     board = dr.pool.slice(0, 24).map((pr, k) => {

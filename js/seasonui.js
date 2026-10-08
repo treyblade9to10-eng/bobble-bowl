@@ -135,52 +135,5 @@ function renderOffseason(changes) {
 }
 $('osGo').onclick = () => renderHub();
 
-// ---- trades ----
-const tr = { other: null, side: null, mine: null, theirs: null };
-$('shTrade').onclick = () => { Season.ensureRosters(); tr.mine = tr.theirs = null; if (!tr.other || tr.other === Season.data.team) tr.other = TEAMS.find(t => t.id !== Season.data.team).id; renderTrade(); show('trade'); };
+// ---- trades: see trades.js ----
 $('trBack').onclick = () => renderHub();
-$('trTeam').onchange = () => { tr.other = $('trTeam').value; tr.theirs = null; renderTrade(); };
-function trList(teamId, el, pickMine) {
-  const t = Season.team(teamId);
-  const rows = [];
-  for (const side of ['off', 'def']) t[side].forEach((p, i) => {
-    const key = side + ':' + i;
-    const selKey = pickMine ? tr.mine : tr.theirs;
-    const blocked = !pickMine && tr.mine && (tr.side !== side || Season.team(Season.data.team)[side][+tr.mine.split(':')[1]][0] !== p[0]);
-    rows.push(`<div tabindex="0" class="trRow${selKey === key ? ' on' : ''}${blocked ? ' off' : ''}" data-k="${key}"><span class="pos">${p[0]}</span><b>${p[3]}</b><span>#${p[2]} ${p[1]}</span></div>`);
-  });
-  el.innerHTML = rows.join('');
-  el.querySelectorAll('.trRow').forEach(r => r.onclick = () => {
-    if (r.classList.contains('off')) return;
-    Sound.click();
-    if (pickMine) { tr.mine = r.dataset.k; tr.side = tr.mine.split(':')[0]; tr.theirs = null; } else tr.theirs = r.dataset.k;
-    renderTrade();
-  });
-}
-function renderTrade() {
-  const d = Season.data;
-  $('trTeam').innerHTML = TEAMS.filter(t => t.id !== d.team).map(t => `<option value="${t.id}"${t.id === tr.other ? ' selected' : ''}>${t.city} ${t.name}</option>`).join('');
-  $('trMineHead').textContent = `${Season.team(d.team).name.toUpperCase()} (YOU)`;
-  trList(d.team, $('trMine'), true); trList(tr.other, $('trTheirs'), false);
-  const go = $('trGo'), meter = $('trMeter').firstElementChild;
-  if (tr.mine && tr.theirs) {
-    const [s1, i1] = tr.mine.split(':'), [, i2] = tr.theirs.split(':');
-    const a = Season.team(d.team)[s1][+i1], b = Season.team(tr.other)[s1][+i2];
-    const pct = Season.tradeOdds(a, b);
-    meter.style.width = pct + '%'; meter.style.background = pct >= 80 ? '#5cdd8a' : pct >= 50 ? 'var(--gold)' : 'var(--red)';
-    $('trPct').textContent = `${pct}% chance they say yes`;
-    $('trMsg').textContent = `${a[1]} (${a[3]}) for ${b[1]} (${b[3]})`;
-    go.disabled = pct < 80;
-  } else {
-    meter.style.width = '0%'; $('trPct').textContent = tr.mine ? 'Now pick one of their players at the same position' : 'Pick one of your players';
-    $('trMsg').textContent = 'They need to hit 80% to accept.'; go.disabled = true;
-  }
-}
-$('trGo').onclick = () => {
-  if (!tr.mine || !tr.theirs) return;
-  const [side, i] = tr.mine.split(':'), [, j] = tr.theirs.split(':');
-  const got = Season.team(tr.other)[side][+j][1];
-  Season.trade(tr.other, side, +i, +j);
-  Sound.td(); tr.mine = tr.theirs = null; renderTrade();
-  $('trMsg').textContent = `Done. ${got} is on your team now.`;
-};
