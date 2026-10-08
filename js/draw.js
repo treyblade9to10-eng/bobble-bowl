@@ -131,7 +131,7 @@ function drawLines(g, G) {
 
 // planned routes before the snap (only for the human's offense)
 function drawRoutes(g, G) {
-  if (!G.O || !G.play) return;
+  if (!G.O || !G.play || G.versus) return; // 2-player: no peeking at routes
   if (G.poss !== G.human) return drawDefJob(g, G);
   const live = G.phase === 'live';
   if (!(G.phase === 'presnap' || (live && G.bstate === 'snap'))) return;
@@ -227,7 +227,7 @@ function drawPlayer(g, p, G, at) {
   // ground marks
   if (p.isHuman && !at && G.phase !== 'kick' && G.phase !== 'kickmeter') {
     const pulse = 1 + Math.sin(G.time * 8) * 0.08;
-    g.strokeStyle = '#ffe14d'; g.lineWidth = 3.5;
+    g.strokeStyle = G.versus && p.ctl === 1 ? '#5ad1ff' : '#ffe14d'; g.lineWidth = 3.5;
     g.beginPath(); g.ellipse(x, y, 22 * pulse, 9 * pulse, 0, 0, 7); g.stroke();
   }
   if (!at) drawXFRing(g, p, x, y);
@@ -356,7 +356,7 @@ function drawPlayer(g, p, G, at) {
     g.font = 'bold 13px Barlow, Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
     const label = (p.isHuman || carrying) ? `${p.name}` : lastName(p.name);
     const w = g.measureText(label).width + 14;
-    g.fillStyle = p.isHuman ? '#ffe14d' : '#000000c0'; roundRect(g, x - w / 2, ly - 10, w, 20, 10); g.fill();
+    g.fillStyle = p.isHuman ? (G.versus && p.ctl === 1 ? '#5ad1ff' : '#ffe14d') : '#000000c0'; roundRect(g, x - w / 2, ly - 10, w, 20, 10); g.fill();
     if (p.cap) { g.strokeStyle = '#f6c31c'; g.lineWidth = 2; g.stroke(); }
     g.fillStyle = p.isHuman ? '#111' : '#fff'; g.fillText(label, x, ly + 1);
     if (p.isHuman || carrying) { g.font = 'bold 10px Barlow, Arial, sans-serif'; g.fillStyle = '#fff'; g.strokeStyle = '#000'; g.lineWidth = 3; const r = `${p.pos} • ${p.ovr} OVR`; g.strokeText(r, x, ly - 17); g.fillText(r, x, ly - 17); }
@@ -593,6 +593,7 @@ function drawHUD(g, G) {
     g.fillStyle = t.c2; g.fillRect(x, y0 + H - 8, 200, 4);
     g.fillStyle = textOn(t.c1); g.font = 'italic 900 26px "Barlow Condensed", "Arial Black", sans-serif'; g.textAlign = 'left'; g.textBaseline = 'middle';
     g.fillText(t.id, x + 10, y0 + H / 2);
+    if (G.versus) { const tg = G.teams.indexOf(t) === G.p1 ? 'P1' : 'P2'; g.font = '800 12px "Barlow Condensed", Arial, sans-serif'; g.fillStyle = tg === 'P1' ? '#ffe14d' : '#5ad1ff'; g.fillText(tg, x + 10, y0 + 9); g.font = 'italic 900 26px "Barlow Condensed", "Arial Black", sans-serif'; g.fillStyle = textOn(t.c1); }
     if (poss) drawFootball(g, x + 10 + g.measureText(t.id).width + 16, y0 + H / 2, 0.9);
     g.font = 'italic 900 36px "Barlow Condensed", "Arial Black", sans-serif'; g.textAlign = 'right'; g.fillText(s, x + 192, y0 + H / 2 + 1);
     const side = G.teams.indexOf(t);
@@ -615,7 +616,7 @@ function drawHUD(g, G) {
     g.fillText(`:${String(pc).padStart(2, '0')}`, CW / 2, y0 + H + 22);
   }
   // your play
-  if (G.play && (G.phase === 'presnap' || G.phase === 'live') && !G.demo) {
+  if (G.play && (G.phase === 'presnap' || G.phase === 'live') && !G.demo && !G.versus) {
     const mine = G.poss === G.human ? G.play.off : G.play.def;
     const t = mine.name.toUpperCase();
     g.font = 'bold 14px Barlow, Arial, sans-serif'; const w = g.measureText(t).width + 22;
@@ -676,7 +677,7 @@ function drawRef(g, r, G) {
 
 // ---------- field goal / punt meter ----------
 function drawKickMeter(g, G) {
-  const km = G.km; if (!km || G.phase !== 'kickmeter' || km.side !== G.human || km.cpuT != null) return;
+  const km = G.km; if (!km || G.phase !== 'kickmeter' || !isHumanSide(km.side) || km.cpuT != null) return;
   const W = 560, H = 196, x0 = (CW - W) / 2, y0 = CH - H - 46;
   g.fillStyle = '#0b0f16ee'; roundRect(g, x0, y0, W, H, 18); g.fill();
   g.strokeStyle = '#ffd23f'; g.lineWidth = 3; roundRect(g, x0, y0, W, H, 18); g.stroke();
@@ -708,6 +709,6 @@ function drawKickMeter(g, G) {
     g.fillRect(ax - 2, y0 + 146, 4, 22);
   }
   g.fillStyle = '#ffd23f'; g.font = 'bold 14px Barlow, Arial, sans-serif'; g.textAlign = 'center';
-  const tap = G.mode === 'mobile' ? 'TAP' : 'SPACE';
+  const tap = G.mode === 'mobile' ? 'TAP' : G.versus && km.side !== G.p1 ? 'P2: ENTER' : G.versus ? 'P1: SPACE' : 'SPACE';
   g.fillText(km.stage === 0 ? `${tap} to lock the POWER` : km.stage === 1 ? `${tap} when the needle is in the GREEN` : '', CW / 2, y0 + H - 6);
 }

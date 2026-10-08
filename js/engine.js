@@ -6,6 +6,17 @@ const G = {
 };
 
 const dirOf = s => (s === 0 ? 1 : -1);
+// 2-player: both sides are human. withSide() runs code as if `s` were the human side, with that player's keys.
+const isHumanSide = s => G.versus ? s === 0 || s === 1 : s === G.human;
+function withSide(s, fn) {
+  if (!G.versus) return fn();
+  G.hd[G.human] = G.humanDef;
+  const h = G.human, ctl = Input.ctl;
+  G.human = s; G.humanDef = G.hd[s]; Input.ctl = s === G.p1 ? 0 : 1;
+  try { return fn(); } finally { G.hd[s] = G.humanDef; G.human = h; G.humanDef = G.hd[h]; Input.ctl = ctl; }
+}
+function setHD(side, p) { if (G.versus) G.hd[side] = p; if (side === G.human) G.humanDef = p; }
+const pName = s => G.versus ? (s === G.p1 ? 'P1' : 'P2') : (s === G.human ? 'YOU' : 'CPU');
 const goalX = s => (s === 0 ? 110 : 10);      // goal line this side is attacking
 const ownGoal = s => (s === 0 ? 10 : 110);    // goal line this side defends
 const fromOwn = (s, x) => dirOf(s) * (x - ownGoal(s));
@@ -36,8 +47,11 @@ function newGame(home, away, opts) {
     fx: [], banner: null, players: [], ball: null, patSide: null, twoPt: false, next: null, firstPoss: 1, paused: false,
     pstats: {}, tstats: [{ pass: 0, rush: 0, to: 0 }, { pass: 0, rush: 0, to: 0 }],
     timeouts: [3, 3], special: null, pendingRunoff: 0, mini: null, scenario: opts.scenario || null,
-    weather: opts.weather || 'clear', night: !!opts.night, uni: opts.uni || null, pbp: [], pbpShow: null, lastResult: null
+    weather: opts.weather || 'clear', night: !!opts.night, uni: opts.uni || null, pbp: [], pbpShow: null, lastResult: null,
+    versus: !!opts.versus, p1: opts.humanSide || 0, hd: [null, null], hp: [null, null], humanDef: null
   });
+  if (G.versus) G.diff = 1;
+  Input.versus = G.versus; Input.ctl = 0;
   setupXFactors();
   if (opts.scenario) { // e.g. the Two-Minute Challenge
     const sc = opts.scenario;
@@ -75,14 +89,15 @@ function toPlayCall() {
   G.flags = [];
   G.fx = G.fx.filter(f => f.kind !== 'flag');
   previewFormation();
-  G.playClock = (G.poss === G.human && !(G.patSide != null && !G.twoPt)) ? (G.mode === 'mobile' ? 25 : 20) : 0;
+  G.playClock = (isHumanSide(G.poss) && !(G.patSide != null && !G.twoPt)) ? (G.versus ? 40 : G.mode === 'mobile' ? 25 : 20) : 0;
   G.koPending = false; G.special = null; G.kickoffSide = null; G.callStart = G.time; G.timeoutCalled = false;
   if (G.patSide != null && !G.twoPt) {
-    if (G.patSide === G.human) G.hooks.onPlayCall({ mode: 'pat' });
+    if (isHumanSide(G.patSide)) G.hooks.onPlayCall({ mode: 'pat', side: G.patSide });
     else { const two = chance(0.12) || (G.quarter >= 4 && G.score[G.patSide] - G.score[1 - G.patSide] === -2); setTimeout(() => choosePAT(two ? 'two' : 'xp'), 700); }
     return;
   }
   cpuTimeoutCheck();
+  if (G.versus) return G.hooks.onPlayCall({ ...withSide(G.poss, playCallCtx), side: G.poss });
   G.hooks.onPlayCall(playCallCtx());
 }
 function playCallCtx() {
@@ -120,11 +135,12 @@ function cpuDefCall() {
 }
 
 // called by the UI when the human picks a card
-function choosePlay(key) {
-  const humanOff = G.poss === G.human;
+function choosePlay(key, defPick) {
+  const humanOff = G.versus || G.poss === G.human;
   const offKey = humanOff ? key : cpuOffCall();
-  const defKey = humanOff ? cpuDefCall() : key;
-  if (humanOff) G.lastOffKey = key; else G.lastDefKey = key;
+  const defKey = G.versus ? (defPick || 'c3') : humanOff ? cpuDefCall() : key;
+  if (G.versus) { G.lastOffKeys = G.lastOffKeys || [null, null]; G.lastOffKeys[G.poss] = offKey; G.lastDefKeys = G.lastDefKeys || [null, null]; G.lastDefKeys[1 - G.poss] = defKey; }
+  else if (humanOff) G.lastOffKey = key; else G.lastDefKey = key;
   if (offKey === 'punt' || offKey === 'fg') { doKick(offKey); return; }
   const fake = FAKE_PLAYS.find(p => p.key === offKey);
   if (fake) setupFake(fake);
@@ -256,7 +272,8 @@ function setupPlay(offPlay, defPlay, preview) {
   G.runoff = 0; G.passPlay = offPlay.type === 'pass';
   // human control
   for (const p of P) p.isHuman = false;
-  if (o !== G.human) G.humanDef = D.find(p => p.cap) || D[3];
+  if (G.versus) { G.hd[dsd] = D[3]; G.hd[o] = null; G.humanDef = G.hd[G.human]; }
+  else if (o !== G.human) G.humanDef = D.find(p => p.cap) || D[3];
   updateHuman();
 }
 
@@ -289,26 +306,15 @@ function update(dt) {
     if (G.playClock <= 0) return delayOfGame();
   }
   if (G.phase === 'presnap') {
-    if (Input.hit('KeyT')) callTimeout(G.human);
-    if (Input.hit('KeyZ')) { audible(); return; }
-    if (G.poss === G.human) {
-      for (const [k, s2] of [['Digit1', 2], ['Digit2', 3], ['Digit3', 4], ['Digit4', 1]]) if (Input.hit(k)) hotRoute(s2);
-      let tapped = false;
-      for (const c of Input.taps) { // tap a receiver = hot route, tap anywhere else = snap
-        let best = null, bd = 50;
-        for (const r of G.O) if (r.slot >= 1 && r.slot <= 4) { const dd = Math.hypot(sx(r.x) - c.x, sy(r.y) - 35 - c.y); if (dd < bd) { bd = dd; best = r; } }
-        if (best && G.play.off.type === 'pass') { hotRoute(best.slot); tapped = true; }
-      }
-      if (Input.hit('Space') || (Input.taps.length && !tapped)) snap();
-    }
-    else { G.snapTimer -= dt; if (Input.hit('KeyQ') || Input.hit('Tab')) presnapSwitch(); if (G.snapTimer <= 0) snap(); }
+    if (G.versus) { withSide(G.poss, () => presnapInput(dt)); if (G.phase === 'presnap') withSide(1 - G.poss, () => presnapInput(dt)); }
+    else if (presnapInput(dt) === 'audible') return;
     idlePlayers(dt);
   } else if (G.phase === 'live') {
     livePlay(dt);
   } else if (G.phase === 'dead') {
     for (const p of G.players) { p.dvx = 0; p.dvy = 0; applyMove(p, dt); if (p.celly) p.celly.t += dt; }
     const cg = G.cellyGuy;
-    if (cg) {
+    if (cg) withSide(cg.side, () => {
       const moves = { ArrowUp: 'leap', KeyW: 'leap', ArrowDown: 'griddy', KeyS: 'griddy', ArrowLeft: 'spike', KeyA: 'spike', ArrowRight: 'dab', KeyD: 'dab' };
       for (const k in moves) if (Input.hit(k)) {
         cg.celly = { type: moves[k], t: 0 }; cg.celebrate = 3;
@@ -316,7 +322,7 @@ function update(dt) {
         Sound.boing(); Sound.crowd(false); G.crowdHype = 1.5;
         if (moves[k] === 'spike') { G.ball.holder = null; G.ball.x = cg.x + cg.face.dir * 0.6; G.ball.y = cg.y; G.ball.z = 2; G.ball.dead = { vx: cg.face.dir * 2, vy: rand(-1, 1) }; G.ball.bounce = 0.9; }
       }
-    }
+    });
     updateBallPhysicsDead(dt);
     G.deadT -= dt;
     if (G.deadT <= 0) { if (Replay.want()) Replay.start(); else afterPlay(); }
@@ -324,7 +330,7 @@ function update(dt) {
     updateKick(dt);
     idlePlayers(dt);
   } else if (G.phase === 'kickmeter') {
-    updateKickMeter(dt);
+    withSide(G.km ? G.km.side : G.human, () => updateKickMeter(dt));
     idlePlayers(dt);
   } else if (G.phase === 'mini') {
     miniUpdate(dt);
@@ -337,6 +343,26 @@ function update(dt) {
   updateHint();
   updateCamera(dt);
 }
+// before the snap: offense snaps / hot routes, defense picks who to control
+function presnapInput(dt) {
+  if (Input.hit('KeyT')) callTimeout(G.human);
+  if (Input.hit('KeyZ') && !G.versus) { audible(); return 'audible'; }
+  if (G.poss === G.human) {
+    for (const [k, s2] of [['Digit1', 2], ['Digit2', 3], ['Digit3', 4], ['Digit4', 1]]) if (Input.hit(k)) hotRoute(s2);
+    let tapped = false;
+    for (const c of Input.taps) { // tap a receiver = hot route, tap anywhere else = snap
+      let best = null, bd = 50;
+      for (const r of G.O) if (r.slot >= 1 && r.slot <= 4) { const dd = Math.hypot(sx(r.x) - c.x, sy(r.y) - 35 - c.y); if (dd < bd) { bd = dd; best = r; } }
+      if (best && G.play.off.type === 'pass') { hotRoute(best.slot); tapped = true; }
+    }
+    if (Input.hit('Space') || (Input.taps.length && !tapped)) snap();
+  } else {
+    G.snapTimer -= dt;
+    if (Input.hit('KeyQ') || Input.hit('Tab')) presnapSwitch();
+    if (G.snapTimer <= 0) snap();
+  }
+}
+
 function updateRefs(dt) {
   if (!G.refs || !G.ball) return;
   const b = G.ball, d = dirOf(G.poss);
@@ -373,7 +399,7 @@ function livePlay(dt) {
     if (p.down > 0 || p.stun > 0) { p.dvx = p.dvy = 0; continue; }
     if (p.dive > 0) continue; // dive keeps its velocity
     p.humanDriven = false; p.sprinting = false;
-    if (p.isHuman && humanControl(p, dt)) { p.humanDriven = Input.axis().m > 0.1 || Input.stick.m > 0.15 || Input.pointer.down || p.dive > 0; p.sdx = p.dvx; p.sdy = p.dvy; continue; }
+    if (p.isHuman && withSide(p.side, () => humanControl(p, dt) && (p.humanDriven = Input.axis().m > 0.1 || Input.stick.m > 0.15 || Input.pointer.down || p.dive > 0, true))) { p.sdx = p.dvx; p.sdy = p.dvy; continue; }
     ai(p, dt);
     // smooth AI steering so players don't twitch
     const k = 1 - Math.exp(-dt * 12);
@@ -408,6 +434,17 @@ function livePlay(dt) {
   if (b.holder) { b.x = b.holder.x; b.y = b.holder.y; b.z = 1; }
 
   // throw markers for human QB
+  withSide(G.poss, humanQBInput);
+
+  if (G.phase !== 'live') return;
+  checkFouls();
+  checkTackles();
+  if (G.phase !== 'live') return;
+  checkBounds();
+}
+
+function humanQBInput() {
+  const b = G.ball;
   const canThrow = humanCanThrow();
   for (const p of G.O) { p.throwKey = 0; p.openness = null; }
   if (canThrow) for (const s of [2, 3, 4, 1]) {
@@ -441,12 +478,6 @@ function livePlay(dt) {
       if (best) { throwTo(qb, best, false, null, style); break; }
     }
   }
-
-  if (G.phase !== 'live') return;
-  checkFouls();
-  checkTackles();
-  if (G.phase !== 'live') return;
-  checkBounds();
 }
 
 const FOULS = {
@@ -480,7 +511,7 @@ function checkFouls() {
     }
   }
   // pass interference: laying out a receiver before he has the ball
-  const h = G.humanPlayer;
+  const h = G.versus ? G.hp[1 - off] : G.humanPlayer;
   if (h && h.side !== off && (G.bstate === 'snap' || G.bstate === 'air') && h.down <= 0) {
     for (const r of G.O) {
       if (!eligible(r) || r === b.holder || r.down > 0) continue;
@@ -571,10 +602,21 @@ function humanCanThrow() {
 // who the human is driving right now
 function updateHuman() {
   for (const p of G.players) p.isHuman = false;
+  G.humanPlayer = null;
+  if (!G.ball || G.human < 0) return;
+  if (G.versus) {
+    const hs = [0, 1].map(s => withSide(s, humanFor));
+    hs.forEach((h, s) => { if (h) { h.isHuman = true; h.ctl = s === G.p1 ? 0 : 1; } });
+    G.hp = hs; G.humanPlayer = hs[G.human];
+    return;
+  }
+  const h = humanFor();
+  if (h) h.isHuman = true;
+  G.humanPlayer = h;
+}
+function humanFor() {
   let h = null;
   const b = G.ball;
-  G.humanPlayer = null;
-  if (!b || G.human < 0) return;
   if (G.poss === G.human) {
     if (b.holder && b.holder.side === G.human) h = b.holder;
     else if (b.flight && b.flight.intended && b.flight.intended.side === G.human && !b.flight.pitch) h = b.flight.intended;
@@ -588,8 +630,7 @@ function updateHuman() {
     if (b.holder && b.holder.side === G.human) h = b.holder; // you picked it off!
     else h = G.humanDef;
   }
-  if (h) h.isHuman = true;
-  G.humanPlayer = h;
+  return h;
 }
 // before the snap: cycle through every defender so you can pick a pass rusher
 function presnapSwitch() {
@@ -796,7 +837,7 @@ function ai(p, dt) {
   if (b.flight && b.flight.pitch) return pursue(p, b.flight.intended);
   const holder = carrier || qb;
   switch (a.type) {
-    case 'rush': steer(p, holder.x, holder.y, (p.pos === 'DL' ? 0.95 : 0.97) * (G.play.t < 0.45 ? 0.55 : 1) * (G.poss === G.human ? [0.88, 0.94, 1, 1.06][G.diff] : 1), 0.2); break;
+    case 'rush': steer(p, holder.x, holder.y, (p.pos === 'DL' ? 0.95 : 0.97) * (G.play.t < 0.45 ? 0.55 : 1) * (G.poss === G.human && !G.versus ? [0.88, 0.94, 1, 1.06][G.diff] : 1), 0.2); break;
     case 'spy': {
       if (G.qbScramble || d * (holder.x - G.los) > 0) return pursue(p, holder);
       steer(p, G.los + d * 5, lerp(p.y, holder.y, 0.6), 0.8); break;
@@ -1044,7 +1085,7 @@ function resolveBlocks(dt) {
     const big = bl.pos === 'OL';
     let rate = (big ? 0.42 : 0.85) * Math.pow(df.ovr / bl.ovr, 2.2) * rand(0.4, 1.4);
     if (bl.role === 'screenblock') rate *= 1.8;
-    if (df.isHuman && Input.axis().m > 0.3) rate *= 1.7;
+    if (df.isHuman && withSide(df.side, () => Input.axis().m) > 0.3) rate *= 1.7;
     if (xfOn(df, 'unstoppable')) rate *= 2.6;
     if (G.bstate === 'run') rate *= big ? 1.4 : 2.8;
     df.shed += rate * dt;
@@ -1180,7 +1221,7 @@ function throwTo(qb, r, pitch = false, aimed = null, style = 'normal', lead = nu
   for (const p of G.players) { p.laneChecked = false; p.jumpTried = false; }
   G.passPlay = !pitch;
   G.showTarget = true;
-  if (!pitch && r.side === G.human) G.humanDef = r;
+  if (!pitch && isHumanSide(r.side)) setHD(r.side, r);
 }
 
 function updateFlight(dt) {
@@ -1248,7 +1289,7 @@ function resolveCatch() {
       rcv.mouth = 'O'; rcv.mouthT = 0.4;
       stat(f.passer).comp++; G.credit = { p: rcv, kind: 'rec', passer: f.passer };
       addText(rcv.x, rcv.y, pick(['CAUGHT!', 'GOT IT!', 'NICE GRAB!']), '#9cff9c', 15, 0.8);
-      if (rcv.side === G.human) G.humanDef = rcv;
+      if (isHumanSide(rcv.side)) setHD(rcv.side, rcv);
       return;
     }
     return incomplete(rcv, 'DROPPED!');
@@ -1264,7 +1305,8 @@ function intercept(def) {
   showBanner('INTERCEPTED!', def.name, '#ff5050', 1.6);
   def.mouth = 'O'; def.mouthT = 0.6;
   G.credit = null; G.crowdHype = 1;
-  if (def.side === G.human) G.humanDef = def;
+  if (G.versus) { setHD(def.side, def); setHD(1 - def.side, nearestTo(G.players.filter(p => p.side !== def.side), def)); }
+  else if (def.side === G.human) G.humanDef = def;
   else G.humanDef = nearestTo(G.players.filter(p => p.side === G.human), def);
 }
 function incomplete(who, text) {
@@ -1395,9 +1437,9 @@ function endPlay(res) {
     G.twoPt = false; G.patSide = null;
     next = { kickoff: off };
   } else if (res.type === 'td') {
-    G.score[cs] += 6; G.deadT = cs === G.human ? 3.8 : 2.5;
-    if (cs === G.human) { G.cellyGuy = car; car.down = 0; car.dive = 0; }
-    showBanner('TOUCHDOWN!', `${car.name} • ${G.teams[cs].city} ${G.teams[cs].name}`, cs === G.human ? '#ffd23f' : '#ff6040', 2.6);
+    G.score[cs] += 6; G.deadT = isHumanSide(cs) ? 3.8 : 2.5;
+    if (isHumanSide(cs)) { G.cellyGuy = car; car.down = 0; car.dive = 0; }
+    showBanner('TOUCHDOWN!', `${car.name} • ${G.teams[cs].city} ${G.teams[cs].name}`, isHumanSide(cs) ? '#ffd23f' : '#ff6040', 2.6);
     Sound.td(); G.crowdHype = 1.5; stat(car).td++; G.slowmo = 0.9;
     for (const q of G.players) if (q.side === cs) q.celebrate = 2.6;
     for (let i = 0; i < 70; i++) G.fx.push({ kind: 'confetti', px: rand(0, CW), py: rand(-200, 0), vy: rand(120, 260), vx: rand(-40, 40), z: 0, vz: 0, color: pick([G.teams[cs].c1, G.teams[cs].c2, '#fff']), life: 2.6, max: 2.6 });
@@ -1518,7 +1560,7 @@ function doKick(kind) {
            rateP: 0.75 + (90 - ovr) * 0.02, rateA: 0.9 + (90 - ovr) * 0.028,
            need: kind === 'punt' ? 0 : yds / fgRange(ovr), tol: kind === 'punt' ? 0.35 : fgTol(yds, ovr) * (kind === 'xp' ? 1.25 : 1) };
   G.playClock = 0;
-  if (s === G.human) { G.phase = 'kickmeter'; G.km.wait = 0.35; return; }
+  if (isHumanSide(s) && !G.demo) { G.phase = 'kickmeter'; G.km.wait = 0.35; return; }
   // computer kicks: roll the dice using the kicker's rating
   const km = G.km;
   if (kind === 'punt') { km.power = rand(0.55, 0.95); km.aim = rand(-0.45, 0.45); }
@@ -1648,8 +1690,13 @@ function updateCamera(dt) {
 function updateHint() {
   if (!G.teams) return;
   if (G.phase === 'kickmeter' || G.mini) { G.hint = ''; return; }
-  if (G.cellyGuy && G.phase === 'dead') { G.hint = G.mode === 'mobile' ? 'CELEBRATE! Tap a celly button' : 'CELEBRATE!  ↑ Leap  •  ↓ Griddy  •  ← Spike  •  → Dab'; return; }
+  if (G.cellyGuy && G.phase === 'dead') { G.hint = G.versus ? `${pName(G.cellyGuy.side)}: CELEBRATE!` : G.mode === 'mobile' ? 'CELEBRATE! Tap a celly button' : 'CELEBRATE!  ↑ Leap  •  ↓ Griddy  •  ← Spike  •  → Dab'; return; }
   if (G.mode === 'mobile') return updateHintMobile();
+  if (G.versus) {
+    const k = s => s === G.p1 ? 'SPACE' : 'ENTER';
+    G.hint = G.phase === 'presnap' ? `${pName(G.poss)} snaps with ${k(G.poss)}  •  ${pName(1 - G.poss)} picks a defender with ${G.poss === G.p1 ? 'L' : 'Q'}` : '';
+    return;
+  }
   const humanOff = G.poss === G.human;
   const b = G.ball;
   if (G.phase === 'presnap') G.hint = humanOff ? (G.play.off.type === 'run' ? 'SPACE snap  •  Z audible  •  T timeout' : 'SPACE snap  •  1-4 = HOT ROUTE a receiver  •  Z audible  •  T timeout') : 'Q / TAB pick your defender  •  Z audible  •  T timeout';

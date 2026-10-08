@@ -33,6 +33,11 @@ function textOn(hex) {
 const lastName = n => { const p = n.split(' '); return p.length > 1 ? p.slice(1).join(' ') : n; };
 
 // ---------------- input ----------------
+// player 2 keys: arrows move, right shift sprint, enter = snap / dive / jump, / . , = juke spin stiff arm, 7 8 9 0 = throw, L switch, K hit stick
+const P2KEYS = { KeyW: 'ArrowUp', KeyA: 'ArrowLeft', KeyS: 'ArrowDown', KeyD: 'ArrowRight', ArrowUp: 'ArrowUp', ArrowDown: 'ArrowDown', ArrowLeft: 'ArrowLeft', ArrowRight: 'ArrowRight',
+  Space: 'Enter', ShiftLeft: 'ShiftRight', ControlLeft: 'ControlRight', ControlRight: 'ControlRight', KeyE: 'Slash', KeyF: 'Period', KeyR: 'Comma', KeyQ: 'KeyL', Tab: 'KeyL',
+  KeyC: 'KeyK', Digit1: 'Digit7', Digit2: 'Digit8', Digit3: 'Digit9', Digit4: 'Digit0', Numpad1: 'Digit7', Numpad2: 'Digit8', Numpad3: 'Digit9', Numpad4: 'Digit0', KeyT: 'KeyN', KeyX: 'KeyJ' };
+const P1BLOCK = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter']);
 const Input = {
   down: {},      // key code -> held
   pressed: {},   // key code -> pressed this frame
@@ -44,8 +49,11 @@ const Input = {
   press(code) { if (!this.down[code]) this.pressed[code] = true; this.down[code] = true; },
   release_(code) { this.down[code] = false; },
   endFrame() { this.pressed = {}; this.taps.length = 0; this.release = null; },
-  hit(...codes) { return codes.some(c => this.pressed[c]); },
-  held(...codes) { return codes.some(c => this.down[c]); },
+  // 2-player on one keyboard: the engine always asks for P1's keys, and we translate them for whoever is acting
+  versus: false, ctl: 0,
+  map(c) { if (!this.versus) return c; if (this.ctl === 1) return P2KEYS[c] || '-'; return P1BLOCK.has(c) ? '-' : c; },
+  hit(...codes) { return codes.some(c => this.pressed[this.map(c)]); },
+  held(...codes) { return codes.some(c => this.down[this.map(c)]); },
   axis() {
     let x = 0, y = 0;
     if (this.held('KeyA', 'ArrowLeft')) x -= 1;
@@ -62,12 +70,13 @@ window.addEventListener('keydown', e => {
   if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
   if (e.repeat) return;
   Input.press(e.code);
-  if (e.code === 'ShiftRight') Input.press('ShiftLeft');
+  if (e.code === 'ShiftRight' && !Input.versus) Input.press('ShiftLeft');
+  if (Input.versus && ['Slash', 'Quote', 'Tab'].includes(e.code)) e.preventDefault();
 });
 window.addEventListener('keyup', e => {
   if (e.code === 'Space') e.preventDefault();
   Input.release_(e.code);
-  if (e.code === 'ShiftRight') Input.release_('ShiftLeft');
+  if (e.code === 'ShiftRight' && !Input.versus) Input.release_('ShiftLeft');
 });
 window.addEventListener('blur', () => { Input.down = {}; });
 

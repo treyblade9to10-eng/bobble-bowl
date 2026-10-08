@@ -8,7 +8,7 @@ function startKickoff(k, from = 35) {
   G.kickoffSide = k; G.kickFrom = from; G.poss = 1 - k;
   G.phase = 'playcall'; G.flags = []; G.playClock = 0; G.pendingRunoff = 0; G.koPending = true;
   setupReturn('ko', k);
-  if (k === G.human && !G.demo) G.hooks.onPlayCall({ mode: 'kickoff' });
+  if (isHumanSide(k) && !G.demo) G.hooks.onPlayCall({ mode: 'kickoff', side: k });
   else setTimeout(() => { if (G.phase === 'playcall' && G.kickoffSide === k) chooseKickoff(cpuKickoffCall(k)); }, 900);
 }
 function cpuKickoffCall(k) {
@@ -58,14 +58,14 @@ function setupReturn(kind, k) {
   G.ball = { x: kind === 'punt' ? D[1].x : spot, y: MID, z: 0.2, holder: null, flight: null, loose: null };
   G.bstate = 'snap'; G.los = kind === 'punt' ? G.los : spot; G.ballY = MID;
   G.refs = [{ x: spot - dk * 10, y: 3, face: dk, anim: 0, throwT: 0 }, { x: spot + dk * 45, y: FIELD_W - 3, face: -dk, anim: 0, throwT: 0 }];
-  G.humanDef = D[3];
+  if (G.versus) { G.hd[k] = D[3]; G.hd[r] = null; G.humanDef = G.hd[G.human]; } else G.humanDef = D[3];
   updateHuman();
 }
 
 function startKickMeter(kind, k) {
   const kk = kickerOf(k, kind === 'punt' ? 'punt' : 'fg');
   G.km = { kind, yds: 0, kk, stage: 0, t: 0, power: 0, aim: 0, side: k, rateP: 0.75 + (90 - kk.ovr) * 0.02, rateA: 0.9 + (90 - kk.ovr) * 0.028, need: 0, tol: 0.35 };
-  if (k === G.human && !G.demo) { G.phase = 'kickmeter'; G.km.wait = 0.35; return; }
+  if (isHumanSide(k) && !G.demo) { G.phase = 'kickmeter'; G.km.wait = 0.35; return; }
   // CPU kickoffs: mostly land in the field so you get to return them, sometimes a deep boot
   G.km.power = kind === 'onside' ? rand(0.3, 0.8) : kind === 'ko' ? (chance(0.7) ? rand(0.15, 0.68) : rand(0.7, 0.98)) : rand(0.6, 0.98); G.km.aim = rand(-0.4, 0.4);
   G.phase = 'kickmeter'; G.km.cpuT = 0.8; G.km.stage = 2; // short pause so you can see the lineup
@@ -113,11 +113,11 @@ function catchKick(f) {
   if (!rt || rd > 3) { b.loose = { vx: dirOf(k) * 2, vy: rand(-1, 1), t: 0 }; b.x = f.tx; b.y = f.ty; G.bstate = 'loose'; addText(f.tx, f.ty, 'LOOSE BALL!', '#ff9a3d', 20, 1); return; }
   // CPU returner calls a fair catch on punts when the coverage is right there
   const cover = Math.min(...G.D.map(p => dist(p, rt)));
-  if (f.kick === 'punt' && rt.side !== G.human && cover < 3.5) { addText(rt.x, rt.y, 'FAIR CATCH', '#fff', 18, 1); return endPlay({ type: 'kickdead', x: rt.x, why: 'FAIR CATCH' }); }
+  if (f.kick === 'punt' && !isHumanSide(rt.side) && cover < 3.5) { addText(rt.x, rt.y, 'FAIR CATCH', '#fff', 18, 1); return endPlay({ type: 'kickdead', x: rt.x, why: 'FAIR CATCH' }); }
   if (chance(0.02)) { b.loose = { vx: rand(-2, 2), vy: rand(-2, 2), t: 0 }; b.x = rt.x; b.y = rt.y; G.bstate = 'loose'; addText(rt.x, rt.y, 'MUFFED IT!', '#ff6040', 22, 1); return; }
   b.holder = rt; G.bstate = 'run'; G.credit = null; G.retStart = rt.x;
   Sound.catch(); addText(rt.x, rt.y, 'RETURN!', '#9cff9c', 18, 0.8);
-  if (rt.side === G.human) G.humanDef = rt;
+  if (isHumanSide(rt.side)) setHD(rt.side, rt);
 }
 
 // AI while a kick is in the air
@@ -145,8 +145,8 @@ function endReturn(res) {
   let x = res.x != null ? res.x : G.ball.x;
   G.special = null;
   if (res.type === 'td') {
-    G.score[cs] += 6; G.deadT = cs === G.human ? 3.8 : 2.5;
-    if (cs === G.human) { G.cellyGuy = car; car.down = 0; car.dive = 0; }
+    G.score[cs] += 6; G.deadT = isHumanSide(cs) ? 3.8 : 2.5;
+    if (isHumanSide(cs)) { G.cellyGuy = car; car.down = 0; car.dive = 0; }
     showBanner(cs === r ? (kind === 'punt' ? 'PUNT RETURN TD!' : 'KICK RETURN TD!') : 'TOUCHDOWN!', `${car.name} • ${G.teams[cs].name}`, cs === G.human ? '#ffd23f' : '#ff6040', 2.6);
     Sound.td(); G.crowdHype = 1.5; stat(car).td++; G.slowmo = 0.9;
     for (const q of G.players) if (q.side === cs) q.celebrate = 2.6;
@@ -200,7 +200,7 @@ function callTimeout(side) {
 // CPU uses timeouts to save clock when it's behind late in a half
 function cpuTimeoutCheck() {
   const cpu = 1 - G.human;
-  if (G.human < 0 || !G.pendingRunoff || G.timeouts[cpu] <= 0) return;
+  if (G.versus || G.human < 0 || !G.pendingRunoff || G.timeouts[cpu] <= 0) return;
   if (!(G.quarter === 2 || G.quarter >= 4) || G.clock > 120) return;
   const behind = G.score[G.human] - G.score[cpu];
   if ((G.poss === cpu && behind >= 0) || (G.poss === G.human && behind > 0 && behind <= 16)) callTimeout(cpu);
@@ -214,7 +214,7 @@ function burnHuddleClock() {
   G.pendingRunoff = 0;
 }
 function spikeBall() {
-  if (!(G.phase === 'playcall' || G.phase === 'presnap') || G.poss !== G.human || G.down >= 4 || G.patSide != null) return;
+  if (!(G.phase === 'playcall' || G.phase === 'presnap') || !isHumanSide(G.poss) || G.down >= 4 || G.patSide != null) return;
   burnHuddleClock();
   G.clock = Math.max(0, G.clock - 1);
   showBanner('SPIKED!', 'Clock stopped', '#fff', 1.1); Sound.tackle();

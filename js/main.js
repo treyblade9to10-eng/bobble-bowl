@@ -89,10 +89,11 @@ function renderSelect(bumpSide) {
     el.innerHTML = teamCard(t);
     el.style.background = `linear-gradient(160deg, ${t.c1} 55%, ${t.c2})`; el.style.color = textOn(t.c1);
     const who = $(id).querySelector('.who');
-    who.textContent = sel.you === side ? 'YOU' : 'CPU'; who.className = 'who ' + (sel.you === side ? 'you' : 'cpu');
+    const two = $('optPlayers').value === '2' && G.mode !== 'mobile';
+    who.textContent = sel.you === side ? (two ? 'P1' : 'YOU') : (two ? 'P2' : 'CPU'); who.className = 'who ' + (sel.you === side ? 'you' : two ? 'p2' : 'cpu');
     if (bumpSide === side) { el.classList.add('bump'); setTimeout(() => el.classList.remove('bump'), 120); }
   }
-  $('selHint').textContent = G.mode === 'mobile' ? 'Tap the arrows to change teams' : 'W / S  away team      ↑ / ↓  home team      ENTER  kickoff';
+  $('selHint').textContent = G.mode === 'mobile' ? 'Tap the arrows to change teams' : $('optPlayers').value === '2' ? 'P1: WASD move, SPACE snap/dive, SHIFT sprint, 1-4 throw, E/F/R moves, Q switch      P2: ARROWS, ENTER, RIGHT SHIFT, 7-0 throw, / . , moves, L switch' : 'W / S  away team      ↑ / ↓  home team      ENTER  kickoff';
   try { localStorage.setItem('bobbleSel', JSON.stringify(sel)); } catch (e) {}
 }
 function moveTeam(side, d) {
@@ -115,7 +116,8 @@ $('btnKick').onclick = startGame;
 
 // uniforms / weather / time pickers
 const fillSel = (id, list, val) => { $(id).innerHTML = list.map(([v, t]) => `<option value="${v}">${t}</option>`).join(''); if (val != null) $(id).value = val; };
-fillSel('optUni0', UNIFORMS, 'home'); fillSel('optUni1', UNIFORMS, 'away'); fillSel('optWeather', WEATHER, 'clear');
+fillSel('optUni0', UNIFORMS, 'home');
+$('optPlayers').onchange = () => renderSelect(); fillSel('optUni1', UNIFORMS, 'away'); fillSel('optWeather', WEATHER, 'clear');
 try { const o = JSON.parse(localStorage.getItem('bobbleOpts') || 'null'); if (o) for (const k in o) if ($(k)) $(k).value = o[k]; } catch (e) {}
 function saveOpts() { const o = {}; for (const k of ['optUni0', 'optUni1', 'optWeather', 'optNight', 'optQtr', 'optDiff', 'optPlayers']) o[k] = $(k).value; try { localStorage.setItem('bobbleOpts', JSON.stringify(o)); } catch (e) {} }
 
@@ -134,16 +136,17 @@ let pcList = [];
 function onPlayCall(c) {
   const humanOff = c.mode === 'off';
   pcCtx = c;
+  const who = G.versus ? `<span class="vsTag p${c.side === G.p1 ? 1 : 2}">${pName(c.side)}</span>` : '';
   if (c.mode === 'kickoff') {
-    $('pcHead').innerHTML = 'KICKOFF <span class="pcsub">You kick to them</span>';
+    $('pcHead').innerHTML = who + 'KICKOFF <span class="pcsub">You kick to them</span>';
     pcList = [{ key: 'ko', name: 'Kickoff', desc: 'Boom it deep, then cover the return!', special: true },
               { key: 'onside', name: 'Onside Kick', desc: 'Short hop. Try to steal the ball back.', special: true }];
   } else if (c.mode === 'pat') {
-    $('pcHead').innerHTML = 'TOUCHDOWN <span class="pcsub">Kick the extra point or go for two</span>';
+    $('pcHead').innerHTML = who + 'TOUCHDOWN <span class="pcsub">Kick the extra point or go for two</span>';
     pcList = [{ key: 'xp', name: 'Extra Point', desc: 'Easy kick for 1 point.', special: true },
               { key: 'two', name: 'Go For 2', desc: 'One play from the 3-yard line.', special: true }];
   } else {
-    $('pcHead').innerHTML = `${humanOff ? 'OFFENSE' : 'DEFENSE'} <span class="pcsub">${G.downText()}</span>`;
+    $('pcHead').innerHTML = `${who}${humanOff ? 'OFFENSE' : 'DEFENSE'} <span class="pcsub">${G.downText()}</span>`;
     pcList = humanOff ? OFF_PLAYS.slice() : DEF_PLAYS.slice();
     if (humanOff && !c.twoPt) {
       const sp = [];
@@ -162,6 +165,15 @@ function onPlayCall(c) {
   pcOff = humanOff; pcPage = 0;
   renderCards();
   show('playcall');
+  // 2-player: hide the cards until the right player is looking
+  const cover = $('pcCover');
+  if (G.versus) {
+    const other = pName(1 - c.side);
+    cover.innerHTML = `<div class="vsTag big p${c.side === G.p1 ? 1 : 2}">${pName(c.side)}</div><div class="cvT">${c.mode === 'off' ? 'OFFENSE' : c.mode === 'def' ? 'DEFENSE' : c.mode === 'pat' ? 'EXTRA POINT' : 'KICKOFF'}: YOUR CALL</div>
+      <div class="cvS">${other}, look away.</div><button class="big" id="pcReveal">SHOW MY PLAYS</button>`;
+    cover.classList.add('on');
+    $('pcReveal').onclick = () => { cover.classList.remove('on'); Sound.click(); };
+  } else cover.classList.remove('on');
 }
 let pcPage = 0, pcCoach = null, pcOff = true, pcCtx = {};
 const PER_PAGE = 10;
@@ -199,9 +211,10 @@ function renderCards() {
   }
   // clock tools
   const tool = (txt, fn) => { const b = document.createElement('button'); b.className = 'pgbtn tool'; b.textContent = txt; b.onclick = fn; hint.appendChild(b); };
-  if ((pcCtx.mode === 'off' || pcCtx.mode === 'def') && G.timeouts && G.timeouts[G.human] > 0 && G.pendingRunoff > 0) tool(`TIMEOUT (${G.timeouts[G.human]})`, () => { if (callTimeout(G.human)) renderCards(); });
+  const tos = pcCtx.side != null ? pcCtx.side : G.human;
+  if ((pcCtx.mode === 'off' || pcCtx.mode === 'def') && G.timeouts && G.timeouts[tos] > 0 && G.pendingRunoff > 0) tool(`TIMEOUT (${G.timeouts[tos]})`, () => { if (callTimeout(tos)) renderCards(); });
   if (pcCtx.mode === 'off' && G.down < 4 && G.pendingRunoff > 0) tool('SPIKE', () => { show(null); spikeBall(); });
-  const last = pcCtx.mode === 'off' ? G.lastOffKey : pcCtx.mode === 'def' ? G.lastDefKey : null;
+  const last = G.versus ? (pcCtx.mode === 'off' ? (G.lastOffKeys || [])[pcCtx.side] : pcCtx.mode === 'def' ? (G.lastDefKeys || [])[pcCtx.side] : null) : pcCtx.mode === 'off' ? G.lastOffKey : pcCtx.mode === 'def' ? G.lastDefKey : null;
   const li = last ? pcList.findIndex(p => p.key === last) : -1;
   if (li >= 0) tool('LAST PLAY', () => choose(li));
   const tip = document.createElement('span'); tip.className = 'pgtip';
@@ -234,10 +247,15 @@ function choose(i) {
   Sound.click();
   show(null);
   if (p.key === 'xp' || p.key === 'two') choosePAT(p.key);
+  else if (G.versus && pcCtx.mode === 'off' && !p.special) { // now the defense picks
+    G.vsOff = p.key;
+    setTimeout(() => onPlayCall({ ...withSide(1 - G.poss, playCallCtx), side: 1 - G.poss }), 60);
+  } else if (G.versus && pcCtx.mode === 'def') choosePlay(G.vsOff, p.key);
   else choosePlay(p.key);
 }
 window.addEventListener('keydown', e => {
   if (!$('playcall').classList.contains('show')) return;
+  if ($('pcCover').classList.contains('on')) { if (e.code === 'Space' || e.code === 'Enter') $('pcReveal').onclick(); return; }
   if (e.code === 'KeyT' && G.timeouts && G.pendingRunoff > 0) { if (callTimeout(G.human)) renderCards(); return; }
   if (e.code === 'Enter') { const last = pcCtx.mode === 'off' ? G.lastOffKey : G.lastDefKey; const li = pcList.findIndex(p => p.key === last); if (li >= 0) choose(li); return; }
   if (e.code === 'ArrowRight' || e.code === 'ArrowLeft') { const pages = Math.ceil(pcList.length / PER_PAGE); pcPage = (pcPage + (e.code === 'ArrowRight' ? 1 : -1) + pages) % pages; renderCards(); return; }
@@ -254,7 +272,7 @@ G.hooks.onGameOver = s => {
   const me = s.human, them = 1 - me;
   const won = s.score[me] > s.score[them], tie = s.score[me] === s.score[them];
   $('over').classList.toggle('win', won);
-  $('overTitle').textContent = won ? 'YOU WIN!' : tie ? 'TIE GAME' : 'GAME OVER';
+  $('overTitle').textContent = G.versus ? (tie ? 'TIE GAME' : `${s.score[G.p1] > s.score[1 - G.p1] ? 'PLAYER 1' : 'PLAYER 2'} WINS`) : won ? 'YOU WIN!' : tie ? 'TIE GAME' : 'GAME OVER';
   const tag = t => `<span style="color:${t.c1 === '#000000' ? '#aaa' : t.c1};-webkit-text-stroke:1px #fff">${t.id}</span>`;
   $('overScore').innerHTML = `${tag(s.teams[1])} ${s.score[1]} - ${s.score[0]} ${tag(s.teams[0])}`;
   const line = (lbl, p, k, suf) => p ? `<div>${lbl}: <b>${p.name}</b> — ${p[k]} ${suf}</div>` : '';
@@ -483,6 +501,7 @@ function frame(now) {
 function step(now) {
   const dt = clamp((now - last) / 1000, 0, 0.033); last = now;
   if (Input.pointer.down) Input.pointer.t += dt;
+  Input.versus = !!G.versus && !G.demo; if (!Input.versus) Input.ctl = 0;
   const inMenu = menuScreens.some(id => $(id).classList.contains('show')) && !(G.mini && $('miniOver').classList.contains('show'));
   if (inMenu) {
     if (!G.demo || G.phase === 'over') demoSetup();

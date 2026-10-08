@@ -53,11 +53,11 @@ function drawWeather(g, G) {
     }
   }
   if (G.night) {
-    g.fillStyle = 'rgba(6,12,32,0.42)'; g.fillRect(0, 0, CW, CH);
+    g.fillStyle = 'rgba(4,8,26,0.5)'; g.fillRect(0, 0, CW, CH);
     g.save(); g.globalCompositeOperation = 'lighter';
     for (const lx of [CW * 0.12, CW * 0.5, CW * 0.88]) {
       const lg = g.createRadialGradient(lx, -40, 10, lx, 120, 520);
-      lg.addColorStop(0, 'rgba(255,250,225,0.32)'); lg.addColorStop(1, 'rgba(255,250,225,0)');
+      lg.addColorStop(0, 'rgba(255,250,225,0.2)'); lg.addColorStop(1, 'rgba(255,250,225,0)');
       g.fillStyle = lg; g.fillRect(0, 0, CW, CH);
     }
     g.restore();

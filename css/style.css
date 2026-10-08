@@ -366,3 +366,13 @@ input.bad { border-color: var(--red); }
 #trPct { font-family: var(--hd); font-weight: 800; font-size: 18px; }
 #trMsg { font-size: 13px; color: var(--dim); }
 @media (max-height: 500px) { .trList { max-height: 46vh; } #trMid { padding-top: 6px; width: 170px; } #trade h2 { display: none; } }
+
+/* ---- 2 players ---- */
+.vsTag { display: inline-block; font-style: normal; font-size: .7em; padding: 0 8px; margin-right: 10px; vertical-align: middle; color: #111; }
+.vsTag.p1 { background: #ffe14d; } .vsTag.p2 { background: #5ad1ff; }
+.vsTag.big { font-family: var(--hd); font-weight: 900; font-size: 40px; padding: 0 18px; margin: 0 0 8px; }
+.pside .who.p2 { background: #5ad1ff; color: #111; }
+#pcCover { display: none; position: absolute; inset: 0; background: var(--ink); z-index: 12; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+#pcCover.on { display: flex; }
+#pcCover .cvT { font-family: var(--hd); font-style: italic; font-weight: 900; font-size: 44px; }
+#pcCover .cvS { color: var(--dim); font-size: 18px; margin: 6px 0 16px; }
