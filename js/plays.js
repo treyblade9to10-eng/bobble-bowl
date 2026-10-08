@@ -112,8 +112,8 @@ function drawPlayDiagram(cv, play, isOff) {
   const P = (d, y) => [losX + d * sx, cy + y * sy];
   g.strokeStyle = '#fff6'; g.lineWidth = 1; g.beginPath(); g.moveTo(losX, 0); g.lineTo(losX, H); g.stroke();
   if (play.special) {
-    g.fillStyle = '#fff'; g.font = 'bold 28px sans-serif'; g.textAlign = 'center';
-    g.fillText({ punt: '🦶', ko: '🦶', onside: '🎯', fakepunt: '🎭', fakefg: '🎭' }[play.key] || '🥅', W / 2, H / 2 + 10);
+    g.fillStyle = '#fff'; g.font = "italic 900 26px 'Barlow Condensed', sans-serif"; g.textAlign = 'center';
+    g.fillText({ punt: 'PUNT', ko: 'DEEP', onside: 'ONSIDE', fakepunt: 'FAKE', fakefg: 'FAKE' }[play.key] || 'FG', W / 2, H / 2 + 9);
     return;
   }
   if (isOff) {

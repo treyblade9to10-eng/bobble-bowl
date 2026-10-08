@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Bobble Bowl 🏈</title>
+<title>Bobble Bowl</title>
+<link rel="preload" href="fonts/bc-900i.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -14,14 +15,14 @@
 
   <!-- Title -->
   <div id="title" class="screen show">
-    <div class="logo">BOBBLE<span>BOWL</span></div>
-    <div class="tag">8 on 8 • 32 NFL teams • Madden 27 ratings • big heads</div>
+    <div class="logo"><span class="l1">BOBBLE</span><span class="l2">BOWL</span></div>
+    <div class="tag">8-ON-8 ARCADE FOOTBALL</div>
     <div class="row">
       <button class="big" id="btnPlay">QUICK GAME</button>
-      <button class="big gold" id="btnSeason">🏆 SEASON</button>
+      <button class="big gold" id="btnSeason">SEASON</button>
     </div>
     <div class="row">
-      <button class="big" id="btnModes">🎯 CHALLENGES</button>
+      <button class="big" id="btnModes">CHALLENGES</button>
     </div>
     <div class="row">
       <button id="btnHow">HOW TO PLAY</button>
@@ -31,14 +32,14 @@
 
   <!-- Mode select -->
   <div id="mode" class="screen">
-    <h2>How are you playing?</h2>
+    <h2>Controls</h2>
     <div class="modes">
       <div class="modecard" data-mode="mobile">
-        <div class="mi">📱</div><div class="mt">MOBILE</div>
+        <div class="mi"><svg viewBox="0 0 48 48" class="ico"><rect x="6" y="13" width="36" height="22" rx="3"/><circle cx="37" cy="24" r="1.6"/></svg></div><div class="mt">MOBILE</div>
         <div class="md">Phone or tablet.<br>Drag back to throw.<br>Hold to steer, tap to juke.</div>
       </div>
       <div class="modecard" data-mode="computer">
-        <div class="mi">💻</div><div class="mt">COMPUTER</div>
+        <div class="mi"><svg viewBox="0 0 48 48" class="ico"><rect x="9" y="11" width="30" height="20" rx="1.5"/><path d="M4 36h40l-3 3H7z"/></svg></div><div class="mt">COMPUTER</div>
         <div class="md">Keyboard + mouse.<br>WASD to move, 1-4 or mouse drag to throw.<br>Sprint, juke, spin, stiff arm.</div>
       </div>
     </div>
@@ -53,27 +54,27 @@
 
   <!-- Team select: away on the left, home on the right -->
   <div id="select" class="screen">
-    <h2>Pick the matchup</h2>
+    <h2>Matchup</h2>
     <div id="matchRow">
       <div class="tpanel" id="pAway">
         <div class="pside">AWAY <span class="who"></span></div>
-        <button class="arr" data-side="1" data-d="-1">▲</button>
+        <button class="arr" data-side="1" data-d="-1"><svg viewBox="0 0 24 24" class="chev"><path d="M5 15l7-7 7 7"/></svg></button>
         <div class="tbig"></div>
-        <button class="arr" data-side="1" data-d="1">▼</button>
+        <button class="arr" data-side="1" data-d="1"><svg viewBox="0 0 24 24" class="chev"><path d="M5 9l7 7 7-7"/></svg></button>
       </div>
       <div id="vsCol">
         <div class="vs">VS</div>
-        <button id="btnSwap">⇄ Switch sides</button>
+        <button id="btnSwap">Switch sides</button>
         <label>Quarter <select id="optQtr"><option value="120">2 min</option><option value="180" selected>3 min</option><option value="300">5 min</option></select></label>
-        <label>CPU <select id="optDiff"><option value="0">Rookie</option><option value="1" selected>Pro</option><option value="2">All-Pro</option><option value="3">All-Madden 🔥</option></select></label>
+        <label>CPU <select id="optDiff"><option value="0">Rookie</option><option value="1" selected>Pro</option><option value="2">All-Pro</option><option value="3">All-Madden</option></select></label>
         <button class="big" id="btnKick">KICKOFF</button>
         <button id="btnBackSel">Back</button>
       </div>
       <div class="tpanel" id="pHome">
         <div class="pside">HOME <span class="who"></span></div>
-        <button class="arr" data-side="0" data-d="-1">▲</button>
+        <button class="arr" data-side="0" data-d="-1"><svg viewBox="0 0 24 24" class="chev"><path d="M5 15l7-7 7 7"/></svg></button>
         <div class="tbig"></div>
-        <button class="arr" data-side="0" data-d="1">▼</button>
+        <button class="arr" data-side="0" data-d="1"><svg viewBox="0 0 24 24" class="chev"><path d="M5 9l7 7 7-7"/></svg></button>
       </div>
     </div>
     <div id="selHint"></div>
@@ -83,19 +84,19 @@
 
   <!-- Season: new -->
   <div id="seasonNew" class="screen">
-    <h2>🏆 New Season</h2>
+    <h2>New Season</h2>
     <div id="snRow">
       <div class="tpanel" id="pSeason">
         <div class="pside">YOUR TEAM</div>
-        <button class="arr" id="snUp">▲</button>
+        <button class="arr" id="snUp"><svg viewBox="0 0 24 24" class="chev"><path d="M5 15l7-7 7 7"/></svg></button>
         <div class="tbig"></div>
-        <button class="arr" id="snDn">▼</button>
+        <button class="arr" id="snDn"><svg viewBox="0 0 24 24" class="chev"><path d="M5 9l7 7 7-7"/></svg></button>
       </div>
       <div id="snOpts">
         <label>Season <select id="snGames"><option value="6">6 games</option><option value="8" selected>8 games</option><option value="12">12 games</option><option value="17">17 games (full)</option></select></label>
         <label>Quarter <select id="snQtr"><option value="120" selected>2 min</option><option value="180">3 min</option><option value="300">5 min</option></select></label>
-        <label>CPU <select id="snDiff"><option value="0">Rookie</option><option value="1" selected>Pro</option><option value="2">All-Pro</option><option value="3">All-Madden 🔥</option></select></label>
-        <div class="snInfo">Top 4 in your conference make the playoffs.<br>Win 3 playoff games to take the 🏆 Bobble Bowl!</div>
+        <label>CPU <select id="snDiff"><option value="0">Rookie</option><option value="1" selected>Pro</option><option value="2">All-Pro</option><option value="3">All-Madden</option></select></label>
+        <div class="snInfo">Top 4 in your conference make the playoffs.<br>Win 3 playoff games to take the Bobble Bowl.</div>
         <button class="big" id="snStart">START SEASON</button>
         <button id="snBack">Back</button>
       </div>
@@ -109,8 +110,8 @@
       <div id="shLeft">
         <div id="shNext"></div>
         <div id="shBtns">
-          <button class="big" id="shPlay">▶ PLAY</button>
-          <button id="shSim">⏩ SIM</button>
+          <button class="big" id="shPlay">PLAY</button>
+          <button id="shSim">SIM</button>
         </div>
         <div id="shSched"></div>
       </div>
@@ -124,8 +125,8 @@
 
   <!-- Challenges & mini-games -->
   <div id="modes" class="screen">
-    <h2>🎯 Challenges</h2>
-    <div id="mdTeam"><button class="pgbtn" id="mdPrev">◀</button><span id="mdTeamName"></span><button class="pgbtn" id="mdNext">▶</button></div>
+    <h2>Challenges</h2>
+    <div id="mdTeam"><button class="pgbtn" id="mdPrev">‹</button><span id="mdTeamName"></span><button class="pgbtn" id="mdNext">›</button></div>
     <div id="mdCards"></div>
     <button id="mdBack">BACK</button>
   </div>
@@ -147,7 +148,7 @@
   <!-- Game over / YOU WIN -->
   <div id="over" class="screen">
     <div id="confetti"></div>
-    <div id="trophy">🏆</div>
+    <div id="trophy"><svg viewBox="0 0 64 64"><path d="M18 8h28v14c0 9-6 16-14 16s-14-7-14-16z"/><path d="M18 13H9c0 9 4 14 10 15M46 13h9c0 9-4 14-10 15" fill="none" stroke-width="4"/><path d="M28 38h8v9h-8z"/><path d="M19 50h26v6H19z"/></svg></div>
     <h2 id="overTitle">FINAL</h2>
     <div id="overScore"></div>
     <div id="overChal"></div>
@@ -156,7 +157,7 @@
       <div id="overStats"></div>
     </div>
     <div class="row">
-      <button class="big" id="btnSeasonCont" style="display:none">CONTINUE SEASON ▶</button>
+      <button class="big" id="btnSeasonCont" style="display:none">CONTINUE SEASON</button>
       <button class="big" id="btnAgain">REMATCH</button>
       <button id="btnNewTeams">NEW TEAMS</button>
     </div>
@@ -169,29 +170,29 @@
     <button id="btnQuit">QUIT GAME</button>
   </div>
 
-  <button id="btnMute" title="Sound">🔊</button>
-  <button id="btnPause" title="Menu">⏸</button>
+  <button id="btnMute" title="Sound"><svg viewBox="0 0 24 24"><path class="spk" d="M4 9h4l5-4v14l-5-4H4z"/><path class="wave" d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12"/><path class="x" d="M16 9l6 6M22 9l-6 6"/></svg></button>
+  <button id="btnPause" title="Menu"><svg viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14"/><rect x="14" y="5" width="4" height="14"/></svg></button>
 
   <!-- Mobile action buttons (shown when they're useful) -->
   <div id="mbtns">
-    <button data-k="KeyX" data-show="qb">🏃 RUN</button>
-    <button data-k="KeyF" data-show="carrier">🌀 SPIN</button>
-    <button data-k="KeyR" data-show="carrier">✋ STIFF</button>
-    <button data-k="KeyQ" data-show="def">🔄 SWITCH</button>
-    <button data-k="KeyE" data-show="def" id="mbSwim">🏊 SWIM</button>
-    <button data-k="Space" data-show="def" id="mbDive">💥 DIVE</button>
-    <button data-k="KeyC" data-show="def">🔨 HIT</button>
-    <button data-k="KeyZ" data-show="presnap">📢 AUDIBLE</button>
-    <button data-k="KeyT" data-show="presnap" id="mbTO">⏱ TIMEOUT</button>
-    <button data-k="ArrowUp" data-show="celly">⬆️ LEAP</button>
-    <button data-k="ArrowDown" data-show="celly">🕺 GRIDDY</button>
-    <button data-k="ArrowLeft" data-show="celly">💥 SPIKE</button>
-    <button data-k="ArrowRight" data-show="celly">😎 DAB</button>
+    <button data-k="KeyX" data-show="qb">RUN</button>
+    <button data-k="KeyF" data-show="carrier">SPIN</button>
+    <button data-k="KeyR" data-show="carrier">STIFF ARM</button>
+    <button data-k="KeyQ" data-show="def">SWITCH</button>
+    <button data-k="KeyE" data-show="def" id="mbSwim">SWIM</button>
+    <button data-k="Space" data-show="def" id="mbDive">DIVE</button>
+    <button data-k="KeyC" data-show="def">HIT STICK</button>
+    <button data-k="KeyZ" data-show="presnap">AUDIBLE</button>
+    <button data-k="KeyT" data-show="presnap" id="mbTO">TIMEOUT</button>
+    <button data-k="ArrowUp" data-show="celly">LEAP</button>
+    <button data-k="ArrowDown" data-show="celly">GRIDDY</button>
+    <button data-k="ArrowLeft" data-show="celly">SPIKE</button>
+    <button data-k="ArrowRight" data-show="celly">DAB</button>
   </div>
 
   <div id="joy"><div id="joyKnob"></div></div>
 
-  <div id="rotate">📱↻<br>Turn your phone sideways to play</div>
+  <div id="rotate"><div class="rot"><svg viewBox="0 0 48 48" class="ico"><rect x="6" y="13" width="36" height="22" rx="3"/><circle cx="37" cy="24" r="1.6"/></svg></div>Turn your phone sideways</div>
 </div>
 
 <script src="js/teams.js"></script>

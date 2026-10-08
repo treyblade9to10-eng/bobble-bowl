@@ -18,7 +18,7 @@ function setMode(m) {
   G.mode = m;
   try { localStorage.setItem('bobbleMode', m); } catch (e) {}
   document.body.classList.toggle('mobile', m === 'mobile');
-  $('modeLabel').textContent = m === 'mobile' ? '📱 MOBILE' : '💻 COMPUTER';
+  $('modeLabel').textContent = m === 'mobile' ? 'MOBILE' : 'COMPUTER';
   document.querySelectorAll('.modecard').forEach(c => c.classList.toggle('sel', c.dataset.mode === m));
   buildHow();
 }
@@ -37,26 +37,26 @@ function goFullscreen() {
 function buildHow() {
   const m = G.mode === 'mobile';
   $('howGrid').innerHTML = m ? `
-    <div><h3>🏈 Offense</h3>
+    <div><h3>Offense</h3>
       <p><b>Tap a play</b>, then <b>tap the field</b> to snap.</p>
       <p><b>Pass:</b> put your finger down, <b>DRAG BACK</b> (like a slingshot) and let go. Pull further = throw further. The yellow ring shows where it lands.</p>
       <p>Or just <b>tap a receiver's ▲</b> to throw to him.</p>
-      <p><b>🏃 RUN</b> button = QB takes off.</p></div>
-    <div><h3>🏃 Running</h3>
+      <p><b>RUN</b> button = QB takes off.</p></div>
+    <div><h3>Running</h3>
       <p>Your runner <b>runs on his own</b>. <b>Hold your finger</b> where you want him to go.</p>
-      <p><b>Tap</b> = juke. <b>🌀 SPIN</b> and <b>✋ STIFF</b> arm buttons break tackles.</p></div>
-    <div><h3>🛡️ Defense</h3>
+      <p><b>Tap</b> = juke. <b>SPIN</b> and <b>STIFF</b> arm buttons break tackles.</p></div>
+    <div><h3>Defense</h3>
       <p><b>Hold</b> to move your player (yellow ring). Let go and he plays on his own.</p>
       <p><b>Tap near the runner</b> = dive tackle. <b>Tap a teammate</b> to switch to him.</p></div>`
   : `
-    <div><h3>🏈 Offense</h3>
+    <div><h3>Offense</h3>
       <p><b>Pick a play</b> (1-9), <b>SPACE</b> to snap.</p>
       <p>Throw: <b>1 2 3 4</b>, <b>click</b> a receiver, or <b>drag back with the mouse</b> and let go to throw to that spot.</p>
       <p>Move the QB with <b>WASD</b>; run past the line to scramble.</p></div>
-    <div><h3>🏃 Running</h3>
+    <div><h3>Running</h3>
       <p><b>WASD</b> move, <b>SHIFT</b> sprint.</p>
       <p><b>E</b> juke, <b>F</b> spin, <b>R</b> stiff arm.</p></div>
-    <div><h3>🛡️ Defense</h3>
+    <div><h3>Defense</h3>
       <p>You control the player with the <b>yellow ring</b>.</p>
       <p><b>Q</b> switch to the guy closest to the ball, <b>SPACE</b> dive tackle, <b>SHIFT</b> sprint.</p></div>`;
 }
@@ -66,7 +66,7 @@ $('btnPlay').onclick = () => { Sound.init(); Sound.click(); modeAfter = 'select'
 $('btnMode').onclick = () => { Sound.init(); modeAfter = 'title'; show('mode'); };
 $('btnHow').onclick = () => { Sound.init(); show('how'); };
 $('btnHowBack').onclick = () => show('title');
-$('btnMute').onclick = () => { Sound.muted = !Sound.muted; $('btnMute').textContent = Sound.muted ? '🔇' : '🔊'; };
+$('btnMute').onclick = () => { Sound.muted = !Sound.muted; $('btnMute').classList.toggle('off', Sound.muted); };
 
 // ---------- team select: AWAY (left) vs HOME (right), arrows to scroll ----------
 function teamOvr(t) { const all = t.off.concat(t.def); return Math.round(all.reduce((a, p) => a + p[3], 0) / all.length); }
@@ -89,7 +89,7 @@ function renderSelect(bumpSide) {
     who.textContent = sel.you === side ? 'YOU' : 'CPU'; who.className = 'who ' + (sel.you === side ? 'you' : 'cpu');
     if (bumpSide === side) { el.classList.add('bump'); setTimeout(() => el.classList.remove('bump'), 120); }
   }
-  $('selHint').textContent = G.mode === 'mobile' ? 'Tap the arrows to change teams' : 'Arrows to change teams  •  W/S = away  •  ↑/↓ = home  •  ENTER = kickoff';
+  $('selHint').textContent = G.mode === 'mobile' ? 'Tap the arrows to change teams' : 'W / S  away team      ↑ / ↓  home team      ENTER  kickoff';
   try { localStorage.setItem('bobbleSel', JSON.stringify(sel)); } catch (e) {}
 }
 function moveTeam(side, d) {
@@ -123,15 +123,15 @@ function onPlayCall(c) {
   const humanOff = c.mode === 'off';
   pcCtx = c;
   if (c.mode === 'kickoff') {
-    $('pcHead').innerHTML = '🦶 KICKOFF — you kick it to them';
+    $('pcHead').innerHTML = 'KICKOFF <span class="pcsub">You kick to them</span>';
     pcList = [{ key: 'ko', name: 'Kickoff', desc: 'Boom it deep, then cover the return!', special: true },
-              { key: 'onside', name: 'Onside Kick', desc: 'Short hop — try to steal the ball back!', special: true }];
+              { key: 'onside', name: 'Onside Kick', desc: 'Short hop. Try to steal the ball back.', special: true }];
   } else if (c.mode === 'pat') {
-    $('pcHead').innerHTML = 'TOUCHDOWN! Go for one or two?';
+    $('pcHead').innerHTML = 'TOUCHDOWN <span class="pcsub">Kick the extra point or go for two</span>';
     pcList = [{ key: 'xp', name: 'Extra Point', desc: 'Easy kick for 1 point.', special: true },
               { key: 'two', name: 'Go For 2', desc: 'One play from the 3-yard line.', special: true }];
   } else {
-    $('pcHead').innerHTML = `${humanOff ? '🏈 OFFENSE' : '🛡️ DEFENSE'} — ${G.downText()}`;
+    $('pcHead').innerHTML = `${humanOff ? 'OFFENSE' : 'DEFENSE'} <span class="pcsub">${G.downText()}</span>`;
     pcList = humanOff ? OFF_PLAYS.slice() : DEF_PLAYS.slice();
     if (humanOff && !c.twoPt) {
       const sp = [];
@@ -139,7 +139,7 @@ function onPlayCall(c) {
       if (c.fourth) sp.push(FAKE_PLAYS[0]);
       if (c.fourth && c.fgDist <= c.fgMax + 8) sp.push(FAKE_PLAYS[1]);
       // field goal: any down, as long as it's not hopeless
-      if (c.fgDist <= c.fgMax + 8) sp.push({ ...SPECIAL_PLAYS[1], name: `${c.fgDist} yd FG`, desc: c.fgDist > c.fgMax ? 'Past his range — long shot!' : c.fgDist > c.fgMax - 8 ? 'Long kick. Nail the meter!' : 'Kick it through for 3.' });
+      if (c.fgDist <= c.fgMax + 8) sp.push({ ...SPECIAL_PLAYS[1], name: `${c.fgDist} yd FG`, desc: c.fgDist > c.fgMax ? 'Past his range. Long shot.' : c.fgDist > c.fgMax - 8 ? 'Long kick. Nail the meter!' : 'Kick it through for 3.' });
       pcList = sp.concat(pcList);
     }
   }
@@ -167,9 +167,9 @@ function renderCards() {
     el.className = 'pcard' + (p.special ? ' special' : '') + (p.key === pcCoach ? ' coach' : '');
     const kind = p.type === 'run' ? 'run' : p.type === 'pass' ? 'pass' : p.special ? 'kick' : '';
     const label = G.mode === 'mobile' ? (kind === 'run' ? 'RUN' : kind === 'pass' ? 'PASS' : kind === 'kick' ? 'KICK' : 'D') : (j + 1) % 10;
-    el.innerHTML = `${p.key === pcCoach ? '<span class="cp">⭐ COACH PICK</span>' : ''}<span class="k ${kind}">${label}</span><div class="t">${p.name}</div>`;
+    el.innerHTML = `${p.key === pcCoach ? '<span class="cp">COACH PICK</span>' : ''}<span class="k ${kind}">${label}</span><div class="t">${p.name}</div>`;
     const mini = document.createElement('canvas'); mini.width = 120; mini.height = 72;
-    if (p.key === 'xp' || p.key === 'two') { const g = mini.getContext('2d'); g.fillStyle = '#3a8a3c'; g.fillRect(0, 0, 120, 72); g.font = 'bold 30px sans-serif'; g.textAlign = 'center'; g.fillText(p.key === 'xp' ? '🦶' : '✌️', 60, 48); }
+    if (p.key === 'xp' || p.key === 'two') { const g = mini.getContext('2d'); g.fillStyle = '#3a8a3c'; g.fillRect(0, 0, 120, 72); g.font = "italic 900 34px 'Barlow Condensed', sans-serif"; g.textAlign = 'center'; g.fillStyle = '#fff'; g.fillText(p.key === 'xp' ? '+1' : '+2', 60, 48); }
     else drawPlayDiagram(mini, p, pcOff);
     el.appendChild(mini);
     const d = document.createElement('div'); d.className = 'd'; d.textContent = p.desc; el.appendChild(d);
@@ -181,19 +181,19 @@ function renderCards() {
   const hint = $('pcHint'); hint.innerHTML = '';
   if (pages > 1) {
     const mk = (txt, d) => { const b = document.createElement('button'); b.className = 'pgbtn'; b.textContent = txt; b.onclick = () => { pcPage = (pcPage + d + pages) % pages; Sound.click(); renderCards(); }; return b; };
-    hint.appendChild(mk('◀ PREV', -1));
+    hint.appendChild(mk('‹ PREV', -1));
     const t = document.createElement('span'); t.className = 'pgtxt'; t.textContent = `PAGE ${pcPage + 1} / ${pages}`; hint.appendChild(t);
-    hint.appendChild(mk('NEXT ▶', 1));
+    hint.appendChild(mk('NEXT ›', 1));
   }
   // clock tools
   const tool = (txt, fn) => { const b = document.createElement('button'); b.className = 'pgbtn tool'; b.textContent = txt; b.onclick = fn; hint.appendChild(b); };
-  if ((pcCtx.mode === 'off' || pcCtx.mode === 'def') && G.timeouts && G.timeouts[G.human] > 0 && G.pendingRunoff > 0) tool(`⏱ TIMEOUT (${G.timeouts[G.human]})`, () => { if (callTimeout(G.human)) renderCards(); });
-  if (pcCtx.mode === 'off' && G.down < 4 && G.pendingRunoff > 0) tool('⬇ SPIKE', () => { show(null); spikeBall(); });
+  if ((pcCtx.mode === 'off' || pcCtx.mode === 'def') && G.timeouts && G.timeouts[G.human] > 0 && G.pendingRunoff > 0) tool(`TIMEOUT (${G.timeouts[G.human]})`, () => { if (callTimeout(G.human)) renderCards(); });
+  if (pcCtx.mode === 'off' && G.down < 4 && G.pendingRunoff > 0) tool('SPIKE', () => { show(null); spikeBall(); });
   const last = pcCtx.mode === 'off' ? G.lastOffKey : pcCtx.mode === 'def' ? G.lastDefKey : null;
   const li = last ? pcList.findIndex(p => p.key === last) : -1;
-  if (li >= 0) tool('⚡ SAME PLAY', () => choose(li));
+  if (li >= 0) tool('LAST PLAY', () => choose(li));
   const tip = document.createElement('span'); tip.className = 'pgtip';
-  tip.textContent = G.mode === 'mobile' ? '⭐ = coach pick' : `1-${Math.min(PER_PAGE, list.length) % 10 || 0} pick  •  ←/→ pages  •  ⭐ = coach pick`;
+  tip.textContent = G.mode === 'mobile' ? '' : `1-${Math.min(PER_PAGE, list.length) % 10 || 0} to pick     ← → pages`;
   hint.appendChild(tip);
 }
 G.hooks.onPlayCall = c => { if (!G.demo) onPlayCall(c); };
@@ -278,7 +278,7 @@ G.hooks.onGameOver = s => {
   if (inSeason) seasonGameDone(s.score);
   $('btnSeasonCont').style.display = inSeason ? '' : 'none';
   $('btnAgain').style.display = $('btnNewTeams').style.display = inSeason ? 'none' : '';
-  if (inSeason && G.playoff && won) $('overTitle').textContent = Season.data.phase === 'done' ? '🏆 CHAMPIONS! 🏆' : 'YOU ADVANCE!';
+  if (inSeason && G.playoff && won) $('overTitle').textContent = Season.data.phase === 'done' ? 'CHAMPIONS' : 'YOU ADVANCE!';
   setTimeout(() => show('over'), 1400);
 };
 function drawMvp(st, side) {
@@ -396,7 +396,7 @@ function updateMobileButtons() {
   if (key === mbState) return;
   mbState = key;
   document.querySelectorAll('#mbtns button').forEach(x => x.classList.toggle('on', x.dataset.show === st));
-  $('mbDive').textContent = b && b.flight ? '🙌 JUMP' : '💥 DIVE';
+  $('mbDive').textContent = b && b.flight ? 'JUMP' : 'DIVE';
   $('mbSwim').style.display = st === 'def' && h && h.engaged ? 'block' : 'none';
   $('mbTO').style.display = st === 'presnap' && G.timeouts && G.timeouts[G.human] > 0 && G.pendingRunoff > 0 ? 'block' : 'none';
 }
@@ -437,7 +437,7 @@ function renderHub() {
   } else {
     nx.style.background = '#0009';
     const ch = d.champ && Season.team(d.champ);
-    const msg = d.phase === 'done' && d.champ === d.team ? `🏆 YOU WON THE BOBBLE BOWL! 🏆` :
+    const msg = d.phase === 'done' && d.champ === d.team ? `You won the Bobble Bowl.` :
       d.phase === 'missed' ? `You missed the playoffs (top 4 get in).` : d.phase === 'eliminated' ? `Your season ended in the playoffs.` : 'Season over.';
     nx.innerHTML = `<div class="mu">${msg}</div><div class="sub">${ch ? `Bobble Bowl champion: <b>${ch.city} ${ch.name}</b>` : ''}</div>
       <button class="big gold" id="shNew" style="margin-top:8px">NEW SEASON</button>`;
@@ -455,7 +455,7 @@ function renderHub() {
   });
   if (d.log.length) {
     sched += `<div style="margin-top:6px;color:#ffd23f;font-weight:bold">PLAYOFFS</div>`;
-    for (const r of d.log) sched += `<div style="opacity:.8;margin-top:3px">${Season.roundName(r.round)}</div><div class="bracket">${r.games.map(x => `<div class="bgame">${dotFor(x.home)}${x.home} ${x.score[0]}${x.score[0] > x.score[1] ? ' ✔' : ''}<br>${dotFor(x.away)}${x.away} ${x.score[1]}${x.score[1] > x.score[0] ? ' ✔' : ''}</div>`).join('')}</div>`;
+    for (const r of d.log) sched += `<div style="opacity:.8;margin-top:3px">${Season.roundName(r.round)}</div><div class="bracket">${r.games.map(x => `<div class="bgame"><div class="${x.score[0] > x.score[1] ? 'win' : ''}">${dotFor(x.home)}${x.home} ${x.score[0]}</div><div class="${x.score[1] > x.score[0] ? 'win' : ''}">${dotFor(x.away)}${x.away} ${x.score[1]}</div></div>`).join('')}</div>`;
   }
   $('shSched').innerHTML = sched;
   // standings
@@ -478,7 +478,7 @@ $('shPlay').onclick = () => {
   if (G.mode === 'mobile') goFullscreen();
   G.demo = false; G.season = true; show(null);
   newGame(Season.team(g.home), Season.team(g.away), { qtr: d.qtr, diff: d.diff, humanSide: g.home === d.team ? 0 : 1, playoff: d.phase === 'playoffs' });
-  if (d.phase === 'playoffs') showBanner(Season.roundName(d.bracket.round).replace('🏆 ', '').toUpperCase(), 'Lose and go home!', '#ffd23f', 2.4);
+  if (d.phase === 'playoffs') showBanner(Season.roundName(d.bracket.round).toUpperCase(), 'Lose and go home', '#ffd23f', 2.4);
 };
 function seasonGameDone(score) {
   const d = Season.data;
@@ -499,11 +499,11 @@ function openModes() {
   $('mdTeamName').textContent = `Your team: ${t.city} ${t.name}`;
   const done = R.daily && R.daily.done && R.daily.done[d.date];
   const cards = [
-    ['2min', '⏱', 'TWO-MINUTE DRILL', 'Down by up to a touchdown, 2:00 left, ball on your 25. Win it!', R.twoMin ? `Record: ${R.twoMin.wins}/${R.twoMin.tries}` : ''],
-    ['daily', '📅', 'DAILY CHALLENGE', `${TEAMS[d.mine].name} vs ${TEAMS[d.opp].name}: ${d.goal.text}`, done ? '✅ Done today!' + (R.daily.streak ? ` Streak ${R.daily.streak} 🔥` : '') : (R.daily && R.daily.streak ? `Streak: ${R.daily.streak} 🔥` : 'New every day!')],
-    ['qb', '🎯', 'QB TARGETS', '45 seconds. Hit the targets downfield. Bullseyes = 300!', R.qb ? `High score: ${R.qb}` : ''],
-    ['kick', '🦶', 'KICKING CONTEST', 'Start at 25 yards, back up 5 every make. 2 misses = out.', R.kick ? `Longest: ${R.kick} yds` : ''],
-    ['dash', '💨', '40-YARD DASH', 'Mash ← → (or tap) to race your fastest player!', R.dash && R.dash < 99 ? `Best: ${R.dash}s` : '']
+    ['2min', '01', 'TWO-MINUTE DRILL', 'Down by up to a touchdown, 2:00 left, ball on your 25.', R.twoMin ? `Record: ${R.twoMin.wins}/${R.twoMin.tries}` : ''],
+    ['daily', '02', 'DAILY CHALLENGE', `${TEAMS[d.mine].name} vs ${TEAMS[d.opp].name}: ${d.goal.text}`, done ? 'Done today' + (R.daily.streak ? `, ${R.daily.streak} day streak` : '') : (R.daily && R.daily.streak ? `${R.daily.streak} day streak` : 'New one every day')],
+    ['qb', '03', 'QB TARGETS', '45 seconds to hit targets downfield. Bullseyes are worth 300.', R.qb ? `High score: ${R.qb}` : ''],
+    ['kick', '04', 'KICKING CONTEST', 'Start at 25 yards, back up 5 every make. 2 misses = out.', R.kick ? `Longest: ${R.kick} yds` : ''],
+    ['dash', '05', '40-YARD DASH', 'Mash ← → (or tap) to race your fastest player.', R.dash && R.dash < 99 ? `Best: ${R.dash}s` : '']
   ];
   $('mdCards').innerHTML = cards.map(([k, i, tt, dd, rr]) => `<div class="mdcard" data-k="${k}"><div class="mi">${i}</div><div class="mt">${tt}</div><div class="md">${dd}</div><div class="mr">${rr}</div></div>`).join('');
   document.querySelectorAll('.mdcard').forEach(c => c.onclick = () => runChallenge(c.dataset.k));

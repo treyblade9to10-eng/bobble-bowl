@@ -84,7 +84,7 @@ const Season = {
     else if (b.round === 1) b.games = ['AFC', 'NFC'].map(c => { const w = b.winners.filter(x => x.conf === c).map(x => x.id).sort((x, y) => b.seeds[c].indexOf(x) - b.seeds[c].indexOf(y)); return { conf: c, home: w[0], away: w[1] }; });
     else if (b.round === 2) { const a = b.winners.find(x => x.conf === 'AFC').id, n = b.winners.find(x => x.conf === 'NFC').id; b.games = [{ conf: 'BOWL', home: chance(0.5) ? a : n, away: null }]; b.games[0].away = b.games[0].home === a ? n : a; }
   },
-  roundName(r) { return ['Semifinal', 'Conference Championship', '🏆 BOBBLE BOWL'][r]; },
+  roundName(r) { return ['Semifinal', 'Conference Championship', 'Bobble Bowl'][r]; },
   myPlayoffGame() { const b = this.data.bracket; return b && b.games.find(g => g.home === this.data.team || g.away === this.data.team); },
   playoffSim(home, away) { let s = this.simScore(home, away); if (s[0] === s[1]) s[chance(0.5) ? 0 : 1] += 3; return s; },
   finishPlayoffRound(myScore) {

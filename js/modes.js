@@ -13,7 +13,7 @@ const DAILY_GOALS = [
   { key: 'score35', text: 'Score 35+ points and win', check: (me, op) => me >= 35 && me > op },
   { key: 'hold10', text: 'Win and hold them to 10 or less', check: (me, op) => me > op && op <= 10 },
   { key: 'clean', text: 'Win with ZERO turnovers', check: (me, op, ts) => me > op && ts.to === 0 },
-  { key: 'upset', text: 'Pull off the upset — win as the underdog', check: (me, op) => me > op },
+  { key: 'upset', text: 'Pull off the upset as the underdog', check: (me, op) => me > op },
   { key: 'shoot', text: 'Win a shootout: both teams score 21+', check: (me, op) => me > op && op >= 21 }
 ];
 function dailyToday() {
@@ -65,7 +65,7 @@ function challengeResult(s) {
       R.daily.streak = R.daily.last === ys ? R.daily.streak + 1 : 1; R.daily.last = c.date; R.daily.done[c.date] = true;
     }
     Records.set(R);
-    return { ok, text: ok ? `✅ Goal complete: ${c.goal.text}! Streak: ${R.daily.streak} day${R.daily.streak === 1 ? '' : 's'} 🔥` : `❌ Goal missed: ${c.goal.text}. Try again!` };
+    return { ok, text: ok ? `Goal complete: ${c.goal.text}. Streak: ${R.daily.streak} day${R.daily.streak === 1 ? '' : 's'}` : `Goal missed: ${c.goal.text}. Try again.` };
   }
   return null;
 }
@@ -228,16 +228,16 @@ function miniFinish() {
   let title = '', big = '', sub = '', best = '';
   if (m.type === 'qb') {
     const prev = R.qb || 0; if (m.score > prev) R.qb = m.score;
-    title = '🎯 QB TARGETS'; big = `${m.score} pts`; sub = `${m.hits} hits on ${m.throws} throws`; best = m.score > prev ? '🏆 NEW HIGH SCORE!' : `High score: ${prev}`;
+    title = 'QB TARGETS'; big = `${m.score} pts`; sub = `${m.hits} hits on ${m.throws} throws`; best = m.score > prev ? 'NEW HIGH SCORE' : `High score: ${prev}`;
   } else if (m.type === 'kick') {
     const prev = R.kick || 0; if (m.best > prev) R.kick = m.best;
-    title = '🦶 KICKING CONTEST'; big = m.best ? `${m.best} yards` : 'No makes'; sub = `${m.made} field goals made`; best = m.best > prev ? '🏆 NEW RECORD!' : `Longest ever: ${prev} yards`;
+    title = 'KICKING CONTEST'; big = m.best ? `${m.best} yards` : 'No makes'; sub = `${m.made} field goals made`; best = m.best > prev ? 'NEW RECORD' : `Longest ever: ${prev} yards`;
   } else {
     const t = m.done[0], prev = R.dash || 99, rv = m.done[1];
     if (t < prev) R.dash = +t.toFixed(2);
-    title = '💨 40-YARD DASH'; big = t >= 99 ? 'DNF' : `${t.toFixed(2)}s`;
+    title = '40-YARD DASH'; big = t >= 99 ? 'DNF' : `${t.toFixed(2)}s`;
     sub = rv ? `${t < rv ? 'You beat' : 'You lost to'} ${m.rival.name} (${rv.toFixed(2)}s)` : '';
-    best = t < prev ? '🏆 NEW PERSONAL BEST!' : `Best: ${prev.toFixed(2)}s`;
+    best = t < prev ? 'NEW PERSONAL BEST' : `Best: ${prev.toFixed(2)}s`;
   }
   Records.set(R);
   G.hooks.onMiniOver && G.hooks.onMiniOver({ type: m.type, title, big, sub, best });
@@ -251,25 +251,25 @@ function drawMini(g, G) {
     for (const [k, col] of [[1, '#ff3b30'], [0.66, '#ffffff'], [0.33, '#ff3b30']]) { g.fillStyle = col; g.beginPath(); g.ellipse(x, y, t.r * k * PX, t.r * k * PY, 0, 0, 7); g.fill(); }
     g.strokeStyle = '#000'; g.lineWidth = 2; g.beginPath(); g.ellipse(x, y, t.r * PX, t.r * PY, 0, 0, 7); g.stroke();
     g.fillStyle = '#111'; g.fillRect(x - 2, y - 46, 4, 46); // little pole so it reads as a target
-    g.fillStyle = '#ffd23f'; g.font = 'bold 12px Arial'; g.textAlign = 'center'; g.fillText(`${Math.round(t.x - 30)} yd`, x, y - 50);
+    g.fillStyle = '#ffd23f'; g.font = 'bold 12px Barlow, Arial, sans-serif'; g.textAlign = 'center'; g.fillText(`${Math.round(t.x - 30)} yd`, x, y - 50);
   }
   if (m.type === 'dash') { // finish line
     const fx = sx(50); g.strokeStyle = '#ffd23f'; g.lineWidth = 6; g.setLineDash([12, 8]); g.beginPath(); g.moveTo(fx, sy(MID - 8)); g.lineTo(fx, sy(MID + 8)); g.stroke(); g.setLineDash([]);
-    g.fillStyle = '#ffd23f'; g.font = '900 18px Arial Black, Arial'; g.textAlign = 'center'; g.fillText('FINISH', fx, sy(MID - 8) - 8);
+    g.fillStyle = '#ffd23f'; g.font = '900 18px "Barlow Condensed", "Arial Black", sans-serif'; g.textAlign = 'center'; g.fillText('FINISH', fx, sy(MID - 8) - 8);
   }
 }
 function drawMiniHUD(g, G) {
   const m = G.mini; if (!m) return;
   g.fillStyle = '#0b0f16ee'; roundRect(g, CW / 2 - 200, 8, 400, 46, 12); g.fill();
-  g.fillStyle = '#fff'; g.textAlign = 'center'; g.font = '900 22px Arial Black, Arial';
-  if (m.type === 'qb') g.fillText(`⏱ ${Math.ceil(m.time)}s     🎯 ${m.score}`, CW / 2, 40);
+  g.fillStyle = '#fff'; g.textAlign = 'center'; g.font = '900 22px "Barlow Condensed", "Arial Black", sans-serif';
+  if (m.type === 'qb') g.fillText(`0:${String(Math.ceil(m.time)).padStart(2, '0')}      ${m.score} PTS`, CW / 2, 40);
   else if (m.type === 'kick') g.fillText(`${m.dist} YD  •  MADE ${m.made}  •  MISSES ${m.misses}/2`, CW / 2, 40);
   else {
     g.fillText(m.go ? `${(m.t * 1.2).toFixed(2)}s` : 'GET READY', CW / 2, 40);
     // mash meter
     g.fillStyle = '#000a'; roundRect(g, CW / 2 - 150, CH - 70, 300, 22, 11); g.fill();
     g.fillStyle = m.power > 0.85 ? '#2fd06b' : '#ffd23f'; roundRect(g, CW / 2 - 148, CH - 68, 296 * Math.min(1, m.power), 18, 9); g.fill();
-    g.fillStyle = '#fff'; g.font = 'bold 14px Arial';
+    g.fillStyle = '#fff'; g.font = 'bold 14px Barlow, Arial, sans-serif';
     g.fillText(G.mode === 'mobile' ? 'TAP TAP TAP as fast as you can!' : 'Mash ← → (or A D) back and forth!', CW / 2, CH - 80);
   }
 }

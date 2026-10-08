@@ -38,7 +38,7 @@ function buildField(G) {
   }
   // ad wall
   g.fillStyle = '#10151d'; g.fillRect(0, fy(-1.9), W, 0.9 * PY);
-  g.fillStyle = '#ffffff22'; g.font = 'bold 9px Arial'; g.textAlign = 'left';
+  g.fillStyle = '#ffffff22'; g.font = 'bold 9px Barlow, Arial, sans-serif'; g.textAlign = 'left';
   for (let x = 0; x < W; x += 260) g.fillText('BOBBLE BOWL  •  8 ON 8  •  BIG HEADS ONLY', x + 10, fy(-1.35));
   // apron + grass
   g.fillStyle = '#2b6b2e'; g.fillRect(0, fy(-1.2), W, H - fy(-1.2));
@@ -58,7 +58,7 @@ function buildField(G) {
     ez.addColorStop(0, shade(t.c1, -0.15)); ez.addColorStop(0.5, t.c1); ez.addColorStop(1, shade(t.c1, -0.15));
     g.fillStyle = ez; g.fillRect(x0, fy(0), 10 * PX, FIELD_W * PY);
     g.save(); g.translate(x0 + 5 * PX, fy(FIELD_W / 2)); g.rotate(s === 0 ? -Math.PI / 2 : Math.PI / 2);
-    g.font = '900 86px Arial Black, Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.font = '900 86px "Barlow Condensed", "Arial Black", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
     g.lineWidth = 8; g.strokeStyle = shade(t.c1, -0.5); g.strokeText(t.name.toUpperCase(), 0, 0);
     g.fillStyle = t.c2; g.fillText(t.name.toUpperCase(), 0, 0); g.restore();
   }
@@ -68,7 +68,7 @@ function buildField(G) {
   g.lineWidth = 2;
   for (let yd = 11; yd < 110; yd++) for (const hy of [0.7, 23.6, 29.7, 52.6]) { g.beginPath(); g.moveTo(fx(yd), fy(hy) - 4); g.lineTo(fx(yd), fy(hy) + 4); g.stroke(); }
   // numbers with arrows
-  g.font = '900 34px Arial Black, Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.font = '900 34px "Barlow Condensed", "Arial Black", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
   for (let yd = 20; yd <= 100; yd += 10) {
     const n = yd <= 60 ? yd - 10 : 110 - yd;
     for (const ny of [8.5, 44.8]) { g.fillStyle = '#ffffffd8'; g.fillText(String(n), fx(yd), fy(ny)); }
@@ -169,7 +169,7 @@ function drawDefJob(g, G) {
   else { label = 'SPY THE QB'; }
   g.setLineDash([]); g.globalAlpha = 1;
   if (G.phase === 'presnap') {
-    g.font = 'bold 13px Arial'; g.textAlign = 'center'; const w = g.measureText(label).width + 14;
+    g.font = 'bold 13px Barlow, Arial, sans-serif'; g.textAlign = 'center'; const w = g.measureText(label).width + 14;
     g.fillStyle = '#ffe14d'; roundRect(g, sx(h.x) - w / 2, sy(h.y) + 12, w, 20, 10); g.fill();
     g.fillStyle = '#111'; g.fillText(label, sx(h.x), sy(h.y) + 26);
   }
@@ -292,7 +292,7 @@ function drawPlayer(g, p, G, at) {
   g.beginPath(); g.moveTo(-W * 0.42, -TH + 2); g.lineTo(-W * 0.5, -TH + 8); g.stroke();
   // number (un-flipped so it reads right)
   g.save(); g.scale(dir, 1);
-  g.font = `900 ${big ? 13 : 12}px Arial Black, Arial, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.font = `900 ${big ? 13 : 12}px "Barlow Condensed", "Arial Black", sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
   g.lineWidth = 3; g.strokeStyle = shade(look.jersey, -0.55); g.strokeText(p.num, 0, -TH / 2 - 1);
   g.fillStyle = look.num; g.fillText(p.num, 0, -TH / 2 - 1);
   g.restore();
@@ -315,7 +315,7 @@ function drawPlayer(g, p, G, at) {
   if (p.down > 0 && p.dizzy > 0) {
     for (let i = 0; i < 3; i++) {
       const a = G.time * 6 + i * 2.1;
-      g.fillStyle = '#ffe14d'; g.font = 'bold 14px Arial'; g.textAlign = 'center';
+      g.fillStyle = '#ffe14d'; g.font = 'bold 14px Barlow, Arial, sans-serif'; g.textAlign = 'center';
       g.fillText('★', x + p.downDir * 30 + Math.cos(a) * 14, y - 18 + Math.sin(a) * 5);
     }
   }
@@ -325,16 +325,16 @@ function drawPlayer(g, p, G, at) {
   const showName = p.isHuman || carrying || (G.phase === 'presnap' && p.off && p.slot <= 4 && p.side === G.human);
   let ly = headTop;
   if (showName && p.down <= 0) {
-    g.font = 'bold 13px Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.font = 'bold 13px Barlow, Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
     const label = (p.isHuman || carrying) ? `${p.name}` : lastName(p.name);
     const w = g.measureText(label).width + 14;
     g.fillStyle = p.isHuman ? '#ffe14d' : '#000000c0'; roundRect(g, x - w / 2, ly - 10, w, 20, 10); g.fill();
     g.fillStyle = p.isHuman ? '#111' : '#fff'; g.fillText(label, x, ly + 1);
-    if (p.isHuman || carrying) { g.font = 'bold 10px Arial'; g.fillStyle = '#fff'; g.strokeStyle = '#000'; g.lineWidth = 3; const r = `${p.pos} • ${p.ovr} OVR`; g.strokeText(r, x, ly - 17); g.fillText(r, x, ly - 17); }
+    if (p.isHuman || carrying) { g.font = 'bold 10px Barlow, Arial, sans-serif'; g.fillStyle = '#fff'; g.strokeStyle = '#000'; g.lineWidth = 3; const r = `${p.pos} • ${p.ovr} OVR`; g.strokeText(r, x, ly - 17); g.fillText(r, x, ly - 17); }
     ly -= 30;
   }
   if (p.hot && G.phase === 'presnap') {
-    g.font = 'bold 11px Arial'; g.textAlign = 'center'; const w = g.measureText(p.hot).width + 12;
+    g.font = 'bold 11px Barlow, Arial, sans-serif'; g.textAlign = 'center'; const w = g.measureText(p.hot).width + 12;
     g.fillStyle = '#ffe14d'; roundRect(g, x - w / 2, ly - 8, w, 16, 8); g.fill(); g.fillStyle = '#111'; g.fillText(p.hot, x, ly + 4); ly -= 22;
   }
   if (p.throwKey) {
@@ -343,7 +343,7 @@ function drawPlayer(g, p, G, at) {
     const r = tgt ? 17 : 14;
     g.fillStyle = col; g.strokeStyle = tgt ? '#ffe14d' : '#fff'; g.lineWidth = tgt ? 4 : 2.5;
     g.beginPath(); g.arc(x, ly, r, 0, 7); g.fill(); g.stroke();
-    g.fillStyle = '#fff'; g.font = '900 16px Arial Black, Arial'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillStyle = '#fff'; g.font = '900 16px "Barlow Condensed", "Arial Black", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
     g.fillText(G.mode === 'mobile' ? '▲' : p.throwKey, x, ly + 1);
     if (p.openness != null) {
       const o = clamp(p.openness / 5, 0.12, 1);
@@ -370,7 +370,7 @@ function drawHead(g, R, team, p, look) {
   g.restore();
   // side decal: jersey number
   g.save(); g.scale(face.dir, 1);
-  g.font = `900 ${Math.round(R * 0.62)}px Arial Black, Arial`; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.font = `900 ${Math.round(R * 0.62)}px "Barlow Condensed", "Arial Black", sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
   g.lineWidth = 3; g.strokeStyle = shade(team.helmet, -0.6); g.fillStyle = team.c2 === team.helmet ? '#fff' : team.c2;
   const dx = -R * 0.38 * face.dir;
   g.strokeText(p.num, dx, -R * 0.08); g.fillText(p.num, dx, -R * 0.08);
@@ -487,7 +487,7 @@ function drawAim(g, G) {
     g.strokeStyle = '#7fd3ff'; g.fillStyle = '#7fd3ff'; g.lineWidth = 8; g.lineCap = 'round';
     g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke();
     g.beginPath(); g.moveTo(x1 + d * 16, y1); g.lineTo(x1 - d * 4, y1 - 14); g.lineTo(x1 - d * 4, y1 + 14); g.fill();
-    g.font = '900 22px Arial Black, Arial'; g.textAlign = 'center'; g.lineWidth = 5; g.strokeStyle = '#000';
+    g.font = '900 22px "Barlow Condensed", "Arial Black", sans-serif'; g.textAlign = 'center'; g.lineWidth = 5; g.strokeStyle = '#000';
     g.strokeText('QB RUN', (x0 + x1) / 2, y0 - 22); g.fillText('QB RUN', (x0 + x1) / 2, y0 - 22);
     if (a.from) { g.strokeStyle = '#ffffff66'; g.lineWidth = 3; g.beginPath(); g.moveTo(a.from.x, a.from.y); g.lineTo(a.to.x, a.to.y); g.stroke(); }
     return;
@@ -500,7 +500,7 @@ function drawAim(g, G) {
   g.stroke(); g.setLineDash([]);
   g.fillStyle = a.target ? '#ffe14d55' : '#ffffff33'; g.strokeStyle = a.target ? '#ffe14d' : '#fff'; g.lineWidth = 3;
   g.beginPath(); g.ellipse(x1, y1, 22, 10, 0, 0, 7); g.fill(); g.stroke();
-  if (a.style && a.style !== 'normal') { g.font = '900 14px Arial Black, Arial'; g.textAlign = 'center'; g.fillStyle = '#7fd3ff'; g.fillText(a.style.toUpperCase(), x1, y1 - 16); }
+  if (a.style && a.style !== 'normal') { g.font = '900 14px "Barlow Condensed", "Arial Black", sans-serif'; g.textAlign = 'center'; g.fillStyle = '#7fd3ff'; g.fillText(a.style.toUpperCase(), x1, y1 - 16); }
   // pull-back line from the finger
   if (a.from) { g.strokeStyle = '#ffffff66'; g.lineWidth = 3; g.beginPath(); g.moveTo(a.from.x, a.from.y); g.lineTo(a.to.x, a.to.y); g.stroke(); g.fillStyle = '#fff8'; g.beginPath(); g.arc(a.from.x, a.from.y, 10, 0, 7); g.fill(); }
 }
@@ -515,7 +515,7 @@ function drawFx(g, G) {
   for (const f of G.fx) {
     const a = clamp(f.life / f.max, 0, 1);
     if (f.kind === 'dust') { g.fillStyle = `rgba(225,215,180,${a * 0.6})`; g.beginPath(); g.arc(sx(f.x), sy(f.y) - f.z, f.r * (2 - a), 0, 7); g.fill(); }
-    else if (f.kind === 'star') { g.fillStyle = `rgba(255,225,70,${a})`; g.font = 'bold 20px Arial'; g.textAlign = 'center'; g.fillText('★', sx(f.x), sy(f.y) - f.z); }
+    else if (f.kind === 'star') { g.fillStyle = `rgba(255,225,70,${a})`; g.font = 'bold 20px Barlow, Arial, sans-serif'; g.textAlign = 'center'; g.fillText('★', sx(f.x), sy(f.y) - f.z); }
     else if (f.kind === 'flag') {
       const u = Math.min(1, f.t / f.T);
       const fx = sx(lerp(f.ax, f.x, u)), fy = sy(lerp(f.ay, f.y, u)) - Math.sin(u * Math.PI) * 70;
@@ -529,7 +529,7 @@ function drawFx(g, G) {
     else if (f.kind === 'text') {
       const pop = Math.min(1, (f.max - f.life) * 8);
       g.save(); g.translate(sx(f.x), sy(f.y) - 60 - f.z); g.scale(0.5 + pop * 0.5, 0.5 + pop * 0.5);
-      g.font = `900 ${f.size || 20}px Arial Black, Arial, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.font = `900 ${f.size || 20}px "Barlow Condensed", "Arial Black", sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
       g.globalAlpha = a; g.lineWidth = 6; g.strokeStyle = '#000'; g.strokeText(f.text, 0, 0); g.fillStyle = f.color || '#fff'; g.fillText(f.text, 0, 0);
       g.restore(); g.globalAlpha = 1;
     }
@@ -540,12 +540,12 @@ function drawBanner(g, G) {
   const b = G.banner; if (!b) return;
   const t = b.t, pop = t < 0.18 ? 0.3 + (t / 0.18) * 0.9 : 1.2 - Math.min(0.2, (t - 0.18) * 1.2);
   const fade = Math.min(1, (b.dur - t) * 4);
-  g.save(); g.globalAlpha = fade; g.translate(CW / 2, CH / 2 - 70); g.scale(pop, pop); g.rotate(-0.04 + Math.sin(t * 5) * 0.02);
-  g.font = '900 84px Arial Black, Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.save(); g.globalAlpha = fade; g.translate(CW / 2, CH / 2 - 70); g.scale(pop, pop); g.rotate(-0.03);
+  g.font = 'italic 900 100px "Barlow Condensed", "Arial Black", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
   g.lineWidth = 16; g.strokeStyle = '#000'; g.lineJoin = 'round'; g.strokeText(b.text, 0, 0);
   const gr = g.createLinearGradient(0, -40, 0, 40); gr.addColorStop(0, '#fff'); gr.addColorStop(0.5, b.color || '#ffd23f'); gr.addColorStop(1, shade(b.color || '#ffd23f', -0.3));
   g.fillStyle = gr; g.fillText(b.text, 0, 0);
-  if (b.sub) { g.font = 'bold 28px Arial, sans-serif'; g.lineWidth = 7; g.strokeText(b.sub, 0, 64); g.fillStyle = '#fff'; g.fillText(b.sub, 0, 64); }
+  if (b.sub) { g.font = 'bold 28px Barlow, Arial, sans-serif'; g.lineWidth = 7; g.strokeText(b.sub, 0, 64); g.fillStyle = '#fff'; g.fillText(b.sub, 0, 64); }
   g.restore();
 }
 
@@ -553,53 +553,53 @@ function ordinal(n) { return ['1st', '2nd', '3rd', '4th'][n - 1] || n + 'th'; }
 
 function drawHUD(g, G) {
   const W = 640, x0 = (CW - W) / 2, y0 = 6, H = 46;
-  g.fillStyle = '#0b0f16f0'; roundRect(g, x0, y0, W, H, 10); g.fill();
+  g.fillStyle = '#0b0f16f0'; roundRect(g, x0, y0, W, H, 3); g.fill();
   const cell = (t, s, x, poss) => {
     const cg = g.createLinearGradient(x, 0, x + 200, 0); cg.addColorStop(0, t.c1); cg.addColorStop(1, shade(t.c1, -0.3));
-    g.fillStyle = cg; roundRect(g, x, y0 + 4, 200, H - 8, 7); g.fill();
+    g.fillStyle = cg; roundRect(g, x, y0 + 4, 200, H - 8, 2); g.fill();
     g.fillStyle = t.c2; g.fillRect(x, y0 + H - 8, 200, 4);
-    g.fillStyle = textOn(t.c1); g.font = '900 22px Arial Black, Arial'; g.textAlign = 'left'; g.textBaseline = 'middle';
+    g.fillStyle = textOn(t.c1); g.font = 'italic 900 26px "Barlow Condensed", "Arial Black", sans-serif'; g.textAlign = 'left'; g.textBaseline = 'middle';
     g.fillText(t.id, x + 10, y0 + H / 2);
     if (poss) drawFootball(g, x + 10 + g.measureText(t.id).width + 16, y0 + H / 2, 0.9);
-    g.font = '900 30px Arial Black, Arial'; g.textAlign = 'right'; g.fillText(s, x + 192, y0 + H / 2 + 1);
+    g.font = 'italic 900 36px "Barlow Condensed", "Arial Black", sans-serif'; g.textAlign = 'right'; g.fillText(s, x + 192, y0 + H / 2 + 1);
     const side = G.teams.indexOf(t);
     if (G.timeouts) for (let i = 0; i < 3; i++) { g.fillStyle = i < G.timeouts[side] ? '#ffd23f' : '#ffffff30'; g.fillRect(x + 10 + i * 16, y0 + H - 15, 12, 4); }
   };
   cell(G.teams[1], G.score[1], x0 + 5, G.poss === 1);
   cell(G.teams[0], G.score[0], x0 + 210, G.poss === 0);
-  g.fillStyle = '#fff'; g.textAlign = 'center'; g.font = 'bold 17px Arial, sans-serif';
+  g.fillStyle = '#fff'; g.textAlign = 'center'; g.font = '800 21px "Barlow Condensed", Arial, sans-serif';
   const q = G.quarter > 4 ? 'OT' : ordinal(G.quarter);
   const c = Math.max(0, Math.ceil(G.clock)), m = Math.floor(c / 60), s = String(c % 60).padStart(2, '0');
   g.fillText(`${q}   ${m}:${s}`, x0 + W - 112, y0 + 16);
-  g.font = 'bold 13px Arial, sans-serif'; g.fillStyle = '#ffd23f';
+  g.font = '800 15px "Barlow Condensed", Arial, sans-serif'; g.fillStyle = '#ffd23f';
   g.fillText(G.downText(), x0 + W - 112, y0 + 35);
 
   // play clock
   if (G.playClock > 0 && (G.phase === 'playcall' || G.phase === 'presnap')) {
     const pc = Math.ceil(G.playClock), red = pc <= 5;
-    g.fillStyle = red ? '#c0141ccc' : '#0b0f16e0'; roundRect(g, CW / 2 - 52, y0 + H + 4, 104, 26, 8); g.fill();
-    g.fillStyle = red ? '#fff' : '#ffd23f'; g.font = '900 15px Arial Black, Arial'; g.textAlign = 'center';
-    g.fillText(`⏱ :${String(pc).padStart(2, '0')}`, CW / 2, y0 + H + 22);
+    g.fillStyle = red ? '#c0141ccc' : '#0b0f16e0'; roundRect(g, CW / 2 - 36, y0 + H + 4, 72, 26, 2); g.fill();
+    g.fillStyle = red ? '#fff' : '#ffd23f'; g.font = '900 15px "Barlow Condensed", "Arial Black", sans-serif'; g.textAlign = 'center';
+    g.fillText(`:${String(pc).padStart(2, '0')}`, CW / 2, y0 + H + 22);
   }
   // your play
   if (G.play && (G.phase === 'presnap' || G.phase === 'live') && !G.demo) {
     const mine = G.poss === G.human ? G.play.off : G.play.def;
-    const t = (G.poss === G.human ? '🏈 ' : '🛡️ ') + mine.name.toUpperCase();
-    g.font = 'bold 14px Arial'; const w = g.measureText(t).width + 22;
-    g.fillStyle = '#0b0f16d0'; roundRect(g, 10, 10, w, 28, 14); g.fill();
+    const t = mine.name.toUpperCase();
+    g.font = 'bold 14px Barlow, Arial, sans-serif'; const w = g.measureText(t).width + 22;
+    g.fillStyle = '#0b0f16d0'; roundRect(g, 10, 10, w, 28, 2); g.fill();
     g.fillStyle = '#fff'; g.textAlign = 'left'; g.fillText(t, 21, 29);
   }
   // hint + stamina
   if (G.hint) {
-    g.font = 'bold 14px Arial, sans-serif'; const w = g.measureText(G.hint).width + 24;
-    g.fillStyle = '#000000a0'; roundRect(g, CW / 2 - w / 2, CH - 34, w, 26, 13); g.fill();
+    g.font = 'bold 14px Barlow, Arial, sans-serif'; const w = g.measureText(G.hint).width + 24;
+    g.fillStyle = '#000000a0'; roundRect(g, CW / 2 - w / 2, CH - 34, w, 26, 2); g.fill();
     g.fillStyle = '#fff'; g.textAlign = 'center'; g.fillText(G.hint, CW / 2, CH - 20);
   }
   const h = G.humanPlayer;
   if (h && G.phase === 'live' && G.mode !== 'mobile') {
     g.fillStyle = '#000a'; roundRect(g, 14, CH - 34, 132, 16, 8); g.fill();
     g.fillStyle = h.stamina > 0.3 ? '#2fd06b' : '#ff6040'; roundRect(g, 17, CH - 31, 126 * h.stamina, 10, 5); g.fill();
-    g.fillStyle = '#fff'; g.font = 'bold 10px Arial'; g.textAlign = 'left'; g.fillText('SPRINT', 152, CH - 25);
+    g.fillStyle = '#fff'; g.font = 'bold 10px Barlow, Arial, sans-serif'; g.textAlign = 'left'; g.fillText('SPRINT', 152, CH - 25);
   }
 }
 
@@ -647,21 +647,21 @@ function drawKickMeter(g, G) {
   const W = 560, H = 196, x0 = (CW - W) / 2, y0 = CH - H - 46;
   g.fillStyle = '#0b0f16ee'; roundRect(g, x0, y0, W, H, 18); g.fill();
   g.strokeStyle = '#ffd23f'; g.lineWidth = 3; roundRect(g, x0, y0, W, H, 18); g.stroke();
-  g.fillStyle = '#ffd23f'; g.font = '900 22px Arial Black, Arial'; g.textAlign = 'center';
+  g.fillStyle = '#ffd23f'; g.font = '900 22px "Barlow Condensed", "Arial Black", sans-serif'; g.textAlign = 'center';
   const title = km.kind === 'punt' ? 'PUNT' : km.kind === 'ko' ? 'KICKOFF' : km.kind === 'onside' ? 'ONSIDE KICK' : km.kind === 'xp' ? 'EXTRA POINT' : `${km.yds}-YARD FIELD GOAL`;
   g.fillText(title, CW / 2, y0 + 30);
-  g.fillStyle = '#fff'; g.font = 'bold 14px Arial';
+  g.fillStyle = '#fff'; g.font = 'bold 14px Barlow, Arial, sans-serif';
   g.fillText(`${km.kk.name}  •  ${km.kind === 'punt' ? 'P' : 'K'}  •  ${km.kk.ovr} OVR`, CW / 2, y0 + 50);
   // power bar
   const bx = x0 + 40, bw = W - 80;
-  const bar = (y, label, active) => { g.fillStyle = active ? '#fff' : '#fff8'; g.font = 'bold 13px Arial'; g.textAlign = 'left'; g.fillText(label, bx, y - 6); g.fillStyle = '#222'; roundRect(g, bx, y, bw, 22, 11); g.fill(); };
+  const bar = (y, label, active) => { g.fillStyle = active ? '#fff' : '#fff8'; g.font = 'bold 13px Barlow, Arial, sans-serif'; g.textAlign = 'left'; g.fillText(label, bx, y - 6); g.fillStyle = '#222'; roundRect(g, bx, y, bw, 22, 11); g.fill(); };
   bar(y0 + 80, '1) POWER', km.stage === 0);
   const pg = g.createLinearGradient(bx, 0, bx + bw, 0); pg.addColorStop(0, '#2fd06b'); pg.addColorStop(0.7, '#ffd23f'); pg.addColorStop(1, '#ff4040');
   g.fillStyle = pg; roundRect(g, bx + 2, y0 + 82, Math.max(4, (bw - 4) * km.power), 18, 9); g.fill();
   if (km.kind === 'fg' || km.kind === 'xp') {
     const nx = bx + bw * Math.min(1, km.need);
     g.strokeStyle = '#fff'; g.lineWidth = 3; g.beginPath(); g.moveTo(nx, y0 + 76); g.lineTo(nx, y0 + 106); g.stroke();
-    g.fillStyle = '#fff'; g.font = 'bold 11px Arial'; g.textAlign = 'center'; g.fillText(km.need > 1 ? 'OUT OF RANGE!' : 'NEED', Math.min(nx, bx + bw - 30), y0 + 118);
+    g.fillStyle = '#fff'; g.font = 'bold 11px Barlow, Arial, sans-serif'; g.textAlign = 'center'; g.fillText(km.need > 1 ? 'OUT OF RANGE!' : 'NEED', Math.min(nx, bx + bw - 30), y0 + 118);
   }
   // aim bar
   bar(y0 + 146, '2) AIM', km.stage === 1);
@@ -674,7 +674,7 @@ function drawKickMeter(g, G) {
     g.fillStyle = '#fff'; g.beginPath(); g.moveTo(ax, y0 + 144); g.lineTo(ax - 8, y0 + 134); g.lineTo(ax + 8, y0 + 134); g.fill();
     g.fillRect(ax - 2, y0 + 146, 4, 22);
   }
-  g.fillStyle = '#ffd23f'; g.font = 'bold 14px Arial'; g.textAlign = 'center';
+  g.fillStyle = '#ffd23f'; g.font = 'bold 14px Barlow, Arial, sans-serif'; g.textAlign = 'center';
   const tap = G.mode === 'mobile' ? 'TAP' : 'SPACE';
   g.fillText(km.stage === 0 ? `${tap} to lock the POWER` : km.stage === 1 ? `${tap} when the needle is in the GREEN` : '', CW / 2, y0 + H - 6);
 }
