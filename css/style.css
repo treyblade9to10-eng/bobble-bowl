@@ -14,7 +14,7 @@
 html, body { margin: 0; height: 100%; background: var(--ink); overflow: hidden;
   font-family: var(--bd); font-weight: 500; color: var(--text); user-select: none; -webkit-user-select: none; touch-action: none; }
 #stage { position: relative; width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; }
-canvas { width: min(100vw, 177.78vh); height: min(56.25vw, 100vh); display: block; background: #2f7a32; }
+canvas { width: min(100vw, calc(100vh * var(--ar, 1.7778))); height: min(calc(100vw / var(--ar, 1.7778)), 100vh); display: block; background: #2f7a32; }
 b { font-weight: 700; }
 
 /* buttons: flat, slanted, condensed caps */
@@ -104,9 +104,11 @@ h2::after { content: ''; position: absolute; left: 50%; bottom: 0; width: 56px; 
 .modecard .md { font-size: 15px; line-height: 1.45; color: var(--dim); }
 
 #mbtns { display: none; position: absolute; right: 14px; bottom: 50px; z-index: 6; flex-direction: column; gap: 10px; }
+#mbtns.pre { right: 8px; bottom: 8px; gap: 6px; }
 body.mobile #mbtns { display: flex; }
 #mbtns button { display: none; width: 112px; height: 58px; margin: 0; font-size: 17px; background: #0c1016c0; border: 2px solid #ffffff80; clip-path: none; border-radius: 4px; padding: 0 6px; }
 #mbtns button.on { display: block; }
+#mbtns.pre button { width: 84px; height: 34px; font-size: 13px; background: #0c1016a0; border-width: 1px; }
 #mbtns button:active { background: var(--gold); color: #111; }
 #rotate { display: none; position: absolute; inset: 0; z-index: 50; background: var(--ink); flex-direction: column; align-items: center; justify-content: center;
   text-align: center; font-family: var(--hd); font-weight: 800; font-size: 24px; letter-spacing: .08em; text-transform: uppercase; }

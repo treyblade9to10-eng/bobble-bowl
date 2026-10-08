@@ -1,6 +1,14 @@
 // ---- Menus, mode select, controls, play-call cards, main loop ----
 const cv = document.getElementById('game');
 const ctx = cv.getContext('2d');
+// widen the canvas on wide screens (phones) so the field fills it instead of black bars
+function fitCanvas() {
+  const w = Math.round(Math.min(Math.max(innerWidth / innerHeight, 16 / 9), 2.2) * CH);
+  if (cv.width !== w) { cv.width = w; CW = w; }
+  document.documentElement.style.setProperty('--ar', w / CH);
+}
+fitCanvas();
+addEventListener('resize', fitCanvas);
 const $ = id => document.getElementById(id);
 const screens = ['title', 'mode', 'how', 'select', 'playcall', 'over', 'pause', 'seasonNew', 'seasonHub', 'modes', 'miniOver'];
 function show(id) {
@@ -485,6 +493,7 @@ function updateMobileButtons() {
   if (key === mbState) return;
   mbState = key;
   document.querySelectorAll('#mbtns button').forEach(x => x.classList.toggle('on', x.dataset.show === st && (!x.dataset.side || x.dataset.side === side) && (x.dataset.k !== 'KeyM' || canMotion)));
+  $('mbtns').classList.toggle('pre', st === 'presnap');
   $('mbDive').textContent = b && b.flight ? 'JUMP' : 'DIVE';
   $('mbSwim').style.display = st === 'def' && h && h.engaged ? 'block' : 'none';
   $('mbTO').style.display = st === 'presnap' && G.timeouts && G.timeouts[G.human] > 0 && G.pendingRunoff > 0 ? 'block' : 'none';

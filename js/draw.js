@@ -1,5 +1,5 @@
 // ---- Rendering: field, bobbleheads, ball, effects, scorebug ----
-const CW = 1280, CH = 720;
+let CW = 1280; const CH = 720; // CW grows on wide phones so the field fills the screen
 const PX = 24;          // pixels per yard (left/right)
 const PY = 14;          // pixels per yard (up/down) - squished = tilted camera look
 const FIELD_W = 53.33;
@@ -7,6 +7,13 @@ const MID_Y = FIELD_W / 2;
 const cam = { x: 60, y: FIELD_W / 2, shake: 0, zoom: 1 };
 const SKIN = ['#f6d3b3', '#e8b48f', '#c98e62', '#a26a42', '#7a4a2a', '#5a3620'];
 const OUT = '#14110f'; // cartoon outline color
+
+// 5-point star as a shape (font star glyphs show up as boxes on some phones)
+function starPath(g, x, y, r) {
+  g.beginPath();
+  for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r * 0.45 : r; g.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); }
+  g.closePath();
+}
 
 const VY = 34; // screen offset so the HUD doesn't cover the play
 function sx(x) { return (x - cam.x) * PX + CW / 2; }
@@ -352,8 +359,7 @@ function drawPlayer(g, p, G, at) {
   if (p.down > 0 && p.dizzy > 0) {
     for (let i = 0; i < 3; i++) {
       const a = G.time * 6 + i * 2.1;
-      g.fillStyle = '#ffe14d'; g.font = 'bold 14px Barlow, Arial, sans-serif'; g.textAlign = 'center';
-      g.fillText('★', x + p.downDir * 30 + Math.cos(a) * 14, y - 18 + Math.sin(a) * 5);
+      g.fillStyle = '#ffe14d'; starPath(g, x + p.downDir * 30 + Math.cos(a) * 14, y - 23 + Math.sin(a) * 5, 6); g.fill();
     }
   }
   // labels
@@ -383,7 +389,8 @@ function drawPlayer(g, p, G, at) {
     g.fillStyle = col; g.strokeStyle = tgt ? '#ffe14d' : '#fff'; g.lineWidth = tgt ? 4 : 2.5;
     g.beginPath(); g.arc(x, ly, r, 0, 7); g.fill(); g.stroke();
     g.fillStyle = '#fff'; g.font = '900 16px "Barlow Condensed", "Arial Black", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-    g.fillText(G.mode === 'mobile' ? '▲' : p.throwKey, x, ly + 1);
+    if (G.mode === 'mobile') { g.beginPath(); g.moveTo(x, ly - 7); g.lineTo(x + 7, ly + 6); g.lineTo(x - 7, ly + 6); g.closePath(); g.fill(); }
+    else g.fillText(p.throwKey, x, ly + 1);
     if (p.openness != null) {
       const o = clamp(p.openness / 5, 0.12, 1);
       g.fillStyle = '#000a'; g.fillRect(x - 16, ly + r + 3, 32, 6);
@@ -558,7 +565,7 @@ function drawFx(g, G) {
   for (const f of G.fx) {
     const a = clamp(f.life / f.max, 0, 1);
     if (f.kind === 'dust') { g.fillStyle = `rgba(225,215,180,${a * 0.6})`; g.beginPath(); g.arc(sx(f.x), sy(f.y) - f.z, f.r * (2 - a), 0, 7); g.fill(); }
-    else if (f.kind === 'star') { g.fillStyle = `rgba(255,225,70,${a})`; g.font = 'bold 20px Barlow, Arial, sans-serif'; g.textAlign = 'center'; g.fillText('★', sx(f.x), sy(f.y) - f.z); }
+    else if (f.kind === 'star') { g.fillStyle = `rgba(255,225,70,${a})`; starPath(g, sx(f.x), sy(f.y) - f.z - 7, 9); g.fill(); }
     else if (f.kind === 'flag') {
       const u = Math.min(1, f.t / f.T);
       const fx = sx(lerp(f.ax, f.x, u)), fy = sy(lerp(f.ay, f.y, u)) - Math.sin(u * Math.PI) * 70;
