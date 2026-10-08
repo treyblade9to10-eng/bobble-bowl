@@ -92,6 +92,7 @@ function launchReturnKick() {
     f.T = 1.5 + km.power * 1.4; f.peak = 9 + km.power * 10;
   }
   b.flight = f; G.special = km.kind; G.bstate = 'air'; G.koPending = false;
+  G.lastTackler = null; G.lastResult = null; Replay.begin();
   G.phase = 'live'; G.play.t = 0;
   kicker.throwAnim = 0.3; kicker.vx = dk * 4;
   Sound.tone(140, 0.15, 'square', 0.15, -40); Sound.tone(90, 0.12, 'sine', 0.2);
@@ -149,10 +150,11 @@ function endReturn(res) {
     showBanner(cs === r ? (kind === 'punt' ? 'PUNT RETURN TD!' : 'KICK RETURN TD!') : 'TOUCHDOWN!', `${car.name} • ${G.teams[cs].name}`, cs === G.human ? '#ffd23f' : '#ff6040', 2.6);
     Sound.td(); G.crowdHype = 1.5; stat(car).td++; G.slowmo = 0.9;
     for (const q of G.players) if (q.side === cs) q.celebrate = 2.6;
+    addPbp(`${lastName(car.name)} takes the ${kind === 'punt' ? 'punt' : 'kick'} back for a TOUCHDOWN!`, 'Special teams!'); G.lastResult = { big: true, type: 'td' };
     G.next = { pat: cs }; return;
   }
   if (res.type === 'kickdead') {
-    if (res.tb) { x = ownGoal(r) + rd * (kind === 'punt' ? 20 : 25); showBanner('TOUCHBACK', '', '#fff', 1.2); }
+    if (res.tb) { x = ownGoal(r) + rd * (kind === 'punt' ? 20 : 25); showBanner('TOUCHBACK', '', '#fff', 1.2); addPbp(`${kind === 'punt' ? 'Punt' : 'Kickoff'} goes for a touchback.`); }
     else showBanner(res.why || 'DOWN', '', '#fff', 1.1);
     G.next = { drive: r, x }; return;
   }
@@ -163,6 +165,7 @@ function endReturn(res) {
   if (rd * (x - ownGoal(r)) <= 0) x = ownGoal(r) + rd * 20; // downed in own end zone
   const ret = G.retStart != null ? Math.round(rd * (x - G.retStart)) : 0;
   if (ret > 0) addText(x, MID, `${ret} YD RETURN`, '#9cff9c', 20, 1.2);
+  if (car && cs === r) addPbp(`${lastName(car.name)} ${ret > 0 ? `returns the ${kind === 'punt' ? 'punt' : 'kick'} ${ret} yards` : `fields the ${kind === 'punt' ? 'punt' : 'kick'} and gets stopped right there`}${G.lastTackler ? `, tackled by ${lastName(G.lastTackler.name)}` : ''}.`);
   if (kind === 'onside' && res.type !== 'tackle') showBanner('RECOVERED!', `${G.teams[r].name} ball`, '#fff', 1.3);
   G.next = { drive: r, x: clamp(x, 11, 109) };
 }

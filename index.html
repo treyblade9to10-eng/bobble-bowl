@@ -77,6 +77,13 @@
         <button class="arr" data-side="0" data-d="1"><svg viewBox="0 0 24 24" class="chev"><path d="M5 9l7 7 7-7"/></svg></button>
       </div>
     </div>
+    <div id="selOpts">
+      <label>Away uniform <select id="optUni1"></select></label>
+      <label>Home uniform <select id="optUni0"></select></label>
+      <label>Weather <select id="optWeather"></select></label>
+      <label>Time <select id="optNight"><option value="0">Day</option><option value="1">Night</option></select></label>
+      <label>Players <select id="optPlayers"><option value="1">1 vs CPU</option><option value="2">2 Players</option></select></label>
+    </div>
     <div id="selHint"></div>
   </div>
 
@@ -167,7 +174,8 @@
   <div id="pause" class="screen">
     <h2>Paused</h2>
     <button class="big" id="btnResume">RESUME</button>
-    <button id="btnQuit">QUIT GAME</button>
+    <div class="row"><button id="btnReplayOpt">INSTANT REPLAYS: ON</button><button id="btnQuit">QUIT GAME</button></div>
+    <div id="pausePbp"></div>
   </div>
 
   <button id="btnMute" title="Sound"><svg viewBox="0 0 24 24"><path class="spk" d="M4 9h4l5-4v14l-5-4H4z"/><path class="wave" d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12"/><path class="x" d="M16 9l6 6M22 9l-6 6"/></svg></button>
@@ -200,6 +208,9 @@
 <script src="js/audio.js"></script>
 <script src="js/plays.js"></script>
 <script src="js/draw.js"></script>
+<script src="js/weather.js"></script>
+<script src="js/pbp.js"></script>
+<script src="js/replay.js"></script>
 <script src="js/engine.js"></script>
 <script src="js/special.js"></script>
 <script src="js/season.js"></script>

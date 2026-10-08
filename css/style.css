@@ -256,3 +256,14 @@ body.mobile .pgbtn { padding: 8px 16px; font-size: 16px; }
 @media (max-width: 900px) { #mdCards { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; } .mdcard { padding: 6px; } .mdcard .mi { font-size: 24px; } .mdcard .mt { font-size: 15px; } .mdcard .md { font-size: 10px; min-height: 0; } #moBig { font-size: 44px; } }
 .chev { width: 22px; height: 22px; display: block; margin: auto; fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
 .arr:hover { color: var(--gold); }
+
+/* ---- extra match options ---- */
+#selOpts { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 16px; margin-top: 14px; font-size: 14px; color: var(--dim); }
+#selOpts select { font-size: 13px; padding: 3px 4px; }
+@media (max-height: 500px) { #selOpts { margin-top: 6px; gap: 4px 10px; font-size: 12px; } #selOpts select { font-size: 12px; padding: 2px; } body.mobile #selHint { display: none; } }
+#pausePbp { margin-top: 14px; width: min(760px, 94vw); max-height: 40vh; overflow-y: auto; background: var(--panel); padding: 8px 12px; font-size: 14px; }
+#pausePbp:empty { display: none; }
+.pbpHead { font-family: var(--hd); font-weight: 800; letter-spacing: .2em; color: var(--gold); margin-bottom: 4px; }
+.pbpRow { padding: 4px 0; border-bottom: 1px solid var(--line); line-height: 1.35; }
+.pbpRow span { display: inline-block; width: 74px; color: var(--dim); font-family: var(--hd); font-weight: 800; }
+@media (max-height: 500px) { #pausePbp { max-height: 34vh; font-size: 12px; margin-top: 6px; } }

@@ -110,11 +110,20 @@ function buildGrid() { renderSelect(); }
 $('btnBackSel').onclick = () => show('title');
 $('btnKick').onclick = startGame;
 
+// uniforms / weather / time pickers
+const fillSel = (id, list, val) => { $(id).innerHTML = list.map(([v, t]) => `<option value="${v}">${t}</option>`).join(''); if (val != null) $(id).value = val; };
+fillSel('optUni0', UNIFORMS, 'home'); fillSel('optUni1', UNIFORMS, 'away'); fillSel('optWeather', WEATHER, 'clear');
+try { const o = JSON.parse(localStorage.getItem('bobbleOpts') || 'null'); if (o) for (const k in o) if ($(k)) $(k).value = o[k]; } catch (e) {}
+function saveOpts() { const o = {}; for (const k of ['optUni0', 'optUni1', 'optWeather', 'optNight', 'optQtr', 'optDiff', 'optPlayers']) o[k] = $(k).value; try { localStorage.setItem('bobbleOpts', JSON.stringify(o)); } catch (e) {} }
+
 function startGame() {
   Sound.init(); Sound.whistle(); Sound.crowd(false);
   if (G.mode === 'mobile') goFullscreen();
+  saveOpts();
   G.demo = false; G.season = false; G.challenge = null; G.mini = null; show(null);
-  newGame(TEAMS[sel.idx[0]], TEAMS[sel.idx[1]], { qtr: +$('optQtr').value, diff: +$('optDiff').value, humanSide: sel.you });
+  newGame(TEAMS[sel.idx[0]], TEAMS[sel.idx[1]], { qtr: +$('optQtr').value, diff: +$('optDiff').value, humanSide: sel.you,
+    weather: pickWeather($('optWeather').value), night: $('optNight').value === '1', uni: [$('optUni0').value, $('optUni1').value],
+    versus: $('optPlayers').value === '2' && G.mode !== 'mobile' });
 }
 
 // ---------- play calling ----------
@@ -313,11 +322,14 @@ $('btnNewTeams').onclick = () => { const c = G.challenge; G.teams = null; G.chal
 function togglePause() {
   if (!G.teams || G.phase === 'over' || G.demo) return;
   G.paused = !G.paused;
-  if (G.paused) { G.pauseFrom = $('playcall').classList.contains('show') ? 'playcall' : null; show('pause'); }
+  if (G.paused) { G.pauseFrom = $('playcall').classList.contains('show') ? 'playcall' : null; $('pausePbp').innerHTML = pbpHtml(8); show('pause'); }
   else show(G.pauseFrom);
 }
 $('btnPause').onclick = togglePause;
 $('btnResume').onclick = togglePause;
+const replayLabel = () => { $('btnReplayOpt').textContent = 'INSTANT REPLAYS: ' + (Replay.enabled ? 'ON' : 'OFF'); };
+replayLabel();
+$('btnReplayOpt').onclick = () => { Replay.setEnabled(!Replay.enabled); replayLabel(); };
 $('btnQuit').onclick = () => {
   G.paused = false; G.teams = null; G.phase = 'idle';
   if (G.season) { G.season = false; openSeason(); } else if (G.challenge || G.mini) { G.challenge = null; G.mini = null; openModes(); } else show('title');
@@ -531,7 +543,7 @@ $('moBack').onclick = () => { G.mini = null; G.teams = null; openModes(); };
 // ---------- title screen background: a fake game ----------
 function demoSetup() {
   const a = pick(TEAMS); let b; do { b = pick(TEAMS); } while (b === a);
-  Object.assign(G, { teams: [a, b], human: -1, diff: 1, poss: 0, los: rand(30, 70), ballY: MID, down: 1, score: [0, 0], quarter: 1, clock: 180, demo: true, fx: [],
+  Object.assign(G, { teams: [a, b], human: -1, diff: 1, poss: 0, los: rand(30, 70), ballY: MID, down: 1, score: [0, 0], quarter: 1, clock: 180, demo: true, fx: [], weather: 'clear', night: false, uni: null, versus: false,
     pstats: {}, tstats: [{ pass: 0, rush: 0, to: 0 }, { pass: 0, rush: 0, to: 0 }], patSide: null, twoPt: false, next: null, paused: false, slowmo: 0, banner: null });
   setFirstDown();
   setupPlay(pick(OFF_PLAYS), pick(DEF_PLAYS));
@@ -570,6 +582,7 @@ function render() {
   if (cam.shake > 0.3) ctx.translate(rand(-cam.shake, cam.shake), rand(-cam.shake, cam.shake));
   if (G.teams) {
     drawField(ctx, G);
+    drawWeatherGround(ctx, G);
     drawLines(ctx, G);
     drawRoutes(ctx, G);
     const ps = G.players.concat(G.refs || []).sort((a, b) => a.y - b.y);
@@ -578,9 +591,13 @@ function render() {
     if (G.ball) drawBallFree(ctx, G);
     drawAim(ctx, G);
     drawFx(ctx, G);
+    drawWeather(ctx, G);
   }
   ctx.restore();
-  if (G.teams && !G.demo) { drawBanner(ctx, G); if (G.mini) drawMiniHUD(ctx, G); else drawHUD(ctx, G); drawKickMeter(ctx, G); }
+  if (G.teams && !G.demo) {
+    if (G.phase === 'replay') Replay.drawOverlay(ctx);
+    else { drawBanner(ctx, G); if (G.mini) drawMiniHUD(ctx, G); else { drawHUD(ctx, G); drawTicker(ctx, G); } drawKickMeter(ctx, G); }
+  }
 }
 
 requestAnimationFrame(frame);

@@ -34,7 +34,8 @@ function newGame(home, away, opts) {
     teams: [home, away], human: opts.humanSide || 0, diff: opts.diff, flags: [], playClock: 0, playoff: !!opts.playoff, qtrLen: opts.qtr, score: [0, 0], quarter: 1, clock: opts.qtr,
     fx: [], banner: null, players: [], ball: null, patSide: null, twoPt: false, next: null, firstPoss: 1, paused: false,
     pstats: {}, tstats: [{ pass: 0, rush: 0, to: 0 }, { pass: 0, rush: 0, to: 0 }],
-    timeouts: [3, 3], special: null, pendingRunoff: 0, mini: null, scenario: opts.scenario || null
+    timeouts: [3, 3], special: null, pendingRunoff: 0, mini: null, scenario: opts.scenario || null,
+    weather: opts.weather || 'clear', night: !!opts.night, uni: opts.uni || null, pbp: [], pbpShow: null, lastResult: null
   });
   if (opts.scenario) { // e.g. the Two-Minute Challenge
     const sc = opts.scenario;
@@ -149,11 +150,11 @@ function makePlayer(side, isOff, slot, tuple) {
   // Madden speed matters: 99 SPD ≈ 12 yd/s, 85 ≈ 9.4, 70 ≈ 6.7
   const yps = Math.max(4.8, 2.6 + (spdR - 50) * 0.16) * GAME_SPEED;
   const skill = isOff && (pos === 'WR' || pos === 'TE' || pos === 'RB');
-  const cpuMul = cpu ? (skill ? [0.85, 0.91, 0.96, 1.01] : [0.92, 0.98, 1.02, 1.06])[G.diff] : 1;
+  const cpuMul = cpu && !G.versus ? (skill ? [0.85, 0.91, 0.96, 1.01] : [0.92, 0.98, 1.02, 1.06])[G.diff] : 1;
   return {
     side, off: isOff, slot, pos, name, num, ovr,
     x: 0, y: 0, vx: 0, vy: 0, dvx: 0, dvy: 0,
-    spd: yps * cpuMul, spdR, acc: (big ? 20 : 30) * GAME_SPEED,
+    spd: yps * cpuMul * Weather.speed(), spdR, acc: (big ? 20 : 30) * GAME_SPEED * Weather.grip(),
     face: { skin: skin0 != null ? skin0 : h % 6, beard: ((h >> 5) % 4) === 0, visor: ((h >> 7) % 5) === 0, dir: dirOf(side) },
     stiff: 0, stiffCd: 0, throwAnim: 0, celebrate: 0, dizzy: 0,
     head: { ox: 0, oy: 0, vx: 0, vy: 0, rot: 0 }, headScale: 1 + ((h >> 9) % 5) * 0.035 + (pos === 'QB' ? 0.06 : 0),
@@ -263,6 +264,8 @@ function snap() {
     G.phase = 'dead'; G.deadT = 0.9; G.next = null; showBanner('TIME EXPIRES', '', '#fff', 1.2); Sound.whistle(); return;
   }
   G.phase = 'live'; G.play.t = 0; Sound.hike(); G.throwT = null; G.playClock = 0;
+  G.credit = null; G.lastTackler = null; G.intBy = null; G.breakup = null; G.lastResult = null;
+  if (typeof Replay !== 'undefined') Replay.begin();
   if (G.fake) { showBanner(G.fake === 'punt' ? 'FAKE PUNT!' : 'FAKE FIELD GOAL!', '', '#7fd3ff', 1.3); G.crowdHype = 1; }
   if (!G.twoPt && chance(0.012)) { const dl = pick(G.D.slice(0, 3)); throwFlag('OFFSIDE', dl.side, dl.x, dl.y, dl); }
   G.ball.holder = G.O[0]; G.bstate = 'snap';
@@ -271,6 +274,7 @@ function snap() {
 
 function update(dt) {
   if (G.paused) return;
+  if (G.phase === 'replay') { Replay.update(dt); return; }
   if (G.slowmo > 0) { G.slowmo -= dt; dt *= 0.35; }
   G.time += dt;
   for (const p of G.players) { p.throwAnim = Math.max(0, p.throwAnim - dt); p.celebrate = Math.max(0, p.celebrate - dt); if (p.down <= 0) p.dizzy = 0; }
@@ -311,7 +315,7 @@ function update(dt) {
     }
     updateBallPhysicsDead(dt);
     G.deadT -= dt;
-    if (G.deadT <= 0) afterPlay();
+    if (G.deadT <= 0) { if (Replay.want()) Replay.start(); else afterPlay(); }
   } else if (G.phase === 'kick') {
     updateKick(dt);
     idlePlayers(dt);
@@ -323,6 +327,7 @@ function update(dt) {
   } else if (G.phase === 'playcall') {
     idlePlayers(dt);
   }
+  if (Replay.rec && (G.phase === 'live' || G.phase === 'dead')) Replay.record();
   updateRefs(dt);
   updateFx(dt);
   updateHint();
@@ -517,7 +522,8 @@ function enforcePenalty(res) {
   }
   G.flags = [];
   const who = `${G.teams[f.side].name}${f.num != null ? ' #' + f.num : ''}`;
-  if (!accept) { G.flagNote = `FLAG: ${F.name} — DECLINED`; return false; }
+  if (!accept) { G.flagNote = `FLAG: ${F.name}, DECLINED`; addPbp(`Penalty on ${who}: ${F.name.toLowerCase()}, declined.`); return false; }
+  addPbp(`PENALTY on ${who}: ${F.name.toLowerCase()}. ${F.text.replace(/ • /g, ', ')}.`);
   G.los = clamp(newLos, 11, 109);
   if (autoFirst || d * (G.los - G.firstDownX) >= 0) { G.down = 1; setFirstDown(); }
   else if (!F.def) { /* same down, longer to go */ }
@@ -531,6 +537,7 @@ function delayOfGame() {
   const d = dirOf(G.poss);
   G.los = clamp(G.los - d * Math.min(5, d * (G.los - ownGoal(G.poss)) / 2), 11, 109);
   showBanner('DELAY OF GAME', `${G.teams[G.poss].name} • 5 yards • Replay the down`, '#ffe14d', 2.2);
+  addPbp(`Delay of game on ${G.teams[G.poss].name}, 5 yards.`);
   Sound.whistle();
   const f = { kind: 'flag', ax: G.los - d * 10, ay: MID + 6, x: G.los, y: G.ballY, t: 0, T: 0.55, z: 0, vz: 0, life: 2.5, max: 2.5 };
   toPlayCall(); G.fx.push(f);
@@ -688,6 +695,7 @@ function qbTakeOff(qb) {
 function sprintBoost(p) { return 1.02 + clamp((p.spdR || 80) - 50, 0, 50) * 0.0033; }
 function doStiff(p) { p.stiff = 0.4; p.stiffCd = 1.4; Sound.tone(160, 0.12, 'sawtooth', 0.08); }
 function doJuke(p, ax) {
+  if (chance(Weather.slipChance())) { p.down = 0.55; p.downDir = p.face.dir; p.jukeCd = 1; addText(p.x, p.y, 'SLIPPED!', '#cfe3ff', 18, 0.8); Sound.boing(); return; }
   const sp = Math.hypot(p.vx, p.vy) || 1;
   let fx = p.vx / sp, fy = p.vy / sp;
   if (sp < 1) { fx = dirOf(p.side); fy = 0; }
@@ -1226,7 +1234,7 @@ function resolveCatch() {
   }
   if (rcv && rd < R && def && dd < 1.0 && chance(0.03)) { throwFlag('DPI', def.side, land.x, land.y, def); return incomplete(def, 'INTERFERENCE!'); }
   if (rcv && rd < R) {
-    let pc = 0.86 + (rcv.ovr - 78) / 140 - (rd > 0.9 ? 0.12 : 0);
+    let pc = 0.86 + (rcv.ovr - 78) / 140 - (rd > 0.9 ? 0.12 : 0) - Weather.catchPenalty();
     if (def && dd < 1.4) { pc -= 0.28 - (rcv.ovr - def.ovr) / 150; if (chance(0.03 + humanDefBonus * 0.5)) return intercept(def); }
     if (chance(clamp(pc, 0.25, 0.97))) {
       b.holder = rcv; G.bstate = 'run'; Sound.catch(); G.catchX = rcv.x;
@@ -1245,7 +1253,7 @@ function resolveCatch() {
 function intercept(def) {
   const b = G.ball;
   b.holder = def; G.bstate = 'run'; Sound.bad();
-  stat(def).int++; G.tstats[G.poss].to++;
+  stat(def).int++; G.tstats[G.poss].to++; G.intBy = def;
   showBanner('INTERCEPTED!', def.name, '#ff5050', 1.6);
   def.mouth = 'O'; def.mouthT = 0.6;
   G.credit = null; G.crowdHype = 1;
@@ -1256,6 +1264,7 @@ function incomplete(who, text) {
   const b = G.ball;
   b.loose = null; b.dead = { vx: rand(-3, 3), vy: rand(-2, 2) }; b.z = 1;
   if (who) addText(who.x, who.y, text, '#fff', 16, 1);
+  if (who && who.side !== G.poss) G.breakup = who;
   endPlay({ type: 'inc', text });
 }
 
@@ -1294,7 +1303,7 @@ function checkTackles() {
 
 function tackle(car, df, hitters) {
   const b = G.ball;
-  Sound.tackle(); cam.shake = 7;
+  Sound.tackle(); cam.shake = 7; G.lastTackler = df;
   const stick = df.hit > 0;
   const boom = stick || ((df.speedNow > 11 || (df.dive > 0 && df.speedNow > 10.5)) && chance(0.35));
   if (boom) { cam.shake = 15; G.slowmo = 0.45; car.dizzy = 1; addText(car.x, car.y, pick(['BOOM!', 'WHAM!', 'CRUNCH!', 'POW!']), '#ff7a3d', 30, 0.9); Sound.boing(); }
@@ -1305,7 +1314,7 @@ function tackle(car, df, hitters) {
   const st = stat(df);
   // fumble?
   df.hit = 0;
-  if ((G.bstate === 'run' || stick) && chance(0.022 + (hitters > 1 ? 0.02 : 0) + (stick ? 0.3 : 0))) {
+  if ((G.bstate === 'run' || stick) && chance(0.022 + (hitters > 1 ? 0.02 : 0) + (stick ? 0.3 : 0) + Weather.fumbleBonus())) {
     b.holder = null; b.x = car.x; b.y = car.y;
     b.loose = { vx: rand(-4, 4), vy: rand(-3, 3), t: 0 };
     G.bstate = 'loose'; showBanner('FUMBLE!', '', '#ff9a3d', 1.0); car.down = 0.9;
@@ -1353,6 +1362,7 @@ function endPlay(res) {
   for (const p of G.players) { p.throwKey = 0; p.engaged = null; }
   G.flagNote = null; G.pendingRunoff = 0;
   if (G.special) { G.flags = []; return endReturn(res); }
+  G.lastResult = pbpPlay(res);
   if (G.flags && G.flags.length) { if (G.twoPt) G.flags = []; else if (enforcePenalty(res)) return; }
   const off = G.poss, d = dirOf(off);
   const car = res.carrier;
@@ -1370,7 +1380,7 @@ function endPlay(res) {
   if (res.type === 'sack') { const yds = Math.round(d * (x - G.los)); G.tstats[off].pass += yds; }
 
   if (G.twoPt) {
-    if (res.type === 'td' && cs === off) { G.score[off] += 2; showBanner('TWO POINTS!', '', '#9cff9c', 1.8); Sound.td(); }
+    if (res.type === 'td' && cs === off) { G.score[off] += 2; showBanner('TWO POINTS!', '', '#9cff9c', 1.8); Sound.td(); addPbp('Two-point try is GOOD.'); }
     else showBanner('NO GOOD', '2-point try fails', '#ff6040', 1.5);
     G.twoPt = false; G.patSide = null;
     next = { kickoff: off };
@@ -1475,7 +1485,7 @@ function kickerOf(side, kind) {
   const t = G.teams[side], k = kind === 'punt' ? t.p : t.k;
   return k ? { name: k[0], num: k[1], ovr: k[2], skin: k[3] } : { name: t.name + (kind === 'punt' ? ' Punter' : ' Kicker'), num: kind === 'punt' ? 4 : 3, ovr: 74 };
 }
-const fgRange = ovr => 42 + (ovr - 60) * 0.6;   // 90 OVR kicker ≈ 60 yards, 70 OVR ≈ 48
+const fgRange = ovr => 42 + (ovr - 60) * 0.6 + Weather.kickRange();   // 90 OVR kicker ≈ 60 yards, 70 OVR ≈ 48
 function fgTol(yds, ovr) { return clamp(0.3 - (yds - 20) * 0.0045, 0.07, 0.3) * (0.75 + (ovr - 60) / 120); }
 
 function doKick(kind) {
@@ -1570,15 +1580,18 @@ function updateKick(dt) {
     if (d * (x - goalX(s)) >= 0) { x = goalX(s) - d * 20; showBanner('TOUCHBACK', '', '#fff', 1.2); }
     else {
       const yl = Math.round(d * (goalX(s) - x));
+      addPbp(`${G.km.kk.name.split(' ').slice(-1)[0]} punts ${yd(Math.round(Math.abs(x - G.los)))}${k.shank ? ', shanked' : k.oob ? ', out of bounds' : ''}.`);
       showBanner(k.shank ? 'SHANKED!' : k.oob ? 'OUT OF BOUNDS' : 'PUNT', `${Math.round(Math.abs(x - G.los))} yards${yl <= 10 ? ` • pinned at the ${yl}!` : ''}`, k.shank ? '#ff6040' : '#fff', 1.4);
     }
     G.next = { drive: 1 - s, x }; G.runoff = 6;
   } else if (k.kind === 'fg') {
     if (G.mini) { k.wait = 1.4; G.miniKick = k.good; showBanner(k.good ? "IT'S GOOD!" : k.short ? 'SHORT!' : 'NO GOOD!', `${k.yds} yards`, k.good ? '#9cff9c' : '#ff6040', 1.3); (k.good ? Sound.td() : Sound.bad()); return; }
+    addPbp(`${lastName(G.km.kk.name)} ${k.yds}-yard field goal is ${k.good ? 'GOOD' : k.short ? 'short' : 'no good'}.`);
     if (k.good) { G.score[s] += 3; showBanner("IT'S GOOD!", `${k.yds}-yard field goal`, '#9cff9c', 1.8); Sound.td(); G.next = { kickoff: s }; }
     else { showBanner(k.short ? 'SHORT!' : 'NO GOOD!', k.short ? `${k.yds} yards was too far` : `${k.yds}-yard try is ${k.ty < MID ? 'wide left' : 'wide right'}`, '#ff6040', 1.6); Sound.bad(); G.next = { drive: 1 - s, x: d * (G.los - (goalX(s) - d * 20)) > 0 ? goalX(s) - d * 20 : G.los }; }
     G.runoff = 5;
   } else { // xp
+    addPbp(`${lastName(G.km.kk.name)} extra point is ${k.good ? 'good' : 'NO GOOD'}.`);
     if (k.good) { G.score[s] += 1; showBanner('EXTRA POINT GOOD', '', '#9cff9c', 1.2); Sound.catch(); }
     else { showBanner('XP MISSED!', '', '#ff6040', 1.3); Sound.bad(); }
     G.patSide = null; G.next = { kickoff: s };

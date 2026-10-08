@@ -177,16 +177,42 @@ function drawDefJob(g, G) {
 }
 
 // ---------- the bobblehead ----------
-function teamLook(team, home) {
-  return home
-    ? { jersey: team.c1, trim: team.c2, num: team.c2 === '#ffffff' || team.c2 === '#FFFFFF' ? '#fff' : team.c2, pants: team.pants || shade(team.c2, 0.15), sock: team.c1 }
-    : { jersey: '#f7f7f7', trim: team.c1, num: team.c1, pants: team.pantsAway || '#ececec', sock: team.c1 };
+// real throwback sets for some teams; everyone else gets a generic alternate built from their colors
+const THROWBACKS = {
+  CHI: { jersey: '#0B162A', trim: '#C83803', num: '#ffffff', pants: '#d8cdb0', sock: '#C83803', helmet: '#0B162A', stripe: '#0B162A', mask: '#8a8a8a' },
+  TB: { jersey: '#F47B20', trim: '#C8102E', num: '#C8102E', pants: '#ffffff', sock: '#F47B20', helmet: '#ffffff', stripe: '#F47B20', mask: '#C8102E' },
+  PHI: { jersey: '#2b8a3e', trim: '#ffffff', num: '#ffffff', pants: '#ffffff', sock: '#2b8a3e', helmet: '#2b8a3e', stripe: '#ffffff', mask: '#9a9a9a' },
+  TEN: { jersey: '#6CACE4', trim: '#C8102E', num: '#ffffff', pants: '#ffffff', sock: '#6CACE4', helmet: '#6CACE4', stripe: '#C8102E', mask: '#ffffff' },
+  SEA: { jersey: '#1C3F94', trim: '#4CA845', num: '#ffffff', pants: '#A5ACAF', sock: '#1C3F94', helmet: '#A5ACAF', stripe: '#1C3F94', mask: '#1C3F94' },
+  LAR: { jersey: '#003594', trim: '#FFD100', num: '#ffffff', pants: '#ffffff', sock: '#003594', helmet: '#003594', stripe: '#FFD100', mask: '#ffffff' },
+  NE: { jersey: '#C8102E', trim: '#0C2340', num: '#ffffff', pants: '#ffffff', sock: '#C8102E', helmet: '#ffffff', stripe: '#C8102E', mask: '#C8102E' },
+  DEN: { jersey: '#FB4F14', trim: '#0C2C6D', num: '#ffffff', pants: '#ffffff', sock: '#FB4F14', helmet: '#0C2C6D', stripe: '#FB4F14', mask: '#9a9a9a' },
+  MIA: { jersey: '#00A3AD', trim: '#F26A24', num: '#ffffff', pants: '#ffffff', sock: '#00A3AD', helmet: '#ffffff', stripe: '#F26A24', mask: '#9a9a9a' },
+  BUF: { jersey: '#00338D', trim: '#C60C30', num: '#ffffff', pants: '#ffffff', sock: '#00338D', helmet: '#ffffff', stripe: '#C60C30', mask: '#9a9a9a' },
+  DET: { jersey: '#0076B6', trim: '#B0B7BC', num: '#ffffff', pants: '#B0B7BC', sock: '#0076B6', helmet: '#B0B7BC', stripe: '#0076B6', mask: '#9a9a9a' },
+  KC: { jersey: '#C8102E', trim: '#FFB81C', num: '#ffffff', pants: '#ffffff', sock: '#C8102E', helmet: '#C8102E', stripe: '#FFB81C', mask: '#9a9a9a' },
+  GB: { jersey: '#1d2a5b', trim: '#C8A04A', num: '#C8A04A', pants: '#C8A04A', sock: '#1d2a5b', helmet: '#7a5230', stripe: '#7a5230', mask: '#7a5230' }
+};
+const UNIFORMS = [['home', 'Home'], ['away', 'Away'], ['rush', 'Color Rush'], ['throwback', 'Throwback']];
+function teamLook(team, home, style) {
+  style = style || (home ? 'home' : 'away');
+  const base = { helmet: team.helmet, stripe: team.c2, mask: team.mask };
+  const light = c => textOn(c) === '#111';
+  if (style === 'throwback') {
+    if (THROWBACKS[team.id]) return { ...base, ...THROWBACKS[team.id] };
+    const j = light(team.c2) ? shade(team.c1, -0.35) : team.c2;
+    return { ...base, jersey: j, trim: team.c1, num: light(j) ? team.c1 : '#ffffff', pants: '#ffffff', sock: j };
+  }
+  if (style === 'rush') return { ...base, jersey: team.c1, trim: team.c2, num: light(team.c2) ? '#fff' : team.c2, pants: shade(team.c1, -0.08), sock: team.c1 };
+  return style === 'home'
+    ? { ...base, jersey: team.c1, trim: team.c2, num: team.c2 === '#ffffff' || team.c2 === '#FFFFFF' ? '#fff' : team.c2, pants: team.pants || shade(team.c2, 0.15), sock: team.c1 }
+    : { ...base, jersey: '#f7f7f7', trim: team.c1, num: team.c1, pants: team.pantsAway || '#ececec', sock: team.c1 };
 }
 
 function drawPlayer(g, p, G, at) {
   const x = at ? at.x : sx(p.x), y = at ? at.y : sy(p.y);
   if (!at && (x < -80 || x > CW + 80 || y < -40 || y > CH + 140)) return;
-  const team = G.teams[p.side], look = teamLook(team, p.side === 0);
+  const team = G.teams[p.side], look = teamLook(team, p.side === 0, G.uni && G.uni[p.side]);
   const big = p.pos === 'OL' || p.pos === 'DL';
   const k = Math.min(1, p.speedNow / 5);
   const dir = p.face.dir;
@@ -358,12 +384,12 @@ function drawHead(g, R, team, p, look) {
   const face = p.face;
   // helmet shell with shine
   const hg = g.createRadialGradient(-R * 0.35, -R * 0.45, R * 0.15, 0, 0, R * 1.05);
-  hg.addColorStop(0, shade(team.helmet, 0.45)); hg.addColorStop(0.45, team.helmet); hg.addColorStop(1, shade(team.helmet, -0.35));
+  hg.addColorStop(0, shade(look.helmet, 0.45)); hg.addColorStop(0.45, look.helmet); hg.addColorStop(1, shade(look.helmet, -0.35));
   g.fillStyle = hg; g.strokeStyle = OUT; g.lineWidth = 3;
   g.beginPath(); g.ellipse(-R * 0.05, 0, R * 1.04, R, 0, 0, 7); g.fill(); g.stroke();
   // stripe front-to-back over the top
   g.save(); g.beginPath(); g.ellipse(-R * 0.05, 0, R * 1.04, R, 0, 0, 7); g.clip();
-  g.strokeStyle = team.c2; g.lineWidth = R * 0.32;
+  g.strokeStyle = look.stripe; g.lineWidth = R * 0.32;
   g.beginPath(); g.ellipse(-R * 0.1, R * 0.15, R * 0.98, R * 1.02, 0, Math.PI * 1.05, Math.PI * 1.75); g.stroke();
   g.strokeStyle = '#ffffffcc'; g.lineWidth = 1.5;
   g.beginPath(); g.ellipse(-R * 0.1, R * 0.15, R * 0.8, R * 0.84, 0, Math.PI * 1.08, Math.PI * 1.72); g.stroke();
@@ -371,12 +397,12 @@ function drawHead(g, R, team, p, look) {
   // side decal: jersey number
   g.save(); g.scale(face.dir, 1);
   g.font = `900 ${Math.round(R * 0.62)}px "Barlow Condensed", "Arial Black", sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
-  g.lineWidth = 3; g.strokeStyle = shade(team.helmet, -0.6); g.fillStyle = team.c2 === team.helmet ? '#fff' : team.c2;
+  g.lineWidth = 3; g.strokeStyle = shade(look.helmet, -0.6); g.fillStyle = look.stripe === look.helmet ? '#fff' : look.stripe;
   const dx = -R * 0.38 * face.dir;
   g.strokeText(p.num, dx, -R * 0.08); g.fillText(p.num, dx, -R * 0.08);
   g.restore();
   // ear hole
-  g.fillStyle = shade(team.helmet, -0.55); g.beginPath(); g.arc(-R * 0.18, R * 0.22, R * 0.13, 0, 7); g.fill();
+  g.fillStyle = shade(look.helmet, -0.55); g.beginPath(); g.arc(-R * 0.18, R * 0.22, R * 0.13, 0, 7); g.fill();
   // face opening
   const fx = R * 0.36, fy = R * 0.16;
   g.fillStyle = SKIN[face.skin]; g.strokeStyle = OUT; g.lineWidth = 2;
@@ -411,7 +437,7 @@ function drawHead(g, R, team, p, look) {
   else { g.beginPath(); g.moveTo(mx - R * 0.13, my); g.quadraticCurveTo(mx, my + R * 0.06, mx + R * 0.13, my - R * 0.02); g.stroke(); }
   if (face.beard) { g.fillStyle = '#2a1a10cc'; g.beginPath(); g.ellipse(mx, my + R * 0.16, R * 0.25, R * 0.11, 0, 0, Math.PI); g.fill(); }
   // facemask cage
-  const mc = team.mask || '#c8c8c8';
+  const mc = look.mask || '#c8c8c8';
   for (const [col, w] of [[OUT, 3.6], [mc, 2]]) {
     g.strokeStyle = col; g.lineWidth = w; g.lineCap = 'round';
     g.beginPath();
