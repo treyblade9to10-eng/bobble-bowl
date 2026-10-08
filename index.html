@@ -124,12 +124,39 @@
         </div>
         <div id="shSched"></div>
       </div>
-      <div id="shRight"><div id="shStand"></div></div>
+      <div id="shRight">
+        <div id="shTabs"><button data-tab="stand" class="on">STANDINGS</button><button data-tab="lead">LEADERS</button><button data-tab="hist">HISTORY</button></div>
+        <div id="shStand"></div>
+      </div>
     </div>
     <div class="row">
+      <button id="shTrade">TRADE</button>
       <button id="shMenu">MENU</button>
       <button id="shQuit">ABANDON SEASON</button>
     </div>
+  </div>
+
+  <!-- Franchise: offseason report -->
+  <div id="offseason" class="screen">
+    <h2>Offseason</h2>
+    <div id="osBody"></div>
+    <button class="big gold" id="osGo">TO THE SEASON</button>
+  </div>
+
+  <!-- Franchise: trades -->
+  <div id="trade" class="screen">
+    <h2>Trade</h2>
+    <div id="trWrap">
+      <div class="trCol"><div class="trHead" id="trMineHead">YOUR TEAM</div><div class="trList" id="trMine"></div></div>
+      <div id="trMid">
+        <div id="trMeter"><i></i></div>
+        <div id="trPct"></div>
+        <button class="big" id="trGo" disabled>MAKE TRADE</button>
+        <div id="trMsg"></div>
+      </div>
+      <div class="trCol"><div class="trHead"><select id="trTeam"></select></div><div class="trList" id="trTheirs"></div></div>
+    </div>
+    <button id="trBack">BACK</button>
   </div>
 
   <!-- My Player (create-a-player) -->
@@ -235,5 +262,6 @@
 <script src="js/modes.js"></script>
 <script src="js/main.js"></script>
 <script src="js/careerui.js"></script>
+<script src="js/seasonui.js"></script>
 </body>
 </html>

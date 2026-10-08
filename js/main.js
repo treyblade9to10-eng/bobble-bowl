@@ -291,7 +291,7 @@ G.hooks.onGameOver = s => {
   if (ch && ch.ok) $('overTitle').textContent = G.challenge.type === '2min' ? 'DRIVE COMPLETE!' : 'CHALLENGE COMPLETE!';
   $('btnAgain').textContent = G.challenge ? 'TRY AGAIN' : 'REMATCH';
   $('btnNewTeams').textContent = G.challenge ? 'CHALLENGES' : 'NEW TEAMS';
-  if (inSeason) seasonGameDone(s.score);
+  if (inSeason) { Season.addPlayedStats(G.pstats, G.teams); seasonGameDone(s.score); }
   $('btnSeasonCont').style.display = inSeason ? '' : 'none';
   $('btnAgain').style.display = $('btnNewTeams').style.display = inSeason ? 'none' : '';
   if (inSeason && G.playoff && won) $('overTitle').textContent = Season.data.phase === 'done' ? 'CHAMPIONS' : 'YOU ADVANCE!';
@@ -420,91 +420,7 @@ function updateMobileButtons() {
   $('mbTO').style.display = st === 'presnap' && G.timeouts && G.timeouts[G.human] > 0 && G.pendingRunoff > 0 ? 'block' : 'none';
 }
 
-// ---------- SEASON MODE ----------
-let snIdx = TEAMS.findIndex(t => t.id === 'KC');
-$('btnSeason').onclick = () => { Sound.init(); Sound.click(); openSeason(); };
-function openSeason() { Season.load(); if (Season.data) renderHub(); else renderSeasonNew(); }
-function renderSeasonNew() {
-  const el = $('pSeason').querySelector('.tbig'), t = TEAMS[snIdx];
-  el.innerHTML = teamCard(t); el.style.background = `linear-gradient(160deg, ${t.c1} 55%, ${t.c2})`; el.style.color = textOn(t.c1);
-  show('seasonNew');
-}
-$('snUp').onclick = () => { snIdx = (snIdx + TEAMS.length - 1) % TEAMS.length; Sound.click(); renderSeasonNew(); };
-$('snDn').onclick = () => { snIdx = (snIdx + 1) % TEAMS.length; Sound.click(); renderSeasonNew(); };
-$('snBack').onclick = () => show('title');
-$('snStart').onclick = () => { Season.start(TEAMS[snIdx].id, +$('snGames').value, +$('snQtr').value, +$('snDiff').value); Sound.whistle(); renderHub(); };
-window.addEventListener('keydown', e => {
-  if ($('seasonNew').classList.contains('show')) { if (e.code === 'ArrowUp' || e.code === 'KeyW') $('snUp').onclick(); if (e.code === 'ArrowDown' || e.code === 'KeyS') $('snDn').onclick(); if (e.code === 'Enter') $('snStart').onclick(); }
-  else if ($('seasonHub').classList.contains('show') && e.code === 'Enter' && $('shPlay').style.display !== 'none') $('shPlay').onclick();
-});
-
-const recStr = id => { const r = Season.data.rec[id]; return `${r.w}-${r.l}${r.t ? '-' + r.t : ''}`; };
-const dotFor = id => { const t = Season.team(id); return `<span class="dot" style="background:${t.c1}"></span>`; };
-function renderHub() {
-  const d = Season.data, me = Season.team(d.team), conf = me.conf;
-  $('shTop').innerHTML = `<div class="big1" style="color:${me.c1 === '#000000' ? '#fff' : me.c1};-webkit-text-stroke:1px #fff">${me.city.toUpperCase()} ${me.name.toUpperCase()}</div>
-    <div class="rec">${recStr(d.team)} • ${d.phase === 'regular' ? `WEEK ${d.week + 1} of ${d.games}` : d.phase === 'playoffs' ? 'PLAYOFFS' : 'SEASON OVER'}</div>`;
-  // next game / season result
-  const g = Season.myGame(), nx = $('shNext');
-  let canPlay = !!g;
-  if (g) {
-    const home = g.home === d.team, opp = Season.team(home ? g.away : g.home);
-    nx.style.background = `linear-gradient(120deg, ${me.c1} 0%, ${me.c1} 45%, ${opp.c1} 55%, ${opp.c1} 100%)`;
-    nx.innerHTML = `<div class="lbl">${d.phase === 'playoffs' ? Season.roundName(d.bracket.round).toUpperCase() : 'NEXT GAME'}</div>
-      <div class="mu">${home ? 'vs' : '@'} ${opp.city} ${opp.name}</div>
-      <div class="sub">${opp.id} is ${recStr(opp.id)} • ${teamOvr(opp)} OVR • you are ${home ? 'HOME' : 'AWAY'}</div>`;
-  } else {
-    nx.style.background = '#0009';
-    const ch = d.champ && Season.team(d.champ);
-    const msg = d.phase === 'done' && d.champ === d.team ? `You won the Bobble Bowl.` :
-      d.phase === 'missed' ? `You missed the playoffs (top 4 get in).` : d.phase === 'eliminated' ? `Your season ended in the playoffs.` : 'Season over.';
-    nx.innerHTML = `<div class="mu">${msg}</div><div class="sub">${ch ? `Bobble Bowl champion: <b>${ch.city} ${ch.name}</b>` : ''}</div>
-      <button class="big gold" id="shNew" style="margin-top:8px">NEW SEASON</button>`;
-    $('shNew').onclick = () => { Season.clear(); renderSeasonNew(); };
-  }
-  $('shPlay').style.display = $('shSim').style.display = canPlay ? '' : 'none';
-  $('shQuit').style.display = canPlay ? '' : 'none';
-  // schedule + playoff results
-  let sched = '';
-  d.weeks.forEach((wk, i) => {
-    const m = wk[0], home = m.home === d.team, opp = home ? m.away : m.home;
-    let res = '';
-    if (m.score) { const my = home ? m.score[0] : m.score[1], th = home ? m.score[1] : m.score[0]; const r = my > th ? 'W' : my < th ? 'L' : 'T'; res = `<span class="${r}">${r} ${my}-${th}</span>`; }
-    sched += `<div class="wkrow ${i === d.week && d.phase === 'regular' ? 'now' : ''}"><span>Wk ${i + 1} ${home ? 'vs' : '@'} ${dotFor(opp)}${opp}</span>${res}</div>`;
-  });
-  if (d.log.length) {
-    sched += `<div style="margin-top:6px;color:#ffd23f;font-weight:bold">PLAYOFFS</div>`;
-    for (const r of d.log) sched += `<div style="opacity:.8;margin-top:3px">${Season.roundName(r.round)}</div><div class="bracket">${r.games.map(x => `<div class="bgame"><div class="${x.score[0] > x.score[1] ? 'win' : ''}">${dotFor(x.home)}${x.home} ${x.score[0]}</div><div class="${x.score[1] > x.score[0] ? 'win' : ''}">${dotFor(x.away)}${x.away} ${x.score[1]}</div></div>`).join('')}</div>`;
-  }
-  $('shSched').innerHTML = sched;
-  // standings
-  const st = Season.standings(conf);
-  $('shStand').innerHTML = `<div style="color:#ffd23f;font-weight:900;margin-bottom:4px">${conf} STANDINGS</div><table><tr><th>#</th><th>TEAM</th><th>W-L</th><th>PF</th><th>PA</th></tr>` +
-    st.map((id, i) => { const r = d.rec[id]; return `<tr class="${id === d.team ? 'me' : ''} ${i === 3 ? 'cut' : ''}"><td>${i + 1}</td><td>${dotFor(id)}${Season.team(id).name}</td><td>${recStr(id)}</td><td>${r.pf}</td><td>${r.pa}</td></tr>`; }).join('') +
-    `</table><div style="opacity:.6;font-size:11px;margin-top:4px">Dashed line = playoff cut (top 4)</div>`;
-  show('seasonHub');
-}
-$('shMenu').onclick = () => show('title');
-$('shQuit').onclick = () => { if (confirm('Abandon this season? Your progress will be deleted.')) { Season.clear(); show('title'); } };
-$('shSim').onclick = () => {
-  const d = Season.data, g = Season.myGame(); if (!g) return;
-  const sc = d.phase === 'playoffs' ? Season.playoffSim(g.home, g.away) : Season.simScore(g.home, g.away);
-  Sound.click(); seasonGameDone(sc); renderHub();
-};
-$('shPlay').onclick = () => {
-  const d = Season.data, g = Season.myGame(); if (!g) return;
-  Sound.init(); Sound.whistle(); Sound.crowd(false);
-  if (G.mode === 'mobile') goFullscreen();
-  G.demo = false; G.season = true; show(null);
-  newGame(Season.team(g.home), Season.team(g.away), { qtr: d.qtr, diff: d.diff, humanSide: g.home === d.team ? 0 : 1, playoff: d.phase === 'playoffs' });
-  if (d.phase === 'playoffs') showBanner(Season.roundName(d.bracket.round).toUpperCase(), 'Lose and go home', '#ffd23f', 2.4);
-};
-function seasonGameDone(score) {
-  const d = Season.data;
-  if (d.phase === 'regular') Season.finishWeek(score);
-  else if (d.phase === 'playoffs') Season.finishPlayoffRound(score);
-}
-$('btnSeasonCont').onclick = () => { G.season = false; G.teams = null; G.phase = 'idle'; renderHub(); };
+// (season mode screens live in seasonui.js)
 
 // ---------- CHALLENGES & MINI-GAMES ----------
 const myIdx = () => sel.idx[sel.you];
