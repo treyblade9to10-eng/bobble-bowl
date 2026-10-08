@@ -742,7 +742,11 @@ function mobileControl(p, dt, isCarrier) {
   const b = G.ball, P = Input.pointer;
   const qbHolding = p === G.O[0] && G.bstate === 'snap' && b.holder === p;
   if (qbHolding && Input.hit('KeyX')) qbTakeOff(p);
-  if (qbHolding && !G.humanScramble) return false; // QB moves himself in the pocket; you just aim + throw
+  if (qbHolding && !G.humanScramble) { // QB moves himself in the pocket unless you slide him with the stick; you aim + throw on the field
+    const st = Input.stick;
+    if (st.m > 0.15 && isFinite(st.x) && isFinite(st.y)) { p.dvx = st.x * p.spd * 0.75; p.dvy = st.y * p.spd * 0.75; return true; }
+    return false;
+  }
   const onD = p.side !== G.poss || (b.holder && b.holder.side !== p.side);
   if (!isCarrier && onD && b.flight && !b.flight.pitch && (Input.taps.length || Input.hit('Space'))) { doJump(p); Input.taps.length = 0; }
   if (!isCarrier && p.engaged && Input.hit('KeyE')) doSwim(p);

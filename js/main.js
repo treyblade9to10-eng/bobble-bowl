@@ -454,7 +454,7 @@ function updateMobileButtons() {
   }
   if (G.phase === 'dead' && G.cellyGuy && !G.demo) st = 'celly';
   if (G.phase === 'presnap' && !G.demo) st = 'presnap';
-  const joyOn = G.phase === 'live' && !G.demo && h && (st === 'def' || st === 'carrier');
+  const joyOn = G.phase === 'live' && !G.demo && !!h; // stays up the whole play so your thumb never loses it
   $('joy').classList.toggle('on', !!joyOn);
   if (!joyOn && Input.stick.m) { Input.stick.x = Input.stick.y = Input.stick.m = 0; $('joyKnob').style.left = $('joyKnob').style.top = '43px'; }
   const key = st + (b && b.flight ? 'air' : '') + (h && h.engaged ? 'eng' : '');
