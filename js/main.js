@@ -405,7 +405,6 @@ function togglePause() {
   if (!G.teams || G.phase === 'over' || G.demo) return;
   if (G.online) { const on = !$('pause').classList.contains('show'); if (on) { $('pausePbp').innerHTML = '<div class="pbpHead">ONLINE GAME KEEPS GOING WHILE THIS IS OPEN</div>' + pbpHtml(6); show('pause'); } else show(null); return; }
   G.paused = !G.paused;
-  if (G.paused && Commentary.ok) speechSynthesis.cancel();
   if (G.paused) { G.pauseFrom = $('playcall').classList.contains('show') ? 'playcall' : null; $('pausePbp').innerHTML = pbpHtml(8); show('pause'); }
   else show(G.pauseFrom);
 }
@@ -414,9 +413,6 @@ $('btnResume').onclick = togglePause;
 const replayLabel = () => { $('btnReplayOpt').textContent = 'INSTANT REPLAYS: ' + (Replay.enabled ? 'ON' : 'OFF'); };
 replayLabel();
 $('btnReplayOpt').onclick = () => { Replay.setEnabled(!Replay.enabled); replayLabel(); };
-const talkLabel = () => { $('btnTalkOpt').textContent = 'COMMENTARY: ' + (Commentary.enabled ? 'ON' : 'OFF'); $('btnTalkOpt').style.display = Commentary.ok ? '' : 'none'; };
-talkLabel();
-$('btnTalkOpt').onclick = () => { Commentary.set(!Commentary.enabled); talkLabel(); };
 $('btnQuit').onclick = () => {
   if (G.online) { Net.leave(); G.online = false; G.teams = null; G.phase = 'idle'; show('title'); return; }
   SaveGame.clear();

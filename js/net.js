@@ -280,7 +280,7 @@ const Net = {
     for (const f of s.fx || []) G.fx.push(f);
     for (let i = 0; i < (s.conf || 0); i++) G.fx.push({ kind: 'confetti', px: rand(0, CW), py: rand(-200, 0), vy: rand(120, 260), vx: rand(-40, 40), z: 0, vz: 0, color: pick([G.teams[0].c1, G.teams[1].c1, '#fff']), life: 2.6, max: 2.6 });
     if (s.bn !== undefined) G.banner = s.bn || null;
-    if (s.pb) { G.pbpShow = { ...s.pb, t: G.time }; (G.pbp || (G.pbp = [])).push(G.pbpShow); Commentary.say(s.pb.text); }
+    if (s.pb) { G.pbpShow = { ...s.pb, t: G.time }; (G.pbp || (G.pbp = [])).push(G.pbpShow); }
     for (const [k, args] of s.snd || []) if (Sound[k]) Sound[k](...args);
     if (s.rt) s.rt.o.forEach((q, i) => { const p = G.O && G.O[i]; if (p) Object.assign(p, q); });
     if (s.rt) s.rt.d.forEach((a, i) => { const p = G.D && G.D[i]; if (p) p.assign = a; });

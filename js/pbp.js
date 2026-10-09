@@ -9,7 +9,6 @@ function addPbp(text, extra) {
   const line = { text: extra ? `${text} ${extra}` : text, q, clock: `${Math.floor(c / 60)}:${String(c % 60).padStart(2, '0')}`, t: G.time };
   G.pbp.push(line); if (G.pbp.length > 200) G.pbp.shift();
   G.pbpShow = line;
-  if (typeof Commentary !== 'undefined') Commentary.say(line.text, /TOUCHDOWN|INTERCEPTED|FUMBLE|gone|Big play|Chunk/i.test(line.text));
 }
 
 // called by endPlay() before the down/score bookkeeping, so G.los is still the old spot
