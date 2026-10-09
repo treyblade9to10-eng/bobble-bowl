@@ -741,13 +741,14 @@ $('onHost').onclick = () => {
   if (typeof Peer === 'undefined') { $('onStatus').textContent = "Online play couldn't load. Check your internet and refresh."; return; }
   $('onPick').style.display = 'none'; $('onCodeBox').style.display = ''; $('onCode').textContent = '....';
   $('onStatus').textContent = 'Getting a code...';
-  Net.host(code => { $('onCode').textContent = code; $('onStatus').textContent = 'Tell your friend this code. The game starts when they join. Keep this screen open.'; },
+  Net.host(code => { $('onCode').textContent = code; $('onStatus').textContent = 'Tell your friend this code. The game starts when they join. Stay on this screen (a quick switch to text the code is OK).'; },
     st => { $('onStatus').textContent = st; });
 };
 $('onJoin').onclick = () => { Sound.click(); $('onPick').style.display = 'none'; $('onJoinBox').style.display = ''; $('onCodeIn').value = ''; $('onCodeIn').focus(); $('onStatus').textContent = 'Type the 4-letter code from your friend\'s screen.'; };
 $('onGo').onclick = () => {
   const code = $('onCodeIn').value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
   if (code.length !== 4) { $('onStatus').textContent = 'Codes are 4 letters/numbers.'; return; }
+  if ([...code].some(ch => !NET_CHARS.includes(ch))) { $('onStatus').textContent = 'Codes never use O, 0, I, 1 or L. Look at the code again.'; return; }
   if (typeof Peer === 'undefined') { $('onStatus').textContent = "Online play couldn't load. Check your internet and refresh."; return; }
   Sound.click(); if (G.mode === 'mobile') goFullscreen();
   $('onStatus').textContent = 'Connecting...';
