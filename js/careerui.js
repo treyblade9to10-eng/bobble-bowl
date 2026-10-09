@@ -138,6 +138,11 @@ const CareerUI = {
     cancelAnimationFrame(capAnim);
     G.demo = false; G.challenge = null; G.mini = null; show(null);
     newGame(home, away, { qtr: Career.cap.qtr, diff: Career.cap.diff, lock: Career.cap.lock, ...opts });
+    const mineIsHome = opts.humanSide === 0, opp = mineIsHome ? away : home;
+    if (Career.isRival(opp.id)) {
+      G.rivalry = opp.id; G.crowdHype = 1;
+      showBanner('RIVALRY GAME', `vs ${opp.city} ${opp.name} · 1.5x XP · series ${Career.series(opp.id)}`, '#ff6040', 3);
+    }
   },
 
   // ---------------- college ----------------
@@ -150,7 +155,7 @@ const CareerUI = {
       <div class="ccMain">
         <div class="ccHead">SENIOR SEASON · ${me.city.toUpperCase()} ${me.name.toUpperCase()} · ${cl.w}-${cl.l}</div>
         ${this.newBadges()}
-        ${g ? `<div class="ccNext" style="background:linear-gradient(110deg, ${me.c1} 45%, ${opp.c1} 55%)"><div class="lbl">${g.bowl ? 'BOWL GAME' : 'NEXT GAME'}</div><div class="mu">${g.home ? 'vs' : '@'} ${opp.city} ${opp.name}</div><div class="sub">${opp.id} ${ovr(opp)} OVR · you are ${g.home ? 'HOME' : 'AWAY'}</div></div>
+        ${g ? `<div class="ccNext" style="background:linear-gradient(110deg, ${me.c1} 45%, ${opp.c1} 55%)"><div class="lbl">${g.bowl ? 'BOWL GAME' : Career.isRival(g.opp) ? 'RIVALRY WEEK · 1.5x XP' : 'NEXT GAME'}</div><div class="mu">${g.home ? 'vs' : '@'} ${opp.city} ${opp.name}</div><div class="sub">${opp.id} ${ovr(opp)} OVR · you are ${g.home ? 'HOME' : 'AWAY'}</div></div>
         ${this.goalsHtml()}
         <div class="row"><button class="big" id="ccPlay">PLAY</button><button id="ccSim">SIM</button>${this.lockBtn()}</div>` : ''}
         <div class="ccStock">DRAFT STOCK: <b>${Career.projText()}</b></div>
@@ -261,7 +266,7 @@ const CareerUI = {
     let next = '';
     if (g) {
       const home = g.home === c.team, opp = Season.team(home ? g.away : g.home);
-      next = `<div class="ccNext" style="background:linear-gradient(110deg, ${me.c1} 45%, ${opp.c1} 55%)"><div class="lbl">${d.phase === 'playoffs' ? Season.roundName(d.bracket.round).toUpperCase() : `WEEK ${d.week + 1} OF ${d.games}`}</div><div class="mu">${home ? 'vs' : '@'} ${opp.city} ${opp.name}</div><div class="sub">${opp.id} is ${recStr(opp.id)} · ${teamOvr(opp)} OVR</div></div>
+      next = `<div class="ccNext" style="background:linear-gradient(110deg, ${me.c1} 45%, ${opp.c1} 55%)"><div class="lbl">${d.phase === 'playoffs' ? Season.roundName(d.bracket.round).toUpperCase() : `WEEK ${d.week + 1} OF ${d.games}`}${Career.isRival(opp.id) ? ` · <b class="rivTag">RIVALRY · 1.5x XP · ${Career.series(opp.id)}</b>` : ''}</div><div class="mu">${home ? 'vs' : '@'} ${opp.city} ${opp.name}</div><div class="sub">${opp.id} is ${recStr(opp.id)} · ${teamOvr(opp)} OVR</div></div>
         ${this.goalsHtml()}
         <div class="row"><button class="big" id="ccPlay">PLAY</button><button id="ccSim">SIM</button>${this.lockBtn()}</div>`;
     } else {

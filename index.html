@@ -39,7 +39,7 @@
       <button id="btnMode">MODE: <span id="modeLabel">?</span></button>
     </div>
     <button id="btnInstall" style="display:none">INSTALL APP</button>
-    <div class="ver">v5.2</div>
+    <div class="ver">v5.3</div>
   </div>
 
   <!-- Mode select -->
@@ -88,6 +88,10 @@
         <div class="tbig"></div>
         <button class="arr" data-side="0" data-d="1"><svg viewBox="0 0 24 24" class="chev"><path d="M5 9l7 7 7-7"/></svg></button>
       </div>
+    </div>
+    <div id="tgrid">
+      <div id="tgHead"><span id="tgTitle"></span><div id="tgTabs"><button data-f="all">ALL</button><button data-f="AFC">AFC</button><button data-f="NFC">NFC</button></div><button id="tgClose">CLOSE</button></div>
+      <div id="tgList"></div>
     </div>
     <div id="selOpts">
       <label>Away uniform <select id="optUni1"></select></label>
@@ -206,6 +210,7 @@
   <div id="modes" class="screen">
     <h2>Challenges</h2>
     <div id="mdTeam"><button class="pgbtn" id="mdPrev">‹</button><span id="mdTeamName"></span><button class="pgbtn" id="mdNext">›</button></div>
+    <div id="mdWeekly"></div>
     <div id="mdCards"></div>
     <button id="mdBack">BACK</button>
   </div>
@@ -228,20 +233,33 @@
   <!-- Game over / YOU WIN -->
   <div id="over" class="screen">
     <div id="confetti"></div>
-    <div id="trophy"><svg viewBox="0 0 64 64"><path d="M18 8h28v14c0 9-6 16-14 16s-14-7-14-16z"/><path d="M18 13H9c0 9 4 14 10 15M46 13h9c0 9-4 14-10 15" fill="none" stroke-width="4"/><path d="M28 38h8v9h-8z"/><path d="M19 50h26v6H19z"/></svg></div>
-    <h2 id="overTitle">FINAL</h2>
-    <div id="overScore"></div>
-    <div id="overChal"></div>
-    <div id="overCap"></div>
-    <div id="overMain">
-      <div id="mvpBox"><div class="mvpTag">GAME MVP</div><canvas id="mvpCv" width="260" height="300"></canvas><div id="mvpText"></div></div>
-      <div id="overStats"></div>
+    <div id="overBody">
+      <div id="overHead">
+        <div id="trophy"><svg viewBox="0 0 64 64"><path d="M18 8h28v14c0 9-6 16-14 16s-14-7-14-16z"/><path d="M18 13H9c0 9 4 14 10 15M46 13h9c0 9-4 14-10 15" fill="none" stroke-width="4"/><path d="M28 38h8v9h-8z"/><path d="M19 50h26v6H19z"/></svg></div>
+        <h2 id="overTitle">FINAL</h2>
+        <div id="overScore"></div>
+      </div>
+      <div id="overChal"></div>
+      <div id="overCap"></div>
+      <div id="overWeek"></div>
+      <div id="overMain">
+        <div id="mvpBox"><div class="mvpTag">PLAYER OF THE GAME</div><canvas id="mvpCv" width="260" height="300"></canvas><div id="mvpText"></div></div>
+        <div id="overStats"></div>
+      </div>
     </div>
-    <div class="row">
+    <div class="row" id="overBtns">
       <button class="big" id="btnSeasonCont" style="display:none">CONTINUE SEASON</button>
       <button class="big" id="btnAgain">REMATCH</button>
       <button id="btnNewTeams">NEW TEAMS</button>
     </div>
+  </div>
+
+  <!-- Halftime -->
+  <div id="half" class="screen">
+    <h2>Halftime</h2>
+    <div id="halfScore"></div>
+    <div id="halfStats"></div>
+    <button class="big" id="btnHalf">START 2ND HALF</button>
   </div>
 
   <!-- Pause -->

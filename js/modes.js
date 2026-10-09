@@ -273,3 +273,64 @@ function drawMiniHUD(g, G) {
     g.fillText(G.mode === 'mobile' ? 'TAP TAP TAP as fast as you can!' : 'Mash ← → (or A D) back and forth!', CW / 2, CH - 80);
   }
 }
+
+// ======== Weekly Challenges: 3 goals each week that add up across all your normal games ========
+const WEEKLY_POOL = [
+  // [key, text, target, kind, value(s, me, them)]  kind: 'sum' adds up over the week, 'game' needs one game
+  ['passY', 'Throw for 800 yards', 800, 'sum', (s, me) => s.tstats[me].pass || 0],
+  ['rushY', 'Rush for 300 yards', 300, 'sum', (s, me) => s.tstats[me].rush || 0],
+  ['totY', 'Gain 1,200 total yards', 1200, 'sum', (s, me) => (s.tstats[me].pass || 0) + (s.tstats[me].rush || 0)],
+  ['sacks', 'Get 6 sacks', 6, 'sum', (s, me) => Object.values(G.pstats || {}).filter(p => p.side === me).reduce((a, p) => a + (p.sack || 0), 0)],
+  ['takeaways', 'Force 5 turnovers', 5, 'sum', (s, me, them) => s.tstats[them].to || 0],
+  ['pts', 'Score 120 points', 120, 'sum', (s, me) => s.score[me]],
+  ['wins', 'Win 3 games', 3, 'sum', (s, me, them) => s.score[me] > s.score[them] ? 1 : 0],
+  ['hardWins', 'Win 2 games on All-Pro or All-Madden', 2, 'sum', (s, me, them) => s.score[me] > s.score[them] && G.diff >= 2 ? 1 : 0],
+  ['clean', 'Win a game with zero turnovers', 1, 'game', (s, me, them) => s.score[me] > s.score[them] && !(s.tstats[me].to) ? 1 : 0],
+  ['lockdown', 'Win and hold them to 7 or less', 1, 'game', (s, me, them) => s.score[me] > s.score[them] && s.score[them] <= 7 ? 1 : 0],
+  ['night', 'Win a night game', 1, 'game', (s, me, them) => s.score[me] > s.score[them] && G.night ? 1 : 0],
+  ['storm', 'Win a game in rain or snow', 1, 'game', (s, me, them) => s.score[me] > s.score[them] && (G.weather === 'rain' || G.weather === 'snow') ? 1 : 0],
+  ['blowout', 'Win by 21 or more', 1, 'game', (s, me, them) => s.score[me] - s.score[them] >= 21 ? 1 : 0],
+  ['ground', 'Win with 150+ rushing yards', 1, 'game', (s, me, them) => s.score[me] > s.score[them] && (s.tstats[me].rush || 0) >= 150 ? 1 : 0]
+];
+const Weekly = {
+  // weeks start on Monday
+  weekKey() { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - (d.getDay() + 6) % 7); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; },
+  goals(wk) {
+    const rnd = seeded('bobble-weekly-' + wk), sums = WEEKLY_POOL.filter(g => g[3] === 'sum'), games = WEEKLY_POOL.filter(g => g[3] === 'game');
+    const a = sums[Math.floor(rnd() * sums.length)]; let b; do { b = sums[Math.floor(rnd() * sums.length)]; } while (b === a);
+    return [a, b, games[Math.floor(rnd() * games.length)]];
+  },
+  state() {
+    const R = Records.get(), wk = this.weekKey();
+    if (!R.weekly || R.weekly.wk !== wk) R.weekly = { wk, prog: {}, champ: false, total: (R.weekly && R.weekly.total) || 0 };
+    return R;
+  },
+  // what to show: [{ text, have, need, done }]
+  list() { const R = this.state(), w = R.weekly; return this.goals(w.wk).map(([k, text, n]) => ({ k, text, have: Math.min(n, w.prog[k] || 0), need: n, done: (w.prog[k] || 0) >= n })); },
+  daysLeft() { const d = new Date(), wd = (d.getDay() + 6) % 7; return 7 - wd; },
+  // after a normal game vs the CPU; returns lines for the game-over screen
+  afterGame(s) {
+    if (G.versus || G.online || G.mini || (G.challenge && G.challenge.type !== 'daily') || s.human < 0) return null;
+    const R = this.state(), w = R.weekly, me = s.human, them = 1 - me, out = [];
+    for (const [k, text, n, kind, f] of this.goals(w.wk)) {
+      const before = w.prog[k] || 0; if (before >= n) continue;
+      const v = f(s, me, them); if (!v) continue;
+      w.prog[k] = kind === 'game' ? n : before + v;
+      out.push({ text, have: Math.min(n, w.prog[k]), need: n, done: w.prog[k] >= n });
+    }
+    let champ = false;
+    if (!w.champ && this.goals(w.wk).every(([k, , n]) => (w.prog[k] || 0) >= n)) {
+      w.champ = true; w.total++; champ = true;
+      Career.addAward('Weekly Champion', `Week of ${w.wk}`, s.teams[me].id, null);
+      if (Career.cap && Career.cap.phase !== 'retired') { Career.gainXP(250); Career.save(); }
+    }
+    Records.set(R);
+    return out.length || champ ? { out, champ, total: w.total } : null;
+  }
+};
+function weeklyHtml(full) {
+  const L = Weekly.list(), R = Weekly.state();
+  return `<div class="wkHead"><b>WEEKLY CHALLENGES</b><span>${R.weekly.champ ? 'ALL DONE THIS WEEK' : `${Weekly.daysLeft()} day${Weekly.daysLeft() === 1 ? '' : 's'} left`}${R.weekly.total ? ` &middot; ${R.weekly.total} won` : ''}</span></div>` +
+    L.map(g => `<div class="wkG${g.done ? ' done' : ''}"><span class="wkT">${g.text}</span><span class="wkBar"><i style="width:${Math.round(100 * g.have / g.need)}%"></i></span><span class="wkN">${g.done ? 'DONE' : `${g.have}/${g.need}`}</span></div>`).join('') +
+    (full ? '<div class="wkFoot">Counts in every normal game vs the CPU. Finish all 3 for a Weekly Champion trophy' + (Career.cap ? ' and +250 My Player XP' : '') + '.</div>' : '');
+}

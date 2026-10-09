@@ -59,7 +59,7 @@ function newGame(home, away, opts) {
 }
 function initGame(home, away, opts) {
   Object.assign(G, {
-    tend: null, teams: [home, away], human: opts.humanSide || 0, diff: opts.diff, flags: [], playClock: 0, playoff: !!opts.playoff, qtrLen: opts.qtr, score: [0, 0], quarter: 1, clock: opts.qtr,
+    tend: null, prevClock: null, rivalry: null, teams: [home, away], human: opts.humanSide || 0, diff: opts.diff, flags: [], playClock: 0, playoff: !!opts.playoff, qtrLen: opts.qtr, score: [0, 0], quarter: 1, clock: opts.qtr,
     fx: [], banner: null, players: [], ball: null, patSide: null, twoPt: false, next: null, firstPoss: 1, paused: false,
     pstats: {}, tstats: [{ pass: 0, rush: 0, to: 0 }, { pass: 0, rush: 0, to: 0 }],
     timeouts: [3, 3], special: null, pendingRunoff: 0, twoMinQ: 0, twoMinAfterPlay: false, runFrom: 0, mini: null, scenario: opts.scenario || null,
@@ -240,12 +240,15 @@ function setupPlay(offPlay, defPlay, preview) {
   const ws = by <= MID ? 1 : -1; // the wide side
   const P = [];
   const offT = G.teams[o], defT = G.teams[dsd];
-  offT.off.forEach((t, i) => P.push(makePlayer(o, true, i, t)));
+  const offTuples = offT.off.slice();
+  if (offPlay.jet) { let f = 4; for (const k of [2, 3]) if ((offTuples[k][4] || 0) > (offTuples[f][4] || 0)) f = k; [offTuples[4], offTuples[f]] = [offTuples[f], offTuples[4]]; } // jet goes to the fastest receiver
+  offTuples.forEach((t, i) => P.push(makePlayer(o, true, i, t)));
   defT.def.forEach((t, i) => P.push(makePlayer(dsd, false, i, t)));
   const O = P.slice(0, 8), D = P.slice(8);
   const at = (p, x, y) => { p.x = x; p.y = y; p.hx = x; p.hy = y; };
   const form = FORMATIONS[preview ? 'gun' : formationFor(offPlay)] || FORMATIONS.gun;
   for (let k = 0; k <= 4; k++) { const [bk, w] = form.spots[k]; at(O[k], L - d * bk, clamp(by + ws * w, 4, FIELD_W - 4)); }
+  if (offPlay.jet && !preview) at(O[4], L - d * 2.6, clamp(by - ws * 5, 3, FIELD_W - 3)); // jet guy lines up on the short side and flies across
   at(O[5], L - d * 0.7, by - 2.4); at(O[6], L - d * 0.7, by); at(O[7], L - d * 0.7, by + 2.4);
 
   // offense roles
@@ -269,6 +272,8 @@ function setupPlay(offPlay, defPlay, preview) {
     }
   }
 
+  // jet sweep: the back leads out to the edge for him
+  if (offPlay.jet) { const rb = O[1]; rb.role = 'lead'; rb.route = { pts: [{ x: L + d * 0.8, y: clamp(by + ws * 11, 2, FIELD_W - 2) }], end: 'block', i: 0 }; }
   // run plays: the slot guy (when he isn't carrying it) blocks down on a linebacker
   if (offPlay.type === 'run' && !offPlay.qbRun && (offPlay.carrier || 1) !== 4) {
     O[4].role = 'runblock'; O[4].route = null; O[4].crack = true;
@@ -340,6 +345,8 @@ function updateMotion(dt) {
 function snapMotion() {
   const m = G.motion; G.motion = null; G.cpuMotion = null;
   for (const p of G.players) p.inMotion = false;
+  // jet sweep / toss: the runner is already flying at the snap
+  if (G.play.off.jet || G.play.off.toss) { const j = G.O[G.play.off.carrier || 1], t = j.route && j.route.pts[0]; if (t) { const dx = t.x - j.x, dy = t.y - j.y, m2 = Math.hypot(dx, dy) || 1; j.vx = dx / m2 * j.spd; j.vy = dy / m2 * j.spd; } }
   if (m && m.p.route) { const sh = m.p.y - m.p.hy; for (const pt of m.p.route.pts) pt.y = clamp(pt.y + sh, 1.2, FIELD_W - 1.2); m.p.hy = m.p.y; }
   if (G.press) for (const df of G.D) { // press coverage: jam the receiver at the line
     if (df.slot < 5 || df.slot > 6) continue;
@@ -393,6 +400,7 @@ function snap() {
     if (G.clock <= 0) return clockRanOut();
   }
   burnHuddleClock();
+  if (G.down === 3 && !G.twoPt && !G.special && G.tstats) { const t = G.tstats[G.poss]; t.a3 = (t.a3 || 0) + 1; }
   G.phase = 'live'; G.play.t = 0; Sound.hike(); G.throwT = null; G.playClock = 0;
   G.credit = null; G.lastTackler = null; G.intBy = null; G.breakup = null; G.lastResult = null;
   if (typeof Replay !== 'undefined') Replay.begin();
@@ -405,6 +413,9 @@ function snap() {
 
 function update(dt) {
   if (G.paused) return;
+  // time of possession: whoever has the ball gets the seconds that came off the clock
+  if (G.prevClock != null && G.clock < G.prevClock && G.tstats && G.tstats[G.poss] && !G.demo) G.tstats[G.poss].top = (G.tstats[G.poss].top || 0) + G.prevClock - G.clock;
+  G.prevClock = G.clock;
   if (G.phase === 'replay') { Replay.update(dt); return; }
   if (G.slowmo > 0) { G.slowmo -= dt; dt *= 0.35; }
   G.time += dt;
@@ -971,6 +982,7 @@ function ai(p, dt) {
       case 'passblock': return passBlock(p);
       case 'runblock': return runBlock(p);
       case 'screenblock': return G.play.t < 1.1 ? passBlock(p) : stalk(p, 10);
+      case 'lead': return G.handedOff && G.ball.holder && G.play.t > 0.7 ? aiEscort(p, G.ball.holder) : followRoute(p, dt);
       case 'stalk': return (p.route && p.route.i < p.route.pts.length && G.play.t < 1.2) ? followRoute(p, dt) : stalk(p, 8);
       default: p.dvx = p.dvy = 0;
     }
@@ -1121,7 +1133,7 @@ function cpuQB(dt) {
     if (s === 1 && !pl.off.screen) sc -= 1.4 - Math.min(1, (pl.t - minT) * 0.4); // check-down only when nothing else is there
     if (pl.off.screen && s === 1) sc += 3;
     if (G.lock && r.cap && G.poss === G.human) sc += G.callBall > 0 ? 0.9 : 0; // your QB looks for you (more when you call for it)
-    if (op < 1.2) sc -= 1.5; // don't throw into a defender
+    if (op < 1.2) sc -= 2.5; // don't throw into a defender
     sc += [-0.6, 0, 0.3, 0.6][G.diff] * (op > 2 ? 1 : 0);
     if (down < Math.abs(G.firstDownX - G.los) && G.down >= 3) sc -= 0.8;
     sc += rand(-0.3, 0.3);
@@ -1144,7 +1156,7 @@ function throwWindow(qb, r) {
   let m = 99;
   for (const df of G.D) {
     if (df.engaged || df.down > 0) continue;
-    m = Math.min(m, Math.hypot(df.x - lx, df.y - ly) - df.spd * T * 0.75);
+    m = Math.min(m, Math.hypot(df.x - lx, df.y - ly) - df.spd * T * 1.0);
     const u = ((df.x - qb.x) * sx + (df.y - qb.y) * sy) / L2;
     if (u > 0.15 && u < 0.9 && Math.abs((df.x - qb.x) * sy - (df.y - qb.y) * sx) / Math.sqrt(L2) < 1.3) m = Math.min(m, 0);
   }
@@ -1165,7 +1177,7 @@ function followRoute(p, dt) {
   if (!r) { p.dvx = p.dvy = 0; return; }
   // deep in the end zone: don't run out the back — shuffle side to side to get open
   if (p.role === 'route' && G.ball.holder !== p && d * (p.x - (goalX(G.poss) + d * 6)) > 0) return endZoneDrill(p, d);
-  if (p.role === 'runpath' && G.ball.holder !== p && G.handedOff) return stalk(p, 6); // after the fake
+  if (p.role === 'runpath' && G.ball.holder !== p && G.handedOff && !(G.ball.flight && G.ball.flight.intended === p)) return stalk(p, 6); // after the fake (not while the pitch is coming to him)
   if (r.i < r.pts.length) {
     const t = r.pts[r.i];
     if (Math.hypot(t.x - p.x, t.y - p.y) < 0.8) r.i++;
@@ -1185,7 +1197,7 @@ function followRoute(p, dt) {
       const last = r.pts[r.pts.length - 1];
       if (near) steer(p, last.x + (p.x - near.x) * 0.4, last.y + (p.y - near.y) * 0.4, 0.5);
       else steer(p, last.x, last.y, 0.4);
-    } else if (r.end === 'block') { p.role = p.slot === 1 ? 'passblock' : 'stalk'; stalk(p, 8); }
+    } else if (r.end === 'block') { if (p.role === 'lead') return aiEscort(p, G.ball.holder || G.O[G.play.off.carrier || 4]); p.role = p.slot === 1 ? 'passblock' : 'stalk'; stalk(p, 8); }
     if (p.role === 'runpath' && G.play.off.fake) { p.role = 'passblock'; }
   }
 }
@@ -1232,7 +1244,7 @@ function stalk(p, range) {
   const b = G.ball, car = b.holder || G.O[1];
   let t = null, td = range;
   for (const df of G.D) { if (df.engaged || df.down > 0) continue; const dd = dist(p, df); if (dd < td) { td = dd; t = df; } }
-  if (t) steer(p, lerp(t.x, car.x, 0.2), lerp(t.y, car.y, 0.2), 0.95, 0.2);
+  if (t) steer(p, t.x + (t.vx || 0) * 0.15, t.y + (t.vy || 0) * 0.15, 1.05, 0.2); // go get your man (don't drift along with him)
   else steer(p, p.x + dirOf(G.poss) * 2, p.y, 0.4);
 }
 
@@ -1253,9 +1265,10 @@ function aiRunner(p, dt) {
   const d = dirOf(p.side);
   // follow a designed run path first
   if (p.role === 'runpath' && p.route && p.route.i < p.route.pts.length && d * (p.x - G.los) < 1) {
+    while (p.route.i < p.route.pts.length - 1 && d * (p.route.pts[p.route.i].x - p.x) < -0.5) p.route.i++; // never run backward to a spot you already passed
     const t = p.route.pts[p.route.i];
     if (Math.hypot(t.x - p.x, t.y - p.y) < 1) p.route.i++;
-    steer(p, t.x, t.y, p.route.i >= 1 ? 1.06 : 1, 0.1); return;
+    steer(p, t.x, t.y, G.play.off.jet ? 1.0 : p.route.i >= 1 ? 1.06 : 1, 0.1); return;
   }
   const foes = G.players.filter(q => q.side !== p.side && q.down <= 0 && !q.engaged);
   let best = 0, bs = -1e9;
@@ -1298,7 +1311,7 @@ function resolveBlocks(dt) {
     if (bl.off && (bl.role === 'route') && G.bstate !== 'run') continue;
     for (const df of G.players) {
       if (df.side === carrierSide || df.engaged || df.down > 0 || df.shedCd > 0 || df.dive > 0 || df === b.holder) continue;
-      if (dist(bl, df) < 1.15) { bl.engaged = df; df.engaged = bl; df.shed = 0; Sound.tone(110, 0.05, 'square', 0.04); break; }
+      if (dist(bl, df) < (bl.role === 'stalk' || bl.role === 'lead' ? 1.45 : 1.15)) { bl.engaged = df; df.engaged = bl; df.shed = 0; Sound.tone(110, 0.05, 'square', 0.04); break; }
     }
   }
   // engaged pairs fight
@@ -1311,7 +1324,7 @@ function resolveBlocks(dt) {
     if (bl.role === 'screenblock') rate *= 1.8;
     if (df.isHuman && withSide(df.side, () => Input.axis().m) > 0.3) rate *= 1.7;
     if (xfOn(df, 'unstoppable')) rate *= 2.6;
-    if (G.bstate === 'run') rate *= big ? 1.4 : 2.8;
+    if (G.bstate === 'run') rate *= big ? 1.4 : 1.5; // receivers can hold a stalk block long enough to spring a sweep or screen
     df.shed += rate * dt;
     // the defender pushes slowly toward where he wants to go
     const push = clamp(df.ovr / bl.ovr, 0.6, 1.4) * 0.22;
@@ -1703,6 +1716,8 @@ function advanceDown(x, moved) {
     const gain = Math.round(d * (x - G.los));
     G.los = clamp(x, 11, 109);
     if (d * (G.los - G.firstDownX) >= -0.05) {
+      const t = G.tstats && G.tstats[G.poss];
+      if (t) { t.fd = (t.fd || 0) + 1; if (G.down === 3) t.c3 = (t.c3 || 0) + 1; }
       G.down = 1; setFirstDown();
       if (!G.banner || G.banner.t > 0.5) showBanner('FIRST DOWN!', gain > 0 ? `+${gain} yards` : '', '#9cff9c', 1.1);
       return null;
@@ -1740,6 +1755,7 @@ function endQuarter() {
     G.quarter = 3; G.clock = G.qtrLen; G.timeouts = [3, 3];
     showBanner('HALFTIME', `${G.teams[1].id} ${G.score[1]}  -  ${G.teams[0].id} ${G.score[0]}`, '#fff', 2.5);
     startKickoff(G.firstPoss); // the team that got the ball first kicks off now
+    if (G.hooks.onHalftime) G.hooks.onHalftime();
     return true;
   } else if (G.quarter >= 4) {
     if ((G.quarter === 4 || G.playoff) && G.score[0] === G.score[1]) {

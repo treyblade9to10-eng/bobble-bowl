@@ -249,11 +249,17 @@ function drawPlayer(g, p, G, at) {
   }
   if (!at) drawXFRing(g, p, x, y);
   g.fillStyle = '#00000055'; g.beginPath(); g.ellipse(x, y, big ? 19 : 15, 6, 0, 0, 7); g.fill();
-  // stamina bar under the player you control
+  // stamina bar under the player you control: only while you're sprinting or getting your wind back, then it fades away
   if (p.isHuman && !at && G.phase === 'live' && p.stamina != null) {
-    const w = 40, st = clamp(p.stamina, 0, 1);
-    g.fillStyle = '#000a'; roundRect(g, x - w / 2 - 2, y + 11, w + 4, 8, 4); g.fill();
-    g.fillStyle = st > 0.5 ? '#2fd06b' : st > 0.2 ? '#ffd23f' : '#ff4040'; roundRect(g, x - w / 2, y + 13, w * st, 4, 2); g.fill();
+    const st = clamp(p.stamina, 0, 1);
+    p.stamA = p.sprinting || st < 0.97 ? 1 : Math.max(0, (p.stamA || 0) - 0.03);
+    if (p.stamA > 0) {
+      const w = 40, empty = st < 0.08;
+      g.save(); g.globalAlpha = p.stamA * (empty ? 0.6 + 0.4 * Math.sin(G.time * 18) : 1);
+      g.fillStyle = '#000a'; roundRect(g, x - w / 2 - 2, y + 11, w + 4, 8, 4); g.fill();
+      g.fillStyle = st > 0.5 ? '#2fd06b' : st > 0.2 ? '#ffd23f' : '#ff4040'; roundRect(g, x - w / 2, y + 13, Math.max(2, w * st), 4, 2); g.fill();
+      g.restore();
+    }
   }
 
   // speed streaks when sprinting

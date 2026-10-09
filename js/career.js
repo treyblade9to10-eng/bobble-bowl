@@ -161,6 +161,15 @@ const Career = {
     return s;
   },
 
+  // rivalries: NFL = your division, college = the last regular-season game (rivalry week)
+  collegeRival() { const cl = this.cap && this.cap.college; if (!cl) return null; const reg = cl.sched.filter(g => !g.bowl); return reg.length ? reg[reg.length - 1].opp : null; },
+  isRival(oppId) {
+    const c = this.cap; if (!c) return false;
+    if (c.phase === 'college') return oppId === this.collegeRival();
+    const me = TEAMS.find(t => t.id === c.team), op = TEAMS.find(t => t.id === oppId);
+    return !!(me && op && me !== op && me.conf === op.conf && me.div === op.div);
+  },
+  series(oppId) { const r = (this.cap.rivals || {})[oppId]; return r ? `${r.w}-${r.l}` : '0-0'; },
   // after a game you PLAYED: stats, goals, grade, XP
   afterGame(s) {
     const c = this.cap; if (!c || !G.career) return null;
@@ -171,7 +180,9 @@ const Career = {
     const hit = goals.filter(g => g.done).length;
     const grade = this.grade(st, won, hit);
     const gb = { 'A+': 80, A: 60, 'B+': 45, B: 30, 'C+': 20, C: 10, D: 0, F: 0 }[grade];
-    const xp = Math.round(50 + (won ? 30 : 0) + hit * 60 + gb + this.score(st, c.pos) * 2.5);
+    const rival = G.rivalry && this.isRival(G.rivalry) ? G.rivalry : null;
+    const xp = Math.round((50 + (won ? 30 : 0) + hit * 60 + gb + this.score(st, c.pos) * 2.5) * (rival ? 1.5 : 1)); // rivalry games are worth 1.5x
+    if (rival) { c.rivals = c.rivals || {}; const R = c.rivals[rival] || (c.rivals[rival] = { w: 0, l: 0 }); if (won) R.w++; else if (s.score[side] < s.score[1 - side]) R.l++; }
     this.addStats(st); this.gameBadges(st);
     if (hit === 3) this.badge('perfect');
     const r = this.gainXP(xp); this.checkBadges();
@@ -179,7 +190,7 @@ const Career = {
     c.log.unshift({ vs: opp, score: `${s.score[side]}-${s.score[1 - side]}`, xp, grade, line: this.line(st) }); c.log.length = Math.min(c.log.length, 12);
     if (G.career === 'college') this.collegeResult(side === 0 ? s.score : [s.score[1], s.score[0]], side === 0);
     this.save();
-    return { xp, grade, goals, lv: r.lv, line: this.line(st), won };
+    return { xp, grade, goals, lv: r.lv, line: this.line(st), won, rival: rival ? { id: rival, series: this.series(rival) } : null };
   },
   line(st) {
     const L = [st.pass && `${st.pass} pass yds`, st.rush && `${st.rush} rush yds`, st.rec && `${st.rec} rec yds`, st.td && `${st.td} TD`, st.tkl && `${st.tkl} tkl`, st.sack && `${st.sack} sack${st.sack > 1 ? 's' : ''}`, st.int && `${st.int} INT`].filter(Boolean);

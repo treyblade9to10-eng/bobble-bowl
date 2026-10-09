@@ -53,15 +53,28 @@ function drawWeather(g, G) {
     }
   }
   if (G.night) {
-    g.fillStyle = 'rgba(4,8,26,0.5)'; g.fillRect(0, 0, CW, CH);
-    g.save(); g.globalCompositeOperation = 'lighter';
-    for (const lx of [CW * 0.12, CW * 0.5, CW * 0.88]) {
-      const lg = g.createRadialGradient(lx, -40, 10, lx, 120, 520);
-      lg.addColorStop(0, 'rgba(255,250,225,0.2)'); lg.addColorStop(1, 'rgba(255,250,225,0)');
+    // real night game: everything outside the lights goes dark blue, the field is lit by banks of stadium lights
+    g.save();
+    g.globalCompositeOperation = 'multiply'; g.fillStyle = 'rgb(52,64,112)'; g.fillRect(0, 0, CW, CH);
+    g.globalCompositeOperation = 'source-over';
+    const vg = g.createRadialGradient(CW / 2, CH / 2, CH * 0.3, CW / 2, CH / 2, CW * 0.66);
+    vg.addColorStop(0, 'rgba(0,0,12,0)'); vg.addColorStop(1, 'rgba(0,0,14,0.85)');
+    g.fillStyle = vg; g.fillRect(0, 0, CW, CH);
+    g.globalCompositeOperation = 'soft-light';
+    const xs = [0.1, 0.37, 0.63, 0.9].map(f => CW * f);
+    for (const [ly, dy] of [[-30, 1], [CH + 30, -1]]) for (const lx of xs) {
+      const lg = g.createRadialGradient(lx, ly, 10, lx, ly + dy * 200, 480);
+      lg.addColorStop(0, 'rgba(255,246,215,0.7)'); lg.addColorStop(0.5, 'rgba(255,246,215,0.18)'); lg.addColorStop(1, 'rgba(255,246,215,0)');
       g.fillStyle = lg; g.fillRect(0, 0, CW, CH);
     }
+    g.globalCompositeOperation = 'lighter';
+    // light banks with a glow
+    for (const lx of xs) {
+      const bl = g.createRadialGradient(lx, 4, 2, lx, 4, 70);
+      bl.addColorStop(0, 'rgba(255,255,240,0.9)'); bl.addColorStop(0.25, 'rgba(255,250,220,0.35)'); bl.addColorStop(1, 'rgba(255,250,220,0)');
+      g.fillStyle = bl; g.fillRect(lx - 70, 0, 140, 74);
+    }
     g.restore();
-    // the light towers
-    for (const lx of [CW * 0.12, CW * 0.5, CW * 0.88]) { g.fillStyle = '#fffbe0'; g.beginPath(); g.ellipse(lx, 6, 40, 6, 0, 0, 7); g.fill(); }
+    for (const lx of xs) { g.fillStyle = '#fffef2'; g.fillRect(lx - 26, 0, 52, 5); g.fillStyle = '#ffffffaa'; for (let k = -2; k <= 2; k++) g.fillRect(lx + k * 10 - 3, 6, 6, 3); }
   }
 }

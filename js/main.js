@@ -10,7 +10,7 @@ function fitCanvas() {
 fitCanvas();
 addEventListener('resize', fitCanvas);
 const $ = id => document.getElementById(id);
-const screens = ['title', 'mode', 'how', 'select', 'playcall', 'over', 'pause', 'seasonNew', 'seasonHub', 'modes', 'miniOver'];
+const screens = ['title', 'mode', 'how', 'select', 'playcall', 'over', 'pause', 'seasonNew', 'seasonHub', 'modes', 'miniOver', 'half'];
 function show(id) {
   if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
   for (const s of screens) $(s).classList.toggle('show', s === id);
@@ -113,7 +113,7 @@ function teamCard(t) {
   const xfs = teamXFactors(t);
   const ovr = teamOvr(t), offO = Math.round(t.off.reduce((a, p) => a + p[3], 0) / 8), defO = Math.round(t.def.reduce((a, p) => a + p[3], 0) / 8);
   const stars = t.off.concat(t.def).slice().sort((a, b) => b[3] - a[3]).slice(0, 5);
-  return `<div class="ab">${t.id}</div><div class="nm">${t.city}<br>${t.name}</div>
+  return `<div class="wm">${teamBadge(t)}</div><div class="ab">${t.id}</div><div class="nm">${t.city}<br>${t.name}</div>
     <div class="ov">${ovr} OVR</div><div style="font-size:12px;margin-bottom:6px;text-shadow:1px 1px 0 #000">OFF ${offO} • DEF ${defO}</div>
     <div class="stars">${stars.map(p => `<div>${p[0]} <b>${p[3]}</b> #${p[2]} ${p[1]}</div>`).join('')}</div>
     ${xfs.length ? `<div class="xfl"><span>X-FACTOR</span> ${xfs.map(x => lastName(x.name)).join(', ')}</div>` : ''}
@@ -129,7 +129,7 @@ function renderSelect(bumpSide) {
     who.textContent = sel.you === side ? (two ? 'P1' : 'YOU') : (two ? 'P2' : 'CPU'); who.className = 'who ' + (sel.you === side ? 'you' : two ? 'p2' : 'cpu');
     if (bumpSide === side) { el.classList.add('bump'); setTimeout(() => el.classList.remove('bump'), 120); }
   }
-  $('selHint').textContent = G.mode === 'mobile' ? 'Tap the arrows to change teams' : $('optPlayers').value === '2' ? 'P1: WASD move, SPACE snap/dive, SHIFT sprint, 1-4 throw, E/F/R moves, Q switch      P2: ARROWS, ENTER, RIGHT SHIFT, 7-0 throw, / . , moves, L switch' : 'W / S  away team      ↑ / ↓  home team      ENTER  kickoff';
+  $('selHint').textContent = G.mode === 'mobile' ? 'Tap a team card to see every team' : $('optPlayers').value === '2' ? 'P1: WASD move, SPACE snap/dive, SHIFT sprint, 1-4 throw, E/F/R moves, Q switch      P2: ARROWS, ENTER, RIGHT SHIFT, 7-0 throw, / . , moves, L switch' : 'W / S  away team      ↑ / ↓  home team      ENTER  kickoff';
   try { localStorage.setItem('bobbleSel', JSON.stringify(sel)); } catch (e) {}
 }
 function moveTeam(side, d) {
@@ -147,6 +147,60 @@ window.addEventListener('keydown', e => {
   if (e.code === 'Enter') startGame();
 });
 function buildGrid() { renderSelect(); }
+
+// team badge: our own shield in the team colors (no real logos)
+function teamBadge(t) {
+  const fg = textOn(t.c1), fs = t.id.length > 2 ? 22 : 27;
+  return `<svg viewBox="0 0 64 72" class="badge"><path d="M32 3 L59 12 V36 C59 53 47 64 32 69 C17 64 5 53 5 36 V12 Z" fill="${t.c1}" stroke="${t.c2}" stroke-width="4"/>
+    <path d="M12 16 L32 9.5 L52 16" fill="none" stroke="${t.helmet || '#fff'}" stroke-width="3" opacity=".8"/>
+    <text x="32" y="${t.id.length > 2 ? 44 : 46}" text-anchor="middle" font-family="Barlow Condensed, sans-serif" font-style="italic" font-weight="900" font-size="${fs}" fill="${fg}" stroke="#0007" stroke-width="1">${t.id}</text></svg>`;
+}
+
+// full team picker: every team at once, grouped by division
+let tgSide = 0, tgConf = 'all';
+function openTeamGrid(side) {
+  tgSide = side; Sound.click();
+  $('tgTitle').innerHTML = `PICK THE <b>${side === 0 ? 'HOME' : 'AWAY'}</b> TEAM`;
+  renderTeamGrid(); $('tgrid').classList.add('show');
+}
+function renderTeamGrid() {
+  document.querySelectorAll('#tgTabs button').forEach(b => b.classList.toggle('on', b.dataset.f === tgConf));
+  let h = '';
+  for (const conf of ['AFC', 'NFC']) for (const dv of ['East', 'North', 'South', 'West']) {
+    if (tgConf !== 'all' && tgConf !== conf) continue;
+    const list = TEAMS.map((t, i) => [t, i]).filter(([t]) => t.conf === conf && t.div === dv);
+    if (!list.length) continue;
+    h += `<div class="tgDiv"><div class="tgDn">${conf} ${dv.toUpperCase()}</div><div class="tgRow">` + list.map(([t, i]) => {
+      const cur = sel.idx[tgSide] === i, opp = sel.idx[1 - tgSide] === i, tt = Career.withCAP(t);
+      return `<button class="tgT${cur ? ' cur' : ''}${opp ? ' opp' : ''}" data-i="${i}" style="--c1:${t.c1};--c2:${t.c2}">${teamBadge(t)}<span class="tgN">${t.city}<br><b>${t.name}</b></span><span class="tgO">${teamOvr(tt)}</span>${opp ? '<span class="tgOpp">OPPONENT</span>' : ''}</button>`;
+    }).join('') + '</div></div>';
+  }
+  $('tgList').innerHTML = h;
+  $('tgList').querySelectorAll('.tgT').forEach(b => b.onclick = () => {
+    const i = +b.dataset.i;
+    if (i === sel.idx[1 - tgSide]) { [sel.idx[0], sel.idx[1]] = [sel.idx[1], sel.idx[0]]; } else sel.idx[tgSide] = i; // picking the opponent swaps the two
+    Sound.click(); $('tgrid').classList.remove('show'); renderSelect(tgSide);
+  });
+}
+document.querySelectorAll('#tgTabs button').forEach(b => b.onclick = () => { tgConf = b.dataset.f; Sound.click(); renderTeamGrid(); });
+$('tgClose').onclick = () => { Sound.click(); $('tgrid').classList.remove('show'); };
+for (const [side, id] of [[0, 'pHome'], [1, 'pAway']]) {
+  $(id).querySelector('.tbig').addEventListener('click', () => openTeamGrid(side));
+  const b = document.createElement('button'); b.className = 'allTeams'; b.textContent = 'ALL TEAMS'; b.onclick = () => openTeamGrid(side);
+  $(id).appendChild(b);
+}
+
+// game options as tap-to-cycle buttons (the hidden <select>s still hold the values)
+function cycleBtn(id, label) {
+  const sl = $(id), lab = sl.closest('label'), b = document.createElement('button');
+  b.className = 'cyc'; b.id = id + 'Btn';
+  const paint = () => { b.innerHTML = `${label} <b>${sl.options[sl.selectedIndex] ? sl.options[sl.selectedIndex].text : ''}</b>`; };
+  b.onclick = () => { sl.selectedIndex = (sl.selectedIndex + 1) % sl.options.length; sl.dispatchEvent(new Event('change')); saveOpts(); Sound.click(); paint(); };
+  sl.addEventListener('change', paint);
+  lab.parentNode.insertBefore(b, lab); lab.style.display = 'none'; paint();
+  return paint;
+}
+
 $('btnBackSel').onclick = () => show('title');
 $('btnKick').onclick = startGame;
 
@@ -156,6 +210,9 @@ fillSel('optUni0', UNIFORMS, 'home');
 $('optPlayers').onchange = () => renderSelect(); fillSel('optUni1', UNIFORMS, 'away'); fillSel('optWeather', WEATHER, 'clear');
 try { const o = JSON.parse(localStorage.getItem('bobbleOpts') || 'null'); if (o) for (const k in o) if ($(k)) $(k).value = o[k]; } catch (e) {}
 function saveOpts() { const o = {}; for (const k of ['optUni0', 'optUni1', 'optWeather', 'optNight', 'optQtr', 'optDiff', 'optPlayers']) o[k] = $(k).value; try { localStorage.setItem('bobbleOpts', JSON.stringify(o)); } catch (e) {} }
+const cycPaint = [['optQtr', 'QUARTERS'], ['optDiff', 'CPU'], ['optWeather', 'WEATHER'], ['optNight', 'TIME'], ['optPlayers', 'PLAYERS']].map(([id, l]) => cycleBtn(id, l));
+const repaintCycles = () => cycPaint.forEach(f => f());
+$('optPlayersBtn').classList.add('optPl');
 
 function startGame() {
   Sound.init(); Sound.whistle(); Sound.crowd(false);
@@ -318,6 +375,40 @@ window.addEventListener('keydown', e => {
   if (i < Math.min(pcList.length, (pcPage + 1) * PER_PAGE)) choose(i);
 });
 
+// ---------- team stat sheet (halftime + final) ----------
+function statTable(ts, teams, me) {
+  const sides = [me, 1 - me];
+  const g = (t, k) => (t && t[k]) || 0;
+  const mmss = v => { v = Math.round(v || 0); return `${Math.floor(v / 60)}:${String(v % 60).padStart(2, '0')}`; };
+  const rows = [
+    ['Total yards', t => g(t, 'pass') + g(t, 'rush'), 1],
+    ['Passing', t => g(t, 'pass'), 1],
+    ['Rushing', t => g(t, 'rush'), 1],
+    ['First downs', t => g(t, 'fd'), 1],
+    ['3rd down', t => `${g(t, 'c3')}/${g(t, 'a3')}`, 0],
+    ['Turnovers', t => g(t, 'to'), -1],
+    ['Possession', t => mmss(g(t, 'top')), 0, t => g(t, 'top')]
+  ];
+  const tag = t => `<span style="color:${t.c1 === '#000000' ? '#ccc' : t.c1}">${t.id}</span>`;
+  let h = `<table class="stTab"><tr><th></th><th>${tag(teams[sides[0]])}</th><th>${tag(teams[sides[1]])}</th></tr>`;
+  for (const [lbl, f, better, raw] of rows) {
+    const a = f(ts[sides[0]]), b = f(ts[sides[1]]);
+    const va = raw ? raw(ts[sides[0]]) : a, vb = raw ? raw(ts[sides[1]]) : b;
+    const w = better === 0 && !raw ? 0 : (better || 1) * ((va > vb) - (va < vb));
+    h += `<tr><td>${lbl}</td><td class="${w > 0 ? 'up' : ''}">${a}</td><td class="${w < 0 ? 'up' : ''}">${b}</td></tr>`;
+  }
+  return h + '</table>';
+}
+G.hooks.onHalftime = () => {
+  if (G.demo || G.online || G.mini || G.challenge || G.versus) return;
+  const me = Math.max(0, G.human), t = G.teams;
+  $('halfScore').innerHTML = `${t[1].id} ${G.score[1]} - ${G.score[0]} ${t[0].id}`;
+  $('halfStats').innerHTML = statTable(G.tstats, t, me);
+  G.halfFrom = $('playcall').classList.contains('show') ? 'playcall' : null;
+  G.paused = true; show('half');
+};
+$('btnHalf').onclick = () => { G.paused = false; show(G.halfFrom); };
+
 // ---------- game over / YOU WIN ----------
 let mvpAnim = null;
 G.hooks.onGameOver = s => {
@@ -328,19 +419,20 @@ G.hooks.onGameOver = s => {
   $('overTitle').textContent = G.versus ? (tie ? 'TIE GAME' : `${s.score[G.p1] > s.score[1 - G.p1] ? 'PLAYER 1' : 'PLAYER 2'} WINS`) : won ? 'YOU WIN!' : tie ? 'TIE GAME' : 'GAME OVER';
   const tag = t => `<span style="color:${t.c1 === '#000000' ? '#aaa' : t.c1};-webkit-text-stroke:1px #fff">${t.id}</span>`;
   $('overScore').innerHTML = `${tag(s.teams[1])} ${s.score[1]} - ${s.score[0]} ${tag(s.teams[0])}`;
-  const line = (lbl, p, k, suf) => p ? `<div>${lbl}: <b>${p.name}</b> — ${p[k]} ${suf}</div>` : '';
-  let html = '';
-  for (const side of [me, them]) {
-    const L = s.leaders[side], t = s.teams[side];
-    html += `<div style="margin-bottom:8px"><b style="color:#ffd23f">${t.city} ${t.name}</b> — ${s.tstats[side].pass} pass yds, ${s.tstats[side].rush} rush yds, ${s.tstats[side].to} turnovers` +
-      line('Passing', L.pass, 'pass', 'yds') + line('Rushing', L.rush, 'rush', 'yds') + line('Receiving', L.rec, 'rec', 'yds') +
-      line('Tackles', L.tkl, 'tkl', '') + line('Sacks', L.sack, 'sack', '') + line('INTs', L.int, 'int', '') + '</div>';
-  }
+  let html = statTable(s.tstats, s.teams, me);
+  const lead = side => { const L = s.leaders[side], b = [];
+    if (L.pass) b.push(`${lastName(L.pass.name)} ${L.pass.pass} pass`); if (L.rush) b.push(`${lastName(L.rush.name)} ${L.rush.rush} rush`); if (L.rec) b.push(`${lastName(L.rec.name)} ${L.rec.rec} rec`);
+    if (L.sack) b.push(`${lastName(L.sack.name)} ${L.sack.sack} sk`); if (L.int) b.push(`${lastName(L.int.name)} ${L.int.int} INT`);
+    return b.length ? `<div class="stLead"><b>${s.teams[side].id}</b> ${b.join(' &middot; ')}</div>` : ''; };
+  html += lead(me) + lead(them);
   $('overStats').innerHTML = html;
   // my player XP + trophy case
   const cr = !G.challenge && !G.mini ? Career.afterGame(s) : null;
   Career.gameDone(s);
-  $('overCap').innerHTML = cr ? `<div class="ocTop"><span class="ocGrade g${cr.grade.replace('+', 'p')}">${cr.grade}</span><div><b>${Career.cap.name}</b>: ${cr.line}<br><b class="ocXp">+${cr.xp} XP</b>${cr.lv ? `<span class="lvl">LEVEL UP! +${cr.lv * 3} SKILL POINTS</span>` : ''}</div></div>
+  const wk = Weekly.afterGame(s);
+  $('overWeek').innerHTML = wk ? (wk.champ ? `<div class="wkChamp">WEEKLY CHAMPION: all 3 done. Trophy added${Career.cap ? ', +250 XP' : ''}.</div>` : '') +
+    wk.out.map(g => `<div class="wkG${g.done ? ' done' : ''}"><span class="wkT">WEEKLY: ${g.text}</span><span class="wkBar"><i style="width:${Math.round(100 * g.have / g.need)}%"></i></span><span class="wkN">${g.done ? 'DONE' : `${g.have}/${g.need}`}</span></div>`).join('') : '';
+  $('overCap').innerHTML = cr ? `<div class="ocTop"><span class="ocGrade g${cr.grade.replace('+', 'p')}">${cr.grade}</span><div><b>${Career.cap.name}</b>: ${cr.line}<br><b class="ocXp">+${cr.xp} XP</b>${cr.rival ? `<span class="rivTag"> RIVALRY 1.5x · series ${cr.rival.series}</span>` : ''}${cr.lv ? `<span class="lvl">LEVEL UP! +${cr.lv * 3} SKILL POINTS</span>` : ''}</div></div>
     <div class="ocGoals">${cr.goals.map(g => `<span class="${g.done ? 'ok' : ''}">${g.done ? 'DONE' : 'MISSED'}: ${g.text}</span>`).join('')}</div>` : '';
   // MVP: best performer on the winning team (or yours if tied)
   const mvpSide = won || tie ? me : them;
@@ -384,8 +476,10 @@ function drawMvp(st, side) {
   p.celebrate = 1e9; p.face.dir = 1; p.headScale = 1.15;
   const bits = [];
   if (st.pass) bits.push(`${st.pass} pass yds`); if (st.rush) bits.push(`${st.rush} rush yds`); if (st.rec) bits.push(`${st.rec} rec yds`);
-  if (st.td) bits.push(`${st.td} TD`); if (st.tkl) bits.push(`${st.tkl} tkl`); if (st.sack) bits.push(`${st.sack} sacks`); if (st.int) bits.push(`${st.int} INT`);
-  $('mvpText').innerHTML = `<b>${st.name}</b> • ${st.pos} • ${t.name}<br>${bits.join(' • ')}`;
+  if (st.td) bits.push(`${st.td} TD`); if (st.tkl) bits.push(`${st.tkl} tkl`); if (st.sack) bits.push(`${st.sack} sack${st.sack === 1 ? "" : "s"}`); if (st.int) bits.push(`${st.int} INT`);
+  const ln = lastName(st.name), lines = (G.pbp || []).filter(l => l.text.includes(ln));
+  const key = lines.find(l => /TOUCHDOWN/i.test(l.text)) || lines.find(l => /INTERCEPT|SACK|FUMBLE/i.test(l.text)) || lines[lines.length - 1];
+  $('mvpText').innerHTML = `<b>${st.name}</b> &middot; ${st.pos} &middot; ${t.name}<div class="mvpLine">${bits.join(' &middot; ') || 'Did a bit of everything'}</div>${key ? `<div class="mvpKey">${key.q} ${key.clock} &middot; ${key.text}</div>` : ''}`;
   const fake = { teams: G.teams, ball: null, phase: 'over', human: G.human, mode: G.mode, time: 0 };
   const loop = () => {
     fake.time = performance.now() / 1000; p.anim += 0.05; p.speedNow = 0;
@@ -525,6 +619,7 @@ function openModes() {
     ['kick', '04', 'KICKING CONTEST', 'Start at 25 yards, back up 5 every make. 2 misses = out.', R.kick ? `Longest: ${R.kick} yds` : ''],
     ['dash', '05', '40-YARD DASH', 'Mash ← → (or tap) to race your fastest player.', R.dash && R.dash < 99 ? `Best: ${R.dash}s` : '']
   ];
+  $('mdWeekly').innerHTML = weeklyHtml(true);
   $('mdCards').innerHTML = cards.map(([k, i, tt, dd, rr]) => `<div class="mdcard" tabindex="0" data-k="${k}"><div class="mi">${i}</div><div class="mt">${tt}</div><div class="md">${dd}</div><div class="mr">${rr}</div></div>`).join('');
   document.querySelectorAll('.mdcard').forEach(c => c.onclick = () => runChallenge(c.dataset.k));
   show('modes');
