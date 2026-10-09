@@ -658,3 +658,4 @@ button.pulse { animation: pulse 1.2s infinite; }
   #overWeek .wkG { font-size: 11px; padding: 1px 8px; } .wkBar { width: 80px; } .wkN { width: 56px; }
 }
 .rivTag { color: #ff8a5c; font-weight: 800; letter-spacing: .04em; }
+#onVer { font-size: 12px; color: var(--dim); margin: -10px 0 8px; letter-spacing: .04em; }

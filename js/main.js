@@ -728,6 +728,7 @@ function renderOnlineTeam() {
 function openOnline(msg) {
   $('onCodeBox').style.display = 'none'; $('onJoinBox').style.display = 'none'; $('onPick').style.display = '';
   $('onStatus').textContent = msg || 'Play a friend on another phone or computer. One of you hosts and gets a code, the other types it in.';
+  $('onVer').textContent = `${document.querySelector('.ver').textContent} · you and your friend need the same version`;
   renderOnlineTeam(); show('online');
 }
 function onlineMsg(t) { onlineWait(null); openOnline(t); }
@@ -751,7 +752,7 @@ $('onGo').onclick = () => {
   if ([...code].some(ch => !NET_CHARS.includes(ch))) { $('onStatus').textContent = 'Codes never use O, 0, I, 1 or L. Look at the code again.'; return; }
   if (typeof Peer === 'undefined') { $('onStatus').textContent = "Online play couldn't load. Check your internet and refresh."; return; }
   Sound.click(); if (G.mode === 'mobile') goFullscreen();
-  $('onStatus').textContent = 'Connecting...';
+  $('onStatus').textContent = `Looking for game ${code}...`;
   Net.join(code, st => { $('onStatus').textContent = st; });
 };
 $('onCodeIn').addEventListener('keydown', e => { if (e.code === 'Enter') $('onGo').onclick(); e.stopPropagation(); });

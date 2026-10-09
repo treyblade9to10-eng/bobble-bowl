@@ -120,6 +120,7 @@ const Net = {
       room.child('host').once('value').then(sn => {
         if (!alive()) return;
         hostSeen = !!sn.val();
+        if (hostSeen && !this.ready) onStatus(`Found game ${this.code}! Connecting...`);
         if (!hostSeen) { if (!this.ready) onStatus('No game with that code. Double-check it with your friend, and make sure they are still on the HOST screen.'); return; }
         if (sn.val().v !== NET_VERSION) { onStatus('You two are on different versions. Both of you: close the game all the way and reopen it.'); return; }
         setTimeout(() => {
