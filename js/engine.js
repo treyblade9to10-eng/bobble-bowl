@@ -140,7 +140,7 @@ function cpuOffCall() {
   if (toGo <= 1 && chance(0.35)) return 'sneak';
   if (chance(runW)) return pick(['zone', 'zone', 'toss', 'qbdraw', 'dive', 'counter', 'jet', 'power', 'power']);
   if (G.clock < 8 && G.quarter % 2 === 0 && fromOwn(G.poss, G.los) > 45) return 'hail';
-  return toGo >= 12 ? pick(['verts', 'pa', 'mesh', 'curls', 'verts', 'ycross', 'flood', 'stopgo', 'drive']) : pick(['slants', 'mesh', 'curls', 'screen', 'pa', 'verts', 'slants', 'outs', 'bubble', 'smash', 'drive', 'ycross']);
+  return toGo >= 12 ? pick(['verts', 'pa', 'mesh', 'curls', 'verts', 'ycross', 'flood', 'stopgo', 'drive', 'mwheel', 'mseam']) : pick(['slants', 'mesh', 'curls', 'screen', 'pa', 'verts', 'slants', 'outs', 'bubble', 'smash', 'drive', 'ycross', 'mflat', 'mdrag', 'mseam', 'mwheel']);
 }
 function cpuDefCall() {
   const toGo = Math.abs(G.firstDownX - G.los);
@@ -179,6 +179,7 @@ function choosePlay(key, defPick) {
   else setupPlay(OFF_PLAYS.find(p => p.key === offKey), DEF_PLAYS.find(p => p.key === defKey));
   G.phase = 'presnap';
   G.snapTimer = humanOff ? Infinity : G.cpuMotion != null ? 2.4 : 1.6;
+  if (G.play && G.play.off && G.play.off.motion) { G.cpuMotion = null; startMotion(); if (!humanOff) G.snapTimer = 2.2; } // motion plays: he takes off right away
 }
 
 function choosePAT(kind) {
@@ -328,7 +329,7 @@ function setupPlay(offPlay, defPlay, preview) {
 // send a receiver in motion across the formation: if a defender runs with him, it's man coverage
 function startMotion() {
   if (G.phase !== 'presnap' || G.motion || G.play.off.type !== 'pass' && !G.play.off.toss && G.play.off.carrier !== 4) return;
-  const p = G.play.off.carrier === 4 ? G.O[4] : [G.O[4], G.O[2], G.O[3]].find(r => r.role === 'route');
+  const p = G.play.off.carrier === 4 || G.play.off.motion ? G.O[4] : [G.O[4], G.O[2], G.O[3]].find(r => r.role === 'route');
   if (!p) return;
   const by = G.ballY, to = clamp(by - (p.hy - by) * 0.55, 5, FIELD_W - 5);
   G.motion = { p, to, from: p.y };
@@ -347,7 +348,11 @@ function snapMotion() {
   for (const p of G.players) p.inMotion = false;
   // jet sweep / toss: the runner is already flying at the snap
   if (G.play.off.jet || G.play.off.toss) { const j = G.O[G.play.off.carrier || 1], t = j.route && j.route.pts[0]; if (t) { const dx = t.x - j.x, dy = t.y - j.y, m2 = Math.hypot(dx, dy) || 1; j.vx = dx / m2 * j.spd; j.vy = dy / m2 * j.spd; } }
-  if (m && m.p.route) { const sh = m.p.y - m.p.hy; for (const pt of m.p.route.pts) pt.y = clamp(pt.y + sh, 1.2, FIELD_W - 1.2); m.p.hy = m.p.y; }
+  if (m && m.p.route && G.play.off.mroute && m.p === G.O[4]) { // motion play: his route starts from where he is, heading the way he was going
+    const d = dirOf(G.poss), dir = Math.sign(m.to - m.from) || 1, p = m.p, deepX = goalX(G.poss) + d * 7.5;
+    p.route = { pts: G.play.off.mroute.map(([dd, oo]) => { const x = p.x + d * dd; return { x: d > 0 ? Math.min(x, deepX) : Math.max(x, deepX), y: clamp(p.y + dir * oo, 1.2, FIELD_W - 1.2) }; }), end: G.play.off.mend || 'go', i: 0 };
+    p.hy = p.y; p.motionMan = true;
+  } else if (m && m.p.route) { const sh = m.p.y - m.p.hy; for (const pt of m.p.route.pts) pt.y = clamp(pt.y + sh, 1.2, FIELD_W - 1.2); m.p.hy = m.p.y; }
   if (G.press) for (const df of G.D) { // press coverage: jam the receiver at the line
     if (df.slot < 5 || df.slot > 6) continue;
     const r = G.O[df.slot - 3];
@@ -1133,6 +1138,7 @@ function cpuQB(dt) {
     if (down > 14 && d * r.vx > 3 && hasStep(r)) sc += 1.4; // he's got a step on everybody deep: take the shot
     if (s === 1 && !pl.off.screen) sc -= 1.4 - Math.min(1, (pl.t - minT) * 0.4); // check-down only when nothing else is there
     if (pl.off.screen && s === 1) sc += 3;
+    if (r.motionMan) sc += 0.9; // the play is built for the man in motion: look there first
     if (G.lock && r.cap && G.poss === G.human) sc += G.callBall > 0 ? 0.9 : 0; // your QB looks for you (more when you call for it)
     if (op < 1.2) sc -= 2.5; // don't throw into a defender
     sc += [-0.6, 0, 0.3, 0.6][G.diff] * (op > 2 ? 1 : 0);

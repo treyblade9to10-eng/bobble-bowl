@@ -64,6 +64,20 @@ const OFF_PLAYS = [
               1: { r: [[1, -2], [3, -3]], end: 'sit' } } },
   { key: 'hail', form: 'gun', name: 'Hail Mary', type: 'pass', desc: 'Everybody to the end zone. Pray.',
     routes: { 2: { r: [[50, 6]], end: 'go' }, 3: { r: [[50, 6]], end: 'go' }, 4: { r: [[50, -2]], end: 'go' } } },
+  // motion plays: the slot (#4) goes in motion across the formation before the snap and the play is built for him.
+  // mroute: [yards downfield, yards in the direction he was moving] from wherever he is at the snap
+  { key: 'mflat', form: 'gun', name: 'Motion Flat', type: 'pass', desc: 'Slot goes in motion and keeps running to the flat. Quick and easy.', motion: true,
+    mroute: [[1, 2], [1.5, 4.5]], mend: 'sit',
+    routes: { 2: { r: [[12, 0]], end: 'go' }, 3: { r: [[2, 0], [9, -7]], end: 'go' }, 4: { r: [[1, 2], [1.5, 4.5]], end: 'sit' }, 1: { r: [[2, -3], [5, -6]], end: 'sit' } } },
+  { key: 'mwheel', form: 'gun', name: 'Motion Wheel', type: 'pass', desc: 'Motion man runs to the flat, then turns it up the sideline. Big play.', motion: true,
+    mroute: [[1, 3], [4, 6], [30, 7]], mend: 'go',
+    routes: { 2: { r: [[6, 0], [5, 0]], end: 'sit' }, 3: { r: [[10, 0], [18, -6]], end: 'go' }, 4: { r: [[1, 3], [4, 6], [30, 7]], end: 'go' }, 1: { r: [[2, -3], [5, -6]], end: 'sit' } } },
+  { key: 'mdrag', form: 'gun', name: 'Motion Drag', type: 'pass', desc: 'Motion man snaps back underneath across the middle. Beats man.', motion: true,
+    mroute: [[3, -2], [4, -12], [5, -22]], mend: 'go',
+    routes: { 2: { r: [[12, 0], [12, 6]], end: 'sit' }, 3: { r: [[12, 0], [12, 6]], end: 'sit' }, 4: { r: [[3, -2], [4, -12], [5, -22]], end: 'go' }, 1: { r: [[1, 4], [2, 9]], end: 'sit' } } },
+  { key: 'mseam', form: 'gun', name: 'Motion Seam', type: 'pass', desc: 'Motion man turns straight up the seam. Outside guys pull the corners away.', motion: true,
+    mroute: [[3, 1], [28, 2]], mend: 'go',
+    routes: { 2: { r: [[8, 0], [8, 7]], end: 'sit' }, 3: { r: [[8, 0], [8, 7]], end: 'sit' }, 4: { r: [[3, 1], [28, 2]], end: 'go' }, 1: { r: [[1, 4], [2, 9]], end: 'sit' } } },
   { key: 'kneel', form: 'goal', name: 'Kneel', type: 'run', desc: 'Victory formation. QB takes a knee, clock keeps running.', kneel: true }
 ];
 
