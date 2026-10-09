@@ -4,41 +4,11 @@
 // Two lanes: a "safe" one (in order, nothing lost) for one-time things like play calls, banners and sounds,
 // and a "fast" one for the constant position updates, so one lost packet can't freeze everything behind it.
 // The guest plays the updates back ~0.1s behind and slides players smoothly between them.
-const NET_VERSION = 3;
+const NET_VERSION = 2;
 const NET_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 const NET_KEYS = ['Space', 'ShiftLeft', 'ControlLeft', 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyE', 'KeyF', 'KeyR', 'KeyQ', 'Tab', 'KeyC',
   'Digit1', 'Digit2', 'Digit3', 'Digit4', 'Numpad1', 'Numpad2', 'Numpad3', 'Numpad4', 'KeyT', 'KeyX', 'KeyM', 'KeyV', 'KeyB', 'Enter', 'Escape'];
 const PSTAT = ['x', 'y', 'vx', 'vy', 'anim', 'speedNow', 'down', 'downDir', 'dive', 'jump', 'spin', 'stiff', 'throwAnim', 'celebrate', 'dizzy', 'hit', 'stamina', 'juke'];
-
-// Backup route: when a direct connection can't get through (phone data, school Wi-Fi, two different houses),
-// both devices talk through a Firebase database instead. Slower than direct, but it works on any network.
-const RELAY_CFG = { apiKey: 'AIzaSyDkw-xjR0eAkCPR3BRQyKk0Rnusu3pbEmw', authDomain: 'cardio-game-3713.firebaseapp.com', databaseURL: 'https://cardio-game-3713-default-rtdb.firebaseio.com', projectId: 'cardio-game-3713' };
-const Relay = {
-  dbp: null,
-  load() {
-    if (this.dbp) return this.dbp;
-    this.dbp = new Promise((res, rej) => {
-      const add = (src, cb) => { const sc = document.createElement('script'); sc.src = src; sc.onload = cb; sc.onerror = () => rej(new Error('relay load')); document.head.appendChild(sc); };
-      const init = () => { try { const app = firebase.apps.find(a => a.name === 'bobble') || firebase.initializeApp(RELAY_CFG, 'bobble'); res(app.database()); } catch (e) { rej(e); } };
-      if (typeof firebase !== 'undefined' && firebase.database) init(); else add('js/lib/firebase-app-compat.js', () => add('js/lib/firebase-database-compat.js', init));
-    });
-    this.dbp.catch(() => { this.dbp = null; });
-    return this.dbp;
-  },
-  // a fake "connection" with the same send/on/close as a PeerJS one. Safe lane = a list (every message, in order); fast lane = one spot that gets overwritten
-  lane(room, outKey, inKey, fast) {
-    const L = { open: true, hs: {}, relay: true,
-      on(ev, fn) { (this.hs[ev] = this.hs[ev] || []).push(fn); if (ev === 'open') setTimeout(() => { if (L.open) fn(); }, 0); },
-      emit(ev, x) { for (const f of this.hs[ev] || []) f(x); } };
-    const outRef = room.child(outKey), inRef = room.child(inKey);
-    const take = v => { if (!v || !L.open) return; let m; try { m = JSON.parse(v); } catch (e) { return; } L.emit('data', m); };
-    let cb;
-    if (fast) { L.send = m => { if (L.open) outRef.set(JSON.stringify(m)); }; cb = inRef.on('value', sn => take(sn.val())); L.close = () => { if (!L.open) return; L.open = false; inRef.off('value', cb); }; }
-    else { L.send = m => { if (L.open) outRef.push(JSON.stringify(m)); }; cb = inRef.on('child_added', sn => { const v = sn.val(); sn.ref.remove(); take(v); });
-      L.close = () => { if (!L.open) return; L.open = false; inRef.off('child_added', cb); setTimeout(() => L.emit('close'), 0); }; }
-    return L;
-  }
-};
 
 const Net = {
   peer: null, conn: null, fast: null, fastOk: false, role: null, code: null, side: null, status: '', ready: false,
@@ -55,11 +25,9 @@ const Net = {
     const tryCode = () => {
       this.code = this.makeCode();
       this.peer = new Peer(this.peerId(this.code), this.ice);
-      this.peer.on('open', () => { onCode(this.code); this.hostRelay(onStatus); });
-      this.peer.on('error', e => { if (e.type === 'unavailable-id') { this.peer.destroy(); tryCode(); } else if (!this.relayRoom) onStatus(this.errText(e)); });
-      this.peer.on('disconnected', () => { try { if (this.peer && !this.peer.destroyed) this.peer.reconnect(); } catch (e) {} }); // came back from another app
+      this.peer.on('open', () => onCode(this.code));
+      this.peer.on('error', e => { if (e.type === 'unavailable-id') { this.peer.destroy(); tryCode(); } else onStatus(this.errText(e)); });
       this.peer.on('connection', c => {
-        if (this.onRelay) { c.close(); return; } // already playing over the backup route
         if (c.label === 'fast') { // the guest's second lane
           if (!this.conn || c.peer !== this.conn.peer) { c.close(); return; }
           this.fast = c; c.on('open', () => { this.fastOk = true; }); c.on('data', m => this.recv(m, true)); c.on('close', () => { this.fastOk = false; });
@@ -71,94 +39,37 @@ const Net = {
     };
     tryCode();
   },
-  // host side of the backup route: put the game in the database and wait for a guest to show up there
-  hostRelay(onStatus) {
-    const code = this.code;
-    Relay.load().then(db => {
-      if (this.code !== code || this.role !== 'host') return;
-      const room = this.relayRoom = db.ref('bobble/rooms/' + code);
-      const here = () => { room.onDisconnect().remove(); room.child('host').set({ t: firebase.database.ServerValue.TIMESTAMP, v: NET_VERSION }); };
-      this.relayInfo = db.ref('.info/connected'); this.relayInfoCb = this.relayInfo.on('value', sn => { if (sn.val() && this.relayRoom === room) here(); });
-      room.child('guest').on('value', sn => {
-        if (this.relayRoom !== room) return;
-        if (sn.val() && !this.ready && !this.onRelay) {
-          if (this.conn) { const old = this.conn; this.conn = null; try { old.close(); } catch (e) {} }
-          this.useRelayLanes(room, 'h2g', 'g2h', onStatus);
-        } else if (!sn.val() && this.onRelay && this.ready) this.lost();
-      });
-    }).catch(() => {});
-  },
-  useRelayLanes(room, out, inn, onStatus) {
-    this.onRelay = true;
-    const safe = Relay.lane(room, out, inn, false), fast = Relay.lane(room, out + 'F', inn + 'F', true);
-    this.conn = safe; this.wire(safe, onStatus);
-    this.fast = fast; this.fastOk = true; fast.on('data', m => this.recv(m, true));
-  },
   join(code, onStatus) {
     this.reset(); this.role = 'guest'; this.side = 1; this.code = code.toUpperCase();
-    const code0 = this.code, alive = () => this.role === 'guest' && this.code === code0;
-    let hostSeen = null; // null = still checking, true/false = the database answered
-    // 1) direct connection (fastest)
-    try {
-      this.peer = new Peer(this.ice);
-      this.peer.on('open', () => {
-        if (!alive() || this.onRelay) return;
-        const c = this.peer.connect(this.peerId(this.code), { reliable: true, serialization: 'json' });
-        this.conn = c; this.wire(c, onStatus);
-        c.on('open', () => { // then open the fast lane (unordered, JSON)
-          if (this.onRelay) return;
-          const f = this.peer.connect(this.peerId(this.code), { reliable: false, serialization: 'json', label: 'fast' });
-          this.fast = f; f.on('open', () => { this.fastOk = true; }); f.on('data', m => this.recv(m, true)); f.on('close', () => { if (this.fast === f) this.fastOk = false; });
-        });
+    this.peer = new Peer(this.ice);
+    this.peer.on('open', () => {
+      const c = this.peer.connect(this.peerId(this.code), { reliable: true, serialization: 'json' });
+      this.conn = c; this.wire(c, onStatus);
+      c.on('open', () => { // then open the fast lane (unordered, JSON)
+        const f = this.peer.connect(this.peerId(this.code), { reliable: false, serialization: 'json', label: 'fast' });
+        this.fast = f; f.on('open', () => { this.fastOk = true; }); f.on('data', m => this.recv(m, true)); f.on('close', () => { this.fastOk = false; });
       });
-      this.peer.on('error', e => { if (alive() && !this.ready && !this.onRelay && e.type !== 'peer-unavailable' && hostSeen === false) onStatus(this.errText(e)); });
-    } catch (e) {}
-    // 2) the backup route: is the game in the database? If the direct line hasn't connected in a few seconds, switch over
-    Relay.load().then(db => {
-      if (!alive()) return;
-      const room = db.ref('bobble/rooms/' + this.code);
-      room.child('host').once('value').then(sn => {
-        if (!alive()) return;
-        hostSeen = !!sn.val();
-        if (!hostSeen) { if (!this.ready) onStatus('No game with that code. Double-check it with your friend, and make sure they are still on the HOST screen.'); return; }
-        if (sn.val().v !== NET_VERSION) { onStatus('You two are on different versions. Both of you: close the game all the way and reopen it.'); return; }
-        setTimeout(() => {
-          if (!alive() || this.ready || this.onRelay) return;
-          onStatus('Connecting the backup way...');
-          if (this.conn) { const old = this.conn; this.conn = null; try { old.close(); } catch (e) {} }
-          if (this.fast) { const f = this.fast; this.fast = null; try { f.close(); } catch (e) {} }
-          this.relayRoom = room;
-          room.child('guest').onDisconnect().remove();
-          room.child('guest').set({ t: firebase.database.ServerValue.TIMESTAMP });
-          this.useRelayLanes(room, 'g2h', 'h2g', onStatus);
-          room.child('host').on('value', s2 => { if (!s2.val() && this.relayRoom === room && this.ready) this.lost(); });
-        }, 3500);
-      });
-    }).catch(() => { hostSeen = false; });
-    setTimeout(() => { if (alive() && !this.ready) onStatus("Couldn't reach that game. Make sure your friend is still on the HOST screen with the same code, then try again."); }, 20000);
+      setTimeout(() => { if (!this.ready) onStatus("Couldn't reach that game. Check the code, and make sure your friend is still on the HOST screen."); }, 12000);
+    });
+    this.peer.on('error', e => onStatus(e.type === 'peer-unavailable' ? 'No game with that code. Double-check it with your friend.' : this.errText(e)));
   },
   errText(e) { return e.type === 'network' || e.type === 'server-error' || e.type === 'socket-error' ? "Can't reach the online server. Check your internet." : 'Connection problem (' + (e.type || 'unknown') + '). Try again.'; },
   wire(c, onStatus) {
     c.on('open', () => {
-      if (c !== this.conn) return;
       this.ready = true;
       if (this.role === 'guest') c.send({ t: 'hello', team: TEAMS[sel.idx[sel.you]].id, mode: G.mode, v: NET_VERSION });
-      onStatus(this.onRelay ? 'Connected (backup route)!' : 'Connected!');
+      onStatus('Connected!');
     });
-    c.on('data', m => { if (c === this.conn) this.recv(m); });
-    c.on('close', () => { if (c === this.conn) this.lost(); });
-    c.on('error', () => { if (c === this.conn) this.lost(); });
+    c.on('data', m => this.recv(m));
+    c.on('close', () => this.lost());
+    c.on('error', () => this.lost());
   },
   send(m, fast) {
     if (fast && this.fast && this.fastOk) { try { this.fast.send(m); } catch (e) {} return; }
     if (this.conn && this.ready) try { this.conn.send(m); } catch (e) {}
   },
   reset() {
-    const fa = this.fast, co = this.conn, pe = this.peer, room = this.relayRoom;
-    this.conn = null; this.fast = null; this.relayRoom = null; this.onRelay = false;
-    try { fa && fa.close(); } catch (e) {} try { co && co.close(); } catch (e) {} try { pe && pe.destroy(); } catch (e) {}
-    if (this.relayInfo) { try { this.relayInfo.off('value', this.relayInfoCb); } catch (e) {} this.relayInfo = null; }
-    if (room) { try { room.child('guest').off(); room.child('host').off(); if (this.role === 'host') { room.onDisconnect().cancel(); room.remove(); } else { room.child('guest').onDisconnect().cancel(); room.child('guest').remove(); } } catch (e) {} }
+    try { this.fast && this.fast.close(); } catch (e) {} try { this.conn && this.conn.close(); } catch (e) {} try { this.peer && this.peer.destroy(); } catch (e) {}
     Object.assign(this, { peer: null, conn: null, fast: null, fastOk: false, seq: 0, lastSeq: -1, inSeq: 0, lastIn: -1, buf: [], off: null, jit: 0.02, role: null, ready: false, last: null, rosterRef: null, bannerRef: null, pbpRef: null, routeKey: '', picks: {}, pendingCall: null, sounds: [], out: { pressed: [], taps: [] } });
     G.online = false; Input.online = false; Input.use(0); Input.store[1] = null;
   },
@@ -232,7 +143,7 @@ const Net = {
     const R = Input.store[1];
     if (R) { R.pressed = {}; R.taps = []; R.release = null; if (Input.cur === 1) Input.use(0); }
     this.snapT -= dt;
-    if (this.snapT <= 0) { this.snapT = this.onRelay ? 1 / 15 : 1 / 30; this.sendSnap(); }
+    if (this.snapT <= 0) { this.snapT = 1 / 30; this.sendSnap(); }
   },
   // convert the guest's finger (sent in field coords) into this screen's coords right before the engine runs
   prepRemote() {
@@ -421,7 +332,7 @@ const Net = {
     }
     this.sendT -= dt;
     if (this.sendT > 0) return;
-    this.sendT = this.onRelay ? 1 / 15 : 1 / 30;
+    this.sendT = 1 / 30;
     this.send({ t: 'in', n: ++this.inSeq, held: NET_KEYS.filter(c => Input.down[c]),
       st: [r2(Input.stick.x), r2(Input.stick.y), r2(Input.stick.m)], ax: Input.pads[0] ? [r2(ax.x), r2(ax.y), r2(ax.m)] : null, p: ptr }, true);
   },
