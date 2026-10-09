@@ -1014,7 +1014,7 @@ function ai(p, dt) {
   if (b.flight && b.flight.pitch) return pursue(p, b.flight.intended);
   const holder = carrier || qb;
   switch (a.type) {
-    case 'rush': steer(p, holder.x, holder.y, (p.pos === 'DL' ? 0.95 : 0.97) * (G.play.t < 0.45 ? 0.55 : 1) * (G.poss === G.human && !G.versus ? [0.9, 0.99, 1.03, 1.08][G.diff] : 1), 0.2); break;
+    case 'rush': steer(p, holder.x, holder.y, (p.pos === 'DL' ? 0.95 : 0.97) * (G.play.t < 0.45 ? 0.55 : 1) * (G.poss === G.human && !G.versus ? [0.88, 0.94, 1, 1.06][G.diff] : 1), 0.2); break;
     case 'spy': {
       if (G.qbScramble || d * (holder.x - G.los) > 0) return pursue(p, holder);
       steer(p, G.los + d * 5, lerp(p.y, holder.y, 0.6), 0.8); break;
@@ -1332,7 +1332,9 @@ function resolveBlocks(dt) {
     if (!df || df.engaged !== bl || bl.side !== carrierSide) continue;
     if (df.down > 0 || bl.down > 0 || dist(bl, df) > 2.5 || df === b.holder || bl === b.holder) { unlink(bl, df); continue; }
     const big = bl.pos === 'OL';
-    let rate = (big ? 0.42 : 0.85) * Math.pow(df.ovr / bl.ovr, 2.2) * rand(0.4, 1.4);
+    // pass pro: a good line gives the QB ~4 seconds, a bad one vs a good rush gets beat fast
+    const passPro = big && G.bstate !== 'run';
+    let rate = (passPro ? 0.3 : big ? 0.42 : 0.85) * Math.pow(df.ovr / bl.ovr, passPro ? 3.5 : 2.2) * rand(0.4, 1.4);
     if (bl.role === 'screenblock') rate *= 1.8;
     if (df.isHuman && withSide(df.side, () => Input.axis().m) > 0.3) rate *= 1.7;
     if (xfOn(df, 'unstoppable')) rate *= 2.6;
