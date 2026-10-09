@@ -1121,7 +1121,7 @@ function cpuQB(dt) {
   if (G.callBall > 0) G.callBall -= dt;
   if (pl.off.type === 'run' || G.qbScramble) return;
   G.qbThink -= dt; if (G.qbThink > 0) return; G.qbThink = 0.15;
-  const minT = (pl.off.fake ? 1.35 : pl.off.screen || pl.off.quick ? 0.6 : 1.0) + [0.15, 0, -0.1, -0.2][G.diff];
+  const minT = (pl.off.fake ? 1.15 : pl.off.screen || pl.off.quick ? 0.6 : 1.0) + [0.15, 0, -0.1, -0.2][G.diff];
   if (pl.t < minT) return;
   const d = dirOf(G.poss);
   let best = null, bs = -1e9;
@@ -1130,6 +1130,7 @@ function cpuQB(dt) {
     const op = Math.min(4.5, throwWindow(qb, r));
     const down = d * (r.x - G.los);
     let sc = op + clamp(down, -3, 35) * 0.13 + (r.route && r.route.i >= r.route.pts.length && r.route.end === 'sit' ? 0.3 : 0);
+    if (down > 14 && d * r.vx > 3 && hasStep(r)) sc += 1.4; // he's got a step on everybody deep: take the shot
     if (s === 1 && !pl.off.screen) sc -= 1.4 - Math.min(1, (pl.t - minT) * 0.4); // check-down only when nothing else is there
     if (pl.off.screen && s === 1) sc += 3;
     if (G.lock && r.cap && G.poss === G.human) sc += G.callBall > 0 ? 0.9 : 0; // your QB looks for you (more when you call for it)
@@ -1140,23 +1141,28 @@ function cpuQB(dt) {
     if (sc > bs) { bs = sc; best = r; }
   }
   let pressure = 99; for (const df of G.D) if (!df.engaged && df.down <= 0) pressure = Math.min(pressure, dist(qb, df));
-  const need = 4.6 - (pl.t - minT) * 1.2;
+  const need = 4.7 - (pl.t - minT) * 1.9; // throw on time: the longer he holds it, the less open the guy has to be
   // hot read: a free rusher is coming, so take what's there
   if (best && pressure < 3.2 && bs > 0.6 + (pressure < 1.8 ? -0.6 : 0) && chance(0.5)) { throwTo(qb, best); return; }
   if (best && (bs > need || (pressure < 1.6 && bs > 1.0 && chance(0.6)))) { throwTo(qb, best); return; }
-  if (pl.t > 3.8) { if (best && bs > 0.8) throwTo(qb, best); else throwAway(qb); return; } // held it too long: take it or get rid of it
+  if (pl.t > minT + 2.0) { if (best && bs > 0.3) throwTo(qb, best); else throwAway(qb); return; } // held it too long: take it or get rid of it
   // nothing open and about to get hit: smart QBs throw it away instead of taking the sack
-  if (pressure < 1.5 && pl.t > 0.9 && chance(0.25 + (qb.ovr - 70) / 100)) { throwAway(qb); return; }
+  if (pressure < 1.6 && pl.t > 0.9 && chance(0.45 + (qb.ovr - 70) / 100)) { throwAway(qb); return; }
   if (pressure < 1.5 && chance(0.12 + (qb.spdR > 86 ? 0.2 : 0))) G.qbScramble = true;
 }
+// nobody is deeper than him within a few yards: he's beaten his man
+function hasStep(r) { const d = dirOf(G.poss); return !G.D.some(df => df.down <= 0 && d * (df.x - r.x) > -0.8 && Math.abs(df.y - r.y) < 5); }
 // how open a receiver will be when the ball gets there: defenders who can close on the spot or sit in the passing lane count against it
 function throwWindow(qb, r) {
-  const T = dist(qb, r) / (19 * GAME_SPEED), lx = r.x + r.vx * T, ly = r.y + r.vy * T;
+  const d = dirOf(G.poss), T = dist(qb, r) / (19 * GAME_SPEED), lx = r.x + r.vx * T, ly = r.y + r.vy * T;
   const sx = lx - qb.x, sy = ly - qb.y, L2 = sx * sx + sy * sy || 1;
   let m = 99;
   for (const df of G.D) {
     if (df.engaged || df.down > 0) continue;
-    m = Math.min(m, Math.hypot(df.x - lx, df.y - ly) - df.spd * T * 1.0);
+    // a defender trailing a receiver who's running deep can't undercut a ball thrown out in front of him
+    const trailing = d * (df.x - r.x) < -0.5 && d * r.vx > 3;
+    m = Math.min(m, Math.hypot(df.x - lx, df.y - ly) - df.spd * Math.max(0, T - 0.1) * (trailing ? 0.5 : 1.0));
+    if (!trailing && Math.hypot(df.x - lx, df.y - ly) < 2.2) m = Math.min(m, -1); // somebody's already sitting on that spot
     const u = ((df.x - qb.x) * sx + (df.y - qb.y) * sy) / L2;
     if (u > 0.15 && u < 0.9 && Math.abs((df.x - qb.x) * sy - (df.y - qb.y) * sx) / Math.sqrt(L2) < 1.3) m = Math.min(m, 0);
   }
@@ -1514,11 +1520,11 @@ function resolveCatch() {
   const R = 1.45;
   const hands = xfOn(rcv, 'hands') && rd < 1.6; // a "Double Me" guy usually wins the 50-50 ball
   if (def && dd < 0.5 && dd < rd - 0.3 && !(hands && chance(0.7))) { // ball hits the defender right in the body: 7 out of 10 get picked
-    if (chance(def.isHuman ? 0.55 : 0.28)) return intercept(def);
+    if (chance(def.isHuman ? 0.55 : 0.2)) return intercept(def);
     return incomplete(def, 'BROKEN UP!');
   }
   if (def && dd < 1.25 && dd < rd - 0.25 && !(hands && chance(0.7))) { // defender has inside position
-    const pInt = clamp(0.12 + (def.ovr - 75) / 140 + humanDefBonus + (G.diff === 3 && !def.isHuman ? 0.08 : 0) - (rd < 1 ? 0.08 : 0), 0.05, 0.6);
+    const pInt = clamp(0.08 + (def.ovr - 75) / 140 + humanDefBonus + (G.diff === 3 && !def.isHuman ? 0.08 : 0) - (rd < 1 ? 0.08 : 0), 0.05, 0.6);
     if (chance(pInt)) return intercept(def);
     return incomplete(def, 'BROKEN UP!');
   }
