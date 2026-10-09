@@ -478,3 +478,97 @@ body.pad button:focus, body.pad .pcard:focus, body.pad .mdcard:focus, body.pad .
 #tuCard .tuGoal { font-family: var(--hd); font-weight: 800; font-size: 17px; color: var(--gold); letter-spacing: .03em; }
 #tuCard .tuHint { font-size: 13px; line-height: 1.3; margin-top: 2px; }
 @media (max-height: 500px) { #tuCard { top: 52px; width: min(280px, 36vw); padding: 5px 8px; } #tuCard.low { top: 4px; padding: 3px 8px; width: min(238px, 29vw); } #tuCard.low .tuHead { display: none; } #tuCard .tuGoal { font-size: 14px; } #tuCard .tuHint { font-size: 11.5px; } .tuRow { padding: 4px 10px; } .tuRow b { font-size: 14px; min-width: 160px; } #tuSub { font-size: 12px; margin-bottom: 4px; } }
+
+/* career mode */
+#cap { justify-content: flex-start; padding-top: 10px; }
+.ccWrap { display: flex; gap: 14px; align-items: flex-start; width: min(1100px, 96vw); }
+.ccCard { flex: none; width: 230px; background: linear-gradient(170deg, color-mix(in srgb, var(--tc) 70%, #000) 0%, var(--panel) 60%); border-bottom: 4px solid var(--gold); padding: 8px 10px; text-align: center; }
+.ccCard #capCv { width: 150px; height: 179px; margin: 0 auto; display: block; background: transparent; }
+.ccName { font-family: var(--hd); font-style: italic; font-weight: 900; font-size: 24px; line-height: 1; text-transform: uppercase; }
+.ccSub { color: var(--dim); font-size: 12px; margin: 2px 0 4px; }
+.ccOvr { font-family: var(--hd); font-weight: 800; font-size: 16px; color: var(--dim); }
+.ccOvr b { font-style: italic; font-weight: 900; font-size: 38px; color: var(--gold); margin-right: 4px; }
+.ccCard .xpbar { margin: 2px 0; }
+.ccCard .xptext { font-size: 11px; color: var(--dim); }
+.ccRat { display: flex; flex-direction: column; gap: 1px; font-size: 12px; color: var(--dim); margin: 4px 0; }
+.ccRat span { display: flex; justify-content: space-between; } .ccRat b { color: #fff; }
+.ccBtns button { font-size: 13px; padding: 5px 12px; margin: 3px; }
+button.gold { background: var(--gold); color: #111; }
+button.pulse { animation: pulse 1.2s infinite; }
+@keyframes pulse { 50% { box-shadow: 0 0 0 4px #f6c31c55; } }
+.ccMain { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.ccHead { font-family: var(--hd); font-weight: 800; letter-spacing: .08em; color: var(--gold); font-size: 15px; }
+.ccHead b.gold { color: #fff; font-size: 20px; }
+.ccNext { padding: 8px 12px; text-shadow: 0 1px 3px #000a; }
+.ccNext.done { background: var(--panel); }
+.ccNext .lbl { font-family: var(--hd); font-weight: 800; letter-spacing: .14em; font-size: 12px; opacity: .85; }
+.ccNext .mu { font-family: var(--hd); font-style: italic; font-weight: 900; font-size: 26px; text-transform: uppercase; line-height: 1.05; }
+.ccNext .sub { font-size: 13px; }
+.ccGoals { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; font-size: 12px; }
+.ccGoals .lbl { font-family: var(--hd); font-weight: 800; letter-spacing: .08em; color: var(--dim); font-size: 11px; width: 100%; }
+.ccGoals span { background: var(--panel2); padding: 2px 8px; border-left: 3px solid var(--gold); }
+.ccMain .row { justify-content: flex-start; margin: 0; }
+.ccMain .row button { margin: 2px 6px 2px 0; }
+#ccLock { font-size: 13px; padding: 6px 12px; } #ccLock.on { background: #1f9d55; }
+.ccStock { font-family: var(--hd); font-weight: 800; letter-spacing: .05em; font-size: 15px; } .ccStock b { color: var(--gold); }
+.ccLine, .ccText { font-size: 13px; color: var(--dim); line-height: 1.4; } .ccText b { color: #fff; }
+.w { color: #5cdd8a; } .l { color: #ff7a6a; }
+.ccSched { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 2px 10px; font-size: 12px; color: var(--dim); }
+.ccSched .cur { color: #fff; background: #f6c31c22; }
+.ccLog { font-size: 12px; color: var(--dim); display: flex; flex-direction: column; gap: 2px; } .ccLog b { color: var(--gold); }
+.gr { display: inline-block; min-width: 28px; text-align: center; font-family: var(--hd); font-weight: 900; color: #111; background: #9aa6b5; margin-right: 4px; }
+.gr.gAp, .gr.gA, .ocGrade.gAp, .ocGrade.gA { background: #5cdd8a; } .gr.gBp, .gr.gB, .ocGrade.gBp, .ocGrade.gB { background: var(--gold); } .gr.gCp, .gr.gC, .ocGrade.gCp, .ocGrade.gC { background: #ffa04a; } .gr.gD, .gr.gF, .ocGrade.gD, .ocGrade.gF { background: #ff6a5a; }
+.ccNew { background: var(--gold); color: #111; font-family: var(--hd); font-weight: 800; letter-spacing: .06em; padding: 4px 10px; }
+.ccTabs { display: flex; gap: 4px; } .ccTabs button { font-size: 12px; padding: 4px 12px; margin: 0; } .ccTabs button.on { background: var(--gold); color: #111; }
+.ccTab { background: var(--panel); padding: 6px 8px; min-height: 60px; }
+.ccTable { width: 100%; border-collapse: collapse; font-size: 12px; } .ccTable th { color: var(--gold); font-family: var(--hd); text-align: left; } .ccTable td { padding: 1px 4px; border-bottom: 1px solid var(--line); } .ccTable tr.tot td { color: #fff; font-weight: 700; }
+.ccDraftNote { font-size: 12px; color: var(--dim); margin-bottom: 4px; }
+.ccBadges { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 4px; }
+.ccBadges .bd { padding: 4px 8px; background: var(--panel2); opacity: .45; display: flex; flex-direction: column; font-size: 12px; } .ccBadges .bd b { font-family: var(--hd); letter-spacing: .03em; }
+.ccBadges .bd.on { opacity: 1; border-left: 3px solid var(--gold); } .ccBadges .bd span { color: var(--dim); font-size: 11px; }
+.ccLeague { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 12px; } .ccLeague .lbl { color: var(--gold); font-family: var(--hd); font-weight: 800; } .ccLeague .me, .ccLead .me { color: var(--gold); font-weight: 700; }
+.ccLead { display: flex; flex-direction: column; margin-bottom: 4px; } .ccLead b { color: var(--gold); font-family: var(--hd); }
+.ccCombine { display: flex; gap: 10px; } .ccCombine div { background: var(--panel); padding: 6px 14px; display: flex; flex-direction: column; align-items: center; }
+.ccCombine b { font-family: var(--hd); font-style: italic; font-weight: 900; font-size: 30px; color: var(--gold); } .ccCombine span { font-size: 11px; color: var(--dim); letter-spacing: .1em; }
+.upRow { display: flex; align-items: center; gap: 10px; font-size: 14px; } .upRow span { width: 150px; } .upRow b { width: 28px; color: var(--gold); font-family: var(--hd); font-size: 18px; }
+.upBar { flex: 1; height: 10px; background: var(--panel2); } .upBar i { display: block; height: 100%; background: var(--gold); }
+.upRow button { font-size: 13px; padding: 4px 12px; margin: 0; } .upRow small { opacity: .7; }
+.gRow { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; } .gRow span { width: 70px; font-family: var(--hd); font-weight: 800; color: var(--dim); }
+.gOpt { font-size: 13px; padding: 5px 12px; margin: 0; } .gOpt.on { background: var(--gold); color: #111; }
+.ccOffers { display: flex; gap: 8px; flex-wrap: wrap; } .ofr { display: flex; flex-direction: column; align-items: flex-start; text-align: left; border-left: 5px solid; clip-path: none; margin: 0; } .ofr span { font-family: var(--bd); font-weight: 500; font-size: 12px; text-transform: none; letter-spacing: 0; color: var(--dim); }
+/* draft day */
+.ddWrap { width: min(760px, 94vw); display: flex; flex-direction: column; gap: 8px; position: relative; }
+.ddTop { display: flex; justify-content: space-between; align-items: center; font-family: var(--hd); font-weight: 800; letter-spacing: .08em; color: var(--gold); font-size: 18px; }
+.ddTop button { font-size: 13px; padding: 5px 14px; margin: 0; }
+.ddList { height: 56vh; overflow: hidden; display: flex; flex-direction: column; gap: 3px; }
+.ddRow { display: flex; align-items: center; gap: 10px; background: var(--panel); padding: 4px 8px; font-size: 13px; animation: ddIn .25s; }
+@keyframes ddIn { from { opacity: 0; transform: translateY(-8px); } }
+.ddRow .n { width: 26px; color: var(--dim); font-family: var(--hd); font-weight: 800; } .ddRow .tm { font-family: var(--hd); font-weight: 800; padding: 0 6px; min-width: 40px; text-align: center; }
+.ddRow i { margin-left: auto; color: var(--dim); font-style: normal; font-size: 12px; }
+#ddReveal:empty { display: none; }
+#ddReveal { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+.ddCard { padding: 18px 28px; text-align: center; box-shadow: 0 10px 40px #000c; animation: ddPop .5s cubic-bezier(.2,1.6,.4,1); min-width: min(520px, 90vw); }
+@keyframes ddPop { from { transform: scale(.6); opacity: 0; } }
+.ddCard .r { font-family: var(--hd); font-weight: 800; letter-spacing: .14em; background: #000a; display: inline-block; padding: 2px 10px; }
+.ddCard .t { font-family: var(--hd); font-weight: 800; letter-spacing: .08em; margin-top: 8px; }
+.ddCard .p { font-family: var(--hd); font-style: italic; font-weight: 900; font-size: 46px; text-transform: uppercase; line-height: 1; color: #fff; text-shadow: 0 3px 0 #000; }
+.ddCard .s, .ddCard .k { font-size: 14px; color: #fff; text-shadow: 0 1px 2px #000; margin: 4px 0; }
+/* hall of fame */
+.hofWrap { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.hof { background: var(--panel); border: 2px solid var(--line2); padding: 16px 30px; text-align: center; min-width: min(520px, 90vw); }
+.hof.gold { background: linear-gradient(160deg, #3a2c08, #1c1606); border-color: var(--gold); }
+.hof .h1 { font-family: var(--hd); font-weight: 800; letter-spacing: .2em; color: var(--gold); }
+.hof .nm { font-family: var(--hd); font-style: italic; font-weight: 900; font-size: 44px; text-transform: uppercase; line-height: 1.05; }
+.hof .ps { color: var(--dim); } .hof .ln { font-size: 14px; margin-top: 4px; } .hof .ln.big { font-family: var(--hd); font-weight: 900; color: var(--gold); font-size: 20px; letter-spacing: .1em; }
+/* game over summary for career games */
+#overCap .ocTop { display: flex; align-items: center; gap: 12px; }
+.ocGrade { font-family: var(--hd); font-style: italic; font-weight: 900; font-size: 34px; color: #111; padding: 0 10px; background: #9aa6b5; min-width: 54px; text-align: center; }
+.ocXp { color: var(--gold); }
+.ocGoals { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; font-size: 12px; } .ocGoals span { background: #ff6a5a33; padding: 1px 6px; } .ocGoals span.ok { background: #1f9d5555; }
+@media (max-height: 500px) {
+  #cap h2 { display: none; } #cap { padding-top: 6px; }
+  .ccWrap { gap: 10px; } .ccCard { width: 170px; padding: 4px 6px; } .ccCard #capCv { width: 96px; height: 115px; }
+  .ccName { font-size: 18px; } .ccOvr b { font-size: 28px; } .ccRat { font-size: 11px; } .ccBtns button { font-size: 11px; padding: 4px 8px; }
+  .ccMain { gap: 4px; } .ccNext { padding: 4px 10px; } .ccNext .mu { font-size: 20px; } .ccHead { font-size: 13px; }
+  .ccMain .row button.big { font-size: 20px; padding: 6px 24px; } .ddList { height: 62vh; } .ddCard .p { font-size: 34px; } .hof .nm { font-size: 32px; }
+}

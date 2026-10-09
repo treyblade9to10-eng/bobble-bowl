@@ -2,7 +2,7 @@
 const SaveGame = {
   KEY: 'bobbleLive',
   FIELDS: ['human', 'diff', 'playoff', 'qtrLen', 'score', 'quarter', 'clock', 'poss', 'los', 'ballY', 'down', 'firstDownX', 'goalToGo', 'timeouts', 'patSide', 'twoPt',
-    'weather', 'night', 'uni', 'versus', 'p1', 'pstats', 'tstats', 'xf', 'twoMinQ', 'firstPoss', 'lastOffKey', 'lastDefKey', 'lastOffKeys', 'lastDefKeys', 'kickFrom'],
+    'weather', 'night', 'uni', 'versus', 'p1', 'pstats', 'tstats', 'xf', 'twoMinQ', 'firstPoss', 'lastOffKey', 'lastDefKey', 'lastOffKeys', 'lastDefKeys', 'kickFrom', 'career', 'lock'],
   save() {
     if (G.demo || G.mini || G.challenge || G.online || !G.teams || G.phase === 'over' || G.human < 0) return;
     const d = { v: 1, at: Date.now(), teams: G.teams, pbp: (G.pbp || []).slice(-40), ko: G.koPending ? G.kickoffSide : null,
@@ -22,7 +22,9 @@ const SaveGame = {
     initGame(d.teams[0], d.teams[1], { qtr: d.qtrLen, diff: d.diff, humanSide: d.human, weather: d.weather, night: d.night, uni: d.uni, versus: d.versus, playoff: d.playoff });
     for (const k of this.FIELDS) if (d[k] !== undefined) G[k] = d[k];
     G.pbp = d.pbp || [];
-    // a season game only counts if the season is still on that same week
+    // a season game only counts if the season is still on that same week (career games use the career's season)
+    if (d.season && Season.use) Season.use(d.career === 'nfl' ? 'career' : 'franchise');
+    if (d.career === 'college' && !(Career.cap && Career.cap.phase === 'college')) G.career = false;
     const sNow = Season.data ? Season.data.week + ':' + Season.data.phase : null;
     G.season = !!(d.season && d.season === sNow);
     showBanner('GAME RESUMED', this.summary(d), '#fff', 2);

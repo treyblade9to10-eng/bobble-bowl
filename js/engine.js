@@ -64,7 +64,8 @@ function initGame(home, away, opts) {
     pstats: {}, tstats: [{ pass: 0, rush: 0, to: 0 }, { pass: 0, rush: 0, to: 0 }],
     timeouts: [3, 3], special: null, pendingRunoff: 0, twoMinQ: 0, twoMinAfterPlay: false, runFrom: 0, mini: null, scenario: opts.scenario || null,
     weather: stadiumOf(home).dome ? 'clear' : (opts.weather || 'clear'), night: !!opts.night, stadium: stadiumOf(home), uni: opts.uni || null, pbp: [], pbpShow: null, lastResult: null,
-    versus: !!opts.versus, p1: opts.humanSide || 0, hd: [null, null], hp: [null, null], humanDef: null
+    versus: !!opts.versus, p1: opts.humanSide || 0, hd: [null, null], hp: [null, null], humanDef: null,
+    career: opts.career || false, lock: !!opts.lock, callBall: 0
   });
   if (G.versus) G.diff = 1;
   Input.versus = G.versus; Input.ctl = 0;
@@ -188,14 +189,14 @@ function makePlayer(side, isOff, slot, tuple) {
     side, off: isOff, slot, pos, name, num, ovr,
     x: 0, y: 0, vx: 0, vy: 0, dvx: 0, dvy: 0,
     spd: yps * cpuMul * Weather.speed(), spdR, acc: (big ? 20 : 30) * GAME_SPEED * Weather.grip(),
-    face: { skin: skin0 != null ? skin0 : h % 6, beard: ((h >> 5) % 4) === 0, visor: ((h >> 7) % 5) === 0, dir: dirOf(side) },
+    face: { skin: skin0 != null ? skin0 : h % 6, beard: ((h >> 5) % 4) === 0, visor: ex && ex.visor != null ? ex.visor : ((h >> 7) % 5) === 0, dir: dirOf(side) },
     stiff: 0, stiffCd: 0, throwAnim: 0, celebrate: 0, dizzy: 0,
     head: { ox: 0, oy: 0, vx: 0, vy: 0, rot: 0 }, headScale: 1 + ((h >> 9) % 5) * 0.035 + (pos === 'QB' ? 0.06 : 0),
     anim: (h % 100) / 10, speedNow: 0, stamina: 1, down: 0, downDir: 1, stun: 0, spin: 0, juke: 0, jukeCd: 0, spinCd: 0,
     dive: 0, tackleCd: 0, engaged: null, shed: 0, shedCd: 0, mouth: '', mouthT: 0, isHuman: false, throwKey: 0, openness: null,
     role: 'idle', route: null, assign: null, aiIdle: 0,
     xf: (G.xf && G.xf[side + ':' + name]) || null,
-    cap: !!(ex && ex.cap), thp: ex && ex.thp || null, tha: ex && ex.tha || null
+    cap: !!(ex && ex.cap), thp: ex && ex.thp || null, tha: ex && ex.tha || null, gloves: ex && ex.gloves || null, teamGloves: !!(ex && ex.teamGloves)
   };
 }
 
@@ -731,9 +732,16 @@ function updateHuman() {
     G.hp = hs; G.humanPlayer = hs[G.human];
     return;
   }
-  const h = humanFor();
+  const h = G.lock ? lockedGuy() || humanFor() : humanFor();
   if (h) h.isHuman = true;
   G.humanPlayer = h;
+}
+// Player Lock (career): you only ever control your own player
+function lockedGuy() { return G.players.find(p => p.cap && p.side === G.human && p.down <= 0) || G.players.find(p => p.cap && p.side === G.human); }
+// career receiver / back: ask the QB for the ball
+function callForBall(p) {
+  if (G.callBall > 0) return;
+  G.callBall = 1.4; addText(p.x, p.y - 1.5, "I'M OPEN!", '#ffe14d', 16, 0.9); Sound.click();
 }
 function humanFor() {
   let h = null;
@@ -755,6 +763,7 @@ function humanFor() {
 }
 // before the snap: cycle through every defender so you can pick a pass rusher
 function presnapSwitch() {
+  if (G.lock && lockedGuy()) return; // your guy is on the field: no switching
   const order = [3, 4, 0, 1, 2, 5, 6, 7].map(i => G.D[i]);
   const i = order.indexOf(G.humanDef);
   G.humanDef = order[(i + 1) % order.length]; Sound.click(); updateHuman();
@@ -762,6 +771,7 @@ function presnapSwitch() {
 }
 function nearestTo(list, t) { let best = null, bd = 1e9; for (const p of list) { const d = dist(p, t); if (d < bd && p.down <= 0) { bd = d; best = p; } } return best; }
 function cycleHumanDef() {
+  if (G.lock && lockedGuy()) return;
   const b = G.ball; const target = b.holder || b;
   const pool = G.players.filter(p => p.side === G.human && p !== G.humanDef && !(b.holder === p));
   const n = nearestTo(pool, target.flight ? { x: target.flight.tx, y: target.flight.ty } : target);
@@ -785,6 +795,7 @@ function humanControl(p, dt) {
     if (Input.hit('KeyR') && p.stiffCd <= 0) doStiff(p);
   }
   const chasing = b.holder ? b.holder.side !== p.side : p.side !== G.poss;
+  if (G.lock && !isCarrier && !chasing && p !== G.O[0] && G.bstate === 'snap' && !b.flight && Input.hit('Space')) callForBall(p);
   if (!isCarrier && chasing && b.flight && !b.flight.pitch && Input.hit('Space')) { doJump(p); }
   else if (!isCarrier && chasing && Input.hit('Space') && p.dive <= 0) { doDive(p, ax); return true; }
   if (!isCarrier && p.engaged && Input.hit('KeyE')) doSwim(p);
@@ -821,6 +832,7 @@ function mobileControl(p, dt, isCarrier) {
   if (p.hit > 0) return true;
   // taps = moves
   for (const c of Input.taps) {
+    if (G.lock && !isCarrier && !onD && p !== G.O[0] && G.bstate === 'snap' && !b.flight) { callForBall(p); continue; }
     if (isCarrier) { if (p.jukeCd <= 0) doJuke(p, { x: 0, y: wy(c.y) < p.y ? -1 : 1, m: 1 }); }
     else if (p.side !== G.poss || (b.holder && b.holder.side !== p.side)) {
       const w = { x: wx(c.x), y: wy(c.y) };
@@ -835,7 +847,8 @@ function mobileControl(p, dt, isCarrier) {
     if (Input.hit('KeyF') && p.spinCd <= 0) doSpin(p);
     if (Input.hit('KeyR') && p.stiffCd <= 0) doStiff(p);
     if (Input.hit('KeyE') && p.jukeCd <= 0) doJuke(p, null);
-  } else if (Input.hit('Space') && p.dive <= 0) { const car = b.holder || b; doDive(p, { x: car.x - p.x, y: car.y - p.y, m: 1 }); return true; }
+  } else if (G.lock && !onD && p !== G.O[0] && Input.hit('Space')) { if (G.bstate === 'snap' && !b.flight) callForBall(p); }
+  else if (Input.hit('Space') && p.dive <= 0) { const car = b.holder || b; doDive(p, { x: car.x - p.x, y: car.y - p.y, m: 1 }); return true; }
   const sprint = p.stamina > 0.05;
   const st = Input.stick;
   if (st.m > 0.15 && isFinite(st.x) && isFinite(st.y)) { // joystick
@@ -1077,6 +1090,7 @@ function aiQBMove(p, dt) {
 
 function cpuQB(dt) {
   const pl = G.play, qb = G.O[0];
+  if (G.callBall > 0) G.callBall -= dt;
   if (pl.off.type === 'run' || G.qbScramble) return;
   G.qbThink -= dt; if (G.qbThink > 0) return; G.qbThink = 0.15;
   const minT = (pl.off.fake ? 1.35 : pl.off.screen || pl.off.quick ? 0.6 : 1.0) + [0.15, 0, -0.1, -0.2][G.diff];
@@ -1090,6 +1104,7 @@ function cpuQB(dt) {
     let sc = op + clamp(down, -3, 35) * 0.13 + (r.route && r.route.i >= r.route.pts.length && r.route.end === 'sit' ? 0.3 : 0);
     if (s === 1 && !pl.off.screen) sc -= 1.4 - Math.min(1, (pl.t - minT) * 0.4); // check-down only when nothing else is there
     if (pl.off.screen && s === 1) sc += 3;
+    if (G.lock && r.cap && G.poss === G.human) sc += G.callBall > 0 ? 0.9 : 0; // your QB looks for you (more when you call for it)
     if (op < 1.2) sc -= 1.5; // don't throw into a defender
     sc += [-0.6, 0, 0.3, 0.6][G.diff] * (op > 2 ? 1 : 0);
     if (down < Math.abs(G.firstDownX - G.los) && G.down >= 3) sc -= 0.8;
@@ -1889,6 +1904,8 @@ function updateHint() {
   }
   const humanOff = G.poss === G.human;
   const b = G.ball;
+  if (G.lock && G.phase === 'live' && humanOff && G.humanPlayer && G.humanPlayer !== G.O[0] && b.holder !== G.humanPlayer && !b.flight) { G.hint = 'PLAYER LOCK  •  WASD run your route  •  SPACE = call for the ball'; return; }
+  if (G.lock && G.phase === 'presnap' && !humanOff) { G.hint = 'PLAYER LOCK: you play your guy  •  V press  •  B show blitz  •  T timeout'; return; }
   if (G.phase === 'presnap') G.hint = humanOff ? (G.play.off.type === 'run' ? 'SPACE snap  •  Z audible  •  T timeout' : `SPACE snap  •  1-4 hot route  •  M motion${G.versus ? '' : '  •  Z audible'}  •  T timeout`) : `Q / TAB pick defender  •  V press  •  B show blitz${G.versus ? '' : '  •  Z audible'}  •  T timeout`;
   else if (G.phase === 'live') {
     const h = G.humanPlayer;
@@ -1900,6 +1917,8 @@ function updateHint() {
 
 function updateHintMobile() {
   const humanOff = G.poss === G.human, b = G.ball, h = G.humanPlayer;
+  if (G.lock && G.phase === 'live' && humanOff && h && h !== G.O[0] && b.holder !== h && !b.flight) { G.hint = 'PLAYER LOCK  •  hold to steer  •  TAP = call for the ball'; return; }
+  if (G.lock && G.phase === 'presnap' && !humanOff) { G.hint = 'PLAYER LOCK: you play your guy'; return; }
   if (G.phase === 'presnap') G.hint = humanOff ? (G.play.off.type === 'pass' ? 'TAP field to snap  •  TAP a receiver = hot route' : 'TAP to snap') : 'SWITCH = pick your defender';
   else if (G.phase === 'kickmeter') G.hint = '';
   else if (G.phase === 'live') {

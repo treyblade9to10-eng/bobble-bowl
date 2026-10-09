@@ -317,7 +317,7 @@ function drawPlayer(g, p, G, at) {
     g.strokeStyle = look.jersey; g.lineWidth = 6.5;
     g.beginPath(); g.moveTo(shx, shy); g.lineTo(ex, ey); g.stroke();
     g.strokeStyle = SKIN[p.face.skin]; g.beginPath(); g.moveTo(ex, ey); g.lineTo(hx, hy); g.stroke();
-    g.fillStyle = p.gloves || '#f2f2f2'; g.strokeStyle = OUT; g.lineWidth = 2;
+    g.fillStyle = p.teamGloves ? look.trim : p.gloves || '#f2f2f2'; g.strokeStyle = OUT; g.lineWidth = 2;
     g.beginPath(); g.arc(hx, hy, 3.8, 0, 7); g.fill(); g.stroke();
     return { hx, hy };
   };

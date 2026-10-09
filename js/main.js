@@ -79,8 +79,9 @@ function buildHow() {
     <div><h3>X-Factors</h3>
       <p>Stars have a special ability. String together big plays and they get <b>in the zone</b> (orange glow).</p>
       <p>A bad play, or 8 snaps, knocks them out of it.</p></div>
-    <div><h3>My Player</h3>
-      <p>Create your own guy, put him on any team, and play games with that team to earn XP and level him up.</p></div>
+    <div><h3>Career</h3>
+      <p>Create a player, play a college season, run the 40 at the Combine, and get picked on <b>Draft Day</b>. Then play NFL seasons until you retire, and maybe make the Hall of Fame.</p>
+      <p><b>Player Lock</b>: you only control your guy. Receivers: <b>SPACE</b> (or tap) to call for the ball. Level up for skill points, hit game goals for bonus XP.</p></div>
     <div><h3>Online</h3>
       <p>Tap <b>ONLINE</b>. One player hits <b>HOST</b> and gets a 4-letter code, the other hits <b>JOIN</b> and types it in. Each of you picks plays on your own screen.</p></div>
     <div><h3>Before the snap</h3>
@@ -339,7 +340,8 @@ G.hooks.onGameOver = s => {
   // my player XP + trophy case
   const cr = !G.challenge && !G.mini ? Career.afterGame(s) : null;
   Career.gameDone(s);
-  $('overCap').innerHTML = cr ? `MY PLAYER <b>${Career.cap.name}</b>: ${cr.line}. <b>+${cr.xp} XP</b>${cr.ups ? `<span class="lvl">OVR ${cr.before} → ${cr.after}</span>` : ''}` : '';
+  $('overCap').innerHTML = cr ? `<div class="ocTop"><span class="ocGrade g${cr.grade.replace('+', 'p')}">${cr.grade}</span><div><b>${Career.cap.name}</b>: ${cr.line}<br><b class="ocXp">+${cr.xp} XP</b>${cr.lv ? `<span class="lvl">LEVEL UP! +${cr.lv * 3} SKILL POINTS</span>` : ''}</div></div>
+    <div class="ocGoals">${cr.goals.map(g => `<span class="${g.done ? 'ok' : ''}">${g.done ? 'DONE' : 'MISSED'}: ${g.text}</span>`).join('')}</div>` : '';
   // MVP: best performer on the winning team (or yours if tied)
   const mvpSide = won || tie ? me : them;
   const score = p => p.pass / 20 + p.rush / 8 + p.rec / 8 + p.td * 6 + p.tkl * 1.5 + p.sack * 4 + p.int * 6;
@@ -363,8 +365,9 @@ G.hooks.onGameOver = s => {
   $('btnNewTeams').textContent = G.challenge ? 'CHALLENGES' : G.online ? 'MAIN MENU' : 'NEW TEAMS';
   if (G.online && Net.role === 'host') Net.over(s);
   if (inSeason) { Season.addPlayedStats(G.pstats, G.teams); seasonGameDone(s.score); }
-  $('btnSeasonCont').style.display = inSeason ? '' : 'none';
-  $('btnAgain').style.display = $('btnNewTeams').style.display = inSeason ? 'none' : '';
+  const inCareer = !!G.career;
+  $('btnSeasonCont').style.display = inSeason || inCareer ? '' : 'none';
+  $('btnAgain').style.display = $('btnNewTeams').style.display = inSeason || inCareer ? 'none' : '';
   if (G.online) $('btnAgain').style.display = 'none';
   if (inSeason && G.playoff && won) $('overTitle').textContent = Season.data.phase === 'done' ? 'CHAMPIONS' : 'YOU ADVANCE!';
   setTimeout(() => show('over'), 1400);
@@ -418,7 +421,7 @@ $('btnQuit').onclick = () => {
   if (G.online) { Net.leave(); G.online = false; G.teams = null; G.phase = 'idle'; show('title'); return; }
   SaveGame.clear();
   G.paused = false; G.teams = null; G.phase = 'idle';
-  if (G.season) { G.season = false; openSeason(); } else if (G.challenge || G.mini) { G.challenge = null; G.mini = null; openModes(); } else show('title');
+  if (G.career) { G.season = false; G.career = false; CareerUI.open(); } else if (G.season) { G.season = false; openSeason(); } else if (G.challenge || G.mini) { G.challenge = null; G.mini = null; openModes(); } else show('title');
 };
 window.addEventListener('keydown', e => { if (e.code === 'Escape' || e.code === 'KeyP') togglePause(); });
 
@@ -487,6 +490,7 @@ function updateMobileButtons() {
     if (humanCanThrow()) st = 'qb';
     else if (b.holder === h) st = 'carrier';
     else if (h.side !== G.poss || (b.holder && b.holder.side !== h.side)) st = 'def';
+    else if (G.lock && h !== G.O[0] && G.bstate === 'snap' && !b.flight) st = 'call';
   }
   if (G.phase === 'dead' && G.cellyGuy && !G.demo && (!G.online || G.cellyGuy.side === G.human)) st = 'celly';
   if (G.phase === 'presnap' && !G.demo) st = 'presnap';
