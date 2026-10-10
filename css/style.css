@@ -105,12 +105,12 @@ h2::after { content: ''; position: absolute; left: 50%; bottom: 0; width: 56px; 
 .modecard.sel .mt { color: var(--gold); }
 .modecard .md { font-size: 15px; line-height: 1.45; color: var(--dim); }
 
-#mbtns { display: none; position: absolute; right: 14px; bottom: 50px; z-index: 6; flex-direction: column; gap: 10px; }
-#mbtns.pre { right: 8px; bottom: 8px; gap: 6px; }
+#mbtns { display: none; position: absolute; right: max(16px, calc(env(safe-area-inset-right) + 8px)); bottom: max(34px, calc(env(safe-area-inset-bottom) + 24px)); z-index: 6; flex-direction: column; gap: 12px; }
+#mbtns.pre { gap: 10px; }
 body.mobile #mbtns { display: flex; }
-#mbtns button { display: none; width: 112px; height: 58px; margin: 0; font-size: 17px; background: #0c1016c0; border: 2px solid #ffffff80; clip-path: none; border-radius: 4px; padding: 0 6px; }
+#mbtns button { display: none; width: 142px; height: 72px; margin: 0; font-size: 20px; background: #0c1016c0; border: 2px solid #ffffff80; clip-path: none; border-radius: 4px; padding: 0 6px; }
 #mbtns button.on { display: block; }
-#mbtns.pre button { width: 84px; height: 34px; font-size: 13px; background: #0c1016a0; border-width: 1px; }
+#mbtns.pre button { width: 136px; height: 54px; font-size: 17px; background: #0c1016b8; border-width: 2px; }
 #mbtns button:active { background: var(--gold); color: #111; }
 #rotate { display: none; position: absolute; inset: 0; z-index: 50; background: var(--ink); flex-direction: column; align-items: center; justify-content: center;
   text-align: center; font-family: var(--hd); font-weight: 800; font-size: 24px; letter-spacing: .08em; text-transform: uppercase; }
@@ -204,10 +204,10 @@ body.mobile #vsCol .vs { font-size: 38px; } body.mobile #vsCol { min-width: 150p
 }
 
 /* ---- joystick ---- */
-#joy { display: none; position: absolute; left: 22px; bottom: 22px; width: 150px; height: 150px; border-radius: 50%; z-index: 7;
+#joy { display: none; position: absolute; left: max(22px, calc(env(safe-area-inset-left) + 12px)); bottom: max(26px, calc(env(safe-area-inset-bottom) + 18px)); width: 200px; height: 200px; border-radius: 50%; z-index: 7;
   background: #0c101640; border: 2px solid #ffffff60; touch-action: none; }
 #joy.on { display: block; }
-#joyKnob { position: absolute; left: 43px; top: 43px; width: 64px; height: 64px; border-radius: 50%; background: #ffffffb0; border: 2px solid #fff; }
+#joyKnob { position: absolute; left: 54px; top: 54px; width: 84px; height: 84px; border-radius: 50%; background: #ffffffb0; border: 2px solid #fff; }
 @media (max-height: 500px) {
   #select { justify-content: center; padding: 6px; }
   .tpanel { gap: 4px; }
@@ -658,3 +658,5 @@ button.pulse { animation: pulse 1.2s infinite; }
   #overWeek .wkG { font-size: 11px; padding: 1px 8px; } .wkBar { width: 80px; } .wkN { width: 56px; }
 }
 .rivTag { color: #ff8a5c; font-weight: 800; letter-spacing: .04em; }
+
+@media (max-height: 360px) { #joy { width: 170px; height: 170px; } #joyKnob { left: 45px; top: 45px; width: 72px; height: 72px; } #mbtns button { width: 124px; height: 62px; font-size: 18px; } #mbtns.pre button { width: 120px; height: 46px; font-size: 15px; } }

@@ -707,37 +707,60 @@ function drawRef(g, r, G) {
 // ---------- field goal / punt meter ----------
 function drawKickMeter(g, G) {
   const km = G.km; if (!km || G.phase !== 'kickmeter' || !isHumanSide(km.side) || km.cpuT != null) return;
-  const W = 560, H = 196, x0 = (CW - W) / 2, y0 = CH - H - 46;
-  g.fillStyle = '#0b0f16ee'; roundRect(g, x0, y0, W, H, 18); g.fill();
-  g.strokeStyle = '#ffd23f'; g.lineWidth = 3; roundRect(g, x0, y0, W, H, 18); g.stroke();
-  g.fillStyle = '#ffd23f'; g.font = '900 22px "Barlow Condensed", "Arial Black", sans-serif'; g.textAlign = 'center';
+  const W = 600, H = 168, x0 = (CW - W) / 2, y0 = CH - H - 40;
+  const fg = km.kind === 'fg' || km.kind === 'xp', needle = km.needle || 0, st = km.stage;
+  // panel
+  g.fillStyle = '#0b0f16f0'; g.fillRect(x0, y0, W, H);
+  g.fillStyle = '#f6c31c'; g.fillRect(x0, y0, 6, H);
+  g.textAlign = 'left'; g.fillStyle = '#fff'; g.font = 'italic 900 26px "Barlow Condensed", "Arial Black", sans-serif';
   const title = km.kind === 'punt' ? 'PUNT' : km.kind === 'ko' ? 'KICKOFF' : km.kind === 'onside' ? 'ONSIDE KICK' : km.kind === 'xp' ? 'EXTRA POINT' : `${km.yds}-YARD FIELD GOAL`;
-  g.fillText(title, CW / 2, y0 + 30);
-  g.fillStyle = '#fff'; g.font = 'bold 14px Barlow, Arial, sans-serif';
-  g.fillText(`${km.kk.name}  •  ${km.kind === 'punt' ? 'P' : 'K'}  •  ${km.kk.ovr} OVR`, CW / 2, y0 + 50);
-  // power bar
-  const bx = x0 + 40, bw = W - 80;
-  const bar = (y, label, active) => { g.fillStyle = active ? '#fff' : '#fff8'; g.font = 'bold 13px Barlow, Arial, sans-serif'; g.textAlign = 'left'; g.fillText(label, bx, y - 6); g.fillStyle = '#222'; roundRect(g, bx, y, bw, 22, 11); g.fill(); };
-  bar(y0 + 80, '1) POWER', km.stage === 0);
-  const pg = g.createLinearGradient(bx, 0, bx + bw, 0); pg.addColorStop(0, '#2fd06b'); pg.addColorStop(0.7, '#ffd23f'); pg.addColorStop(1, '#ff4040');
-  g.fillStyle = pg; roundRect(g, bx + 2, y0 + 82, Math.max(4, (bw - 4) * km.power), 18, 9); g.fill();
-  if (km.kind === 'fg' || km.kind === 'xp') {
-    const nx = bx + bw * Math.min(1, km.need);
-    g.strokeStyle = '#fff'; g.lineWidth = 3; g.beginPath(); g.moveTo(nx, y0 + 76); g.lineTo(nx, y0 + 106); g.stroke();
-    g.fillStyle = '#fff'; g.font = 'bold 11px Barlow, Arial, sans-serif'; g.textAlign = 'center'; g.fillText(km.need > 1 ? 'OUT OF RANGE!' : 'NEED', Math.min(nx, bx + bw - 30), y0 + 118);
+  g.fillText(title, x0 + 22, y0 + 32);
+  g.fillStyle = '#9aa6b5'; g.font = '600 13px Barlow, Arial, sans-serif';
+  g.fillText(`${km.kk.name}  ·  ${km.kind === 'punt' ? 'P' : 'K'}  ·  ${km.kk.ovr} OVR`, x0 + 22, y0 + 50);
+  // wind (top right)
+  const w = km.wind || gameWind();
+  g.textAlign = 'right'; g.font = '800 15px "Barlow Condensed", Arial, sans-serif';
+  if (w.mph > 0) {
+    g.fillStyle = '#cfe3ff'; g.fillText(`WIND ${w.mph} MPH`, x0 + W - 46, y0 + 30);
+    const ax = x0 + W - 26, ay = y0 + 24, L = 10 + Math.min(10, w.mph * 0.6);
+    g.strokeStyle = '#cfe3ff'; g.lineWidth = 3; g.beginPath(); g.moveTo(ax, ay - w.dir * L / 2); g.lineTo(ax, ay + w.dir * L / 2); g.stroke();
+    g.fillStyle = '#cfe3ff'; g.beginPath(); g.moveTo(ax, ay + w.dir * (L / 2 + 6)); g.lineTo(ax - 6, ay + w.dir * (L / 2 - 2)); g.lineTo(ax + 6, ay + w.dir * (L / 2 - 2)); g.fill();
+    if (fg && w.mph >= 6) { g.font = '600 12px Barlow, Arial, sans-serif'; g.fillStyle = '#9aa6b5'; g.fillText(`pushes it ${w.dir > 0 ? 'DOWN' : 'UP'}: tap a hair ${w.dir > 0 ? 'LATE' : 'EARLY'}`, x0 + W - 22, y0 + H - 12); }
+  } else { g.fillStyle = '#9aa6b5'; g.fillText('NO WIND', x0 + W - 22, y0 + 30); }
+  // the meter: 0 on the left, full power on the right. Needle goes right (power), then back left across the accuracy line
+  const bx = x0 + 22, bw = W - 44, by = y0 + 72, bh = 34;
+  const X = v => bx + bw * v;
+  g.fillStyle = '#1a212c'; g.fillRect(bx, by, bw, bh);
+  // power fill
+  const pw = st >= 2 ? km.power : needle;
+  const pg = g.createLinearGradient(bx, 0, bx + bw, 0); pg.addColorStop(0, '#1f8f4c'); pg.addColorStop(0.65, '#f6c31c'); pg.addColorStop(1, '#e8401c');
+  g.fillStyle = pg; g.globalAlpha = st >= 2 ? 0.45 : 0.9; g.fillRect(bx, by, bw * pw, bh); g.globalAlpha = 1;
+  // tick marks
+  g.fillStyle = '#ffffff22'; for (let i = 1; i < 10; i++) g.fillRect(X(i / 10) - 1, by, 2, bh);
+  // accuracy zone + line
+  const zh = km.tol * KM_SCALE, soft = !fg;
+  g.fillStyle = soft ? '#2fd06b55' : '#2fd06bcc'; g.fillRect(X(Math.max(0, KM_LINE - zh)), by, X(KM_LINE + zh) - X(Math.max(0, KM_LINE - zh)), bh);
+  g.fillStyle = '#fff'; g.fillRect(X(KM_LINE) - 1.5, by - 6, 3, bh + 12);
+  // power you need for this kick
+  if (fg) {
+    const nx = X(Math.min(1, km.need));
+    g.fillStyle = km.need > 1 ? '#e8401c' : '#fff'; g.beginPath(); g.moveTo(nx, by - 2); g.lineTo(nx - 7, by - 12); g.lineTo(nx + 7, by - 12); g.fill();
+    g.font = '800 11px "Barlow Condensed", Arial, sans-serif'; g.textAlign = 'center'; g.fillText(km.need > 1 ? 'OUT OF RANGE' : 'NEED', Math.min(nx, bx + bw - 34), by - 15);
   }
-  // aim bar
-  bar(y0 + 146, '2) AIM', km.stage === 1);
-  const cx = bx + bw / 2, zw = bw / 2 * km.tol;
-  const soft = km.kind === 'punt' || km.kind === 'ko' || km.kind === 'onside';
-  g.fillStyle = soft ? '#2fd06b55' : '#2fd06b'; g.fillRect(cx - zw, y0 + 148, zw * 2, 18);
-  if (soft) { g.fillStyle = '#ff404077'; g.fillRect(bx + 2, y0 + 148, bw / 2 * 0.25, 18); g.fillRect(bx + bw - 2 - bw / 2 * 0.25, y0 + 148, bw / 2 * 0.25, 18); }
-  if (km.stage >= 1) {
-    const ax = cx + km.aim * (bw / 2 - 4);
-    g.fillStyle = '#fff'; g.beginPath(); g.moveTo(ax, y0 + 144); g.lineTo(ax - 8, y0 + 134); g.lineTo(ax + 8, y0 + 134); g.fill();
-    g.fillRect(ax - 2, y0 + 146, 4, 22);
+  // locked power marker
+  if (st >= 2) { g.fillStyle = '#f6c31c'; g.fillRect(X(km.power) - 2, by - 4, 4, bh + 8); }
+  // needle
+  if (st >= 1) {
+    const nx = X(clamp(needle, -0.05, 1));
+    g.fillStyle = '#ffffff55'; g.fillRect(nx - 5, by - 8, 10, bh + 16);
+    g.fillStyle = '#fff'; g.fillRect(nx - 2, by - 8, 4, bh + 16);
   }
-  g.fillStyle = '#ffd23f'; g.font = 'bold 14px Barlow, Arial, sans-serif'; g.textAlign = 'center';
-  const tap = G.mode === 'mobile' ? 'TAP' : G.online ? 'SPACE' : G.versus && km.side !== G.p1 ? 'P2: ENTER' : G.versus ? 'P1: SPACE' : 'SPACE';
-  g.fillText(km.stage === 0 ? `${tap} to lock the POWER` : km.stage === 1 ? `${tap} when the needle is in the GREEN` : '', CW / 2, y0 + H - 6);
+  // labels
+  g.font = '800 12px "Barlow Condensed", Arial, sans-serif'; g.textAlign = 'left'; g.fillStyle = '#9aa6b5';
+  g.fillText('ACCURACY', X(KM_LINE) - 20, by + bh + 16);
+  g.textAlign = 'right'; g.fillText('POWER', bx + bw, by + bh + 16);
+  // what to do
+  const tap = G.mode === 'mobile' ? 'TAP' : G.online ? 'SPACE' : G.versus && km.side !== G.p1 ? 'ENTER' : 'SPACE';
+  g.textAlign = 'center'; g.fillStyle = '#f6c31c'; g.font = 'italic 900 19px "Barlow Condensed", Arial, sans-serif';
+  g.fillText(st === 0 ? `${tap} TO START THE KICK` : st === 1 ? `${tap} TO SET THE POWER` : st === 2 ? `${tap} ON THE WHITE LINE` : '', CW / 2, y0 + H - 12);
 }

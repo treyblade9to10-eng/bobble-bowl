@@ -65,11 +65,11 @@ function setupReturn(kind, k) {
 
 function startKickMeter(kind, k) {
   const kk = kickerOf(k, kind === 'punt' ? 'punt' : 'fg');
-  G.km = { kind, yds: 0, kk, stage: 0, t: 0, power: 0, aim: 0, side: k, rateP: 0.75 + (90 - kk.ovr) * 0.02, rateA: 0.9 + (90 - kk.ovr) * 0.028, need: 0, tol: 0.35 };
+  G.km = { kind, yds: 0, kk, stage: 0, t: 0, power: 0, aim: 0, side: k, rateP: 0.85 + (90 - kk.ovr) * 0.02, rateA: 1.0 + (90 - kk.ovr) * 0.025, need: 0, tol: 0.35 };
   if (isHumanSide(k) && !G.demo) { G.phase = 'kickmeter'; G.km.wait = 0.35; return; }
   // CPU kickoffs: mostly land in the field so you get to return them, sometimes a deep boot
   G.km.power = kind === 'onside' ? rand(0.3, 0.8) : kind === 'ko' ? (chance(0.7) ? rand(0.15, 0.68) : rand(0.7, 0.98)) : rand(0.6, 0.98); G.km.aim = rand(-0.4, 0.4);
-  G.phase = 'kickmeter'; G.km.cpuT = 0.8; G.km.stage = 2; // short pause so you can see the lineup
+  G.phase = 'kickmeter'; G.km.cpuT = 0.8; G.km.stage = 3; // short pause so you can see the lineup
 }
 
 // called by the kick meter (or the CPU) — the ball goes up, the return team waits for it

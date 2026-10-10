@@ -11,7 +11,7 @@ const OFF_PLAYS = [
   { key: 'zone', form: 'iform', name: 'Inside Zone', type: 'run', desc: 'Handoff right up the gut.',
     rb: { path: [[-3.6, 0.6], [0.5, 0.4], [10, 0]], end: 'go' }, wr: 'block' },
   { key: 'toss', form: 'gun', name: 'Toss Sweep', type: 'run', desc: 'Pitch it outside and race the edge.',
-    rb: { path: [[-4.2, 7.5], [-2.2, 12], [1.5, 15], [12, 16]], end: 'go' }, wr: 'block', toss: true },
+    rb: { path: [[-4, 6], [-1.8, 10], [1.5, 12.5], [12, 13.5]], end: 'go' }, wr: 'block', toss: true },
   { key: 'slants', form: 'gun', name: 'Slants', type: 'pass', desc: 'Quick slants. Get it out fast!',
     routes: { 2: { r: [[2, 0], [9, -7]], end: 'go' }, 3: { r: [[2, 0], [9, -7]], end: 'go' }, 4: { r: [[5, 0], [6, 5]], end: 'sit' },
               1: { r: [[1, 4], [2, 9]], end: 'sit' } } },

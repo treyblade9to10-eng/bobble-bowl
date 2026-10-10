@@ -59,7 +59,7 @@ function newGame(home, away, opts) {
 }
 function initGame(home, away, opts) {
   Object.assign(G, {
-    tend: null, prevClock: null, rivalry: null, teams: [home, away], human: opts.humanSide || 0, diff: opts.diff, flags: [], playClock: 0, playoff: !!opts.playoff, qtrLen: opts.qtr, score: [0, 0], quarter: 1, clock: opts.qtr,
+    tend: null, prevClock: null, rivalry: null, wind: null, teams: [home, away], human: opts.humanSide || 0, diff: opts.diff, flags: [], playClock: 0, playoff: !!opts.playoff, qtrLen: opts.qtr, score: [0, 0], quarter: 1, clock: opts.qtr,
     fx: [], banner: null, players: [], ball: null, patSide: null, twoPt: false, next: null, firstPoss: 1, paused: false,
     pstats: {}, tstats: [{ pass: 0, rush: 0, to: 0 }, { pass: 0, rush: 0, to: 0 }],
     timeouts: [3, 3], special: null, pendingRunoff: 0, twoMinQ: 0, twoMinAfterPlay: false, runFrom: 0, mini: null, scenario: opts.scenario || null,
@@ -347,7 +347,7 @@ function snapMotion() {
   const m = G.motion; G.motion = null; G.cpuMotion = null;
   for (const p of G.players) p.inMotion = false;
   // jet sweep / toss: the runner is already flying at the snap
-  if (G.play.off.jet || G.play.off.toss) { const j = G.O[G.play.off.carrier || 1], t = j.route && j.route.pts[0]; if (t) { const dx = t.x - j.x, dy = t.y - j.y, m2 = Math.hypot(dx, dy) || 1; j.vx = dx / m2 * j.spd; j.vy = dy / m2 * j.spd; } }
+  if (G.play.off.jet) { const j = G.O[G.play.off.carrier || 1], t = j.route && j.route.pts[0]; if (t) { const dx = t.x - j.x, dy = t.y - j.y, m2 = Math.hypot(dx, dy) || 1; j.vx = dx / m2 * j.spd; j.vy = dy / m2 * j.spd; } }
   if (m && m.p.route && G.play.off.mroute && m.p === G.O[4]) { // motion play: his route starts from where he is, heading the way he was going
     const d = dirOf(G.poss), dir = Math.sign(m.to - m.from) || 1, p = m.p, deepX = goalX(G.poss) + d * 7.5;
     p.route = { pts: G.play.off.mroute.map(([dd, oo]) => { const x = p.x + d * dd; return { x: d > 0 ? Math.min(x, deepX) : Math.max(x, deepX), y: clamp(p.y + dir * oo, 1.2, FIELD_W - 1.2) }; }), end: G.play.off.mend || 'go', i: 0 };
@@ -970,7 +970,10 @@ function ai(p, dt) {
     if (carrier === p) return aiRunner(p, dt);
     if (carrier && p.side === carrier.side) return aiEscort(p, carrier);
     // run fits: until he reads it, a back-seven defender fills his gap at the line instead of beelining to the ball
-    if (carrier && !p.off && p.pos !== 'DL' && G.play.off.type === 'run' && G.play.t < readTime(p) + 0.15 && d * (carrier.x - G.los) < 0 && dist(p, carrier) > 2.2) {
+    const wide = G.play.off.toss || G.play.off.jet;
+    if (carrier && !p.off && p.pos !== 'DL' && G.play.off.type === 'run' && G.play.t < readTime(p) - (wide ? 0.25 : 0) + 0.15 && d * (carrier.x - G.los) < 0 && dist(p, carrier) > 2.2) {
+      // inside runs: fill your gap. Sweeps/tosses: flow outside with him and keep him from turning the corner
+      if (wide) return steer(p, G.los + d * 2.5, carrier.y + Math.sign(carrier.y - G.ballY || 1) * 2.5, 1.0, 0.3);
       return steer(p, G.los + d * 1.2, lerp(p.y, carrier.y, 0.45), 0.85, 0.4);
     }
     if (carrier) return pursue(p, carrier);
@@ -1432,12 +1435,13 @@ function throwTo(qb, r, pitch = false, aimed = null, style = 'normal', lead = nu
   const b = G.ball;
   const arm = qbArm(qb);
   const sMul = style === 'bullet' ? 1.3 : style === 'lob' ? 0.72 : 1;
-  const spd = (pitch ? 13 : Math.max(11, 19 + (arm.thp - 70) * 0.16)) * GAME_SPEED * (pitch ? 1 : sMul);
+  const spd = (pitch ? 20 : Math.max(11, 19 + (arm.thp - 70) * 0.16)) * GAME_SPEED * (pitch ? 1 : sMul); // pitches are short and quick
   let tx = r.x, ty = r.y, T = 0.3;
   const sitting = r.route && r.route.end === 'sit' && r.route.i >= r.route.pts.length;
   if (aimed) { tx = aimed.x; ty = aimed.y; T = Math.max(0.3, Math.hypot(tx - qb.x, ty - qb.y) / spd); }
   else for (let k = 0; k < 4; k++) {
-    T = Math.max(pitch ? 0.3 : 0.35, Math.hypot(tx - qb.x, ty - qb.y) / spd);
+    T = Math.max(pitch ? 0.25 : 0.35, Math.hypot(tx - qb.x, ty - qb.y) / spd);
+    if (pitch) T = Math.min(T, 0.4);
     if (sitting) break;
     tx = r.x + r.vx * T; ty = r.y + r.vy * T;
   }
@@ -1822,7 +1826,7 @@ function doKick(kind) {
   const yds = kind === 'xp' ? 33 : kind === 'fg' ? Math.round(Math.abs(goalX(s) - G.los) + 17) : 0;
   const ovr = kk.ovr;
   G.km = { kind, yds, kk, stage: 0, t: 0, power: 0, aim: 0, side: s,
-           rateP: 0.75 + (90 - ovr) * 0.02, rateA: 0.9 + (90 - ovr) * 0.028,
+           rateP: 0.85 + (90 - ovr) * 0.02, rateA: 1.0 + (90 - ovr) * 0.025,
            need: kind === 'punt' ? 0 : yds / fgRange(ovr), tol: kind === 'punt' ? 0.35 : fgTol(yds, ovr) * (kind === 'xp' ? 1.25 : 1) };
   G.playClock = 0;
   if (isHumanSide(s) && !G.demo) { G.phase = 'kickmeter'; G.km.wait = 0.35; return; }
@@ -1839,19 +1843,39 @@ function doKick(kind) {
 }
 
 const tri = t => 1 - Math.abs(((t % 2) + 2) % 2 - 1); // 0..1..0
+// wind for this game: none in a dome, more when it's raining or snowing. dir +1 pushes the ball down the screen
+function gameWind() {
+  if (!G.wind) { const dome = typeof stadiumOf === 'function' && G.teams && stadiumOf(G.teams[0]).dome; G.wind = { mph: dome || G.mini ? 0 : Math.round(rand(0, 13) + (G.weather === 'rain' || G.weather === 'snow' ? 6 : 0)), dir: chance(0.5) ? 1 : -1 }; }
+  return G.wind;
+}
+// 3-tap kick meter: tap to start the swing, tap to lock the POWER, then tap again as the needle comes back across the ACCURACY line.
+// Early = it drifts one way, late = the other. Better kickers swing slower and get a wider accuracy zone.
+const KM_LINE = 0.1, KM_SCALE = 0.4;
 function updateKickMeter(dt) {
   const km = G.km;
   km.t += dt;
   if (km.cpuT != null) { km.cpuT -= dt; if (km.cpuT <= 0) { km.cpuT = null; launchReturnKick(); } return; }
   if (km.wait > 0) { km.wait -= dt; Input.taps.length = 0; return; }
   const press = Input.hit('Space') || Input.taps.length > 0;
-  if (km.stage === 0) {
-    km.power = tri(km.t * km.rateP);
-    if (press) { km.stage = 1; km.t2 = 0; Sound.click(); }
-  } else if (km.stage === 1) {
-    km.t2 += dt;
-    km.aim = tri(km.t2 * km.rateA + 0.5) * 2 - 1;
-    if (press) { km.stage = 2; Sound.click(); (km.kind === 'punt' || km.kind === 'ko' || km.kind === 'onside') ? launchReturnKick() : launchKick(); }
+  if (km.needle == null) km.needle = 0;
+  if (km.stage === 0) { // waiting for the first tap
+    if (press) { km.stage = 1; Sound.click(); }
+  } else if (km.stage === 1) { // swinging up = power
+    km.needle = Math.min(1, km.needle + dt * km.rateP);
+    km.power = km.needle;
+    if (press || km.needle >= 1) { km.stage = 2; km.power = km.needle; km.maxed = km.needle >= 1; Sound.click(); }
+  } else if (km.stage === 2) { // coming back down = accuracy
+    km.needle -= dt * km.rateA;
+    const done = press || km.needle < KM_LINE - KM_SCALE;
+    if (done) {
+      km.aim = clamp((km.needle - KM_LINE) / KM_SCALE, -1, 1);
+      const w = gameWind(); km.windPush = w.dir * w.mph / 15 * (km.kind === 'xp' || km.kind === 'fg' ? 0.16 * Math.max(0.6, km.yds / 40) : 0.2);
+      km.aim = clamp(km.aim + km.windPush, -1, 1);
+      km.stage = 3; Sound.click();
+      const good = Math.abs(km.aim) <= km.tol;
+      if (km.kind === 'fg' || km.kind === 'xp') addText(G.los, G.ballY - 8, km.power < km.need ? 'NOT ENOUGH LEG' : good ? (Math.abs(km.aim) < km.tol * 0.35 ? 'PERFECT!' : 'GOOD CONTACT') : km.aim > 0 ? 'PUSHED IT' : 'PULLED IT', good && km.power >= km.need ? '#9cff9c' : '#ff8a8a', 18, 1.2);
+      (km.kind === 'punt' || km.kind === 'ko' || km.kind === 'onside') ? launchReturnKick() : launchKick();
+    }
   }
 }
 

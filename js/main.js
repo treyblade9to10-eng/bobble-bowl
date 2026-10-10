@@ -538,13 +538,22 @@ const endPointer = e => {
   const P = Input.pointer;
   const quick = performance.now() - P.start < 260;
   if (P.aiming || (G.online && Net.role === 'guest' && P.moved)) { Input.release = { x: P.x0 - P.x, y: P.y0 - P.y }; Input.flick = performance.now() - P.start < 330; }
-  else if (!P.moved && quick) Input.taps.push({ x: P.x, y: P.y });
+  else if (!P.moved && quick && !nearMobileButton(e)) Input.taps.push({ x: P.x, y: P.y });
   P.down = false; P.moved = false; P.aiming = false;
 };
 cv.addEventListener('pointerup', endPointer);
 cv.addEventListener('pointercancel', endPointer);
 cv.addEventListener('contextmenu', e => e.preventDefault());
 
+// a tap that just misses a mobile button shouldn't count as "tap the field" (that would snap the ball)
+function nearMobileButton(e) {
+  if (G.mode !== 'mobile') return false;
+  for (const b of document.querySelectorAll('#mbtns button.on')) {
+    const r = b.getBoundingClientRect(), pad = 26;
+    if (e.clientX > r.left - pad && e.clientX < r.right + pad && e.clientY > r.top - pad && e.clientY < r.bottom + pad) return true;
+  }
+  return false;
+}
 // joystick (mobile)
 (function joystick() {
   const joy = $('joy'), knob = $('joyKnob'); let id = null;
@@ -555,9 +564,10 @@ cv.addEventListener('contextmenu', e => e.preventDefault());
     if (!isFinite(x) || !isFinite(y)) return;
     const m = Math.hypot(x, y); if (m > 1) { x /= m; y /= m; }
     Input.stick.x = x; Input.stick.y = y; Input.stick.m = Math.min(1, m);
-    knob.style.left = (43 + x * 45) + 'px'; knob.style.top = (43 + y * 45) + 'px';
+    const c = (joy.clientWidth - knob.offsetWidth) / 2, travel = joy.clientWidth * 0.32;
+    knob.style.left = (c + x * travel) + 'px'; knob.style.top = (c + y * travel) + 'px';
   };
-  const reset = () => { id = null; Input.stick.x = Input.stick.y = Input.stick.m = 0; knob.style.left = knob.style.top = '43px'; };
+  const reset = () => { id = null; Input.stick.x = Input.stick.y = Input.stick.m = 0; knob.style.left = knob.style.top = ''; };
   joy.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); id = e.pointerId; try { joy.setPointerCapture(id); } catch (_) {} set(e); });
   joy.addEventListener('pointermove', e => { if (e.pointerId === id) set(e); });
   joy.addEventListener('pointerup', e => { if (e.pointerId === id) reset(); });
@@ -586,7 +596,7 @@ function updateMobileButtons() {
   if (G.phase === 'presnap' && !G.demo) st = 'presnap';
   const joyOn = G.phase === 'live' && !G.demo && !!h; // stays up the whole play so your thumb never loses it
   $('joy').classList.toggle('on', !!joyOn);
-  if (!joyOn && Input.stick.m) { Input.stick.x = Input.stick.y = Input.stick.m = 0; $('joyKnob').style.left = $('joyKnob').style.top = '43px'; }
+  if (!joyOn && Input.stick.m) { Input.stick.x = Input.stick.y = Input.stick.m = 0; $('joyKnob').style.left = $('joyKnob').style.top = ''; }
   const side = G.poss === G.human ? 'off' : 'def';
   const po = G.play && G.play.off, canMotion = !!po && (po.type === 'pass' || po.toss || po.carrier === 4);
   const key = st + side + canMotion + (b && b.flight ? 'air' : '') + (h && h.engaged ? 'eng' : '');
