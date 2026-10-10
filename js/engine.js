@@ -65,9 +65,10 @@ function initGame(home, away, opts) {
     timeouts: [3, 3], special: null, pendingRunoff: 0, twoMinQ: 0, twoMinAfterPlay: false, runFrom: 0, mini: null, scenario: opts.scenario || null,
     weather: stadiumOf(home).dome ? 'clear' : (opts.weather || 'clear'), night: !!opts.night, stadium: stadiumOf(home), uni: opts.uni || null, pbp: [], pbpShow: null, lastResult: null,
     versus: !!opts.versus, p1: opts.humanSide || 0, hd: [null, null], hp: [null, null], humanDef: null,
-    career: opts.career || false, lock: !!opts.lock, callBall: 0
+    career: opts.career || false, lock: !!opts.lock, callBall: 0, sitOut: false
   });
   if (G.versus) G.diff = 1;
+  Injury.reset();
   Input.versus = G.versus; Input.ctl = 0;
   setupXFactors();
 }
@@ -91,7 +92,7 @@ function stat(p) {
 
 // ---------------- play calling ----------------
 function toPlayCall() {
-  G.phase = 'playcall';
+  G.phase = 'playcall'; G.sitOut = false;
   G.ball = null;
   G.flags = [];
   G.fx = G.fx.filter(f => f.kind !== 'flag');
@@ -105,6 +106,13 @@ function toPlayCall() {
   }
   cpuTimeoutCheck();
   if (typeof SaveGame !== 'undefined') SaveGame.save();
+  G.sitOut = lockSitsOut();
+  if (G.sitOut) { // Player Lock: your guy is on the sideline, so the coach calls it and the play runs itself (fast)
+    const off = G.poss === G.human;
+    if (!G.banner || G.banner.t > 1) showBanner(off ? 'OFFENSE ON THE FIELD' : 'DEFENSE ON THE FIELD', 'Your player is on the sideline', '#9aa6b5', 1.0);
+    setTimeout(() => { if (G.phase === 'playcall' && G.sitOut) choosePlay(off ? cpuOffCall() : cpuDefCall()); }, 650);
+    return;
+  }
   if (G.versus) return G.hooks.onPlayCall({ ...withSide(G.poss, playCallCtx), side: G.poss });
   G.hooks.onPlayCall(playCallCtx());
 }
@@ -121,25 +129,50 @@ function playCallCtx() {
     timeouts: G.timeouts ? G.timeouts[G.human] : 0, kneel: G.poss === G.human && canKneelOut(), canSpike: humanOff && G.down < 4 && !G.twoPt && G.pendingRunoff > 0, lastKey: humanOff ? G.lastOffKey : G.lastDefKey };
 }
 
+// does the CPU go for it on 4th down? Thinks about the score, the clock and the field like a real coach
+function cpuGoForIt(toGo, fgOk) {
+  const margin = G.score[G.poss] - G.score[1 - G.poss], own = fromOwn(G.poss, G.los);
+  const q = G.quarter, left = G.clock / (G.qtrLen || 300); // share of the quarter left
+  const late = q >= 4 && left < 0.5, veryLate = q >= 4 && left < 0.2;
+  if (q >= 4 && margin < 0) {
+    if (fgOk && margin >= -3 && (veryLate || toGo > 3)) return false;    // a field goal ties it or wins it: kick it
+    if (veryLate) return true;                                           // a field goal doesn't save us: must go
+    if (late && margin < -3 && (own > 40 || toGo <= 4)) return true;     // down more than a field goal late: go
+    if (late && margin < -8 && own > 25) return true;                    // two scores down: can't give it back
+  }
+  if (q >= 4 && margin > 0 && own < 60) return false;                    // protecting a lead: punt it away
+  if (q === 2 && left < 0.08 && fgOk) return false;                      // end of half: take the points
+  if (toGo <= 1 && own >= 40) return true;                               // 4th and inches past midfield
+  if (toGo <= 2 && own >= 55 && !fgOk) return true;                      // no man's land
+  if (toGo <= 3 && own >= 62 && own <= 80 && chance(0.4)) return true;
+  return false;
+}
 function cpuOffCall() {
   if (canKneelOut()) return 'kneel';
+  const toGo = Math.abs(G.firstDownX - G.los);
+  const margin = G.score[G.poss] - G.score[1 - G.poss], left = G.clock / (G.qtrLen || 300);
+  const hurry = (G.quarter >= 4 && margin < 0 && left < 0.4) || (G.quarter === 2 && left < 0.15); // need to score: pass and get out of bounds
+  const milk = G.quarter >= 4 && margin > 0 && left < 0.4;                                          // ahead late: run the clock
   if (G.down === 4 && !G.twoPt) {
     const fg = Math.abs(goalX(G.poss) - G.los) + 17;
-    const toGo = Math.abs(G.firstDownX - G.los);
-    const behind = G.score[G.poss] < G.score[1 - G.poss];
-    const desperate = G.quarter >= 4 && behind && G.clock < 60;
-    if (!desperate && !(toGo <= 2 && fromOwn(G.poss, G.los) > 45)) {
-      const fgOk = fg <= fgRange(kickerOf(G.poss, 'fg').ovr) - 4;
-      if (toGo <= 5 && chance(0.04)) return fgOk ? 'fakefg' : 'fakepunt';
-      if (fgOk && !(desperate)) return 'fg';
-      return 'punt';
+    const fgOk = fg <= fgRange(kickerOf(G.poss, 'fg').ovr) - 4;
+    if (!cpuGoForIt(toGo, fgOk)) {
+      if (toGo <= 5 && !hurry && !milk && chance(0.04)) return fgOk ? 'fakefg' : 'fakepunt';
+      return fgOk ? 'fg' : 'punt';
     }
+    // going for it: pick a play that can actually get the yards
+    if (toGo <= 1) return pick(['sneak', 'power', 'sneak', 'zone']);
+    if (toGo <= 3) return pick(['power', 'slants', 'mesh', 'zone', 'mflat']);
+    if (toGo <= 9) return pick(['curls', 'smash', 'ycross', 'slants', 'outs', 'mesh']);
+    return pick(['verts', 'flood', 'ycross', 'drive', 'stopgo']);
   }
-  const toGo = Math.abs(G.firstDownX - G.los);
-  const runW = toGo <= 3 ? 0.55 : toGo >= 8 ? 0.15 : 0.35;
+  if (G.clock < 8 && G.quarter % 2 === 0 && fromOwn(G.poss, G.los) > 45 && margin <= 0) return 'hail';
+  let runW = toGo <= 3 ? 0.55 : toGo >= 8 ? 0.15 : 0.35;
+  if (hurry) runW = toGo <= 2 ? 0.3 : 0.08;
+  if (milk) runW = toGo >= 10 ? 0.35 : 0.75;
   if (toGo <= 1 && chance(0.35)) return 'sneak';
-  if (chance(runW)) return pick(['zone', 'zone', 'toss', 'qbdraw', 'dive', 'counter', 'jet', 'power', 'power']);
-  if (G.clock < 8 && G.quarter % 2 === 0 && fromOwn(G.poss, G.los) > 45) return 'hail';
+  if (chance(runW)) return milk ? pick(['zone', 'power', 'dive', 'counter', 'power']) : pick(['zone', 'zone', 'toss', 'qbdraw', 'dive', 'counter', 'jet', 'power', 'power']);
+  if (hurry) return toGo >= 10 ? pick(['verts', 'flood', 'outs', 'drive', 'ycross', 'smash']) : pick(['outs', 'smash', 'flood', 'curls', 'outs', 'slants', 'mesh']); // sideline routes stop the clock
   return toGo >= 12 ? pick(['verts', 'pa', 'mesh', 'curls', 'verts', 'ycross', 'flood', 'stopgo', 'drive', 'mwheel', 'mseam']) : pick(['slants', 'mesh', 'curls', 'screen', 'pa', 'verts', 'slants', 'outs', 'bubble', 'smash', 'drive', 'ycross', 'mflat', 'mdrag', 'mseam', 'mwheel']);
 }
 function cpuDefCall() {
@@ -177,8 +210,9 @@ function choosePlay(key, defPick) {
   const fake = FAKE_PLAYS.find(p => p.key === offKey);
   if (fake) setupFake(fake);
   else setupPlay(OFF_PLAYS.find(p => p.key === offKey), DEF_PLAYS.find(p => p.key === defKey));
-  G.phase = 'presnap';
-  G.snapTimer = humanOff ? Infinity : G.cpuMotion != null ? 2.4 : 1.6;
+  G.phase = 'presnap'; G.presnapAt = G.time;
+  Input.pressed = {}; Input.taps.length = 0; // the key/tap that picked the play doesn't count as a hot route or snap
+  G.snapTimer = humanOff && !G.sitOut ? Infinity : G.cpuMotion != null ? 2.4 : 1.6;
   if (G.play && G.play.off && G.play.off.motion) { G.cpuMotion = null; startMotion(); if (!humanOff) G.snapTimer = 2.2; } // motion plays: he takes off right away
 }
 
@@ -446,17 +480,9 @@ function update(dt) {
   } else if (G.phase === 'live') {
     livePlay(dt);
   } else if (G.phase === 'dead') {
-    for (const p of G.players) { p.dvx = 0; p.dvy = 0; applyMove(p, dt); if (p.celly) p.celly.t += dt; }
+    for (const p of G.players) { p.dvx = 0; p.dvy = 0; applyMove(p, dt); if (p.celly) Celly.update(p, dt); }
     const cg = G.cellyGuy;
-    if (cg) withSide(cg.side, () => {
-      const moves = { ArrowUp: 'leap', KeyW: 'leap', ArrowDown: 'griddy', KeyS: 'griddy', ArrowLeft: 'spike', KeyA: 'spike', ArrowRight: 'dab', KeyD: 'dab' };
-      for (const k in moves) if (Input.hit(k)) {
-        cg.celly = { type: moves[k], t: 0 }; cg.celebrate = 3;
-        addText(cg.x, cg.y - 2, { leap: 'LEAP!', griddy: 'THE GRIDDY!', spike: 'SPIKE IT!', dab: 'DAB!' }[moves[k]], '#ffd23f', 26, 1);
-        Sound.boing(); Sound.crowd(false); G.crowdHype = 1.5;
-        if (moves[k] === 'spike') { G.ball.holder = null; G.ball.x = cg.x + cg.face.dir * 0.6; G.ball.y = cg.y; G.ball.z = 2; G.ball.dead = { vx: cg.face.dir * 2, vy: rand(-1, 1) }; G.ball.bounce = 0.9; }
-      }
-    });
+    if (cg) withSide(cg.side, () => Celly.input(cg));
     updateBallPhysicsDead(dt);
     G.deadT -= dt;
     if (G.deadT <= 0) { if (Replay.want()) Replay.start(); else afterPlay(); }
@@ -479,11 +505,13 @@ function update(dt) {
 }
 // before the snap: offense snaps / hot routes, defense picks who to control
 function presnapInput(dt) {
+  if (G.sitOut) { G.snapTimer -= dt; if (G.snapTimer <= 0) snap(); return; }
   if (Input.hit('KeyT')) callTimeout(G.human);
   if (Input.hit('KeyZ') && !G.versus) { audible(); return 'audible'; }
   if (G.poss === G.human) {
     if (Input.hit('KeyM')) startMotion();
-    for (const [k, s2] of [['Digit1', 2], ['Digit2', 3], ['Digit3', 4], ['Digit4', 1]]) if (Input.hit(k)) hotRoute(s2);
+    const settled = G.time - (G.presnapAt || 0) > 0.3;
+    if (settled) for (const [k, s2] of [['Digit1', 2], ['Digit2', 3], ['Digit3', 4], ['Digit4', 1]]) if (Input.hit(k)) hotRoute(s2);
     let tapped = false;
     for (const c of Input.taps) { // tap a receiver = hot route, tap anywhere else = snap
       let best = null, bd = 50;
@@ -764,11 +792,18 @@ function updateHuman() {
     G.hp = hs; G.humanPlayer = hs[G.human];
     return;
   }
-  const h = G.lock ? lockedGuy() || humanFor() : humanFor();
+  const h = G.lock ? lockedGuy() || (G.sitOut || G.special ? null : humanFor()) : humanFor();
   if (h) h.isHuman = true;
   G.humanPlayer = h;
 }
 // Player Lock (career): you only ever control your own player
+// a WR can't play defense (and a CB can't play offense): when your guy's side of the ball is off the field, you watch
+function lockSitsOut() {
+  if (!G.lock || G.versus || G.online || G.mini || !G.teams || G.human < 0) return false;
+  const t = G.teams[G.human], cap = t.off.concat(t.def).find(p => p[6] && p[6].cap);
+  if (!cap) return false;
+  return (G.poss === G.human) !== t.off.includes(cap);
+}
 function lockedGuy() { return G.players.find(p => p.cap && p.side === G.human && p.down <= 0) || G.players.find(p => p.cap && p.side === G.human); }
 // career receiver / back: ask the QB for the ball
 function callForBall(p) {
@@ -1428,7 +1463,8 @@ function throwAt(qb, tx, ty, style) {
 }
 // QB arm: throw power sets how far and how fast, accuracy sets how close it lands to where you wanted
 function qbArm(qb) {
-  const thp = qb.thp || qb.ovr, acc = qb.tha || qb.ovr; // thp = throw power, tha = throw accuracy (created players have their own)
+  const wear = qb.side != null && qb === G.O[0] ? Injury.wear(qb.side) : 0; // a beat-up QB loses a little zip and touch
+  const thp = (qb.thp || qb.ovr) - wear * 0.04, acc = (qb.tha || qb.ovr) - wear * 0.08; // thp = throw power, tha = throw accuracy (created players have their own)
   return { thp, acc, range: 18 + thp * 0.52, accF: Math.pow(clamp((100 - acc) / 30, 0, 4), 1.3) };
 }
 function throwTo(qb, r, pitch = false, aimed = null, style = 'normal', lead = null) {
@@ -1457,9 +1493,10 @@ function throwTo(qb, r, pitch = false, aimed = null, style = 'normal', lead = nu
       addText(qb.x, qb.y - 2, 'NOT ENOUGH ARM', '#ff8a8a', 15, 0.9);
     }
     let pressure = false; for (const df of G.D) if (!df.engaged && dist(df, qb) < 2.4) pressure = true;
-    let err = (0.55 + arm.accF) * (0.42 + len / 20);
+    const elite = clamp((arm.acc - 80) / 12, 0, 1); // 92+ accuracy = elite, 80 and under = normal
+    let err = (lerp(0.55, 0.28, elite) + arm.accF) * (0.42 + len / 20);
     if (len > reach * 0.75) err *= 1 + (len / reach - 0.75) * 2; // straining for distance
-    if (pressure) err += 0.6 + arm.accF * 0.45;
+    if (pressure) err += 0.6 * (1 - elite * 0.5) + arm.accF * 0.45;
     if (qb.speedNow > 4) err += (0.3 + arm.accF * 0.3) * Math.min(1, qb.speedNow / 8);
     if (aimed) err *= lerp(0.45, 0.85, clamp(arm.accF / 2.5, 0, 1)); // you aimed it, but a bad QB still sprays it
     if (style === 'bullet') err *= 1.15; else if (style === 'lob') err *= 0.9;
@@ -1468,7 +1505,10 @@ function throwTo(qb, r, pitch = false, aimed = null, style = 'normal', lead = nu
     if (arm.thp < 62 || err > 3.5) duck = true;
     if (style !== 'normal') addText(qb.x, qb.y, style === 'bullet' ? 'BULLET!' : 'LOB!', '#7fd3ff', 15, 0.6);
     const a = rand(0, Math.PI * 2), m = Math.abs(rand(-1, 1) + rand(-1, 1)) / 2 * err * 2;
-    tx += Math.cos(a) * m; ty += Math.sin(a) * m;
+    let ex = Math.cos(a) * m, ey = Math.sin(a) * m;
+    // good QBs miss long or to the safe side, not short behind the receiver
+    if (len > 1 && !duck) { const ux = (tx - qb.x) / len, uy = (ty - qb.y) / len, along = ex * ux + ey * uy; if (along < 0) { const cut = along * clamp((arm.acc - 72) / 18, 0, 1); ex -= ux * cut; ey -= uy * cut; } }
+    tx += ex; ty += ey;
     stat(qb).att++;
     Sound.throw();
     qb.mouth = 'O'; qb.mouthT = 0.5; qb.throwAnim = 0.3; G.throwT = G.play.t;
@@ -1546,6 +1586,7 @@ function resolveCatch() {
     if (hands) pc += 0.15;
     if (def && dd < 1.8) { pc -= (hands ? 0.08 : 0.24) - (rcv.ovr - def.ovr) / 150; if (chance(0.03 + humanDefBonus * 0.5)) return intercept(def); }
     if (chance(clamp(pc, 0.25, 0.97))) {
+      if (rcv.y < -0.25 || rcv.y > FIELD_W + 0.25 || rcv.x < -0.25 || rcv.x > 120.25) { addText(rcv.x, clamp(rcv.y, 1, FIELD_W - 1), 'NO FEET IN', '#fff', 15, 1); return incomplete(rcv, 'OUT OF BOUNDS'); }
       b.holder = rcv; G.bstate = 'run'; Sound.catch(); G.catchX = rcv.x;
       rcv.mouth = 'O'; rcv.mouthT = 0.4;
       stat(f.passer).comp++; G.credit = { p: rcv, kind: 'rec', passer: f.passer };
@@ -1619,6 +1660,7 @@ function tackle(car, df, hitters) {
   const stick = df.hit > 0;
   const boom = stick || ((df.speedNow > 11 || (df.dive > 0 && df.speedNow > 10.5)) && chance(0.35));
   if (boom) { cam.shake = 15; G.slowmo = 0.45; car.dizzy = 1; addText(car.x, car.y, pick(['BOOM!', 'WHAM!', 'CRUNCH!', 'POW!']), '#ff7a3d', 30, 0.9); Sound.boing(); }
+  Injury.hit(car, boom ? 'boom' : car === G.O[0] && G.bstate === 'snap' ? 'sack' : 'tackle');
   car.down = 1.2; car.downDir = dirOf(df.side); car.vx = df.vx * 0.4; car.vy = df.vy * 0.4; car.mouth = 'O'; car.mouthT = 1.2;
   df.down = 0.9; df.downDir = car.downDir; df.dive = 0;
   car.head.vx += rand(-400, 400); car.head.vy -= 200;
@@ -1701,7 +1743,7 @@ function endPlay(res) {
     next = { kickoff: off };
   } else if (res.type === 'td') {
     G.score[cs] += 6; G.deadT = isHumanSide(cs) ? 3.8 : 2.5;
-    if (isHumanSide(cs)) { G.cellyGuy = car; car.down = 0; car.dive = 0; }
+    if (isHumanSide(cs)) { G.cellyGuy = car; car.down = 0; car.dive = 0; } else { car.down = 0; car.dive = 0; Celly.cpu(car); }
     showBanner('TOUCHDOWN!', `${car.name} • ${G.teams[cs].city} ${G.teams[cs].name}`, isHumanSide(cs) ? '#ffd23f' : '#ff6040', 2.6);
     Sound.td(); G.crowdHype = 1.5; stat(car).td++; G.slowmo = 0.9;
     for (const q of G.players) if (q.side === cs) q.celebrate = 2.6;
@@ -1752,7 +1794,9 @@ function advanceDown(x, moved) {
 
 function afterPlay() {
   const n = G.next; G.next = null;
-  if (G.cellyGuy) { G.cellyGuy.celly = null; G.cellyGuy = null; }
+  Injury.announce();
+  for (const p of G.players) if (p.celly) Celly.end(p);
+  G.cellyGuy = null;
   G.runoff = 0;
   if (G.twoMinAfterPlay) { G.pendingRunoff = 0; if (G.quarter === G.twoMinQ || G.clock <= 0) G.twoMinAfterPlay = false; else twoMinWarning(); }
   if (G.mini && typeof miniAfterPlay === 'function') return miniAfterPlay();
@@ -1770,6 +1814,7 @@ function afterPlay() {
 function endQuarter() {
   G.pendingRunoff = 0; // new quarter: clock waits for the snap
   if (G.quarter === 2) {
+    Injury.half();
     G.quarter = 3; G.clock = G.qtrLen; G.timeouts = [3, 3];
     showBanner('HALFTIME', `${G.teams[1].id} ${G.score[1]}  -  ${G.teams[0].id} ${G.score[0]}`, '#fff', 2.5);
     startKickoff(G.firstPoss); // the team that got the ball first kicks off now
@@ -1826,10 +1871,10 @@ function doKick(kind) {
   const yds = kind === 'xp' ? 33 : kind === 'fg' ? Math.round(Math.abs(goalX(s) - G.los) + 17) : 0;
   const ovr = kk.ovr;
   G.km = { kind, yds, kk, stage: 0, t: 0, power: 0, aim: 0, side: s,
-           rateP: 0.85 + (90 - ovr) * 0.02, rateA: 1.0 + (90 - ovr) * 0.025,
-           need: kind === 'punt' ? 0 : yds / fgRange(ovr), tol: kind === 'punt' ? 0.35 : fgTol(yds, ovr) * (kind === 'xp' ? 1.25 : 1) };
+           rateP: 0.7 + (90 - ovr) * 0.015, rateA: 0.6 + (90 - ovr) * 0.015,
+           need: kind === 'punt' ? 0 : yds / fgRange(ovr), tol: kind === 'punt' ? 0.35 : Math.min(0.45, fgTol(yds, ovr) * (kind === 'xp' ? 1.6 : 1.35)) };
   G.playClock = 0;
-  if (isHumanSide(s) && !G.demo) { G.phase = 'kickmeter'; G.km.wait = 0.35; return; }
+  if (isHumanSide(s) && !G.demo && !G.sitOut) { G.phase = 'kickmeter'; G.km.wait = 0.35; return; }
   // computer kicks: roll the dice using the kicker's rating
   const km = G.km;
   if (kind === 'punt') { km.power = rand(0.55, 0.95); km.aim = rand(-0.45, 0.45); }
@@ -1848,30 +1893,23 @@ function gameWind() {
   if (!G.wind) { const dome = typeof stadiumOf === 'function' && G.teams && stadiumOf(G.teams[0]).dome; G.wind = { mph: dome || G.mini ? 0 : Math.round(rand(0, 13) + (G.weather === 'rain' || G.weather === 'snow' ? 6 : 0)), dir: chance(0.5) ? 1 : -1 }; }
   return G.wind;
 }
-// 3-tap kick meter: tap to start the swing, tap to lock the POWER, then tap again as the needle comes back across the ACCURACY line.
-// Early = it drifts one way, late = the other. Better kickers swing slower and get a wider accuracy zone.
-const KM_LINE = 0.1, KM_SCALE = 0.4;
+// simple 2-tap kick meter: tap to lock the POWER as the bar fills, then tap to lock the AIM when the slider is in the green.
+// Better kickers move slower and get a wider green zone. No wind on field goals.
 function updateKickMeter(dt) {
   const km = G.km;
   km.t += dt;
   if (km.cpuT != null) { km.cpuT -= dt; if (km.cpuT <= 0) { km.cpuT = null; launchReturnKick(); } return; }
-  if (km.wait > 0) { km.wait -= dt; Input.taps.length = 0; return; }
+  if (km.wait > 0) { km.wait -= dt; Input.taps.length = 0; km.t = 0; return; }
   const press = Input.hit('Space') || Input.taps.length > 0;
-  if (km.needle == null) km.needle = 0;
-  if (km.stage === 0) { // waiting for the first tap
-    if (press) { km.stage = 1; Sound.click(); }
-  } else if (km.stage === 1) { // swinging up = power
-    km.needle = Math.min(1, km.needle + dt * km.rateP);
-    km.power = km.needle;
-    if (press || km.needle >= 1) { km.stage = 2; km.power = km.needle; km.maxed = km.needle >= 1; Sound.click(); }
-  } else if (km.stage === 2) { // coming back down = accuracy
-    km.needle -= dt * km.rateA;
-    const done = press || km.needle < KM_LINE - KM_SCALE;
-    if (done) {
-      km.aim = clamp((km.needle - KM_LINE) / KM_SCALE, -1, 1);
-      const w = gameWind(); km.windPush = w.dir * w.mph / 15 * (km.kind === 'xp' || km.kind === 'fg' ? 0.16 * Math.max(0.6, km.yds / 40) : 0.2);
-      km.aim = clamp(km.aim + km.windPush, -1, 1);
-      km.stage = 3; Sound.click();
+  if (km.stage === 0) { // power bar fills up and back down
+    km.power = tri(km.t * km.rateP);
+    if (press) { km.stage = 1; km.t2 = 0; Sound.click(); }
+  } else if (km.stage === 1) { // aim slider sweeps left and right
+    km.t2 += dt;
+    km.aim = tri(km.t2 * km.rateA) * 2 - 1;
+    if (press) {
+      km.stage = 2; Sound.click();
+      if (km.kind === 'punt' || km.kind === 'ko' || km.kind === 'onside') { const w = gameWind(); km.aim = clamp(km.aim + w.dir * w.mph / 15 * 0.12, -1, 1); }
       const good = Math.abs(km.aim) <= km.tol;
       if (km.kind === 'fg' || km.kind === 'xp') addText(G.los, G.ballY - 8, km.power < km.need ? 'NOT ENOUGH LEG' : good ? (Math.abs(km.aim) < km.tol * 0.35 ? 'PERFECT!' : 'GOOD CONTACT') : km.aim > 0 ? 'PUSHED IT' : 'PULLED IT', good && km.power >= km.need ? '#9cff9c' : '#ff8a8a', 18, 1.2);
       (km.kind === 'punt' || km.kind === 'ko' || km.kind === 'onside') ? launchReturnKick() : launchKick();
@@ -1975,11 +2013,16 @@ function updateCamera(dt) {
   let ty = MID;
   if (b && (G.phase === 'live' || G.phase === 'dead')) ty = lerp(MID, b.holder ? b.holder.y : b.y, 0.4);
   cam.y = lerp(cam.y, clamp(ty, MID - 6, MID + 6), 1 - Math.exp(-dt * 3));
+  // celly cam: push in on the guy celebrating
+  const cg = G.phase === 'dead' ? G.players.find(p => p.celly) : null;
+  if (cg) cam.focus = { x: cg.x + (cg.celly.type === 'bowl' ? (cg.face.dir || 1) * 3.5 : 0), y: cg.y };
+  cam.zoom = lerp(cam.zoom || 1, cg ? 1.6 : 1, 1 - Math.exp(-dt * (cg ? 3 : 6)));
+  if (!cg && cam.zoom < 1.01) cam.zoom = 1;
 }
 function updateHint() {
   if (!G.teams) return;
   if (G.phase === 'kickmeter' || G.mini) { G.hint = ''; return; }
-  if (G.cellyGuy && G.phase === 'dead') { G.hint = G.versus && !G.online ? `${pName(G.cellyGuy.side)}: CELEBRATE!` : G.mode === 'mobile' ? 'CELEBRATE! Tap a celly button' : 'CELEBRATE!  ↑ Leap  •  ↓ Griddy  •  ← Spike  •  → Dab'; return; }
+  if (G.cellyGuy && G.phase === 'dead') { G.hint = G.versus && !G.online ? `${pName(G.cellyGuy.side)}: CELEBRATE!` : G.mode === 'mobile' ? '' : 'CELLY:  ↑ Leap  ↓ Griddy  ← Spike  → Dab   1 Flex  2 Bow  3 Shush  4 Moonwalk   E Nap   F Bowling'; return; }
   if (G.mode === 'mobile') return updateHintMobile();
   if (G.versus && !G.online) {
     const k = s => s === G.p1 ? 'SPACE' : 'ENTER';

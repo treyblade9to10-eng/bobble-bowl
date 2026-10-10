@@ -1,82 +1,99 @@
-// ---- Uniform locker: look at the helmet, jersey, pants and cleats up close and spin the player around ----
+// ---- Uniform Room: both teams side by side. Pick a full set, or mix and match helmet / jersey / pants ----
 screens.push('locker'); menuScreens.push('locker');
 (() => {
   const el = document.createElement('div');
   el.id = 'locker'; el.className = 'screen';
   el.innerHTML = `
-    <h2 id="lkTitle">Uniforms</h2>
-    <div id="lkStyles"></div>
-    <div id="lkWrap">
-      <div id="lkStage">
-        <canvas id="lkCv" width="420" height="460"></canvas>
-        <div id="lkSpin">
-          <button class="lkRot" data-r="-1"><svg viewBox="0 0 24 24" class="chev"><path d="M15 5l-7 7 7 7"/></svg></button>
-          <span>DRAG TO SPIN</span>
-          <button class="lkRot" data-r="1"><svg viewBox="0 0 24 24" class="chev"><path d="M9 5l7 7-7 7"/></svg></button>
+    <div id="lkHead"><h2>Uniforms</h2><div id="lkClash"></div><button class="big gold" id="lkDone">DONE</button></div>
+    <div id="lkCols">${[1, 0].map(s => `
+      <div class="lkCol" data-side="${s}">
+        <div class="lkTeam"><span class="lkSide">${s === 0 ? 'HOME' : 'AWAY'}</span><b class="lkName"></b></div>
+        <div class="lkBody">
+          <canvas class="lkBig" width="260" height="300"></canvas>
+          <div class="lkCtl">
+            <div class="lkSets"></div>
+            <div class="lkMixT">MIX AND MATCH</div>
+            <div class="lkMix"></div>
+          </div>
         </div>
-      </div>
-      <div id="lkParts"></div>
-    </div>
-    <div class="row"><button class="big gold" id="lkWear">WEAR THIS</button><button id="lkBack">BACK</button></div>`;
+      </div>`).join('')}
+    </div>`;
   document.getElementById('stage').appendChild(el);
 })();
 
+// uniform value: a set ('home', 'rush', ...) or a mix 'mix:helmetSet,jerseySet,pantsSet'
+const uniParts = v => { if (v && v.startsWith('mix:')) { const [h, j, p] = v.slice(4).split(','); return { h, j, p }; } return { h: v, j: v, p: v }; };
+const uniValue = ({ h, j, p }) => h === j && j === p ? h : `mix:${h},${j},${p}`;
+const uniName = v => { const n = k => (UNIFORMS.find(u => u[0] === k) || UNIFORMS[0])[1]; if (!v || !v.startsWith('mix:')) return n(v || 'home'); return 'Custom'; };
+function setUni(side, v) {
+  const s = $('optUni' + side);
+  if (![...s.options].some(o => o.value === v)) { const o = document.createElement('option'); o.value = v; o.textContent = uniName(v); s.appendChild(o); }
+  s.value = v;
+}
+const cleatFor = (lk, style) => style === 'rush' ? lk.jersey : textOn(lk.pants) === '#111' ? '#f2f2f2' : '#151515';
+const colorGap = (a, b) => { const n = h => { const x = parseInt(h.replace('#', '').padEnd(6, '0').slice(0, 6), 16); return [x >> 16, (x >> 8) & 255, x & 255]; }; const [p, q] = [n(a), n(b)]; return Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]); };
+
 const Locker = {
-  side: 0, style: 'home', part: 'full', ang: 0.5, spinV: 0, dragging: false, idle: 0,
-  zoom: { x: 0, y: -150, s: 1 },
-  open(side) {
-    this.side = side; this.style = $(side === 0 ? 'optUni0' : 'optUni1').value || (side === 0 ? 'home' : 'away');
-    this.part = 'full'; this.ang = 0.5; this.zoom = { ...this.PARTS.full };
+  ang: [0.5, 0.5], spinV: [0, 0], drag: -1, idle: 0,
+  open() {
+    this.ang = [0.45, -0.45]; this.spinV = [0, 0];
     show('locker'); this.render(); this.loop();
   },
-  team() { return TEAMS[sel.idx[this.side]]; },
-  look() { return teamLook(this.team(), this.side === 0, this.style); },
-  // camera targets for each part (in figure space: feet at y=0, head on top)
-  PARTS: {
-    full: { x: 0, y: -150, s: 1, name: 'FULL UNIFORM' },
-    helmet: { x: 0, y: -262, s: 1.85, name: 'HELMET' },
-    jersey: { x: 0, y: -150, s: 1.7, name: 'JERSEY' },
-    pants: { x: 0, y: -72, s: 2.0, name: 'PANTS' },
-    cleats: { x: 0, y: -12, s: 2.8, name: 'CLEATS' }
-  },
+  team(side) { return TEAMS[sel.idx[side]]; },
+  val(side) { return $('optUni' + side).value || (side === 0 ? 'home' : 'away'); },
+  look(side, v) { return teamLook(this.team(side), side === 0, v || this.val(side)); },
+  pl(side) { const qb = this.team(side).off[0]; return { num: qb[2], name: qb[1].split(' ').slice(-1)[0], skin: qb[5] || 0 }; },
+  pick(side, v) { setUni(side, v); saveOpts(); Sound.click(); this.render(); },
   render() {
-    const t = this.team(), lk = this.look();
-    $('lkTitle').textContent = `${t.city} ${t.name}`;
-    $('lkStyles').innerHTML = UNIFORMS.map(([v, n]) => `<button class="lkStyle${v === this.style ? ' on' : ''}" data-v="${v}">${n}</button>`).join('');
-    $('lkStyles').querySelectorAll('button').forEach(b => b.onclick = () => { this.style = b.dataset.v; Sound.click(); this.render(); });
-    const sw = (c, n) => `<span class="lkSw"><i style="background:${c}"></i>${n}</span>`;
-    const rows = {
-      full: [sw(lk.helmet, 'Helmet'), sw(lk.jersey, 'Jersey'), sw(lk.pants, 'Pants'), sw(lk.sock, 'Socks')],
-      helmet: [sw(lk.helmet, 'Shell'), sw(lk.stripe, 'Stripe'), sw(lk.mask || '#c8c8c8', 'Facemask')],
-      jersey: [sw(lk.jersey, 'Jersey'), sw(lk.num, 'Numbers'), sw(lk.trim, 'Trim')],
-      pants: [sw(lk.pants, 'Pants'), sw(lk.trim, 'Stripe'), sw(lk.sock, 'Socks')],
-      cleats: [sw(this.cleat(lk), 'Cleats'), sw(lk.trim, 'Accent')]
+    for (const side of [0, 1]) {
+      const col = document.querySelector(`.lkCol[data-side="${side}"]`), t = this.team(side), v = this.val(side), parts = uniParts(v);
+      col.style.setProperty('--tc', t.c1);
+      col.querySelector('.lkName').textContent = `${t.city} ${t.name}`;
+      // full sets with a little picture of each
+      col.querySelector('.lkSets').innerHTML = UNIFORMS.map(([k, n]) => `<button class="lkSet${k === v ? ' on' : ''}" data-v="${k}"><canvas width="84" height="96"></canvas><span>${n}</span></button>`).join('');
+      col.querySelectorAll('.lkSet').forEach(b => {
+        this.mini(b.querySelector('canvas'), side, b.dataset.v);
+        b.onclick = () => this.pick(side, b.dataset.v);
+      });
+      // mix and match rows
+      const rows = [['h', 'HELMET', lk => [lk.helmet, lk.stripe]], ['j', 'JERSEY', lk => [lk.jersey, lk.num]], ['p', 'PANTS', lk => [lk.pants, lk.sock]]];
+      col.querySelector('.lkMix').innerHTML = rows.map(([k, label, cols]) => `<div class="lkRow"><span>${label}</span>${UNIFORMS.map(([u, n]) => {
+        const c = cols(teamLook(t, side === 0, u));
+        return `<button class="lkChip${parts[k] === u ? ' on' : ''}" data-k="${k}" data-u="${u}" title="${n}"><i style="background:linear-gradient(135deg, ${c[0]} 55%, ${c[1]} 55%)"></i></button>`;
+      }).join('')}</div>`).join('');
+      col.querySelectorAll('.lkChip').forEach(b => b.onclick = () => { const p = uniParts(this.val(side)); p[b.dataset.k] = b.dataset.u; this.pick(side, uniValue(p)); });
+    }
+    // can you tell the two teams apart?
+    const ja = this.look(1).jersey, jh = this.look(0).jersey, clash = colorGap(ja, jh) < 90;
+    $('lkClash').innerHTML = clash ? `<span>These jerseys look alike. Hard to tell the teams apart.</span><button id="lkFix">FIX IT</button>` : '';
+    if (clash) $('lkFix').onclick = () => {
+      const opts = ['away', 'home', 'rush', 'throwback'].filter(u => colorGap(this.look(0).jersey, this.look(1, u).jersey) >= 90);
+      if (opts.length) this.pick(1, opts[0]); else this.pick(0, 'home');
     };
-    $('lkParts').innerHTML = Object.keys(this.PARTS).map(k => `<button class="lkPart${k === this.part ? ' on' : ''}" data-k="${k}"><b>${this.PARTS[k].name}</b><span class="lkSws">${rows[k].join('')}</span></button>`).join('');
-    $('lkParts').querySelectorAll('button').forEach(b => b.onclick = () => { this.part = b.dataset.k; Sound.click(); this.render(); });
   },
-  cleat(lk) { return this.style === 'rush' ? lk.jersey : textOn(lk.pants) === '#111' ? '#f2f2f2' : '#151515'; },
+  mini(cv, side, v) {
+    const g = cv.getContext('2d'), lk = this.look(side, v);
+    g.clearRect(0, 0, cv.width, cv.height);
+    g.save(); g.translate(cv.width / 2, cv.height - 4); g.scale(0.29, 0.29);
+    drawTurntable(g, lk, cleatFor(lk, v), this.pl(side), side === 0 ? 0.4 : -0.4);
+    g.restore();
+  },
   loop() {
     if (!$('locker').classList.contains('show')) return;
     const dt = 1 / 60;
-    if (!this.dragging) { this.ang += this.spinV * dt; this.spinV *= 0.94; this.idle += dt; if (this.idle > 2.5 && Math.abs(this.spinV) < 0.3) this.ang += 0.5 * dt; }
-    const tg = this.PARTS[this.part], z = this.zoom, k = 1 - Math.exp(-dt * 7);
-    z.x += (tg.x - z.x) * k; z.y += (tg.y - z.y) * k; z.s += (tg.s - z.s) * k;
-    this.draw();
+    this.idle += dt;
+    for (const s of [0, 1]) if (this.drag !== s) { this.ang[s] += this.spinV[s] * dt; this.spinV[s] *= 0.94; if (this.idle > 2.5 && Math.abs(this.spinV[s]) < 0.3) this.ang[s] += (s === 0 ? 0.45 : -0.45) * dt; }
+    document.querySelectorAll('.lkBig').forEach(cv => {
+      const side = +cv.closest('.lkCol').dataset.side, g = cv.getContext('2d'), W = cv.width, H = cv.height, v = this.val(side), lk = this.look(side, v);
+      g.clearRect(0, 0, W, H);
+      const bg = g.createRadialGradient(W / 2, H * 0.6, 10, W / 2, H * 0.6, W * 0.8);
+      bg.addColorStop(0, shade(this.team(side).c1, -0.35)); bg.addColorStop(1, '#0c1016'); g.fillStyle = bg; g.fillRect(0, 0, W, H);
+      g.save(); g.translate(W / 2, H - 14); g.scale(0.88, 0.88);
+      g.fillStyle = '#00000066'; g.beginPath(); g.ellipse(0, 2, 46, 11, 0, 0, 7); g.fill();
+      drawTurntable(g, lk, cleatFor(lk, v), this.pl(side), this.ang[side]);
+      g.restore();
+    });
     requestAnimationFrame(() => this.loop());
-  },
-  draw() {
-    const cv = $('lkCv'), g = cv.getContext('2d'), W = cv.width, H = cv.height;
-    g.clearRect(0, 0, W, H);
-    const bg = g.createRadialGradient(W / 2, H * 0.55, 20, W / 2, H * 0.55, W * 0.75);
-    bg.addColorStop(0, '#2a3446'); bg.addColorStop(1, '#0c1016'); g.fillStyle = bg; g.fillRect(0, 0, W, H);
-    const t = this.team(), lk = this.look(), qb = t.off[0];
-    const z = this.zoom, base = 1.25;
-    g.save(); g.translate(W / 2, H * 0.52); g.scale(base * z.s, base * z.s); g.translate(-z.x, -z.y);
-    // floor spot
-    g.fillStyle = '#00000066'; g.beginPath(); g.ellipse(0, 2, 46, 11, 0, 0, 7); g.fill();
-    drawTurntable(g, lk, this.cleat(lk), { num: qb[2], name: qb[1].split(' ').slice(-1)[0], skin: qb[5] || 0 }, this.ang);
-    g.restore();
   }
 };
 
@@ -191,42 +208,37 @@ function drawTurnHelmet(g, lk, pl, a) {
   g.restore();
 }
 
-// controls: drag to spin, arrow buttons, part + style buttons
+// controls: drag a player to spin him
 (() => {
-  const cv = $('lkCv'); let lastX = 0, lastT = 0;
-  cv.addEventListener('pointerdown', e => { Locker.dragging = true; lastX = e.clientX; lastT = performance.now(); Locker.spinV = 0; cv.setPointerCapture(e.pointerId); });
-  cv.addEventListener('pointermove', e => {
-    if (!Locker.dragging) return;
-    const dx = e.clientX - lastX, now = performance.now(), dtt = Math.max(1, now - lastT) / 1000;
-    Locker.ang += dx * 0.012; Locker.spinV = dx * 0.012 / dtt * 0.6; lastX = e.clientX; lastT = now; Locker.idle = 0;
+  let lastX = 0, lastT = 0;
+  document.querySelectorAll('.lkBig').forEach(cv => {
+    const side = +cv.closest('.lkCol').dataset.side;
+    cv.addEventListener('pointerdown', e => { Locker.drag = side; lastX = e.clientX; lastT = performance.now(); Locker.spinV[side] = 0; cv.setPointerCapture(e.pointerId); });
+    cv.addEventListener('pointermove', e => {
+      if (Locker.drag !== side) return;
+      const dx = e.clientX - lastX, now = performance.now(), dtt = Math.max(1, now - lastT) / 1000;
+      Locker.ang[side] += dx * 0.014; Locker.spinV[side] = dx * 0.014 / dtt * 0.6; lastX = e.clientX; lastT = now; Locker.idle = 0;
+    });
+    const up = () => { Locker.drag = -1; Locker.idle = 0; };
+    cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
   });
-  const up = () => { Locker.dragging = false; Locker.idle = 0; };
-  cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
-  document.querySelectorAll('.lkRot').forEach(b => b.onclick = () => { Locker.spinV = 0; Locker.idle = 0; Locker.ang += +b.dataset.r * Math.PI / 4; });
-  $('lkWear').onclick = () => { $(Locker.side === 0 ? 'optUni0' : 'optUni1').value = Locker.style; saveOpts(); Sound.click(); show('select'); renderUniBtns(); };
-  $('lkBack').onclick = () => { Sound.click(); show('select'); };
-  window.addEventListener('keydown', e => {
-    if (!$('locker').classList.contains('show')) return;
-    if (e.code === 'ArrowLeft' || e.code === 'KeyA') { Locker.ang -= Math.PI / 4; Locker.idle = 0; }
-    if (e.code === 'ArrowRight' || e.code === 'KeyD') { Locker.ang += Math.PI / 4; Locker.idle = 0; }
-    if (e.code === 'Escape') { show('select'); }
-  });
+  $('lkDone').onclick = () => { saveOpts(); Sound.click(); show('select'); renderUniBtns(); };
+  window.addEventListener('keydown', e => { if ($('locker').classList.contains('show') && (e.code === 'Escape' || e.code === 'Enter')) $('lkDone').onclick(); });
 })();
 
-// uniform buttons on the team select screen (they open the locker)
+// one UNIFORMS button on the team select screen shows both teams' colors and opens the room
 function renderUniBtns() {
-  for (const side of [1, 0]) {
-    const b = $('uniBtn' + side), v = $('optUni' + side).value, n = (UNIFORMS.find(u => u[0] === v) || UNIFORMS[0])[1];
-    b.innerHTML = `${side === 0 ? 'HOME' : 'AWAY'} UNIFORM: <b>${n}</b>`;
-  }
+  const b = $('uniBtn'); if (!b || typeof sel === 'undefined') return;
+  const sw = side => { try { const lk = teamLook(TEAMS[sel.idx[side]], side === 0, $('optUni' + side).value); return `<i style="background:linear-gradient(135deg, ${lk.helmet} 50%, ${lk.jersey} 50%)"></i>`; } catch (e) { return ''; } };
+  b.innerHTML = `UNIFORMS ${sw(1)}<b>${uniName($('optUni1').value)}</b> ${sw(0)}<b>${uniName($('optUni0').value)}</b>`;
 }
 (() => {
   const box = $('selOpts');
   for (const side of [0, 1]) { const lab = $('optUni' + side).closest('label'); if (lab) lab.style.display = 'none'; }
-  for (const side of [1, 0]) {
-    const b = document.createElement('button'); b.id = 'uniBtn' + side; b.className = 'uniBtn';
-    b.onclick = () => { Sound.click(); Locker.open(side); };
-    box.insertBefore(b, box.children[side === 1 ? 0 : 1]);
-  }
+  const b = document.createElement('button'); b.id = 'uniBtn'; b.className = 'uniBtn';
+  b.onclick = () => { Sound.click(); Locker.open(); };
+  box.insertBefore(b, box.children[0]);
+  // custom mixes saved from last time need an <option> to live in
+  try { const o = JSON.parse(localStorage.getItem('bobbleOpts') || 'null'); if (o) for (const s of [0, 1]) if (o['optUni' + s]) setUni(s, o['optUni' + s]); } catch (e) {}
   renderUniBtns();
 })();

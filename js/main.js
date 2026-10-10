@@ -120,6 +120,7 @@ function teamCard(t) {
     <div class="cnt">${TEAMS.findIndex(x => x.id === t.id) + 1} / ${TEAMS.length}</div>`;
 }
 function renderSelect(bumpSide) {
+  if (typeof renderUniBtns === 'function') setTimeout(renderUniBtns, 0);
   for (const [side, id] of [[0, 'pHome'], [1, 'pAway']]) {
     const t = TEAMS[sel.idx[side]], el = $(id).querySelector('.tbig');
     el.innerHTML = teamCard(t);
@@ -592,7 +593,7 @@ function updateMobileButtons() {
     else if (h.side !== G.poss || (b.holder && b.holder.side !== h.side)) st = 'def';
     else if (G.lock && h !== G.O[0] && G.bstate === 'snap' && !b.flight) st = 'call';
   }
-  if (G.phase === 'dead' && G.cellyGuy && !G.demo && (!G.online || G.cellyGuy.side === G.human)) st = 'celly';
+  if (G.phase === 'dead' && G.cellyGuy && !G.cellyGuy.celly && !G.demo && (!G.online || G.cellyGuy.side === G.human)) st = 'celly'; // buttons hide once he's celebrating
   if (G.phase === 'presnap' && !G.demo) st = 'presnap';
   const joyOn = G.phase === 'live' && !G.demo && !!h; // stays up the whole play so your thumb never loses it
   $('joy').classList.toggle('on', !!joyOn);
@@ -604,6 +605,7 @@ function updateMobileButtons() {
   mbState = key;
   document.querySelectorAll('#mbtns button').forEach(x => x.classList.toggle('on', x.dataset.show === st && (!x.dataset.side || x.dataset.side === side) && (x.dataset.k !== 'KeyM' || canMotion)));
   $('mbtns').classList.toggle('pre', st === 'presnap');
+  $('mbtns').classList.toggle('cel', st === 'celly');
   $('mbDive').textContent = b && b.flight ? 'JUMP' : 'DIVE';
   $('mbSwim').style.display = st === 'def' && h && h.engaged ? 'block' : 'none';
   $('mbTO').style.display = st === 'presnap' && G.timeouts && G.timeouts[G.human] > 0 && G.pendingRunoff > 0 ? 'block' : 'none';
@@ -689,6 +691,7 @@ function step(now) {
     if (G.demo) G.demo = false;
     if (G.online) Net.prepRemote();
     update(dt);
+    if (G.sitOut && !G.paused && ['presnap', 'live', 'dead'].includes(G.phase)) update(dt); // Player Lock: plays without your guy go by at double speed
     if (G.online) Net.hostFrame(dt);
   }
   updateMobileButtons();
@@ -700,6 +703,10 @@ function render() {
   ctx.save();
   ctx.clearRect(0, 0, CW, CH);
   if (cam.shake > 0.3) ctx.translate(rand(-cam.shake, cam.shake), rand(-cam.shake, cam.shake));
+  if (cam.zoom > 1.001 && cam.focus && G.phase !== 'replay') { // celly cam
+    const fx = sx(cam.focus.x), fy = sy(cam.focus.y) - 40, k = clamp((cam.zoom - 1) / 0.6, 0, 1);
+    ctx.translate(lerp(fx, CW / 2, k), lerp(fy, CH * (G.mode === 'mobile' ? 0.56 : 0.66), k)); ctx.scale(cam.zoom, cam.zoom); ctx.translate(-fx, -fy);
+  }
   if (G.teams) {
     drawField(ctx, G);
     drawWeatherGround(ctx, G);

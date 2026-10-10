@@ -36,7 +36,7 @@ const Pad = {
       if (hit(0)) press('Digit1'); if (hit(1)) press('Digit2'); if (hit(2)) press('Digit3'); if (hit(3)) press('Digit4');
     } else if (G.phase === 'dead' && G.cellyGuy) {
       if (hit(12)) press('ArrowUp'); if (hit(13)) press('ArrowDown'); if (hit(14)) press('ArrowLeft'); if (hit(15)) press('ArrowRight');
-      if (hit(0)) press('Space');
+      if (hit(0)) press('Digit1'); if (hit(1)) press('Digit2'); if (hit(2)) press('Digit3'); if (hit(3)) press('Digit4'); if (hit(4)) press('KeyE'); if (hit(5)) press('KeyF');
     } else {
       if (hit(0)) press('Space'); if (hit(1)) press('KeyE'); if (hit(2)) press('KeyF'); if (hit(3)) press('KeyR');
       if (hit(5)) press('KeyC'); if (hit(4)) press('KeyQ'); if (hit(8)) press('KeyT');

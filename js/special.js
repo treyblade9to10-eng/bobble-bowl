@@ -4,6 +4,7 @@
 // Kicking team = its defense players (coverage team). Receiving team = its offense players (return team).
 // During a return the receiving team is G.poss, so the normal "run" logic (blocking / tackling) just works.
 function startKickoff(k, from = 35) {
+  G.sitOut = false;
   G.special = null; G.patSide = null; G.twoPt = false;
   G.kickoffSide = k; G.kickFrom = from; G.poss = 1 - k;
   G.phase = 'playcall'; G.flags = []; G.playClock = 0; G.pendingRunoff = 0; G.koPending = true;
@@ -65,8 +66,8 @@ function setupReturn(kind, k) {
 
 function startKickMeter(kind, k) {
   const kk = kickerOf(k, kind === 'punt' ? 'punt' : 'fg');
-  G.km = { kind, yds: 0, kk, stage: 0, t: 0, power: 0, aim: 0, side: k, rateP: 0.85 + (90 - kk.ovr) * 0.02, rateA: 1.0 + (90 - kk.ovr) * 0.025, need: 0, tol: 0.35 };
-  if (isHumanSide(k) && !G.demo) { G.phase = 'kickmeter'; G.km.wait = 0.35; return; }
+  G.km = { kind, yds: 0, kk, stage: 0, t: 0, power: 0, aim: 0, side: k, rateP: 0.7 + (90 - kk.ovr) * 0.015, rateA: 0.6 + (90 - kk.ovr) * 0.015, need: 0, tol: 0.35 };
+  if (isHumanSide(k) && !G.demo && !(G.sitOut && kind === 'punt')) { G.phase = 'kickmeter'; G.km.wait = 0.35; return; }
   // CPU kickoffs: mostly land in the field so you get to return them, sometimes a deep boot
   G.km.power = kind === 'onside' ? rand(0.3, 0.8) : kind === 'ko' ? (chance(0.7) ? rand(0.15, 0.68) : rand(0.7, 0.98)) : rand(0.6, 0.98); G.km.aim = rand(-0.4, 0.4);
   G.phase = 'kickmeter'; G.km.cpuT = 0.8; G.km.stage = 3; // short pause so you can see the lineup
@@ -147,7 +148,7 @@ function endReturn(res) {
   G.special = null;
   if (res.type === 'td') {
     G.score[cs] += 6; G.deadT = isHumanSide(cs) ? 3.8 : 2.5;
-    if (isHumanSide(cs)) { G.cellyGuy = car; car.down = 0; car.dive = 0; }
+    if (isHumanSide(cs)) { G.cellyGuy = car; car.down = 0; car.dive = 0; } else { car.down = 0; car.dive = 0; Celly.cpu(car); }
     showBanner(cs === r ? (kind === 'punt' ? 'PUNT RETURN TD!' : 'KICK RETURN TD!') : 'TOUCHDOWN!', `${car.name} • ${G.teams[cs].name}`, cs === G.human ? '#ffd23f' : '#ff6040', 2.6);
     Sound.td(); G.crowdHype = 1.5; stat(car).td++; G.slowmo = 0.9;
     for (const q of G.players) if (q.side === cs) q.celebrate = 2.6;

@@ -28,8 +28,25 @@ const COLLEGES = [
   { id: 'CLEM', city: 'Clemson', name: 'Tigers', c1: '#F56600', c2: '#522D80', helmet: '#FFFFFF', mask: '#F56600', pants: '#FFFFFF', pr: 2 },
   { id: 'PSU', city: 'Penn State', name: 'Nittany Lions', c1: '#041E42', c2: '#FFFFFF', helmet: '#FFFFFF', mask: '#041E42', pants: '#FFFFFF', pr: 2 },
   { id: 'ND', city: 'Notre Dame', name: 'Fighting Irish', c1: '#0C2340', c2: '#C99700', helmet: '#C99700', mask: '#9a9a9a', pants: '#C99700', pr: 2 },
-  { id: 'TENN', city: 'Tennessee', name: 'Volunteers', c1: '#FF8200', c2: '#FFFFFF', helmet: '#FFFFFF', mask: '#FF8200', pants: '#FFFFFF', pr: 1 }
+  { id: 'TENN', city: 'Tennessee', name: 'Volunteers', c1: '#FF8200', c2: '#FFFFFF', helmet: '#FFFFFF', mask: '#FF8200', pants: '#FFFFFF', pr: 1 },
+  { id: 'WIS', city: 'Wisconsin', name: 'Badgers', c1: '#C5050C', c2: '#FFFFFF', helmet: '#FFFFFF', mask: '#C5050C', pants: '#FFFFFF', pr: 1 },
+  { id: 'BSU', city: 'Boise State', name: 'Broncos', c1: '#0033A0', c2: '#D64309', helmet: '#0033A0', mask: '#D64309', pants: '#0033A0', pr: 1 },
+  { id: 'ISU', city: 'Iowa State', name: 'Cyclones', c1: '#C8102E', c2: '#F1BE48', helmet: '#C8102E', mask: '#F1BE48', pants: '#F1BE48', pr: 1 },
+  { id: 'APP', city: 'App State', name: 'Mountaineers', c1: '#222222', c2: '#FFCC00', helmet: '#222222', mask: '#FFCC00', pants: '#FFCC00', pr: 0 },
+  { id: 'TOL', city: 'Toledo', name: 'Rockets', c1: '#15397F', c2: '#FFD200', helmet: '#15397F', mask: '#FFD200', pants: '#FFFFFF', pr: 0 },
+  { id: 'NIU', city: 'Northern Illinois', name: 'Huskies', c1: '#BA0C2F', c2: '#000000', helmet: '#000000', mask: '#BA0C2F', pants: '#000000', pr: 0 }
 ];
+// recruit rating: more stars = higher starting ratings and offers from bigger programs
+const RECRUIT = { 1: { ovr: -8, spd: -3 }, 2: { ovr: -4, spd: -1 }, 3: { ovr: 0, spd: 0 }, 4: { ovr: 5, spd: 1 }, 5: { ovr: 10, spd: 2 } };
+const PROGRAM = ['Small school', 'Rising program', 'Big program', 'Powerhouse'];
+// which colleges offer you a scholarship
+function collegeOffers(stars, seed) {
+  const max = [0, 0, 1, 2, 3, 3][stars], h = hashStr(String(seed || ''));
+  let list = COLLEGES.filter(t => t.pr <= max);
+  if (stars === 4) { const top = COLLEGES.filter(t => t.pr === 3); const skip = top[h % top.length]; list = list.filter(t => t !== skip); } // 4-star: most powerhouses, not all
+  if (stars <= 2) list = list.concat(COLLEGES.filter(t => t.pr === max + 1).slice(h % 2, h % 2 + 1)); // one reach offer
+  return list.sort((a, b) => b.pr - a.pr);
+}
 const CAP_GEAR = { visor: 68, gloves: 74, goldGloves: 88 }; // overall needed to unlock
 const BADGES = {
   first_td: 'First Touchdown', big_game: 'Big Game', perfect: 'Perfect Game', bowl: 'Bowl Champion', first_round: 'First-Round Pick', top10: 'Top 10 Pick',
@@ -61,8 +78,8 @@ const Career = {
     this.save();
   },
   blank(o) {
-    const arch = CAP_ARCH[o.pos].find(a => a[0] === o.arch) || CAP_ARCH[o.pos][0];
-    return { v: 2, name: o.name, pos: o.pos, arch: arch[0], num: o.num, skin: o.skin, a: arch[1].a.slice(), spd: arch[1].spd, sp: 0, xp: 0, lvl: 1,
+    const arch = CAP_ARCH[o.pos].find(a => a[0] === o.arch) || CAP_ARCH[o.pos][0], rc = RECRUIT[o.stars || 3];
+    return { v: 2, name: o.name, pos: o.pos, arch: arch[0], num: o.num, skin: o.skin, stars: o.stars || 3, a: arch[1].a.map(v => v + rc.ovr), spd: Math.min(99, arch[1].spd + rc.spd), sp: 0, xp: 0, lvl: 1,
       games: o.games || 10, diff: o.diff != null ? o.diff : 1, qtr: o.qtr || 180, lock: true, gear: { visor: false, gloves: 'white' },
       phase: 'college', age: 21, college: null, team: null, combine: null, draft: null, contract: null,
       stats: { pass: 0, rush: 0, rec: 0, td: 0, tkl: 0, sack: 0, int: 0, g: 0 }, seasons: [], badges: [], log: [] };

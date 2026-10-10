@@ -2,7 +2,7 @@
 const SaveGame = {
   KEY: 'bobbleLive',
   FIELDS: ['human', 'diff', 'playoff', 'qtrLen', 'score', 'quarter', 'clock', 'poss', 'los', 'ballY', 'down', 'firstDownX', 'goalToGo', 'timeouts', 'patSide', 'twoPt',
-    'weather', 'night', 'uni', 'versus', 'p1', 'pstats', 'tstats', 'xf', 'twoMinQ', 'firstPoss', 'lastOffKey', 'lastDefKey', 'lastOffKeys', 'lastDefKeys', 'kickFrom', 'career', 'lock', 'rivalry', 'tend'],
+    'weather', 'night', 'uni', 'versus', 'p1', 'pstats', 'tstats', 'xf', 'twoMinQ', 'firstPoss', 'lastOffKey', 'lastDefKey', 'lastOffKeys', 'lastDefKeys', 'kickFrom', 'career', 'lock', 'rivalry', 'tend', 'qbWear', 'qbHurt'],
   save() {
     if (G.demo || G.mini || G.challenge || G.online || !G.teams || G.phase === 'over' || G.human < 0) return;
     const d = { v: 1, at: Date.now(), teams: G.teams, pbp: (G.pbp || []).slice(-40), ko: G.koPending ? G.kickoffSide : null,

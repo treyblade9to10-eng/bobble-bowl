@@ -211,8 +211,18 @@ const THROWBACKS = {
   GB: { jersey: '#1d2a5b', trim: '#C8A04A', num: '#C8A04A', pants: '#C8A04A', sock: '#1d2a5b', helmet: '#7a5230', stripe: '#7a5230', mask: '#7a5230' }
 };
 const UNIFORMS = [['home', 'Home'], ['away', 'Away'], ['rush', 'Color Rush'], ['throwback', 'Throwback']];
+const lookCache = new Map();
 function teamLook(team, home, style) {
   style = style || (home ? 'home' : 'away');
+  if (style.startsWith('mix:')) { // mix and match: helmet from one set, jersey from another, pants from a third
+    const key = team.id + home + style; let m = lookCache.get(key);
+    if (!m) {
+      const [h, j, p] = style.slice(4).split(',').map(k => teamLook(team, home, k));
+      m = { helmet: h.helmet, stripe: h.stripe, mask: h.mask, jersey: j.jersey, trim: j.trim, num: j.num, sock: j.sock, pants: p.pants };
+      lookCache.set(key, m);
+    }
+    return m;
+  }
   const base = { helmet: team.helmet, stripe: team.c2, mask: team.mask };
   const light = c => textOn(c) === '#111';
   if (style === 'throwback') {
@@ -231,15 +241,15 @@ function drawPlayer(g, p, G, at) {
   if (!at && (x < -80 || x > CW + 80 || y < -40 || y > CH + 140)) return;
   const team = G.teams[p.side], look = teamLook(team, p.side === 0, G.uni && G.uni[p.side]);
   const big = p.pos === 'OL' || p.pos === 'DL';
-  const k = Math.min(1, p.speedNow / 5);
+  let k = Math.min(1, p.speedNow / 5);
+  if (p.celly) { const ps = Celly.pose(p, p.celly.type, p.celly.t); if (ps.legK != null) k = ps.legK; else k = 0; }
   const dir = p.face.dir;
   const carrying = G.ball && G.ball.holder === p;
   const celebrate = p.celebrate > 0;
   const jumping = p.jump > 0;
-  const cel = p.celly, ct = cel ? cel.t : 0;
-  let hop = (celebrate && !cel ? Math.abs(Math.sin(G.time * 10 + p.slot)) * 14 : 0) + (jumping ? Math.sin((0.55 - p.jump) / 0.55 * Math.PI) * 30 : 0);
-  if (cel && cel.type === 'leap') hop = ct < 1 ? Math.sin(ct / 1 * Math.PI) * 60 : Math.abs(Math.sin(G.time * 8)) * 10;
-  if (cel && cel.type === 'griddy') { hop = Math.abs(Math.sin(ct * 16)) * 7; p.anim += 0.35; p.speedNow = 6; }
+  const cel = p.celly, ct = cel ? cel.t : 0, pose = cel ? Celly.pose(p, cel.type, ct) : null;
+  let hop = (celebrate && !cel && !p.pinAt ? Math.abs(Math.sin(G.time * 10 + p.slot)) * 14 : 0) + (jumping ? Math.sin((0.55 - p.jump) / 0.55 * Math.PI) * 30 : 0);
+  if (pose) hop = pose.hop;
 
   // ground marks
   if (p.isHuman && !at && G.phase !== 'kick' && G.phase !== 'kickmeter') {
@@ -273,8 +283,11 @@ function drawPlayer(g, p, G, at) {
     }
   }
   g.save(); g.translate(x, y - hop);
-  if (cel && cel.type === 'leap' && ct < 1) g.rotate(Math.sin(ct * Math.PI) * 0.25 * dir);
-  if (cel && cel.type === 'dab') g.rotate(-0.12 * dir);
+  if (pose) {
+    if (pose.rot) { g.translate(0, -32); g.rotate(pose.rot * dir); g.translate(0, 32); } // spin around his belly, not his feet
+    if (pose.lie) { g.translate(0, -6); g.rotate(pose.lie * dir); }
+    if (pose.sy !== 1) g.scale(1 / Math.sqrt(pose.sy), pose.sy); // squash and stretch
+  }
   if (p.down > 0) { g.translate(0, -6); g.rotate(p.downDir * 1.45); }
   else if (p.dive > 0) { g.rotate(dir * 1.0); }
   const spinScale = p.spin > 0 ? Math.cos(p.spin * 20) : 1;
@@ -309,11 +322,10 @@ function drawPlayer(g, p, G, at) {
   const arm = (front) => {
     const shx = front ? W * 0.3 : -W * 0.22, shy = -TH + 5;
     let ex, ey, hx, hy;
-    if (carrying && front) { ex = shx + 4; ey = shy + 10; hx = shx + 10; hy = shy + 8; }
+    const pa = pose && pose.arm ? pose.arm(front, shx, shy) : null;
+    if (pa) ({ ex, ey, hx, hy } = pa);
+    else if (carrying && front) { ex = shx + 4; ey = shy + 10; hx = shx + 10; hy = shy + 8; }
     else if (p.throwAnim > 0 && front) { const t = p.throwAnim; ex = shx - 6 + (1 - t) * 14; ey = shy - 10; hx = shx - 4 + (1 - t) * 22; hy = shy - 18 + (1 - t) * 10; }
-    else if (cel && cel.type === 'griddy') { const sw2 = Math.sin(ct * 16) * (front ? 1 : -1); ex = shx + sw2 * 9; ey = shy + 7; hx = shx + sw2 * 16; hy = shy + 4; }
-    else if (cel && cel.type === 'spike') { const t2 = Math.min(1, ct * 4); ex = shx + 5; ey = shy - 10 + t2 * 20; hx = shx + 8; hy = shy - 20 + t2 * 38; }
-    else if (cel && cel.type === 'dab') { if (front) { ex = shx + 9; ey = shy - 8; hx = shx + 17; hy = shy - 16; } else { ex = shx + 10; ey = shy - 4; hx = shx + 16; hy = shy - 12; } }
     else if (celebrate || jumping) { ex = shx + (front ? 4 : -4); ey = shy - 11; hx = shx + (front ? 6 : -6); hy = shy - 22; }
     else if (p.stiff > 0 && front) { ex = shx + 9; ey = shy + 1; hx = shx + 19; hy = shy; }
     else if (p.engaged && front) { ex = shx + 8; ey = shy + 4; hx = shx + 15; hy = shy + 2; }
@@ -355,7 +367,7 @@ function drawPlayer(g, p, G, at) {
   const hx = p.head.ox * dir, hy = -TH - R + 4 + p.head.oy;
   g.fillStyle = SKIN[p.face.skin]; g.strokeStyle = OUT; g.lineWidth = 2;
   g.fillRect(-3, -TH - 6, 6, 6);
-  g.save(); g.translate(hx, hy); g.rotate(p.head.rot * dir + (p.down > 0 ? 0 : -lean * 0.4) + (cel && cel.type === 'dab' ? 0.5 : 0));
+  g.save(); g.translate(hx, hy); g.rotate(p.head.rot * dir + (p.down > 0 ? 0 : -lean * 0.4) + (pose ? pose.head : 0));
   drawHead(g, R, team, p, look);
   g.restore();
   g.restore(); // torso
@@ -368,11 +380,12 @@ function drawPlayer(g, p, G, at) {
       g.fillStyle = '#ffe14d'; starPath(g, x + p.downDir * 30 + Math.cos(a) * 14, y - 23 + Math.sin(a) * 5, 6); g.fill();
     }
   }
+  if (cel) Celly.overlay(g, p, x, y, hop);
   // labels
   const headTop = y - hop - (big ? 85 : 92);
   if (at || G.phase === 'kick' || G.phase === 'kickmeter') return;
   if (p.xf && p.xf.on && p.down <= 0) { drawXFBadge(g, p, x, headTop - (p.isHuman || carrying ? 44 : 4)); }
-  const showName = p.isHuman || carrying || p.cap || (G.phase === 'presnap' && p.off && p.slot <= 4 && p.side === G.human);
+  const showName = !p.celly && (p.isHuman || carrying || p.cap || (G.phase === 'presnap' && p.off && p.slot <= 4 && p.side === G.human));
   let ly = headTop;
   if (showName && p.down <= 0) {
     g.font = 'bold 13px Barlow, Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
@@ -581,6 +594,8 @@ function drawFx(g, G) {
       g.fillStyle = '#fff'; g.beginPath(); g.arc(-6, -3, 2.2, 0, 7); g.fill();
       g.restore();
     }
+    else if (f.kind === 'ring') { g.strokeStyle = f.color || '#fff'; g.globalAlpha = a; g.lineWidth = 4 * a + 1; g.beginPath(); g.ellipse(sx(f.x), sy(f.y), 10 + (1 - a) * 60, 4 + (1 - a) * 22, 0, 0, 7); g.stroke(); g.globalAlpha = 1; }
+    else if (f.kind === 'zzz') { g.globalAlpha = a; g.fillStyle = '#cfe3ff'; g.font = `italic 900 ${16 + (1 - a) * 14}px "Barlow Condensed", Arial, sans-serif`; g.textAlign = 'center'; g.fillText('Z', sx(f.x) + (1 - a) * 18 * (f.dx || 1), sy(f.y) - f.z - 20); g.globalAlpha = 1; }
     else if (f.kind === 'confetti') { g.fillStyle = f.color; g.globalAlpha = a; g.fillRect(f.px, f.py, 6, 9); g.globalAlpha = 1; }
     else if (f.kind === 'text') {
       const pop = Math.min(1, (f.max - f.life) * 8);
@@ -704,63 +719,41 @@ function drawRef(g, r, G) {
   g.restore();
 }
 
-// ---------- field goal / punt meter ----------
+// ---------- field goal / punt meter (simple: power bar, then aim slider) ----------
 function drawKickMeter(g, G) {
   const km = G.km; if (!km || G.phase !== 'kickmeter' || !isHumanSide(km.side) || km.cpuT != null) return;
-  const W = 600, H = 168, x0 = (CW - W) / 2, y0 = CH - H - 40;
-  const fg = km.kind === 'fg' || km.kind === 'xp', needle = km.needle || 0, st = km.stage;
-  // panel
+  const W = 560, H = 176, x0 = (CW - W) / 2, y0 = CH - H - 40;
+  const fg = km.kind === 'fg' || km.kind === 'xp', st = km.stage;
   g.fillStyle = '#0b0f16f0'; g.fillRect(x0, y0, W, H);
   g.fillStyle = '#f6c31c'; g.fillRect(x0, y0, 6, H);
   g.textAlign = 'left'; g.fillStyle = '#fff'; g.font = 'italic 900 26px "Barlow Condensed", "Arial Black", sans-serif';
   const title = km.kind === 'punt' ? 'PUNT' : km.kind === 'ko' ? 'KICKOFF' : km.kind === 'onside' ? 'ONSIDE KICK' : km.kind === 'xp' ? 'EXTRA POINT' : `${km.yds}-YARD FIELD GOAL`;
   g.fillText(title, x0 + 22, y0 + 32);
-  g.fillStyle = '#9aa6b5'; g.font = '600 13px Barlow, Arial, sans-serif';
-  g.fillText(`${km.kk.name}  ·  ${km.kind === 'punt' ? 'P' : 'K'}  ·  ${km.kk.ovr} OVR`, x0 + 22, y0 + 50);
-  // wind (top right)
-  const w = km.wind || gameWind();
-  g.textAlign = 'right'; g.font = '800 15px "Barlow Condensed", Arial, sans-serif';
-  if (w.mph > 0) {
-    g.fillStyle = '#cfe3ff'; g.fillText(`WIND ${w.mph} MPH`, x0 + W - 46, y0 + 30);
-    const ax = x0 + W - 26, ay = y0 + 24, L = 10 + Math.min(10, w.mph * 0.6);
-    g.strokeStyle = '#cfe3ff'; g.lineWidth = 3; g.beginPath(); g.moveTo(ax, ay - w.dir * L / 2); g.lineTo(ax, ay + w.dir * L / 2); g.stroke();
-    g.fillStyle = '#cfe3ff'; g.beginPath(); g.moveTo(ax, ay + w.dir * (L / 2 + 6)); g.lineTo(ax - 6, ay + w.dir * (L / 2 - 2)); g.lineTo(ax + 6, ay + w.dir * (L / 2 - 2)); g.fill();
-    if (fg && w.mph >= 6) { g.font = '600 12px Barlow, Arial, sans-serif'; g.fillStyle = '#9aa6b5'; g.fillText(`pushes it ${w.dir > 0 ? 'DOWN' : 'UP'}: tap a hair ${w.dir > 0 ? 'LATE' : 'EARLY'}`, x0 + W - 22, y0 + H - 12); }
-  } else { g.fillStyle = '#9aa6b5'; g.fillText('NO WIND', x0 + W - 22, y0 + 30); }
-  // the meter: 0 on the left, full power on the right. Needle goes right (power), then back left across the accuracy line
-  const bx = x0 + 22, bw = W - 44, by = y0 + 72, bh = 34;
-  const X = v => bx + bw * v;
-  g.fillStyle = '#1a212c'; g.fillRect(bx, by, bw, bh);
-  // power fill
-  const pw = st >= 2 ? km.power : needle;
-  const pg = g.createLinearGradient(bx, 0, bx + bw, 0); pg.addColorStop(0, '#1f8f4c'); pg.addColorStop(0.65, '#f6c31c'); pg.addColorStop(1, '#e8401c');
-  g.fillStyle = pg; g.globalAlpha = st >= 2 ? 0.45 : 0.9; g.fillRect(bx, by, bw * pw, bh); g.globalAlpha = 1;
-  // tick marks
-  g.fillStyle = '#ffffff22'; for (let i = 1; i < 10; i++) g.fillRect(X(i / 10) - 1, by, 2, bh);
-  // accuracy zone + line
-  const zh = km.tol * KM_SCALE, soft = !fg;
-  g.fillStyle = soft ? '#2fd06b55' : '#2fd06bcc'; g.fillRect(X(Math.max(0, KM_LINE - zh)), by, X(KM_LINE + zh) - X(Math.max(0, KM_LINE - zh)), bh);
-  g.fillStyle = '#fff'; g.fillRect(X(KM_LINE) - 1.5, by - 6, 3, bh + 12);
-  // power you need for this kick
+  g.fillStyle = '#9aa6b5'; g.font = '600 13px Barlow, Arial, sans-serif'; g.textAlign = 'right';
+  g.fillText(`${km.kk.name}  ·  ${km.kk.ovr} OVR`, x0 + W - 20, y0 + 30);
+  const bx = x0 + 96, bw = W - 118, bh = 26;
+  const label = (y, t, on) => { g.textAlign = 'left'; g.fillStyle = on ? '#fff' : '#6c7684'; g.font = '800 15px "Barlow Condensed", Arial, sans-serif'; g.fillText(t, x0 + 22, y + 18); g.fillStyle = '#1a212c'; g.fillRect(bx, y, bw, bh); };
+  // 1) power
+  const py = y0 + 56;
+  label(py, '1  POWER', st === 0);
+  const pg = g.createLinearGradient(bx, 0, bx + bw, 0); pg.addColorStop(0, '#1f8f4c'); pg.addColorStop(0.7, '#f6c31c'); pg.addColorStop(1, '#e8401c');
+  g.fillStyle = pg; g.fillRect(bx, py, bw * clamp(km.power, 0, 1), bh);
   if (fg) {
-    const nx = X(Math.min(1, km.need));
-    g.fillStyle = km.need > 1 ? '#e8401c' : '#fff'; g.beginPath(); g.moveTo(nx, by - 2); g.lineTo(nx - 7, by - 12); g.lineTo(nx + 7, by - 12); g.fill();
-    g.font = '800 11px "Barlow Condensed", Arial, sans-serif'; g.textAlign = 'center'; g.fillText(km.need > 1 ? 'OUT OF RANGE' : 'NEED', Math.min(nx, bx + bw - 34), by - 15);
+    const nx = bx + bw * Math.min(1, km.need);
+    g.fillStyle = km.need > 1 ? '#e8401c' : '#fff'; g.fillRect(nx - 1.5, py - 5, 3, bh + 10);
+    g.font = '800 11px "Barlow Condensed", Arial, sans-serif'; g.textAlign = 'center'; g.fillText(km.need > 1 ? 'OUT OF RANGE' : 'NEED', Math.min(nx, bx + bw - 34), py - 8);
   }
-  // locked power marker
-  if (st >= 2) { g.fillStyle = '#f6c31c'; g.fillRect(X(km.power) - 2, by - 4, 4, bh + 8); }
-  // needle
+  // 2) aim
+  const ay = y0 + 106, cx = bx + bw / 2;
+  label(ay, '2  AIM', st === 1);
+  const zw = bw / 2 * km.tol;
+  g.fillStyle = fg ? '#2fd06bcc' : '#2fd06b66'; g.fillRect(cx - zw, ay, zw * 2, bh);
+  g.fillStyle = '#ffffff44'; g.fillRect(cx - 1, ay, 2, bh);
   if (st >= 1) {
-    const nx = X(clamp(needle, -0.05, 1));
-    g.fillStyle = '#ffffff55'; g.fillRect(nx - 5, by - 8, 10, bh + 16);
-    g.fillStyle = '#fff'; g.fillRect(nx - 2, by - 8, 4, bh + 16);
+    const sx = cx + clamp(km.aim, -1, 1) * (bw / 2 - 3);
+    g.fillStyle = '#fff'; g.fillRect(sx - 3, ay - 6, 6, bh + 12);
   }
-  // labels
-  g.font = '800 12px "Barlow Condensed", Arial, sans-serif'; g.textAlign = 'left'; g.fillStyle = '#9aa6b5';
-  g.fillText('ACCURACY', X(KM_LINE) - 20, by + bh + 16);
-  g.textAlign = 'right'; g.fillText('POWER', bx + bw, by + bh + 16);
-  // what to do
   const tap = G.mode === 'mobile' ? 'TAP' : G.online ? 'SPACE' : G.versus && km.side !== G.p1 ? 'ENTER' : 'SPACE';
   g.textAlign = 'center'; g.fillStyle = '#f6c31c'; g.font = 'italic 900 19px "Barlow Condensed", Arial, sans-serif';
-  g.fillText(st === 0 ? `${tap} TO START THE KICK` : st === 1 ? `${tap} TO SET THE POWER` : st === 2 ? `${tap} ON THE WHITE LINE` : '', CW / 2, y0 + H - 12);
+  g.fillText(st === 0 ? `${tap} TO SET THE POWER` : st === 1 ? `${tap} WHEN IT'S IN THE GREEN` : '', CW / 2, y0 + H - 14);
 }
