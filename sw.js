@@ -1,5 +1,5 @@
 // ---- Offline support: network first (so updates show up right away), saved copy when there's no signal ----
-const CACHE = 'bobble-v5.8';
+const CACHE = 'bobble-v5.9';
 const FILES = [
   './',
   'index.html',
@@ -18,8 +18,10 @@ const FILES = [
   'js/pbp.js',
   'js/replay.js',
   'js/xfactor.js',
+  'js/colleges.js',
   'js/career.js',
   'js/engine.js',
+  'js/customteams.js',
   'js/injury.js',
   'js/celly.js',
   'js/special.js',
@@ -36,6 +38,7 @@ const FILES = [
   'js/franchise.js',
   'js/trades.js',
   'js/tutorial.js',
+  'js/teamlab.js',
   'fonts/barlow-500.woff2',
   'fonts/barlow-700.woff2',
   'fonts/bc-600.woff2',

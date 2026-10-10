@@ -231,7 +231,15 @@ const Career = {
   collegeTeam(id) {
     const c = this.cap, base = COLLEGES.find(x => x.id === id);
     const ro = c.college.rosters[id];
-    return { ...base, conf: 'NCAA', div: '', off: ro.off, def: ro.def };
+    const real = !ro.real && this.realCollegeRoster(id); if (real) Object.assign(ro, real); // older saves get the real lineups too
+    return { ...base, conf: 'NCAA', div: '', off: ro.off, def: ro.def, k: ro.k, p: ro.p };
+  },
+  // real 2026 starting lineups (js/colleges.js). Skin tones aren't known, so they come from the name
+  realCollegeRoster(id) {
+    const R = typeof COLLEGE_ROSTERS !== 'undefined' && COLLEGE_ROSTERS[id]; if (!R) return null;
+    const sk = (s, n) => s >= 0 ? s : hashStr(n) % 6;
+    const pl = p => [p[0], p[1], p[2], p[3], p[4], sk(p[5], p[1])], ks = k => [k[0], k[1], k[2], sk(k[3], k[0])];
+    return { off: R.off.map(pl), def: R.def.map(pl), k: ks(R.k), p: ks(R.p), real: true };
   },
   makeCollegeRoster(pr, seed) {
     const mk = pos => { const [s0, s1] = ROOKIE_SPD[pos]; const star = chance(0.15); return [pos, `${pick(FIRST)} ${pick(LAST)}`, 1 + Math.floor(Math.random() * 98), Math.round(rand(58, 70) + pr * 2 + (star ? 7 : 0)), Math.round(rand(s0, s1) - 2), Math.floor(Math.random() * 6)]; };
@@ -239,7 +247,7 @@ const Career = {
   },
   startCollege(id) {
     const c = this.cap, rosters = {};
-    for (const t of COLLEGES) rosters[t.id] = this.makeCollegeRoster(t.pr);
+    for (const t of COLLEGES) rosters[t.id] = this.realCollegeRoster(t.id) || this.makeCollegeRoster(t.pr);
     const opps = shuffle(COLLEGES.filter(t => t.id !== id).map(t => t.id)).slice(0, 6);
     c.college = { id, rosters, sched: opps.map((o, i) => ({ opp: o, home: i % 2 === 0, score: null })), week: 0, w: 0, l: 0, bowl: null, done: false };
     c.team = id; c.phase = 'college';

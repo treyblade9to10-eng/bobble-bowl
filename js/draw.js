@@ -215,7 +215,7 @@ const lookCache = new Map();
 function teamLook(team, home, style) {
   style = style || (home ? 'home' : 'away');
   if (style.startsWith('mix:')) { // mix and match: helmet from one set, jersey from another, pants from a third
-    const key = team.id + home + style; let m = lookCache.get(key);
+    const key = team.id + team.c1 + team.c2 + team.helmet + team.mask + team.pants + home + style; let m = lookCache.get(key);
     if (!m) {
       const [h, j, p] = style.slice(4).split(',').map(k => teamLook(team, home, k));
       m = { helmet: h.helmet, stripe: h.stripe, mask: h.mask, jersey: j.jersey, trim: j.trim, num: j.num, sock: j.sock, pants: p.pants };
@@ -258,7 +258,8 @@ function drawPlayer(g, p, G, at) {
     g.beginPath(); g.ellipse(x, y, 22 * pulse, 9 * pulse, 0, 0, 7); g.stroke();
   }
   if (!at) drawXFRing(g, p, x, y);
-  g.fillStyle = '#00000055'; g.beginPath(); g.ellipse(x, y, big ? 19 : 15, 6, 0, 0, 7); g.fill();
+  { const sw0 = big ? 21 : 17, shg = g.createRadialGradient(x, y, 1, x, y, sw0); shg.addColorStop(0, '#00000070'); shg.addColorStop(0.7, '#00000040'); shg.addColorStop(1, '#00000000');
+    g.save(); g.translate(x, y); g.scale(1, 0.36); g.translate(-x, -y); g.fillStyle = shg; g.beginPath(); g.arc(x, y, sw0, 0, 7); g.fill(); g.restore(); }
   // stamina bar under the player you control: only while you're sprinting or getting your wind back, then it fades away
   if (p.isHuman && !at && G.phase === 'live' && p.stamina != null) {
     const st = clamp(p.stamina, 0, 1);
@@ -306,10 +307,15 @@ function drawPlayer(g, p, G, at) {
     g.beginPath(); g.moveTo(hx, hy); g.lineTo(kx, ky); g.lineTo(fxp, fyp - 2); g.stroke();
     g.strokeStyle = look.pants; g.lineWidth = 7;
     g.beginPath(); g.moveTo(hx, hy); g.lineTo(kx, ky); g.stroke();
+    g.strokeStyle = look.trim; g.lineWidth = 1.6; // pants stripe
+    g.beginPath(); g.moveTo(hx - 1.8, hy + 1); g.lineTo(kx - 1.8, ky - 1); g.stroke();
     g.strokeStyle = look.sock; g.lineWidth = 6.5;
     g.beginPath(); g.moveTo(kx, ky); g.lineTo(fxp, fyp - 2); g.stroke();
-    g.fillStyle = '#151515'; g.beginPath(); g.ellipse(fxp + 3, fyp - 1, 6, 3.6, 0, 0, 7); g.fill();
-    g.fillStyle = '#ffffff'; g.fillRect(fxp, fyp - 3, 4, 1.5);
+    g.fillStyle = '#ffffff30'; g.beginPath(); g.arc(kx + 1, ky - 1, 2.2, 0, 7); g.fill(); // knee shine
+    const ck = textOn(look.pants) === '#111' ? '#f2f2f2' : '#151515';
+    g.fillStyle = ck; g.strokeStyle = OUT; g.lineWidth = 1.2; g.beginPath(); g.ellipse(fxp + 3, fyp - 1, 6, 3.6, 0, 0, 7); g.fill(); g.stroke();
+    g.fillStyle = look.trim === ck ? look.jersey : look.trim; g.fillRect(fxp - 0.5, fyp - 3, 5, 1.6);
+    g.fillStyle = '#ffffff40'; g.fillRect(fxp + 1, fyp - 4, 4, 1);
   };
   leg(-1, Math.PI); leg(1, 0);
 
@@ -348,6 +354,17 @@ function drawPlayer(g, p, G, at) {
   g.moveTo(-W * 0.4, -2); g.lineTo(-W * 0.5, -TH + 6); g.quadraticCurveTo(-W * 0.55, -TH - 2, -W * 0.3, -TH - 3);
   g.lineTo(W * 0.3, -TH - 3); g.quadraticCurveTo(W * 0.55, -TH - 2, W * 0.5, -TH + 6); g.lineTo(W * 0.4, -2); g.closePath();
   g.fill(); g.stroke();
+  // light from the top left
+  g.save(); g.clip(); g.fillStyle = '#ffffff1c'; g.fillRect(-W * 0.55, -TH - 4, W * 0.32, TH + 4); g.restore();
+  // shoulder pads under the jersey
+  for (const sx0 of [-W * 0.4, W * 0.4]) {
+    const pg = g.createRadialGradient(sx0 - 1.5, -TH - 2, 1, sx0, -TH + 1, 8);
+    pg.addColorStop(0, shade(look.jersey, 0.28)); pg.addColorStop(1, shade(look.jersey, -0.12));
+    g.fillStyle = pg; g.strokeStyle = OUT; g.lineWidth = 2.2;
+    g.beginPath(); g.ellipse(sx0, -TH + 1, 7.5, 5.5, sx0 < 0 ? -0.35 : 0.35, 0, 7); g.fill(); g.stroke();
+  }
+  // collar
+  g.strokeStyle = look.trim; g.lineWidth = 2.2; g.beginPath(); g.arc(0, -TH - 3, 4.5, 0.15, Math.PI - 0.15); g.stroke();
   // sleeve stripes
   g.strokeStyle = look.trim; g.lineWidth = 2.5;
   g.beginPath(); g.moveTo(W * 0.42, -TH + 2); g.lineTo(W * 0.5, -TH + 8); g.stroke();
@@ -440,6 +457,13 @@ function drawHead(g, R, team, p, look) {
   const dx = -R * 0.38 * face.dir;
   g.strokeText(p.num, dx, -R * 0.08); g.fillText(p.num, dx, -R * 0.08);
   g.restore();
+  // gloss
+  g.save(); g.translate(-R * 0.42, -R * 0.52); g.rotate(-0.6);
+  const gl = g.createRadialGradient(0, 0, 0, 0, 0, R * 0.32); gl.addColorStop(0, '#ffffffb0'); gl.addColorStop(1, '#ffffff00');
+  g.fillStyle = gl; g.beginPath(); g.ellipse(0, 0, R * 0.34, R * 0.16, 0, 0, 7); g.fill(); g.restore();
+  // bottom rim of the shell
+  g.save(); g.beginPath(); g.ellipse(-R * 0.05, 0, R * 1.04, R, 0, 0, 7); g.clip();
+  g.strokeStyle = shade(look.helmet, -0.45); g.lineWidth = R * 0.12; g.beginPath(); g.ellipse(-R * 0.05, R * 0.06, R * 1.02, R * 0.98, 0, Math.PI * 0.15, Math.PI * 0.7); g.stroke(); g.restore();
   // ear hole
   g.fillStyle = shade(look.helmet, -0.55); g.beginPath(); g.arc(-R * 0.18, R * 0.22, R * 0.13, 0, 7); g.fill();
   // face opening
@@ -483,8 +507,12 @@ function drawHead(g, R, team, p, look) {
     g.moveTo(-R * 0.05, fy + R * 0.12); g.quadraticCurveTo(fx + R * 0.4, fy + R * 0.12, fx + R * 0.66, fy + R * 0.08);
     g.moveTo(-R * 0.02, fy + R * 0.44); g.quadraticCurveTo(fx + R * 0.35, fy + R * 0.5, fx + R * 0.6, fy + R * 0.42);
     g.moveTo(fx + R * 0.64, fy + R * 0.06); g.lineTo(fx + R * 0.58, fy + R * 0.6);
+    g.moveTo(fx + R * 0.2, fy + R * 0.13); g.lineTo(fx + R * 0.17, fy + R * 0.48); // center bar
     g.stroke();
   }
+  // where the cage bolts on
+  g.fillStyle = mc; g.strokeStyle = OUT; g.lineWidth = 1.2;
+  for (const by of [fy + R * 0.12, fy + R * 0.44]) { g.beginPath(); g.arc(-R * 0.03, by, R * 0.07, 0, 7); g.fill(); g.stroke(); }
   // chin strap
   g.strokeStyle = '#ffffffcc'; g.lineWidth = 2; g.beginPath(); g.moveTo(-R * 0.05, R * 0.55); g.lineTo(fx - R * 0.1, fy + R * 0.58); g.stroke();
 }

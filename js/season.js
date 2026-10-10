@@ -200,7 +200,9 @@ const Season = {
     const d = this.data;
     const changes = this.develop();
     const carry = { year: d.year + 1, history: d.history, rosters: d.rosters };
+    const sw = d.swap;
     this.start(d.team, d.games, d.qtr, d.diff, carry);
+    if (sw) { this.data.swap = sw; this.save(); } // your custom team stays in the league
     this.data.devReport = changes;
     this.save();
     return changes;

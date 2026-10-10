@@ -1482,6 +1482,7 @@ function throwTo(qb, r, pitch = false, aimed = null, style = 'normal', lead = nu
     tx = r.x + r.vx * T; ty = r.y + r.vy * T;
   }
   if (lead && lead.m > 0.1 && !pitch) { tx += lead.x * 2.6; ty += lead.y * 2.6; } // lead him away from the defender
+  if (!aimed && !pitch) { tx = clamp(tx, 1.2, 118.8); ty = clamp(ty, 0.8, FIELD_W - 0.8); } // don't lead him out the back of the end zone or over the sideline
   let len = Math.hypot(tx - qb.x, ty - qb.y);
   let duck = false;
   if (!pitch) {
@@ -1586,7 +1587,8 @@ function resolveCatch() {
     if (hands) pc += 0.15;
     if (def && dd < 1.8) { pc -= (hands ? 0.08 : 0.24) - (rcv.ovr - def.ovr) / 150; if (chance(0.03 + humanDefBonus * 0.5)) return intercept(def); }
     if (chance(clamp(pc, 0.25, 0.97))) {
-      if (rcv.y < -0.25 || rcv.y > FIELD_W + 0.25 || rcv.x < -0.25 || rcv.x > 120.25) { addText(rcv.x, clamp(rcv.y, 1, FIELD_W - 1), 'NO FEET IN', '#fff', 15, 1); return incomplete(rcv, 'OUT OF BOUNDS'); }
+      const backLine = rcv.x < -0.25 || rcv.x > 120.25, sideLine = rcv.y < -0.25 || rcv.y > FIELD_W + 0.25;
+      if (backLine || sideLine) { addText(clamp(rcv.x, 1, 119), clamp(rcv.y, 1, FIELD_W - 1), backLine ? 'OUT THE BACK' : 'NO FEET IN', '#fff', 15, 1); return incomplete(rcv, 'OUT OF BOUNDS'); }
       b.holder = rcv; G.bstate = 'run'; Sound.catch(); G.catchX = rcv.x;
       rcv.mouth = 'O'; rcv.mouthT = 0.4;
       stat(f.passer).comp++; G.credit = { p: rcv, kind: 'rec', passer: f.passer };

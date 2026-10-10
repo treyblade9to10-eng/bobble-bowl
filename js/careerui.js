@@ -66,47 +66,60 @@ const CareerUI = {
     const f = capForm = capForm || { name: '', pos: 'WR', arch: CAP_ARCH.WR[0][0], num: 7, skin: 2, stars: 3, college: 'MICH', games: 10, diff: 1, qtr: 180 };
     const offers = collegeOffers(f.stars, f.pos + f.arch);
     if (!offers.some(t => t.id === f.college)) f.college = offers[0].id;
-    const arch0 = CAP_ARCH[f.pos].find(x => x[0] === f.arch)[1], startOvr = Math.round((arch0.a[0] + arch0.a[1]) / 2) + RECRUIT[f.stars].ovr;
-    const star = on => `<svg viewBox="0 0 24 24" class="rStar${on ? ' on' : ''}"><path d="M12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7L12 17.3 5.8 20.9l1.6-7L2 9.2l7.1-.6z"/></svg>`;
-    const stars = [1, 2, 3, 4, 5].map(n => `<button class="rBtn" data-n="${n}" title="${n}-star">${star(n <= f.stars)}</button>`).join('') + `<b class="rLab">${f.stars}-STAR</b>`;
-    const skins = SKIN.map((c, i) => `<button class="sw${i === f.skin ? ' on' : ''}" data-i="${i}" style="background:${c}" title="Skin ${i + 1}"></button>`).join('');
-    const sel = (id, opts, v) => `<select id="${id}">${opts.map(([k, t]) => `<option value="${k}"${String(k) === String(v) ? ' selected' : ''}>${t}</option>`).join('')}</select>`;
-    this.set(`<div class="capWrap">
-      <div class="capPrev"><canvas id="capCv" width="260" height="310"></canvas></div>
-      <div class="capFields">
-        <label>Name <input id="capName" maxlength="18" placeholder="First Last" value="${f.name.replace(/"/g, '')}"></label>
-        <label>Position ${sel('capPos', CAP_POS.map(p => [p, p]), f.pos)}</label>
-        <label>Style ${sel('capArch', CAP_ARCH[f.pos].map(a => [a[0], a[0]]), f.arch)}</label>
-        <label>Number <input id="capNum" type="number" min="0" max="99" value="${f.num}"></label>
-        <div class="capSkin">Skin <span>${skins}</span></div>
-        <div class="capRec"><span>Recruit</span><div class="rRow">${stars}</div></div>
-        <div class="capRecNote">Starts at <b>${startOvr} OVR</b>  ·  ${offers.length} scholarship offer${offers.length > 1 ? 's' : ''}</div>
-        <label>College offers ${sel('capCol', offers.map(t => [t.id, `${t.city} (${['Small', 'Rising', 'Big', 'Elite'][t.pr]})`]), f.college)}</label>
-        <label>NFL season ${sel('capGames', [[6, '6 games'], [10, '10 games'], [14, '14 games']], f.games)}</label>
-        <label>Quarters ${sel('capQtr', [[120, '2 min'], [180, '3 min'], [300, '5 min']], f.qtr)}</label>
-        <label>Difficulty ${sel('capDiff', [[0, 'Rookie'], [1, 'Pro'], [2, 'All-Pro'], [3, 'All-Madden']], f.diff)}</label>
+    const rc = RECRUIT[f.stars], arch = CAP_ARCH[f.pos].find(x => x[0] === f.arch)[1];
+    const startOvr = Math.round((arch.a[0] + arch.a[1]) / 2) + rc.ovr, col = COLLEGES.find(t => t.id === f.college);
+    const star = (on, cls = 'rStar') => `<svg viewBox="0 0 24 24" class="${cls}${on ? ' on' : ''}"><path d="M12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7L12 17.3 5.8 20.9l1.6-7L2 9.2l7.1-.6z"/></svg>`;
+    const chips = (k, list, cur) => `<div class="cpChips">${list.map(([v, t]) => `<button class="cpChip${String(v) === String(cur) ? ' on' : ''}" data-k="${k}" data-v="${v}">${t}</button>`).join('')}</div>`;
+    const TIER = ['SMALL SCHOOL', 'RISING', 'BIG PROGRAM', 'POWERHOUSE'];
+    this.set(`<div class="cpWrap">
+      <div class="cpCard" style="--c1:${col.c1};--c2:${col.c2}">
+        <canvas id="capCv" width="260" height="310"></canvas>
+        <div class="cpId">
+          <div class="cpNm">${(f.name || 'Your Name').replace(/[<>&"]/g, '')}</div>
+          <div class="cpPos">${f.pos}  ·  ${f.arch.toUpperCase()}  ·  #${f.num}</div>
+          <div class="cpStars">${[1, 2, 3, 4, 5].map(n => star(n <= f.stars, 'cpStar')).join('')}</div>
+        </div>
+        <div class="cpOvr"><b>${startOvr}</b><span>OVR</span></div>
+        <div class="cpCol">${teamBadge(col)}<div><b>${col.city}</b><span>${col.name}  ·  ${TIER[col.pr]}</span></div></div>
+      </div>
+      <div class="cpPane">
+        <div class="tlSec">PLAYER</div>
+        <div class="cpRow2"><label class="tlF"><span>Name</span><input id="capName" maxlength="18" placeholder="First Last" value="${f.name.replace(/"/g, '')}"></label>
+          <label class="tlF cpNum"><span>Number</span><input id="capNum" type="number" min="0" max="99" value="${f.num}"></label></div>
+        <div class="tlSec">POSITION</div>
+        ${chips('pos', CAP_POS.map(p => [p, p]), f.pos)}
+        <div class="tlSec">PLAY STYLE</div>
+        <div class="cpArchs">${CAP_ARCH[f.pos].map(([n, a]) => `<button class="cpArch${n === f.arch ? ' on' : ''}" data-a="${n}"><b>${n}</b>
+          <span><i>SPD</i> ${Math.min(99, a.spd + rc.spd)}</span><span><i>${CAP_SKILLS[f.pos][0]}</i> ${a.a[0] + rc.ovr}</span><span><i>${CAP_SKILLS[f.pos][1]}</i> ${a.a[1] + rc.ovr}</span></button>`).join('')}</div>
+        <div class="tlSec">SKIN TONE</div>
+        <div class="cpSkins">${SKIN.map((c, i) => `<button class="cpSkin${i === f.skin ? ' on' : ''}" data-i="${i}" style="background:${c}"></button>`).join('')}</div>
+        <div class="tlSec">RECRUIT RATING <span class="cpSecR">${f.stars}-STAR  ·  STARTS AT ${startOvr} OVR</span></div>
+        <div class="cpRecs">${[1, 2, 3, 4, 5].map(n => `<button class="cpRec${n === f.stars ? ' on' : ''}" data-n="${n}"><span>${[1, 2, 3, 4, 5].map(k => star(k <= n, 'cpStar')).join('')}</span><b>${startOvr - rc.ovr + RECRUIT[n].ovr} OVR</b></button>`).join('')}</div>
+        <div class="tlSec">SCHOLARSHIP OFFERS <span class="cpSecR">${offers.length}</span></div>
+        <div class="cpOffers">${offers.map(t => `<button class="cpOffer${t.id === f.college ? ' on' : ''}" data-c="${t.id}" style="--c1:${t.c1}">${teamBadge(t)}<div><b>${t.city}</b><span>${TIER[t.pr]}</span></div></button>`).join('')}</div>
+        <div class="tlSec">CAREER SETTINGS</div>
+        <div class="cpSet"><span>NFL season</span>${chips('games', [[6, '6 GAMES'], [10, '10 GAMES'], [14, '14 GAMES']], f.games)}</div>
+        <div class="cpSet"><span>Quarters</span>${chips('qtr', [[120, '2 MIN'], [180, '3 MIN'], [300, '5 MIN']], f.qtr)}</div>
+        <div class="cpSet"><span>Difficulty</span>${chips('diff', [[0, 'ROOKIE'], [1, 'PRO'], [2, 'ALL-PRO'], [3, 'ALL-MADDEN']], f.diff)}</div>
         <div class="capNote">Your story: a senior season in college, the NFL Combine, then Draft Day. Play well and you go higher.</div>
-        <div class="row"><button class="big" id="capCreate">START CAREER</button><button id="capBack">BACK</button></div>
-      </div></div>`, 'Create Your Player');
-    const read = () => {
-      f.name = $('capName').value.trim(); f.pos = $('capPos').value; f.num = clamp(parseInt($('capNum').value, 10) || 0, 0, 99);
-      f.college = $('capCol').value; f.games = +$('capGames').value; f.qtr = +$('capQtr').value; f.diff = +$('capDiff').value;
-      f.arch = CAP_ARCH[f.pos].some(a => a[0] === $('capArch').value) ? $('capArch').value : CAP_ARCH[f.pos][0][0];
-    };
-    const preview = () => { const a = CAP_ARCH[f.pos].find(x => x[0] === f.arch)[1]; capPreview([f.pos, f.name || 'My Player', f.num, startOvr, a.spd + RECRUIT[f.stars].spd, f.skin], COLLEGES.find(t => t.id === f.college)); };
-    document.querySelectorAll('.rBtn').forEach(b => b.onclick = () => { read(); f.stars = +b.dataset.n; Sound.click(); this.form(); });
-    $('capPos').onchange = () => { read(); f.arch = CAP_ARCH[f.pos][0][0]; this.form(); };
-    $('capArch').onchange = () => { read(); this.form(); };
-    for (const id of ['capNum', 'capCol', 'capGames', 'capQtr', 'capDiff']) $(id).onchange = () => { read(); preview(); };
-    $('capName').oninput = () => { f.name = $('capName').value; };
-    document.querySelectorAll('.capSkin .sw').forEach(b => b.onclick = () => { read(); f.skin = +b.dataset.i; this.form(); });
+      </div></div>
+      <div class="cpBar"><button id="capBack">BACK</button><button class="big" id="capCreate">START CAREER</button></div>`, 'Create Your Player');
+    const preview = () => capPreview([f.pos, f.name || 'My Player', f.num, startOvr, arch.spd + rc.spd, f.skin], col);
+    const re = () => { Sound.click(); this.form(); };
+    document.querySelectorAll('.cpChip').forEach(b => b.onclick = () => { const k = b.dataset.k, v = b.dataset.v; if (k === 'pos') { f.pos = v; f.arch = CAP_ARCH[v][0][0]; } else f[k] = +v; re(); });
+    document.querySelectorAll('.cpArch').forEach(b => b.onclick = () => { f.arch = b.dataset.a; re(); });
+    document.querySelectorAll('.cpSkin').forEach(b => b.onclick = () => { f.skin = +b.dataset.i; re(); });
+    document.querySelectorAll('.cpRec').forEach(b => b.onclick = () => { f.stars = +b.dataset.n; re(); });
+    document.querySelectorAll('.cpOffer').forEach(b => b.onclick = () => { f.college = b.dataset.c; re(); });
+    $('capName').oninput = () => { f.name = $('capName').value; $('capName').classList.remove('bad'); document.querySelector('.cpNm').textContent = f.name.trim() || 'Your Name'; };
+    $('capNum').onchange = () => { f.num = clamp(parseInt($('capNum').value, 10) || 0, 0, 99); this.form(); };
     $('capBack').onclick = () => { cancelAnimationFrame(capAnim); show('title'); };
     $('capCreate').onclick = () => {
-      read();
-      if (f.name.length < 2) { $('capName').focus(); $('capName').classList.add('bad'); return; }
+      f.name = $('capName').value.trim();
+      if (f.name.length < 2) { $('capName').focus(); $('capName').classList.add('bad'); $('capName').scrollIntoView({ block: 'center' }); return; }
       Career.create(f); capForm = null; Sound.td(); this.open();
     };
-    $('capName').addEventListener('keydown', e => e.stopPropagation());
+    for (const id of ['capName', 'capNum']) $(id).addEventListener('keydown', e => e.stopPropagation());
     preview();
   },
 

@@ -10,4 +10,4 @@ const STADIUMS = {
   ATL: ['Peach Dome', 'dome', 'turf'], CAR: ['Queen City Stadium', 'open', 'turf'], NO: ['Bayou Superdome', 'dome', 'turf'], TB: ['Pirate Ship Stadium', 'open', 'grass'],
   ARI: ['Cactus Dome', 'dome', 'grass'], LAR: ['SoFly Stadium', 'dome', 'turf'], SF: ['Bay Gold Stadium', 'open', 'grass'], SEA: ['Sound Field', 'open', 'turf']
 };
-const stadiumOf = team => { const s = team && STADIUMS[team.id]; return s ? { name: s[0], dome: s[1] === 'dome', turf: s[2] === 'turf' } : { name: 'Bobble Bowl Stadium', dome: false, turf: false }; };
+const stadiumOf = team => { if (team && team.custom) return { name: team.stadium || 'Home Field', dome: !!team.dome, turf: false }; const s = team && STADIUMS[team.id]; return s ? { name: s[0], dome: s[1] === 'dome', turf: s[2] === 'turf' } : { name: 'Bobble Bowl Stadium', dome: false, turf: false }; };

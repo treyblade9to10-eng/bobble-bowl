@@ -86,6 +86,9 @@ function buildHow() {
       <p>Tap <b>ONLINE</b>. One player hits <b>HOST</b> and gets a 4-letter code, the other hits <b>JOIN</b> and types it in. Each of you picks plays on your own screen.</p></div>
     <div><h3>Before the snap</h3>
       <p><b>MOTION</b> (M) sends a receiver across. If a defender follows him, it's man coverage. On defense: <b>PRESS</b> (V) jams receivers, <b>SHOW BLITZ</b> (B) fakes a blitz.</p></div>
+    <div><h3>Create a Team</h3>
+      <p>Pick colors, a badge, a stadium and a roster, and set every player's rating. Play it in <b>Quick Game</b>, or start a <b>Season</b> where it takes over an NFL team's spot.</p>
+      <p>Set it to <b>PUBLIC</b> to share it in the <b>Team Database</b>, and grab teams other players made.</p></div>
     <div><h3>Controller</h3>
       <p>Plug in an Xbox or PlayStation controller. Stick moves, <b>A</b> snap / dive, <b>B</b> juke, <b>X</b> spin, <b>Y</b> stiff arm, <b>RT</b> sprint. Passing: A B X Y throw to receivers 1-4.</p></div>`;
 }
@@ -151,9 +154,10 @@ function buildGrid() { renderSelect(); }
 
 // team badge: our own shield in the team colors (no real logos)
 function teamBadge(t) {
-  const fg = textOn(t.c1), fs = t.id.length > 2 ? 22 : 27;
-  return `<svg viewBox="0 0 64 72" class="badge"><path d="M32 3 L59 12 V36 C59 53 47 64 32 69 C17 64 5 53 5 36 V12 Z" fill="${t.c1}" stroke="${t.c2}" stroke-width="4"/>
-    <path d="M12 16 L32 9.5 L52 16" fill="none" stroke="${t.helmet || '#fff'}" stroke-width="3" opacity=".8"/>
+  const fg = textOn(t.c1), fs = t.id.length > 3 ? 18 : t.id.length > 2 ? 22 : 27;
+  const SHAPE = { shield: 'M32 3 L59 12 V36 C59 53 47 64 32 69 C17 64 5 53 5 36 V12 Z', round: 'M32 6 A29 29 0 1 1 31.9 6 Z', diamond: 'M32 3 L61 36 L32 69 L3 36 Z', hex: 'M32 3 L60 19 V53 L32 69 L4 53 V19 Z' };
+  return `<svg viewBox="0 0 64 72" class="badge"><path d="${SHAPE[t.shape] || SHAPE.shield}" fill="${t.c1}" stroke="${t.c2}" stroke-width="4"/>
+    ${!t.shape || t.shape === 'shield' ? `<path d="M12 16 L32 9.5 L52 16" fill="none" stroke="${t.helmet || '#fff'}" stroke-width="3" opacity=".8"/>` : ''}
     <text x="32" y="${t.id.length > 2 ? 44 : 46}" text-anchor="middle" font-family="Barlow Condensed, sans-serif" font-style="italic" font-weight="900" font-size="${fs}" fill="${fg}" stroke="#0007" stroke-width="1">${t.id}</text></svg>`;
 }
 
@@ -176,6 +180,12 @@ function renderTeamGrid() {
       return `<button class="tgT${cur ? ' cur' : ''}${opp ? ' opp' : ''}" data-i="${i}" style="--c1:${t.c1};--c2:${t.c2}">${teamBadge(t)}<span class="tgN">${t.city}<br><b>${t.name}</b></span><span class="tgO">${teamOvr(tt)}</span>${opp ? '<span class="tgOpp">OPPONENT</span>' : ''}</button>`;
     }).join('') + '</div></div>';
   }
+  const mine = TEAMS.map((t, i) => [t, i]).filter(([t]) => t.custom);
+  if (mine.length && (tgConf === 'all' || tgConf === 'MINE')) h = `<div class="tgDiv tgMine"><div class="tgDn">MY TEAMS</div><div class="tgRow">` + mine.map(([t, i]) => {
+    const cur = sel.idx[tgSide] === i, opp = sel.idx[1 - tgSide] === i;
+    return `<button class="tgT${cur ? ' cur' : ''}${opp ? ' opp' : ''}" data-i="${i}" style="--c1:${t.c1};--c2:${t.c2}">${teamBadge(t)}<span class="tgN">${t.city}<br><b>${t.name}</b></span><span class="tgO">${teamOvr(t)}</span></button>`;
+  }).join('') + '</div></div>' + (tgConf === 'MINE' ? '' : h);
+  else if (tgConf === 'MINE') h = `<div class="tgEmpty">No custom teams yet. Make one in CREATE A TEAM on the title screen.</div>`;
   $('tgList').innerHTML = h;
   $('tgList').querySelectorAll('.tgT').forEach(b => b.onclick = () => {
     const i = +b.dataset.i;
