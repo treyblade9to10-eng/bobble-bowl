@@ -116,14 +116,7 @@ function buildField(G) {
 function drawField(g, G) {
   buildField(G);
   g.fillStyle = '#2b6b2e'; g.fillRect(0, 0, CW, CH);
-  // source rect for the current camera
-  const x0 = wx(0), y0 = wy(0);
-  let srcX = (x0 + FIELD_PAD_X) * PX, srcY = (y0 + FIELD_PAD_TOP) * PY;
-  let dx = 0, dy = 0, w = CW, h = CH;
-  if (srcX < 0) { dx = -srcX; w -= dx; srcX = 0; }
-  if (srcY < 0) { dy = -srcY; h -= dy; srcY = 0; }
-  w = Math.min(w, fieldCv.width - srcX); h = Math.min(h, fieldCv.height - srcY);
-  if (w > 0 && h > 0) g.drawImage(fieldCv, srcX, srcY, w, h, dx, dy, w, h);
+  blitWorld(g, fieldCv);
   // jumping fans when hyped
   if (G.crowdHype > 0.05) {
     const top = sy(-FIELD_PAD_TOP);
@@ -133,6 +126,16 @@ function drawField(g, G) {
       g.fillRect(x, top + 12 + (i % 5) * 12 - j, 6, 10);
     }
   }
+}
+// draw a canvas laid out like the field canvas (same padding + scale) under the current camera
+function blitWorld(g, cv) {
+  const x0 = wx(0), y0 = wy(0);
+  let srcX = (x0 + FIELD_PAD_X) * PX, srcY = (y0 + FIELD_PAD_TOP) * PY;
+  let dx = 0, dy = 0, w = CW, h = CH;
+  if (srcX < 0) { dx = -srcX; w -= dx; srcX = 0; }
+  if (srcY < 0) { dy = -srcY; h -= dy; srcY = 0; }
+  w = Math.min(w, cv.width - srcX); h = Math.min(h, cv.height - srcY);
+  if (w > 0 && h > 0) g.drawImage(cv, srcX, srcY, w, h, dx, dy, w, h);
 }
 
 function drawLines(g, G) {
@@ -210,7 +213,20 @@ const THROWBACKS = {
   KC: { jersey: '#C8102E', trim: '#FFB81C', num: '#ffffff', pants: '#ffffff', sock: '#C8102E', helmet: '#C8102E', stripe: '#FFB81C', mask: '#9a9a9a' },
   GB: { jersey: '#1d2a5b', trim: '#C8A04A', num: '#C8A04A', pants: '#C8A04A', sock: '#1d2a5b', helmet: '#7a5230', stripe: '#7a5230', mask: '#7a5230' }
 };
-const UNIFORMS = [['home', 'Home'], ['away', 'Away'], ['rush', 'Color Rush'], ['throwback', 'Throwback']];
+const UNIFORMS = [['home', 'Home'], ['away', 'Away'], ['rush', 'Color Rush'], ['throwback', 'Throwback'], ['rivalry', 'Rivalry']];
+// the details that make each set look different: sleeve stripes, pants stripes, helmet stripes, sock bands, shoulder yoke
+const UNI_CUT = {
+  home: { sleeve: 2, pstripe: 1, hstripe: 1, sockBand: 1 },
+  away: { sleeve: 2, pstripe: 1, hstripe: 1, sockBand: 1 },
+  rush: { sleeve: 0, pstripe: 1, hstripe: 1, sockBand: 0 },
+  throwback: { sleeve: 3, pstripe: 2, hstripe: 2, sockBand: 3 },
+  rivalry: { sleeve: 1, pstripe: 1, hstripe: 1, sockBand: 1, yoke: true, matte: true }
+};
+// big real rivalries get the rivalry sets (home team wears them, the road team wears white)
+const RIVALRIES = ['CHI-GB', 'DAL-PHI', 'DAL-WAS', 'DAL-NYG', 'NYG-PHI', 'BAL-PIT', 'CLE-PIT', 'CIN-PIT', 'KC-LV', 'DEN-LV', 'DEN-KC', 'SEA-SF', 'LAR-SF',
+  'DAL-SF', 'BUF-MIA', 'NE-NYJ', 'BUF-NE', 'BUF-KC', 'GB-MIN', 'DET-GB', 'CHI-DET', 'ATL-NO', 'CAR-NO', 'NO-TB', 'HOU-TEN', 'IND-NE', 'LAC-LAR', 'NYG-NYJ', 'BAL-CLE', 'ARI-SEA'];
+function isRivalry(a, b) { return !!(a && b && a.id !== b.id && RIVALRIES.includes([a.id, b.id].sort().join('-'))); }
+const lum = c => { let h = (c || '#000').replace('#', ''); if (h.length === 3) h = h.split('').map(x => x + x).join(''); const n = parseInt(h.slice(0, 6), 16) || 0; return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255; };
 const lookCache = new Map();
 function teamLook(team, home, style) {
   style = style || (home ? 'home' : 'away');
@@ -218,11 +234,16 @@ function teamLook(team, home, style) {
     const key = team.id + team.c1 + team.c2 + team.helmet + team.mask + team.pants + home + style; let m = lookCache.get(key);
     if (!m) {
       const [h, j, p] = style.slice(4).split(',').map(k => teamLook(team, home, k));
-      m = { helmet: h.helmet, stripe: h.stripe, mask: h.mask, jersey: j.jersey, trim: j.trim, num: j.num, sock: j.sock, pants: p.pants };
+      m = { helmet: h.helmet, stripe: h.stripe, mask: h.mask, hstripe: h.hstripe, matte: h.matte,
+        jersey: j.jersey, trim: j.trim, num: j.num, numOut: j.numOut, sleeve: j.sleeve, yoke: j.yoke, sock: j.sock, sockBand: j.sockBand, pants: p.pants, pstripe: p.pstripe };
       lookCache.set(key, m);
     }
     return m;
   }
+  const lk = baseLook(team, style);
+  return { ...(UNI_CUT[style] || UNI_CUT.home), ...lk, numOut: lk.numOut || numOutline(lk, style) };
+}
+function baseLook(team, style) {
   const base = { helmet: team.helmet, stripe: team.c2, mask: team.mask };
   const light = c => textOn(c) === '#111';
   if (style === 'throwback') {
@@ -230,10 +251,38 @@ function teamLook(team, home, style) {
     const j = light(team.c2) ? shade(team.c1, -0.35) : team.c2;
     return { ...base, jersey: j, trim: team.c1, num: light(j) ? team.c1 : '#ffffff', pants: '#ffffff', sock: j };
   }
+  if (style === 'rivalry') {
+    // a dark, matte, one-color set with the team's loudest color as the accent
+    const [dark, bright] = lum(team.c1) <= lum(team.c2) ? [team.c1, team.c2] : [team.c2, team.c1];
+    const body = shade(dark, lum(dark) > 0.35 ? -0.6 : lum(dark) > 0.18 ? -0.4 : -0.15), acc = lum(bright) < 0.3 ? '#c9ced6' : bright;
+    const pants = lum(dark) < 0.18 ? acc : body; // already-dark teams get bold accent pants so the set doesn't look like their home one
+    return { helmet: shade(body, 0.06), stripe: acc, mask: acc, jersey: body, trim: acc, num: acc, numOut: '#ffffff', pants, sock: body };
+  }
   if (style === 'rush') return { ...base, jersey: team.c1, trim: team.c2, num: light(team.c2) ? '#fff' : team.c2, pants: shade(team.c1, -0.08), sock: team.c1 };
   return style === 'home'
     ? { ...base, jersey: team.c1, trim: team.c2, num: team.c2 === '#ffffff' || team.c2 === '#FFFFFF' ? '#fff' : team.c2, pants: team.pants || shade(team.c2, 0.15), sock: team.c1 }
     : { ...base, jersey: '#f7f7f7', trim: team.c1, num: team.c1, pants: team.pantsAway || '#ececec', sock: team.c1 };
+}
+// two-tone numbers: an outline that pops off the jersey
+function numOutline(lk, style) {
+  if (style === 'throwback') return shade(lk.jersey, -0.5);
+  if (style === 'away') return lk.trim !== lk.num ? lk.trim : shade(lk.num, -0.45);
+  const lightNum = lum(lk.num) > 0.62;
+  if (lightNum) return lum(lk.jersey) > 0.5 ? shade(lk.jersey, -0.55) : (lk.trim !== lk.num && lum(lk.trim) < 0.62 ? lk.trim : shade(lk.jersey, -0.5));
+  return lum(lk.jersey) < 0.5 ? '#ffffff' : shade(lk.jersey, -0.55);
+}
+// mud, grass and snow build up on a player every time he hits the ground
+const DIRT = { clear: '#4e6e2c', rain: '#4a3420', snow: '#f4f8ff' };
+function dirtSpots(g, p, n, x0, y0, w, h, a) {
+  if (!p.dirt || p.dirt < 0.04) return;
+  const hs = hashStr(p.name || 'x');
+  g.fillStyle = DIRT[G.weather] || DIRT.clear; g.globalAlpha = Math.min(0.75, p.dirt * 0.8) * a;
+  const k = Math.ceil(n * Math.min(1, p.dirt * 1.4));
+  for (let i = 0; i < k; i++) {
+    const r = (hs >> (i * 3)) & 63, q = (hs >> (i * 2 + 5)) & 63;
+    g.beginPath(); g.ellipse(x0 + (r / 63) * w, y0 + (q / 63) * h, 2 + (r % 4) * (0.6 + p.dirt), 1.4 + (q % 3) * 0.7, (r % 7) * 0.4, 0, 7); g.fill();
+  }
+  g.globalAlpha = 1;
 }
 
 function drawPlayer(g, p, G, at) {
@@ -307,10 +356,22 @@ function drawPlayer(g, p, G, at) {
     g.beginPath(); g.moveTo(hx, hy); g.lineTo(kx, ky); g.lineTo(fxp, fyp - 2); g.stroke();
     g.strokeStyle = look.pants; g.lineWidth = 7;
     g.beginPath(); g.moveTo(hx, hy); g.lineTo(kx, ky); g.stroke();
-    g.strokeStyle = look.trim; g.lineWidth = 1.6; // pants stripe
-    g.beginPath(); g.moveTo(hx - 1.8, hy + 1); g.lineTo(kx - 1.8, ky - 1); g.stroke();
+    // pants stripes: single, or a classic double/triple on throwbacks
+    const ps = look.pstripe == null ? 1 : look.pstripe;
+    if (ps) {
+      g.strokeStyle = look.trim; g.lineWidth = ps > 1 ? 1.1 : 1.7;
+      g.beginPath();
+      for (let i = 0; i < ps; i++) { const o = -2.2 + i * 1.8; g.moveTo(hx + o, hy + 1); g.lineTo(kx + o, ky - 1); }
+      g.stroke();
+    }
+    dirtSpots(g, p, 3, Math.min(hx, kx) - 3, Math.min(hy, ky), Math.abs(kx - hx) + 6, Math.abs(ky - hy), 1);
     g.strokeStyle = look.sock; g.lineWidth = 6.5;
     g.beginPath(); g.moveTo(kx, ky); g.lineTo(fxp, fyp - 2); g.stroke();
+    if (look.sockBand) { // stripes around the top of the sock
+      const bands = look.sockBand;
+      g.strokeStyle = look.trim; g.lineWidth = bands > 1 ? 1.1 : 1.8;
+      for (let i = 0; i < bands; i++) { const u = 0.22 + i * 0.14, bx = lerp(kx, fxp, u), by = lerp(ky, fyp - 2, u); g.beginPath(); g.moveTo(bx - 3.2, by); g.lineTo(bx + 3.2, by); g.stroke(); }
+    }
     g.fillStyle = '#ffffff30'; g.beginPath(); g.arc(kx + 1, ky - 1, 2.2, 0, 7); g.fill(); // knee shine
     const ck = textOn(look.pants) === '#111' ? '#f2f2f2' : '#151515';
     g.fillStyle = ck; g.strokeStyle = OUT; g.lineWidth = 1.2; g.beginPath(); g.ellipse(fxp + 3, fyp - 1, 6, 3.6, 0, 0, 7); g.fill(); g.stroke();
@@ -323,6 +384,7 @@ function drawPlayer(g, p, G, at) {
   // pants top
   g.fillStyle = look.pants; g.strokeStyle = OUT; g.lineWidth = 2.5;
   roundRect(g, -W * 0.42, -4, W * 0.84, 9, 4); g.fill(); g.stroke();
+  dirtSpots(g, p, 3, -W * 0.36, -2, W * 0.72, 6, 1);
   // back arm (behind torso)
   const sw = Math.sin(p.anim) * k;
   const arm = (front) => {
@@ -340,6 +402,12 @@ function drawPlayer(g, p, G, at) {
     g.beginPath(); g.moveTo(shx, shy); g.lineTo(ex, ey); g.lineTo(hx, hy); g.stroke();
     g.strokeStyle = look.jersey; g.lineWidth = 6.5;
     g.beginPath(); g.moveTo(shx, shy); g.lineTo(ex, ey); g.stroke();
+    if (look.sleeve) { // sleeve stripes near the cuff
+      const n = look.sleeve, w = n > 2 ? 0.07 : 0.1;
+      g.strokeStyle = look.trim; g.lineWidth = 6.5; g.lineCap = 'butt';
+      for (let i = 0; i < n; i++) { const u = 0.58 + i * (w + 0.07); g.beginPath(); g.moveTo(lerp(shx, ex, u), lerp(shy, ey, u)); g.lineTo(lerp(shx, ex, u + w), lerp(shy, ey, u + w)); g.stroke(); }
+      g.lineCap = 'round';
+    }
     g.strokeStyle = SKIN[p.face.skin]; g.beginPath(); g.moveTo(ex, ey); g.lineTo(hx, hy); g.stroke();
     g.fillStyle = p.teamGloves ? look.trim : p.gloves || '#f2f2f2'; g.strokeStyle = OUT; g.lineWidth = 2;
     g.beginPath(); g.arc(hx, hy, 3.8, 0, 7); g.fill(); g.stroke();
@@ -354,8 +422,15 @@ function drawPlayer(g, p, G, at) {
   g.moveTo(-W * 0.4, -2); g.lineTo(-W * 0.5, -TH + 6); g.quadraticCurveTo(-W * 0.55, -TH - 2, -W * 0.3, -TH - 3);
   g.lineTo(W * 0.3, -TH - 3); g.quadraticCurveTo(W * 0.55, -TH - 2, W * 0.5, -TH + 6); g.lineTo(W * 0.4, -2); g.closePath();
   g.fill(); g.stroke();
-  // light from the top left
-  g.save(); g.clip(); g.fillStyle = '#ffffff1c'; g.fillRect(-W * 0.55, -TH - 4, W * 0.32, TH + 4); g.restore();
+  // inside the jersey: shoulder yoke, side panel, mud/snow, wet shine, light from the top left
+  g.save(); g.clip();
+  if (look.yoke) { g.fillStyle = look.trim; g.fillRect(-W * 0.6, -TH - 4, W * 1.2, 5); g.fillStyle = shade(look.jersey, 0.1); g.fillRect(-W * 0.6, -TH + 1, W * 1.2, 1.5); }
+  g.fillStyle = shade(look.jersey, -0.22); g.fillRect(W * 0.3, -TH + 6, W * 0.25, TH); // side panel
+  g.fillStyle = look.trim; g.fillRect(W * 0.28, -TH + 6, 1.4, TH);
+  dirtSpots(g, p, 5, -W * 0.45, -TH * 0.55, W * 0.9, TH * 0.55, 1);
+  g.fillStyle = G.weather === 'rain' ? '#ffffff30' : '#ffffff1c'; g.fillRect(-W * 0.55, -TH - 4, W * 0.32, TH + 4);
+  if (G.weather === 'rain') { g.fillStyle = '#ffffff40'; g.fillRect(-W * 0.36, -TH + 3, 2, TH - 8); } // soaked jersey sheen
+  g.restore();
   // shoulder pads under the jersey
   for (const sx0 of [-W * 0.4, W * 0.4]) {
     const pg = g.createRadialGradient(sx0 - 1.5, -TH - 2, 1, sx0, -TH + 1, 8);
@@ -371,8 +446,9 @@ function drawPlayer(g, p, G, at) {
   g.beginPath(); g.moveTo(-W * 0.42, -TH + 2); g.lineTo(-W * 0.5, -TH + 8); g.stroke();
   // number (un-flipped so it reads right)
   g.save(); g.scale(dir, 1);
-  g.font = `900 ${big ? 13 : 12}px "Barlow Condensed", "Arial Black", sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
-  g.lineWidth = 3; g.strokeStyle = shade(look.jersey, -0.55); g.strokeText(p.num, 0, -TH / 2 - 1);
+  g.font = `900 ${big ? 14 : 13}px "Barlow Condensed", "Arial Black", sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineJoin = 'round';
+  g.lineWidth = 4.2; g.strokeStyle = shade(look.jersey, -0.6); g.strokeText(p.num, 0, -TH / 2 - 1);
+  g.lineWidth = 2.4; g.strokeStyle = look.numOut || shade(look.jersey, -0.55); g.strokeText(p.num, 0, -TH / 2 - 1);
   g.fillStyle = look.num; g.fillText(p.num, 0, -TH / 2 - 1);
   g.restore();
   // front arm + ball
@@ -381,9 +457,9 @@ function drawPlayer(g, p, G, at) {
 
   // neck + bobble head
   const R = (big ? 19 : 21) * (p.headScale || 1);
-  const hx = p.head.ox * dir, hy = -TH - R + 4 + p.head.oy;
+  const hx = p.head.ox * dir, hy = -TH - R - 1 + p.head.oy; // head sits a little high so the jersey number shows
   g.fillStyle = SKIN[p.face.skin]; g.strokeStyle = OUT; g.lineWidth = 2;
-  g.fillRect(-3, -TH - 6, 6, 6);
+  g.fillRect(-3, -TH - 9, 6, 9);
   g.save(); g.translate(hx, hy); g.rotate(p.head.rot * dir + (p.down > 0 ? 0 : -lean * 0.4) + (pose ? pose.head : 0));
   drawHead(g, R, team, p, look);
   g.restore();
@@ -445,10 +521,19 @@ function drawHead(g, R, team, p, look) {
   g.beginPath(); g.ellipse(-R * 0.05, 0, R * 1.04, R, 0, 0, 7); g.fill(); g.stroke();
   // stripe front-to-back over the top
   g.save(); g.beginPath(); g.ellipse(-R * 0.05, 0, R * 1.04, R, 0, 0, 7); g.clip();
-  g.strokeStyle = look.stripe; g.lineWidth = R * 0.32;
-  g.beginPath(); g.ellipse(-R * 0.1, R * 0.15, R * 0.98, R * 1.02, 0, Math.PI * 1.05, Math.PI * 1.75); g.stroke();
-  g.strokeStyle = '#ffffffcc'; g.lineWidth = 1.5;
-  g.beginPath(); g.ellipse(-R * 0.1, R * 0.15, R * 0.8, R * 0.84, 0, Math.PI * 1.08, Math.PI * 1.72); g.stroke();
+  const hs = look.hstripe == null ? 1 : look.hstripe;
+  if (hs === 2) { // two thin stripes, old school
+    g.strokeStyle = look.stripe; g.lineWidth = R * 0.12;
+    for (const k of [1.0, 0.8]) { g.beginPath(); g.ellipse(-R * 0.1, R * 0.15, R * 0.98 * k, R * 1.02 * k, 0, Math.PI * 1.05, Math.PI * 1.75); g.stroke(); }
+  } else if (hs) {
+    g.strokeStyle = look.stripe; g.lineWidth = R * 0.32;
+    g.beginPath(); g.ellipse(-R * 0.1, R * 0.15, R * 0.98, R * 1.02, 0, Math.PI * 1.05, Math.PI * 1.75); g.stroke();
+    g.strokeStyle = look.matte ? shade(look.stripe, -0.35) : '#ffffffcc'; g.lineWidth = 1.5;
+    g.beginPath(); g.ellipse(-R * 0.1, R * 0.15, R * 0.8, R * 0.84, 0, Math.PI * 1.08, Math.PI * 1.72); g.stroke();
+  }
+  // snow sticks to the top of the helmet, rain beads on it
+  if (G.weather === 'snow' && p.dirt > 0.1) { g.fillStyle = '#f4f8ffcc'; g.beginPath(); g.ellipse(-R * 0.2, -R * 0.95, R * 0.7 * Math.min(1, p.dirt + 0.3), R * 0.22, -0.1, 0, 7); g.fill(); }
+  if (G.weather === 'rain') { g.fillStyle = '#ffffff70'; for (let i = 0; i < 4; i++) { g.beginPath(); g.arc(-R * (0.6 - i * 0.28), -R * (0.35 + (i % 2) * 0.25), R * 0.05, 0, 7); g.fill(); } }
   g.restore();
   // side decal: jersey number
   g.save(); g.scale(face.dir, 1);
@@ -459,7 +544,7 @@ function drawHead(g, R, team, p, look) {
   g.restore();
   // gloss
   g.save(); g.translate(-R * 0.42, -R * 0.52); g.rotate(-0.6);
-  const gl = g.createRadialGradient(0, 0, 0, 0, 0, R * 0.32); gl.addColorStop(0, '#ffffffb0'); gl.addColorStop(1, '#ffffff00');
+  const gl = g.createRadialGradient(0, 0, 0, 0, 0, R * 0.32); gl.addColorStop(0, look.matte ? '#ffffff38' : '#ffffffb0'); gl.addColorStop(1, '#ffffff00');
   g.fillStyle = gl; g.beginPath(); g.ellipse(0, 0, R * 0.34, R * 0.16, 0, 0, 7); g.fill(); g.restore();
   // bottom rim of the shell
   g.save(); g.beginPath(); g.ellipse(-R * 0.05, 0, R * 1.04, R, 0, 0, 7); g.clip();
@@ -611,7 +696,7 @@ function roundRect(g, x, y, w, h, r) {
 function drawFx(g, G) {
   for (const f of G.fx) {
     const a = clamp(f.life / f.max, 0, 1);
-    if (f.kind === 'dust') { g.fillStyle = `rgba(225,215,180,${a * 0.6})`; g.beginPath(); g.arc(sx(f.x), sy(f.y) - f.z, f.r * (2 - a), 0, 7); g.fill(); }
+    if (f.kind === 'dust') { g.fillStyle = G.weather === 'snow' ? `rgba(246,250,255,${a * 0.85})` : G.weather === 'rain' ? `rgba(185,205,225,${a * 0.7})` : `rgba(225,215,180,${a * 0.6})`; g.beginPath(); g.arc(sx(f.x), sy(f.y) - f.z, f.r * (2 - a), 0, 7); g.fill(); }
     else if (f.kind === 'star') { g.fillStyle = `rgba(255,225,70,${a})`; starPath(g, sx(f.x), sy(f.y) - f.z - 7, 9); g.fill(); }
     else if (f.kind === 'flag') {
       const u = Math.min(1, f.t / f.T);

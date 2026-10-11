@@ -163,6 +163,7 @@ const CareerUI = {
     const mineIsHome = opts.humanSide === 0, opp = mineIsHome ? away : home;
     if (Career.isRival(opp.id)) {
       G.rivalry = opp.id; G.crowdHype = 1;
+      if (!opts.uni) G.uni = ['rivalry', 'away']; // rivalry week: home team breaks out the rivalry set
       showBanner('RIVALRY GAME', `vs ${opp.city} ${opp.name} · 1.5x XP · series ${Career.series(opp.id)}`, '#ff6040', 3);
     }
   },

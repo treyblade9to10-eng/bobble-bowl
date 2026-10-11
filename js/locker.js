@@ -50,7 +50,7 @@ const Locker = {
       col.style.setProperty('--tc', t.c1);
       col.querySelector('.lkName').textContent = `${t.city} ${t.name}`;
       // full sets with a little picture of each
-      col.querySelector('.lkSets').innerHTML = UNIFORMS.map(([k, n]) => `<button class="lkSet${k === v ? ' on' : ''}" data-v="${k}"><canvas width="84" height="96"></canvas><span>${n}</span></button>`).join('');
+      col.querySelector('.lkSets').innerHTML = UNIFORMS.map(([k, n]) => `<button class="lkSet${k === v ? ' on' : ''}" data-v="${k}"><canvas width="84" height="96"></canvas><span>${n.replace("Throwback", "Throw&shy;back")}</span></button>`).join('');
       col.querySelectorAll('.lkSet').forEach(b => {
         this.mini(b.querySelector('canvas'), side, b.dataset.v);
         b.onclick = () => this.pick(side, b.dataset.v);
@@ -67,7 +67,7 @@ const Locker = {
     const ja = this.look(1).jersey, jh = this.look(0).jersey, clash = colorGap(ja, jh) < 90;
     $('lkClash').innerHTML = clash ? `<span>These jerseys look alike. Hard to tell the teams apart.</span><button id="lkFix">FIX IT</button>` : '';
     if (clash) $('lkFix').onclick = () => {
-      const opts = ['away', 'home', 'rush', 'throwback'].filter(u => colorGap(this.look(0).jersey, this.look(1, u).jersey) >= 90);
+      const opts = ['away', 'home', 'rush', 'throwback', 'rivalry'].filter(u => colorGap(this.look(0).jersey, this.look(1, u).jersey) >= 90);
       if (opts.length) this.pick(1, opts[0]); else this.pick(0, 'home');
     };
   },
@@ -112,9 +112,15 @@ function drawTurntable(g, lk, cleat, pl, a) {
       g.strokeStyle = lk.pants; g.lineWidth = 16; g.beginPath(); g.moveTo(x, -98); g.lineTo(x, -52); g.stroke();
       // pants stripe down the outside of the leg
       const sd = proj(side * 19, 0), vis = side * -s; // outside of this leg faces the camera when vis > 0
-      if (Math.abs(sd.x - x) > 1.5) { g.strokeStyle = lk.trim; g.lineWidth = 3; g.globalAlpha = Math.min(1, Math.abs(s) + 0.2); g.beginPath(); g.moveTo(x + Math.sign(sd.x - x) * 5.5, -96); g.lineTo(x + Math.sign(sd.x - x) * 5.5, -56); g.stroke(); g.globalAlpha = 1; }
+      const ps = lk.pstripe == null ? 1 : lk.pstripe;
+      if (ps && Math.abs(sd.x - x) > 1.5) {
+        g.strokeStyle = lk.trim; g.lineWidth = ps > 1 ? 1.8 : 3; g.globalAlpha = Math.min(1, Math.abs(s) + 0.2);
+        for (let i = 0; i < ps; i++) { const o = Math.sign(sd.x - x) * (5.5 - i * 3.2); g.beginPath(); g.moveTo(x + o, -96); g.lineTo(x + o, -56); g.stroke(); }
+        g.globalAlpha = 1;
+      }
       void vis;
       g.strokeStyle = lk.sock; g.lineWidth = 14; g.beginPath(); g.moveTo(x, -52); g.lineTo(x, -10); g.stroke();
+      if (lk.sockBand) { g.fillStyle = lk.trim; for (let i = 0; i < lk.sockBand; i++) g.fillRect(x - 7, -44 + i * 6, 14, lk.sockBand > 1 ? 2.5 : 4); }
       // cleat: long from the side, short from the front
       const len = 9 + 9 * Math.abs(s), toe = s * 6;
       g.fillStyle = cleat; g.strokeStyle = OUT; g.lineWidth = 2.5;
@@ -131,7 +137,9 @@ function drawTurntable(g, lk, cleat, pl, a) {
       g.strokeStyle = OUT; g.lineCap = 'round'; g.lineWidth = 17;
       g.beginPath(); g.moveTo(x, -178); g.lineTo(x + side * c * 4, -120); g.stroke();
       g.strokeStyle = lk.jersey; g.lineWidth = 13; g.beginPath(); g.moveTo(x, -178); g.lineTo(x + side * c * 2, -152); g.stroke();
-      g.strokeStyle = lk.trim; g.lineWidth = 13; g.beginPath(); g.moveTo(x + side * c * 1.7, -157); g.lineTo(x + side * c * 2, -152); g.stroke();
+      const n = lk.sleeve == null ? 1 : lk.sleeve; g.lineCap = 'butt';
+      for (let i = 0; i < n; i++) { const y0 = -164 + i * (n > 2 ? 4.5 : 6); g.strokeStyle = lk.trim; g.lineWidth = 13; g.beginPath(); g.moveTo(x + side * c * 1.5, y0); g.lineTo(x + side * c * 1.6, y0 + (n > 2 ? 2.5 : 3.5)); g.stroke(); }
+      g.lineCap = 'round';
       g.strokeStyle = SKIN[pl.skin]; g.lineWidth = 12; g.beginPath(); g.moveTo(x + side * c * 2, -150); g.lineTo(x + side * c * 4, -122); g.stroke();
       g.fillStyle = '#f2f2f2'; g.strokeStyle = OUT; g.lineWidth = 2; g.beginPath(); g.arc(x + side * c * 4, -116, 7, 0, 7); g.fill(); g.stroke();
     } });
@@ -146,6 +154,7 @@ function drawTurntable(g, lk, cleat, pl, a) {
     g.fillStyle = tg; g.strokeStyle = OUT; g.lineWidth = 3;
     g.beginPath(); g.moveTo(-hw * 0.82, bot); g.lineTo(-hw * 1.05, top + 14); g.quadraticCurveTo(-hw * 1.1, top - 4, -hw * 0.6, top - 4);
     g.lineTo(hw * 0.6, top - 4); g.quadraticCurveTo(hw * 1.1, top - 4, hw * 1.05, top + 14); g.lineTo(hw * 0.82, bot); g.closePath(); g.fill(); g.stroke();
+    if (lk.yoke) { g.save(); g.clip(); g.fillStyle = lk.trim; g.fillRect(-hw * 1.2, top - 6, hw * 2.4, 12); g.restore(); }
     // collar
     g.strokeStyle = lk.trim; g.lineWidth = 4; g.beginPath(); g.ellipse(s * 8, top - 2, 13 * Math.max(0.3, Math.abs(c)), 5, 0, 0, Math.PI); g.stroke();
     // number on the front, name + number on the back
@@ -153,7 +162,8 @@ function drawTurntable(g, lk, cleat, pl, a) {
     if (front || back) {
       g.save(); g.translate(s * 20 * (front ? 1 : -1) * 0.5, -132); g.scale(Math.abs(c), 1);
       g.font = '900 54px "Barlow Condensed", "Arial Black", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-      g.lineWidth = 6; g.strokeStyle = lk.trim === lk.num ? shade(lk.jersey, -0.5) : lk.trim; g.fillStyle = lk.num;
+      g.lineJoin = 'round'; g.lineWidth = 9; g.strokeStyle = shade(lk.jersey, -0.6); g.strokeText(String(pl.num), 0, 4);
+      g.lineWidth = 5; g.strokeStyle = lk.numOut || (lk.trim === lk.num ? shade(lk.jersey, -0.5) : lk.trim); g.fillStyle = lk.num;
       g.strokeText(String(pl.num), 0, 4); g.fillText(String(pl.num), 0, 4);
       if (back) { g.font = '800 15px "Barlow Condensed", Arial, sans-serif'; g.lineWidth = 0; g.fillStyle = lk.num; g.fillText(pl.name.toUpperCase(), 0, -36); }
       g.restore();
@@ -167,13 +177,14 @@ function drawTurnHelmet(g, lk, pl, a) {
   const c = Math.cos(a), s = Math.sin(a), R = 52, cy = -248;
   g.save(); g.translate(0, cy);
   const sh = g.createRadialGradient(-R * 0.35, -R * 0.45, R * 0.15, 0, 0, R * 1.05);
-  sh.addColorStop(0, shade(lk.helmet, 0.45)); sh.addColorStop(0.45, lk.helmet); sh.addColorStop(1, shade(lk.helmet, -0.35));
+  sh.addColorStop(0, shade(lk.helmet, lk.matte ? 0.15 : 0.45)); sh.addColorStop(0.45, lk.helmet); sh.addColorStop(1, shade(lk.helmet, -0.35));
   g.fillStyle = sh; g.strokeStyle = OUT; g.lineWidth = 3.5;
   g.beginPath(); g.ellipse(0, 0, R * 1.04, R, 0, 0, 7); g.fill(); g.stroke();
   g.save(); g.beginPath(); g.ellipse(0, 0, R * 1.04, R, 0, 0, 7); g.clip();
   // center stripe runs front to back over the top: a line from the front it's a thin band, from the side it's an arc
-  g.strokeStyle = lk.stripe; g.lineWidth = R * 0.26;
-  g.beginPath(); g.ellipse(-s * R * 0.08, R * 0.2, Math.max(1, R * 0.88 * Math.abs(s)), R * 0.98, 0, Math.PI, Math.PI * 2); g.stroke();
+  const hs = lk.hstripe == null ? 1 : lk.hstripe;
+  g.strokeStyle = lk.stripe; g.lineWidth = hs > 1 ? R * 0.09 : R * 0.26;
+  for (const o of hs > 1 ? [-0.1, 0.1] : hs ? [0] : []) { g.beginPath(); g.ellipse(-s * R * 0.08 + c * o * R, R * 0.2, Math.max(1, R * 0.88 * Math.abs(s)), R * 0.98, 0, Math.PI, Math.PI * 2); g.stroke(); }
   // side decal (team number) on the side facing you
   for (const side of [-1, 1]) {
     const dx = side * c, depth = -side * s; // side of the helmet facing the camera when depth > 0

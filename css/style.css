@@ -479,18 +479,18 @@ body.pad button:focus, body.pad .pcard:focus, body.pad .mdcard:focus, body.pad .
 .lkBody { display: flex; gap: 12px; margin-top: 6px; }
 .lkBig { width: auto; height: min(46vh, 300px); aspect-ratio: 260 / 300; background: #0c1016; touch-action: none; cursor: grab; flex: none; }
 .lkCtl { display: flex; flex-direction: column; gap: 6px; min-width: 0; flex: 1; }
-.lkSets { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; }
-.lkSet { margin: 0; padding: 4px 2px 5px; clip-path: none; display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 12px; border-bottom: 3px solid transparent; }
+.lkSets { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
+.lkSet { margin: 0; min-width: 0; overflow: hidden; line-height: 1.05; text-align: center; padding: 4px 2px 5px; clip-path: none; display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 12px; border-bottom: 3px solid transparent; }
 .lkSet canvas { width: 100%; max-width: 84px; height: auto; aspect-ratio: 84 / 96; background: transparent; }
 .lkSet.on { background: #2a3544; border-bottom-color: var(--gold); color: var(--gold); }
 .lkMixT { font-family: var(--hd); font-weight: 800; font-size: 12px; letter-spacing: .14em; color: var(--dim); margin-top: 4px; }
 .lkRow { display: flex; align-items: center; gap: 4px; }
 .lkRow span { width: 64px; font-family: var(--hd); font-weight: 800; font-size: 13px; letter-spacing: .06em; }
-.lkChip { margin: 0; padding: 3px; clip-path: none; background: transparent; border: 2px solid transparent; }
+.lkChip { margin: 0; padding: 3px; flex: 0 1 auto; min-width: 0; clip-path: none; background: transparent; border: 2px solid transparent; }
 .lkChip i { display: block; width: 30px; height: 22px; border: 1px solid #fff5; }
 .lkChip.on { border-color: var(--gold); }
 .uniBtn i { display: inline-block; width: 14px; height: 14px; border: 1px solid #fff6; vertical-align: -2px; margin: 0 4px 0 8px; }
-@media (max-height: 500px) { #lkHead h2 { font-size: 24px; } #lkHead .big { font-size: 17px; padding: 5px 20px; } .lkName { font-size: 18px; } .lkBig { height: 54vh; } .lkSet { font-size: 10px; } .lkSet canvas { max-width: 56px; } .lkChip i { width: 24px; height: 16px; } .lkRow span { width: 50px; font-size: 11px; } #lkCols { margin-top: 4px; } .lkCol { padding: 4px 8px 6px; } }
+@media (max-height: 500px) { #lkHead h2 { font-size: 24px; } #lkHead .big { font-size: 17px; padding: 5px 20px; } .lkName { font-size: 18px; } .lkBig { height: 54vh; } .lkSet { font-size: 10px; } .lkSet canvas { max-width: 56px; } .lkSet { font-size: 9px; letter-spacing: 0; } .lkChip { padding: 2px; } .lkChip i { width: 20px; height: 15px; } .lkRow { gap: 2px; } .lkRow span { width: 46px; font-size: 10px; } #lkCols { margin-top: 4px; } .lkCol { padding: 4px 8px 6px; } }
 
 /* trade center */
 .trGrp { font-family: var(--hd); font-weight: 800; font-size: 11px; letter-spacing: .12em; color: var(--dim); padding: 6px 6px 2px; }

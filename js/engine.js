@@ -54,7 +54,8 @@ function newGame(home, away, opts) {
     showBanner(sc.title, sc.sub, '#ffd23f', 2.6);
     return toPlayCall();
   }
-  showBanner('KICKOFF!', `Live from ${G.stadium.name}  •  ${away.name} get the ball first`, '#fff', 2.4);
+  if (G.rivalryMatch) { G.crowdHype = 1; showBanner('RIVALRY GAME', `${away.city} ${away.name} at ${home.city} ${home.name}  •  ${G.stadium.name}`, '#ff6040', 2.8); }
+  else showBanner('KICKOFF!', `Live from ${G.stadium.name}  •  ${away.name} get the ball first`, '#fff', 2.4);
   startKickoff(0);
 }
 function initGame(home, away, opts) {
@@ -65,8 +66,11 @@ function initGame(home, away, opts) {
     timeouts: [3, 3], special: null, pendingRunoff: 0, twoMinQ: 0, twoMinAfterPlay: false, runFrom: 0, mini: null, scenario: opts.scenario || null,
     weather: stadiumOf(home).dome ? 'clear' : (opts.weather || 'clear'), night: !!opts.night, stadium: stadiumOf(home), uni: opts.uni || null, pbp: [], pbpShow: null, lastResult: null,
     versus: !!opts.versus, p1: opts.humanSide || 0, hd: [null, null], hp: [null, null], humanDef: null,
-    career: opts.career || false, lock: !!opts.lock, callBall: 0, sitOut: false
+    career: opts.career || false, lock: !!opts.lock, callBall: 0, sitOut: false, dirt: {}
   });
+  // big rivalries: the home team breaks out its rivalry set (unless someone picked uniforms on purpose)
+  G.rivalryMatch = !opts.scenario && isRivalry(home, away);
+  if (G.rivalryMatch && (!G.uni || (G.uni[0] === 'home' && G.uni[1] === 'away'))) G.uni = ['rivalry', 'away'];
   if (G.versus) G.diff = 1;
   Injury.reset();
   Input.versus = G.versus; Input.ctl = 0;
@@ -246,7 +250,7 @@ function makePlayer(side, isOff, slot, tuple) {
     anim: (h % 100) / 10, speedNow: 0, stamina: 1, down: 0, downDir: 1, stun: 0, spin: 0, juke: 0, jukeCd: 0, spinCd: 0,
     dive: 0, tackleCd: 0, engaged: null, shed: 0, shedCd: 0, mouth: '', mouthT: 0, isHuman: false, throwKey: 0, openness: null,
     role: 'idle', route: null, assign: null, aiIdle: 0,
-    xf: (G.xf && G.xf[side + ':' + name]) || null,
+    xf: (G.xf && G.xf[side + ':' + name]) || null, dirt: (G.dirt && G.dirt[side + ':' + name]) || 0, slip: 0, slipCd: 0,
     cap: !!(ex && ex.cap), thp: ex && ex.thp || null, tha: ex && ex.tha || null, gloves: ex && ex.gloves || null, teamGloves: !!(ex && ex.teamGloves)
   };
 }
@@ -947,7 +951,7 @@ function qbTakeOff(qb) {
 function sprintBoost(p) { return 1.0 + clamp((p.spdR || 80) - 50, 0, 50) * 0.002; }
 function doStiff(p) { p.stiff = 0.4; p.stiffCd = 1.4; Sound.tone(160, 0.12, 'sawtooth', 0.08); }
 function doJuke(p, ax) {
-  if (chance(Weather.slipChance())) { p.down = 0.55; p.downDir = p.face.dir; p.jukeCd = 1; addText(p.x, p.y, 'SLIPPED!', '#cfe3ff', 18, 0.8); Sound.boing(); return; }
+  if (chance(Weather.slipChance())) { slipDown(p); p.jukeCd = 1; return; }
   const sp = Math.hypot(p.vx, p.vy) || 1;
   let fx = p.vx / sp, fy = p.vy / sp;
   if (sp < 1) { fx = dirOf(p.side); fy = 0; }
@@ -1402,7 +1406,11 @@ function applyMove(p, dt) {
   if (!isFinite(p.x) || !isFinite(p.y)) { p.x = isFinite(p.lx) ? p.lx : (G.los != null ? G.los : 60); p.y = isFinite(p.ly) ? p.ly : MID; }
   p.lx = p.x; p.ly = p.y;
   if (p.down > 0) {
-    p.down -= dt; p.vx *= 0.88; p.vy *= 0.88; p.x += p.vx * dt; p.y += p.vy * dt;
+    // on the ground: mud / grass / snow sticks to the uniform for the rest of the game. Slips slide farther on a wet field
+    const fr = p.slip > 0 ? 0.955 : 0.88;
+    p.down -= dt; p.slip = Math.max(0, (p.slip || 0) - dt); p.vx *= fr; p.vy *= fr; p.x += p.vx * dt; p.y += p.vy * dt;
+    if (G.dirt && G.phase === 'live') { p.dirt = Math.min(1, (p.dirt || 0) + dt * (G.weather === 'clear' ? 0.12 : 0.45)); G.dirt[p.side + ':' + p.name] = p.dirt; }
+    if (p.slip > 0 && Math.hypot(p.vx, p.vy) > 1.5) groundMark(p.x, p.y, 1.4, true);
     headPhysics(p, 0, 0, dt); return;
   }
   let ax, ay;
@@ -1411,11 +1419,13 @@ function applyMove(p, dt) {
     if (p.dive <= 0) { p.down = 0.7; p.downDir = p.vx >= 0 ? 1 : -1; addDust(p.x, p.y, 3); }
   } else {
     ax = p.dvx - p.vx; ay = p.dvy - p.vy;
+    if (cutSlip(p, dt)) return;
     const m = Math.hypot(ax, ay), maxA = p.acc * dt * (p.juke > 0 ? 0.25 : 1);
     if (m > maxA) { ax *= maxA / m; ay *= maxA / m; }
     p.vx += ax; p.vy += ay;
   }
   p.x += p.vx * dt; p.y += p.vy * dt;
+  if (wet() && G.phase === 'live' && p.speedNow > 2.5 && (p.stepT = (p.stepT || 0) + dt) > 0.13) { p.stepT = 0; groundMark(p.x, p.y, 0.55, false); } // footprints / splashes
   if (p !== (G.ball && G.ball.holder)) { p.y = clamp(p.y, -2, FIELD_W + 2); p.x = clamp(p.x, -3, 123); }
   p.speedNow = Math.hypot(p.vx, p.vy);
   p.anim += Math.min(p.speedNow, 12) * dt * 1.45;
