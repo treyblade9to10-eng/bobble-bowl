@@ -611,10 +611,10 @@ function updateMobileButtons() {
   if (!joyOn && Input.stick.m) { Input.stick.x = Input.stick.y = Input.stick.m = 0; $('joyKnob').style.left = $('joyKnob').style.top = ''; }
   const side = G.poss === G.human ? 'off' : 'def';
   const po = G.play && G.play.off, canMotion = !!po && (po.type === 'pass' || po.toss || po.carrier === 4);
-  const key = st + side + canMotion + (b && b.flight ? 'air' : '') + (h && h.engaged ? 'eng' : '');
+  const key = st + side + canMotion + G.weather + (b && b.flight ? 'air' : '') + (h && h.engaged ? 'eng' : '');
   if (key === mbState) return;
   mbState = key;
-  document.querySelectorAll('#mbtns button').forEach(x => x.classList.toggle('on', x.dataset.show === st && (!x.dataset.side || x.dataset.side === side) && (x.dataset.k !== 'KeyM' || canMotion)));
+  document.querySelectorAll('#mbtns button').forEach(x => x.classList.toggle('on', x.dataset.show === st && (!x.dataset.side || x.dataset.side === side) && (x.dataset.k !== 'KeyM' || canMotion) && (!x.dataset.wx || x.dataset.wx === G.weather)));
   $('mbtns').classList.toggle('pre', st === 'presnap');
   $('mbtns').classList.toggle('cel', st === 'celly');
   $('mbDive').textContent = b && b.flight ? 'JUMP' : 'DIVE';

@@ -47,7 +47,12 @@ function buildField(G) {
   }
   // ad wall
   g.fillStyle = '#10151d'; g.fillRect(0, fy(-1.9), W, 0.9 * PY);
-  if (stad.dome) { g.fillStyle = '#ffffff10'; for (let x = 0; x < W; x += 90) g.fillRect(x, 0, 3, 8); } // roof trusses
+  if (stad.dome) { // roof: dark steel with trusses and a ring of lights
+    const rf = g.createLinearGradient(0, 0, 0, 22); rf.addColorStop(0, '#05070a'); rf.addColorStop(1, '#05070a00');
+    g.fillStyle = rf; g.fillRect(0, 0, W, 22);
+    g.fillStyle = '#ffffff14'; for (let x = 0; x < W; x += 90) { g.fillRect(x, 0, 3, 14); g.fillRect(x, 6, 90, 1.5); }
+    for (let x = 45; x < W; x += 90) { const lg = g.createRadialGradient(x, 4, 0, x, 4, 16); lg.addColorStop(0, '#fffbe6'); lg.addColorStop(1, '#fffbe600'); g.fillStyle = lg; g.fillRect(x - 16, 0, 32, 20); }
+  }
   g.fillStyle = '#ffffff30'; g.font = 'bold 9px Barlow, Arial, sans-serif'; g.textAlign = 'left';
   const wall = `${stad.name.toUpperCase()}  •  ${G.teams[0].city.toUpperCase()}  •  BOBBLE BOWL`;
   for (let x = 0; x < W; x += 300) g.fillText(wall, x + 10, fy(-1.35));
@@ -400,7 +405,8 @@ function drawPlayer(g, p, G, at) {
     let ex, ey, hx, hy;
     const pa = pose && pose.arm ? pose.arm(front, shx, shy) : null;
     if (pa) ({ ex, ey, hx, hy } = pa);
-    else if (carrying && front) { ex = shx + 4; ey = shy + 10; hx = shx + 10; hy = shy + 8; }
+    else if (carrying && front) { ex = shx + 4; ey = shy + 10; hx = shx + (p.tuck ? 7 : 10); hy = shy + (p.tuck ? 6 : 8); }
+    else if (carrying && p.tuck) { ex = shx + 6; ey = shy + 9; hx = shx + 13; hy = shy + 7; } // two hands on it
     else if (p.throwAnim > 0 && front) { const t = p.throwAnim; ex = shx - 6 + (1 - t) * 14; ey = shy - 10; hx = shx - 4 + (1 - t) * 22; hy = shy - 18 + (1 - t) * 10; }
     else if (celebrate || jumping) { ex = shx + (front ? 4 : -4); ey = shy - 11; hx = shx + (front ? 6 : -6); hy = shy - 22; }
     else if (p.stiff > 0 && front) { ex = shx + 9; ey = shy + 1; hx = shx + 19; hy = shy; }

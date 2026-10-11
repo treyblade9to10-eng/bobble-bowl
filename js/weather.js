@@ -1,13 +1,13 @@
 // ---- Weather + night games: how it looks and how it changes the game ----
 // G.weather: 'clear' | 'rain' | 'snow'.  G.night: true/false.
-const WEATHER = [['clear', 'Clear'], ['rain', 'Rain'], ['snow', 'Snow'], ['random', 'Random']];
+const WEATHER = [['clear', 'Clear'], ['rain', 'Rain'], ['storm', 'Storm'], ['snow', 'Snow'], ['fog', 'Fog'], ['random', 'Random']];
 const wet = () => G.weather === 'rain' || G.weather === 'snow';
 
 function pickWeather(choice, week, games) {
   if (choice && choice !== 'random') return choice;
   const late = week != null && games ? week >= games / 2 : chance(0.5);
   const r = Math.random();
-  return r < 0.16 ? 'rain' : r < (late ? 0.3 : 0.2) ? 'snow' : 'clear';
+  return r < 0.11 ? 'rain' : r < 0.15 ? 'storm' : r < 0.19 ? 'fog' : r < (late ? 0.32 : 0.22) ? 'snow' : 'clear';
 }
 
 // gameplay knobs (used by the engine)
@@ -140,8 +140,9 @@ function drawWeather(g, G) {
       g.moveTo(x - s, y - s * 0.9); g.lineTo(x - s * 0.3, y); g.moveTo(x + s, y - s * 0.9); g.lineTo(x + s * 0.3, y); g.moveTo(x, y - s * 1.2); g.lineTo(x, y - s * 0.3);
     }
     g.stroke();
-    // two layers of rain: thin far-off sheets + fat close drops, both pushed by the wind
-    for (const [n, len, w, a, sp] of [[150, 13, 1, 0.26, 760], [70, 30, 2, 0.45, 1300]]) {
+    // two layers of rain: thin far-off sheets + fat close drops, both pushed by the wind (a storm dumps twice as much)
+    const heavy = G.storm ? 1.8 : 1;
+    for (const [n, len, w, a, sp] of [[150 * heavy, 13, 1, 0.26, 760], [70 * heavy, 30, 2, 0.45, 1300]]) {
       g.strokeStyle = `rgba(200,220,255,${a})`; g.lineWidth = w; g.beginPath();
       const dx = len * (0.25 + lean * 0.4);
       for (let i = 0; i < n; i++) {
@@ -171,6 +172,8 @@ function drawWeather(g, G) {
       g.fillStyle = fg; g.fillRect(x - r, y - r, r * 2, r * 2);
     }
   }
+  if (G.fog) drawFog(g, G);
+  if (G.storm) drawLightning(g, G);
   if (G.night) {
     // real night game: everything outside the lights goes dark blue, the field is lit by banks of stadium lights
     g.save();
@@ -198,3 +201,43 @@ function drawWeather(g, G) {
     for (const lx of xs) { g.fillStyle = '#fffef2'; g.fillRect(lx - 26, 0, 52, 5); g.fillStyle = '#ffffffaa'; for (let k = -2; k <= 2; k++) g.fillRect(lx + k * 10 - 3, 6, 6, 3); }
   }
 }
+
+// ---------- storms: lightning flashes + thunder ----------
+function drawLightning(g, G) {
+  const L = G.ltn || (G.ltn = { next: G.time + rand(3, 7), t0: -9, seed: 1 });
+  if (L.next < G.time - 30 || L.t0 > G.time + 1) { L.next = G.time + rand(3, 7); L.t0 = -9; } // new game / time reset
+  if (G.time >= L.next) {
+    L.t0 = G.time; L.next = G.time + rand(6, 14); L.seed = Math.floor(rand(1, 9999)); L.x = rand(0.15, 0.85) * CW;
+    if (!G.paused && G.phase !== 'replay') { Sound.thunder(rand(0.35, 1.3)); }
+  }
+  const t = G.time - L.t0; if (t < 0 || t > 0.7) return;
+  // the sky flickers twice
+  const a = t < 0.08 ? 0.55 : t < 0.14 ? 0.1 : t < 0.24 ? 0.4 : Math.max(0, 0.4 - (t - 0.24) * 0.9);
+  g.fillStyle = `rgba(225,232,255,${a})`; g.fillRect(0, 0, CW, CH);
+  if (t < 0.26) { // the bolt way off over the stands
+    let x = L.x, y = -10, h = L.seed;
+    g.strokeStyle = 'rgba(255,255,255,0.95)'; g.lineWidth = 3; g.shadowColor = '#bcd0ff'; g.shadowBlur = 18; g.beginPath(); g.moveTo(x, y);
+    for (let i = 0; i < 9; i++) { h = (h * 9301 + 49297) % 233280; x += (h / 233280 - 0.5) * 60; y += CH * 0.035; g.lineTo(x, y); }
+    g.stroke(); g.shadowBlur = 0;
+  }
+}
+// ---------- fog: you can only see so far from the ball ----------
+function drawFog(g, G) {
+  const b = G.ball, fx = b ? sx(b.x) : CW / 2, fy = b ? sy(b.y) - 20 : CH / 2;
+  const col = G.night ? '120,128,140' : '214,220,226';
+  const fg = g.createRadialGradient(fx, fy, 230, fx, fy, 700);
+  fg.addColorStop(0, `rgba(${col},0.08)`); fg.addColorStop(0.45, `rgba(${col},0.6)`); fg.addColorStop(1, `rgba(${col},0.88)`);
+  g.fillStyle = fg; g.fillRect(0, 0, CW, CH);
+  // wisps drifting across
+  for (let i = 0; i < 9; i++) {
+    const w = 260 + (i % 3) * 120, x = ((i * 337 + G.time * (14 + i * 3)) % (CW + w * 2)) - w, y = (i * 131) % CH;
+    const wg = g.createRadialGradient(x, y, 0, x, y, w / 2); wg.addColorStop(0, `rgba(${col},0.22)`); wg.addColorStop(1, `rgba(${col},0)`);
+    g.fillStyle = wg; g.save(); g.translate(x, y); g.scale(1, 0.35); g.translate(-x, -y); g.fillRect(x - w / 2, y - w / 2, w, w); g.restore();
+  }
+}
+// ---------- ball security: tuck it with two hands = way fewer fumbles, but you're a little slower and can't juke or spin ----------
+function toggleTuck(p) {
+  p.tuck = !p.tuck; Sound.click();
+  addText(p.x, p.y, p.tuck ? 'BALL TUCKED' : 'ONE HAND', p.tuck ? '#7fd3ff' : '#ddd', 15, 0.7);
+}
+const tuckFumbleMul = car => car && car.tuck ? 0.25 : 1;

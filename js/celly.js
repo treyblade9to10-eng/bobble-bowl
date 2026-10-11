@@ -10,14 +10,18 @@ const CELLYS = [
   { id: 'shush', name: 'SHUSH', keys: ['Digit3'], dur: 2.2, say: 'SHHHH...' },
   { id: 'moon', name: 'MOONWALK', keys: ['Digit4'], dur: 2.6, say: 'SMOOTH!' },
   { id: 'nap', name: 'NAP', keys: ['KeyE'], dur: 2.8, say: 'NAP TIME' },
-  { id: 'bowl', name: 'BOWLING', keys: ['KeyF'], dur: 3.4, say: 'STRIKE!', team: true }
+  { id: 'bowl', name: 'BOWLING', keys: ['KeyF'], dur: 3.4, say: 'STRIKE!', team: true },
+  { id: 'angel', name: 'SNOW ANGEL', keys: ['KeyR'], dur: 3.0, say: 'SNOW ANGEL!', wx: 'snow' },
+  { id: 'slide', name: 'MUD SLIDE', keys: ['KeyC'], dur: 2.4, say: 'SLIP AND SLIDE!', wx: 'rain' }
 ];
+// weather cellys only work when the field has snow / is soaked
+const cellyOk = c => !c.wx || c.wx === G.weather;
 const ease = t => t < 0 ? 0 : t > 1 ? 1 : t * t * (3 - 2 * t);
 
 const Celly = {
   // human: check the celly keys
   input(cg) {
-    for (const c of CELLYS) if (Input.hit(...c.keys)) return this.start(cg, c.id);
+    for (const c of CELLYS) if (cellyOk(c) && Input.hit(...c.keys)) return this.start(cg, c.id);
   },
   start(cg, id) {
     const c = CELLYS.find(k => k.id === id); if (!c || !cg) return;
@@ -31,7 +35,7 @@ const Celly = {
     if (c.team) this.setupBowl(cg);
   },
   // CPU scorers celebrate too
-  cpu(cg) { if (cg && chance(0.85)) setTimeout(() => { if (G.phase === 'dead' && G.players.includes(cg) && !cg.celly) this.start(cg, pick(CELLYS).id); }, 450); },
+  cpu(cg) { if (cg && chance(0.85)) setTimeout(() => { if (G.phase === 'dead' && G.players.includes(cg) && !cg.celly) this.start(cg, (wet() && chance(0.5) ? CELLYS.find(c => c.wx === G.weather) : null || pick(CELLYS.filter(cellyOk))).id); }, 450); },
   setupBowl(cg) {
     const d = cg.face.dir || 1;
     const mates = G.players.filter(p => p.side === cg.side && p !== cg).sort((a, b) => dist(a, cg) - dist(b, cg)).slice(0, 3);
@@ -56,6 +60,14 @@ const Celly = {
     if (c.type === 'shush' && t > 0.4 && !f.quiet) { f.quiet = 1; G.crowdHype = 0; }
     if (c.type === 'nap' && t > 0.6 && Math.floor(t / 0.5) !== f.z) { f.z = Math.floor(t / 0.5); G.fx.push({ kind: 'zzz', x: cg.x - d * 0.4, y: cg.y, z: 30, vz: 22, life: 1.3, max: 1.3, dx: d }); }
     if (c.type === 'bowl') this.updateBowl(cg, dt);
+    if (c.type === 'angel') { // flop on your back and flap: leaves an angel in the snow
+      if (t > 0.45 && !f.flop) { f.flop = 1; addDust(cg.x, cg.y, 10); Sound.tone(120, 0.15, 'sine', 0.15); }
+      if (t > 0.6 && t < 2.5 && Math.floor(t / 0.3) !== f.flap) { f.flap = Math.floor(t / 0.3); addDust(cg.x - d * 0.8, cg.y, 3); for (const s of [-1, 1]) groundMark(cg.x - d * 0.6 + s * 0.2, cg.y + s * 0.9, 1.3, true); groundMark(cg.x - d * 1.6, cg.y, 1.1, true); }
+    }
+    if (c.type === 'slide') { // sprint, then a belly flop slide through the mud
+      if (t < 0.45) { cg.x += d * 7 * dt; cg.anim += dt * 14; }
+      else if (t < 1.5) { const v = 9 * (1 - (t - 0.45) / 1.05); cg.x += d * v * dt; if (Math.floor(t * 12) !== f.sp) { f.sp = Math.floor(t * 12); addDust(cg.x + d * 0.6, cg.y, 3); groundMark(cg.x, cg.y, 1.5, true); } if (!f.splash) { f.splash = 1; cam.shake = 5; Sound.noise(0.4, 0.25, 300); } }
+    }
   },
   updateBowl(cg, dt) {
     const c = cg.celly, t = c.t, d = cg.face.dir || 1;
@@ -121,6 +133,16 @@ const Celly = {
       const a = ease(t / 0.5);
       P.lie = -a * 1.5; P.hop = a * -2;
       P.arm = (front, shx, shy) => ({ ex: shx - 4 * a, ey: shy - 8 * a, hx: shx - 10 * a, hy: shy - 14 * a });
+    } else if (type === 'angel') {
+      const a = ease((t - 0.2) / 0.35), flap = t > 0.6 && t < 2.5 ? Math.sin((t - 0.6) * 10.5) : 0;
+      if (t > 2.5) { const u = ease((t - 2.5) / 0.4); P.lie = -1.5 * (1 - u); P.hop = u * 6; } else { P.lie = -a * 1.5; P.hop = -a * 2; }
+      P.legK = t > 0.6 && t < 2.5 ? 1 : 0;
+      P.arm = (front, shx, shy) => t > 2.5 ? up(front, shx, shy) : ({ ex: shx - 4 + flap * 6, ey: shy - 6 - Math.abs(flap) * 3, hx: shx - 8 + flap * 14, hy: shy - 14 + Math.abs(flap) * 4 });
+    } else if (type === 'slide') {
+      if (t < 0.45) { P.legK = 1; P.rot = 0.12; }
+      else if (t < 1.6) { const a = ease((t - 0.45) / 0.15); P.rot = 1.35 * a; P.hop = -4 * a; P.legK = 0; }
+      else { const u = ease((t - 1.6) / 0.35); P.rot = 1.35 * (1 - u); P.hop = u * Math.abs(Math.sin(t * 9)) * 10; }
+      P.arm = (front, shx, shy) => t < 0.45 ? null : t < 1.6 ? { ex: shx + 10, ey: shy - 4, hx: shx + 20, hy: shy - 8 } : up(front, shx, shy);
     } else if (type === 'bowl') {
       const wind = t > 0.6 && t < 1.2 ? ease((t - 0.6) / 0.6) : 0, rel = t >= 1.2 ? Math.min(1, (t - 1.2) * 5) : 0;
       P.rot = wind * 0.35 + rel * 0.5 - (t > 1.6 && t < 2 ? 0 : 0); P.sy = 1 - wind * 0.1;

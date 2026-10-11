@@ -116,7 +116,7 @@ const Net = {
     G.demo = false; G.season = false; G.challenge = null; G.mini = null; show(null);
     const opts = { qtr: +$('optQtr').value, diff: 1, humanSide: 0, versus: true, weather: pickWeather($('optWeather').value), night: $('optNight').value === '1' };
     newGame(mine, theirs, opts);
-    this.send({ t: 'start', v: NET_VERSION, teams: G.teams, opts: { qtr: opts.qtr, weather: G.weather, night: G.night }, modes: G.netModes });
+    this.send({ t: 'start', v: NET_VERSION, teams: G.teams, opts: { qtr: opts.qtr, weather: G.storm ? 'storm' : G.fog ? 'fog' : G.weather, night: G.night }, modes: G.netModes });
   },
   // guest's controls arrive: world coords -> host screen coords for taps / finger
   mergeInput(m) {

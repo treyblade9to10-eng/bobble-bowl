@@ -31,5 +31,6 @@ const Sound = {
   bad() { this.tone(220, 0.25, 'square', 0.1, -120); this.tone(160, 0.35, 'square', 0.1, -80, 0.2); },
   crowd(big) { this.noise(big ? 2.2 : 0.9, big ? 0.22 : 0.1, 700); },
   td() { [523, 659, 784, 1047].forEach((f, i) => this.tone(f, 0.22, 'square', 0.1, 0, i * 0.13)); this.crowd(true); },
+  thunder(delay = 0.5) { this.noise(2.4, 0.4, 35, delay); this.tone(48, 1.6, 'sine', 0.22, -12, delay); this.noise(1.2, 0.2, 120, delay + 0.3); },
   click() { this.tone(800, 0.04, 'square', 0.05); }
 };

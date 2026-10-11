@@ -64,7 +64,8 @@ function initGame(home, away, opts) {
     fx: [], banner: null, players: [], ball: null, patSide: null, twoPt: false, next: null, firstPoss: 1, paused: false,
     pstats: {}, tstats: [{ pass: 0, rush: 0, to: 0 }, { pass: 0, rush: 0, to: 0 }],
     timeouts: [3, 3], special: null, pendingRunoff: 0, twoMinQ: 0, twoMinAfterPlay: false, runFrom: 0, mini: null, scenario: opts.scenario || null,
-    weather: stadiumOf(home).dome ? 'clear' : (opts.weather || 'clear'), night: !!opts.night, stadium: stadiumOf(home), uni: opts.uni || null, pbp: [], pbpShow: null, lastResult: null,
+    weather: stadiumOf(home).dome ? 'clear' : opts.weather === 'storm' ? 'rain' : opts.weather === 'fog' ? 'clear' : (opts.weather || 'clear'),
+    storm: !stadiumOf(home).dome && opts.weather === 'storm', fog: !stadiumOf(home).dome && opts.weather === 'fog', ltn: null, night: !!opts.night, stadium: stadiumOf(home), uni: opts.uni || null, pbp: [], pbpShow: null, lastResult: null,
     versus: !!opts.versus, p1: opts.humanSide || 0, hd: [null, null], hp: [null, null], humanDef: null,
     career: opts.career || false, lock: !!opts.lock, callBall: 0, sitOut: false, dirt: {}
   });
@@ -569,7 +570,7 @@ function livePlay(dt) {
     if (p.down > 0 || p.stun > 0) { p.dvx = p.dvy = 0; continue; }
     if (p.dive > 0) continue; // dive keeps its velocity
     p.humanDriven = false; p.sprinting = false;
-    if (p.isHuman && withSide(p.side, () => humanControl(p, dt) && (p.humanDriven = Input.axis().m > 0.1 || Input.stick.m > 0.15 || Input.pointer.down || p.dive > 0, true))) { p.sdx = p.dvx; p.sdy = p.dvy; continue; }
+    if (p.isHuman && withSide(p.side, () => humanControl(p, dt) && (p.humanDriven = Input.axis().m > 0.1 || Input.stick.m > 0.15 || Input.pointer.down || p.dive > 0, true))) { if (p.tuck && b.holder === p) { p.dvx *= 0.92; p.dvy *= 0.92; } p.sdx = p.dvx; p.sdy = p.dvy; continue; }
     ai(p, dt);
     // smooth AI steering so players don't twitch
     const k = 1 - Math.exp(-dt * 12);
@@ -854,6 +855,7 @@ function humanControl(p, dt) {
   const b = G.ball;
   const isCarrier = b.holder === p;
   if (Input.hit('KeyQ') && !isCarrier) { cycleHumanDef(); }
+  if (isCarrier && Input.hit('KeyG') && G.bstate !== 'snap') toggleTuck(p);
   if (ctlMobile()) return mobileControl(p, dt, isCarrier);
   const ax = Input.axis();
   const sprint = Input.held('ShiftLeft') && p.stamina > 0.05;
@@ -861,8 +863,8 @@ function humanControl(p, dt) {
   p.sprinting = sprint && ax.m > 0.1;
   const mul = (sprint ? sprintBoost(p) : 1) * (p.spin > 0 ? 0.8 : 1) * (p.stamina < 0.2 ? 0.9 : 1); // same top speed as the AI, sprint is your edge
   if (isCarrier) {
-    if (Input.hit('KeyE') && p.jukeCd <= 0 && G.bstate !== 'snap') doJuke(p, ax);
-    if (Input.hit('KeyF') && p.spinCd <= 0 && G.bstate !== 'snap') doSpin(p);
+    if (Input.hit('KeyE') && p.jukeCd <= 0 && G.bstate !== 'snap' && !p.tuck) doJuke(p, ax);
+    if (Input.hit('KeyF') && p.spinCd <= 0 && G.bstate !== 'snap' && !p.tuck) doSpin(p);
     if (Input.hit('KeyR') && p.stiffCd <= 0) doStiff(p);
   }
   const chasing = b.holder ? b.holder.side !== p.side : p.side !== G.poss;
@@ -915,9 +917,9 @@ function mobileControl(p, dt, isCarrier) {
     }
   }
   if (isCarrier) {
-    if (Input.hit('KeyF') && p.spinCd <= 0) doSpin(p);
+    if (Input.hit('KeyF') && p.spinCd <= 0 && !p.tuck) doSpin(p);
     if (Input.hit('KeyR') && p.stiffCd <= 0) doStiff(p);
-    if (Input.hit('KeyE') && p.jukeCd <= 0) doJuke(p, null);
+    if (Input.hit('KeyE') && p.jukeCd <= 0 && !p.tuck) doJuke(p, null);
   } else if (G.lock && !onD && p !== G.O[0] && Input.hit('Space')) { if (G.bstate === 'snap' && !b.flight) callForBall(p); }
   else if (Input.hit('Space') && p.dive <= 0) { const car = b.holder || b; doDive(p, { x: car.x - p.x, y: car.y - p.y, m: 1 }); return true; }
   const sprint = p.stamina > 0.05;
@@ -951,6 +953,7 @@ function qbTakeOff(qb) {
 function sprintBoost(p) { return 1.0 + clamp((p.spdR || 80) - 50, 0, 50) * 0.002; }
 function doStiff(p) { p.stiff = 0.4; p.stiffCd = 1.4; Sound.tone(160, 0.12, 'sawtooth', 0.08); }
 function doJuke(p, ax) {
+  if (p.tuck) return;
   if (chance(Weather.slipChance())) { slipDown(p); p.jukeCd = 1; return; }
   const sp = Math.hypot(p.vx, p.vy) || 1;
   let fx = p.vx / sp, fy = p.vy / sp;
@@ -984,7 +987,8 @@ function doSwim(p) {
     addText(p.x, p.y, 'SWIM MOVE!', '#ff8a8a', 18, 0.7); Sound.juke();
   } else addText(p.x, p.y, 'STUFFED', '#ccc', 14, 0.6);
 }
-function doSpin(p) { p.spin = 0.45; p.spinCd = 1.4; Sound.juke(); p.head.vx += 300; }
+function doSpin(p) {
+  if (p.tuck) return; p.spin = 0.45; p.spinCd = 1.4; Sound.juke(); p.head.vx += 300; }
 function doDive(p, ax) {
   const b = G.ball; const t = b.holder || b;
   let dx = ax.m > 0.1 ? ax.x : t.x - p.x, dy = ax.m > 0.1 ? ax.y : t.y - p.y;
@@ -1680,7 +1684,7 @@ function tackle(car, df, hitters) {
   const st = stat(df);
   // fumble?
   df.hit = 0;
-  if ((G.bstate === 'run' || stick) && chance(0.022 + (hitters > 1 ? 0.02 : 0) + (stick ? 0.3 : 0) + Weather.fumbleBonus())) {
+  if ((G.bstate === 'run' || stick) && chance((0.022 + (hitters > 1 ? 0.02 : 0) + (stick ? 0.3 : 0) + Weather.fumbleBonus()) * tuckFumbleMul(car))) {
     b.holder = null; b.x = car.x; b.y = car.y;
     b.loose = { vx: rand(-4, 4), vy: rand(-3, 3), t: 0 };
     G.bstate = 'loose'; showBanner('FUMBLE!', '', '#ff9a3d', 1.0); car.down = 0.9;
@@ -2034,7 +2038,7 @@ function updateCamera(dt) {
 function updateHint() {
   if (!G.teams) return;
   if (G.phase === 'kickmeter' || G.mini) { G.hint = ''; return; }
-  if (G.cellyGuy && G.phase === 'dead') { G.hint = G.versus && !G.online ? `${pName(G.cellyGuy.side)}: CELEBRATE!` : G.mode === 'mobile' ? '' : 'CELLY:  ↑ Leap  ↓ Griddy  ← Spike  → Dab   1 Flex  2 Bow  3 Shush  4 Moonwalk   E Nap   F Bowling'; return; }
+  if (G.cellyGuy && G.phase === 'dead') { G.hint = G.versus && !G.online ? `${pName(G.cellyGuy.side)}: CELEBRATE!` : G.mode === 'mobile' ? '' : 'CELLY:  ↑ Leap  ↓ Griddy  ← Spike  → Dab   1 Flex  2 Bow  3 Shush  4 Moonwalk   E Nap   F Bowling' + (G.weather === 'snow' ? '   R Snow Angel' : G.weather === 'rain' ? '   C Mud Slide' : ''); return; }
   if (G.mode === 'mobile') return updateHintMobile();
   if (G.versus && !G.online) {
     const k = s => s === G.p1 ? 'SPACE' : 'ENTER';
