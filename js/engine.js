@@ -241,7 +241,7 @@ function makePlayer(side, isOff, slot, tuple) {
   const yps = Math.max(4.8, 2.6 + (spdR - 50) * 0.16) * GAME_SPEED;
   const skill = isOff && (pos === 'WR' || pos === 'TE' || pos === 'RB');
   const cpuMul = cpu && !G.versus ? (skill ? [0.88, 0.96, 1.0, 1.04] : [0.95, 1.0, 1.03, 1.06])[G.diff] : 1;
-  return {
+  const pl = {
     side, off: isOff, slot, pos, name, num, ovr,
     x: 0, y: 0, vx: 0, vy: 0, dvx: 0, dvy: 0,
     spd: yps * cpuMul * Weather.speed(), spdR, acc: (big ? 20 : 30) * GAME_SPEED * Weather.grip(),
@@ -254,6 +254,7 @@ function makePlayer(side, isOff, slot, tuple) {
     xf: (G.xf && G.xf[side + ':' + name]) || null, dirt: (G.dirt && G.dirt[side + ':' + name]) || 0, slip: 0, slipCd: 0,
     cap: !!(ex && ex.cap), thp: ex && ex.thp || null, tha: ex && ex.tha || null, gloves: ex && ex.gloves || null, teamGloves: !!(ex && ex.teamGloves)
   };
+  return typeof Gear !== 'undefined' && !(ex && ex.cap) ? Gear.apply(pl, G.teams && G.teams[side]) : pl; // Gear Locker picks
 }
 
 function parseAssign(a) {

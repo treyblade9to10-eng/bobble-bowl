@@ -37,9 +37,10 @@ function renderHub() {
   if (g) {
     const home = g.home === d.team, opp = Season.team(home ? g.away : g.home);
     const wx = d.phase === 'regular' && d.weather && d.weather[d.week];
-    const cond = wx ? [wx.night ? 'Night game' : '', wx.w !== 'clear' ? (wx.w === 'rain' ? 'Rain' : 'Snow') : ''].filter(Boolean).join(', ') : '';
+    const cond = wx ? [wx.night ? 'Night game' : '', wx.w !== 'clear' ? (WEATHER.find(x => x[0] === wx.w) || ['', ''])[1] : ''].filter(Boolean).join(', ') : '';
+    const riv = isRivalry(me, opp), rivWk = riv && d.phase === 'regular' && d.week === d.games - 1;
     nx.style.background = `linear-gradient(120deg, ${me.c1} 0%, ${me.c1} 45%, ${opp.c1} 55%, ${opp.c1} 100%)`;
-    nx.innerHTML = `<div class="lbl">${d.phase === 'playoffs' ? Season.roundName(d.bracket.round).toUpperCase() : 'NEXT GAME'}</div>
+    nx.innerHTML = `<div class="lbl">${d.phase === 'playoffs' ? Season.roundName(d.bracket.round).toUpperCase() : rivWk ? 'RIVALRY WEEK' : 'NEXT GAME'}${riv ? ` · <b class="rivTag">RIVALRY · WIN IT FOR THE TROPHY</b>` : ''}</div>
       <div class="mu">${home ? 'vs' : '@'} ${opp.city} ${opp.name}</div>
       <div class="sub">${opp.id} is ${recStr(opp.id)}  •  ${teamOvr(opp)} OVR  •  you are ${home ? 'HOME' : 'AWAY'}${cond ? `  •  ${cond}` : ''}</div>`;
   } else {
@@ -63,7 +64,7 @@ function renderHub() {
     const m = wk[0], home = m.home === d.team, opp = home ? m.away : m.home;
     let res = '';
     if (m.score) { const my = home ? m.score[0] : m.score[1], th = home ? m.score[1] : m.score[0]; const r = my > th ? 'W' : my < th ? 'L' : 'T'; res = `<span class="${r}">${r} ${my}-${th}</span>`; }
-    sched += `<div class="wkrow ${i === d.week && d.phase === 'regular' ? 'now' : ''}"><span>Wk ${i + 1} ${home ? 'vs' : '@'} ${dotFor(opp)}${opp}</span>${res}</div>`;
+    sched += `<div class="wkrow ${i === d.week && d.phase === 'regular' ? 'now' : ''}"><span>Wk ${i + 1} ${home ? 'vs' : '@'} ${dotFor(opp)}${opp}${isRivalry(TEAMS.find(t => t.id === d.team), TEAMS.find(t => t.id === opp)) ? ' <b class="rivTag">RIVAL</b>' : ''}</span>${res}</div>`;
   });
   if (d.log.length) {
     sched += `<div style="margin-top:6px;color:var(--gold);font-weight:bold">PLAYOFFS</div>`;
@@ -115,6 +116,7 @@ $('shPlay').onclick = () => {
   newGame(Season.team(g.home), Season.team(g.away), { qtr: d.qtr, diff: d.diff, humanSide: g.home === d.team ? 0 : 1, playoff: d.phase === 'playoffs',
     weather: wx ? wx.w : 'clear', night: wx ? wx.night : false });
   if (d.phase === 'playoffs') showBanner(Season.roundName(d.bracket.round).toUpperCase(), 'Lose and go home', '#ffd23f', 2.4);
+  Broadcast.show(d.phase === 'playoffs' ? Season.roundName(d.bracket.round) : d.week === d.games - 1 && G.rivalryMatch ? 'Rivalry Week' : `Week ${d.week + 1}`);
 };
 function seasonGameDone(score) {
   const d = Season.data;

@@ -166,6 +166,7 @@ const CareerUI = {
       if (!opts.uni) G.uni = ['rivalry', 'away']; // rivalry week: home team breaks out the rivalry set
       showBanner('RIVALRY GAME', `vs ${opp.city} ${opp.name} · 1.5x XP · series ${Career.series(opp.id)}`, '#ff6040', 3);
     }
+    Broadcast.show(Career.cap.phase === 'college' ? 'College Football' : 'My Career');
   },
 
   // ---------------- college ----------------
@@ -444,6 +445,7 @@ function renderTrophies() {
   const titles = T.titles.length
     ? T.titles.map(t => { const tm = TEAMS.find(x => x.id === t.team); return `<div class="troph"><div class="tsvg">${TROPHY_SVG}</div><b>${t.team}</b><span>${tm ? tm.name : ''}${t.year > 1 ? `, Year ${t.year}` : ''}</span></div>`; }).join('')
     : '<div class="troEmpty">No Bobble Bowls yet. Win a season and it goes right here.</div>';
+  const riv = (T.rivals || []).map(r => `<div class="troph riv"><div class="tsvg">${TROPHY_SVG}</div><b>${r.me} vs ${r.opp}</b><span>Rivalry win${r.year > 1 ? `, Year ${r.year}` : ''}</span></div>`).join('');
   const rec = [
     ['Record', `${T.w}-${T.l}${T.t ? '-' + T.t : ''}`],
     ['Games played', T.games],
@@ -457,7 +459,7 @@ function renderTrophies() {
   const aw = T.awards.length ? T.awards.slice().reverse().map(a => `<div class="awRow"><b>${a.award}</b> ${a.name} <span>${a.team}${a.year ? `, Year ${a.year}` : ''}</span></div>`).join('') : '<div class="troEmpty">Season awards you win show up here.</div>';
   const leg = (T.legends || []).length ? T.legends.map(l => `<div class="rRow"><span>${l.hof ? 'HOF  ' : ''}${l.name}, ${l.pos} (${l.years} yrs)</span><b>${l.peak} OVR</b></div>`).join('') : '<div class="troEmpty">Finish a career and your player goes here. Great ones make the Hall of Fame.</div>';
   const c = Career.cap;
-  $('troBody').innerHTML = `<div class="shelf">${titles}</div>
+  $('troBody').innerHTML = `<div class="shelf">${titles}</div>${riv ? `<div class="troHead" style="margin:8px 0 2px">RIVALRY TROPHIES</div><div class="shelf">${riv}</div>` : ''}
     <div class="troCols">
       <div class="troBox"><div class="troHead">RECORDS</div>${rec.map(([k, v]) => `<div class="rRow"><span>${k}</span><b>${v}</b></div>`).join('')}</div>
       <div class="troBox"><div class="troHead">AWARDS</div>${aw}

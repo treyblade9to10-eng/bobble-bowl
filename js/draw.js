@@ -240,6 +240,8 @@ const RIVALRIES = ['CHI-GB', 'DAL-PHI', 'DAL-WAS', 'DAL-NYG', 'NYG-PHI', 'BAL-PI
   'DAL-SF', 'BUF-MIA', 'NE-NYJ', 'BUF-NE', 'BUF-KC', 'GB-MIN', 'DET-GB', 'CHI-DET', 'ATL-NO', 'CAR-NO', 'NO-TB', 'HOU-TEN', 'IND-NE', 'LAC-LAR', 'NYG-NYJ', 'BAL-CLE', 'ARI-SEA'];
 function isRivalry(a, b) { return !!(a && b && a.id !== b.id && RIVALRIES.includes([a.id, b.id].sort().join('-'))); }
 const lum = c => { let h = (c || '#000').replace('#', ''); if (h.length === 3) h = h.split('').map(x => x + x).join(''); const n = parseInt(h.slice(0, 6), 16) || 0; return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255; };
+const VISOR_COL = { clear: '#cfe6ff60', dark: '#1a1f2bdd', smoke: '#4a515cc8', gold: '#d9a933e0', blue: '#2a6cffb0' };
+const GEAR_COL = { white: '#f2f2f2', black: '#161616', gold: '#d9a933', neon: '#b6ff2e' };
 const lookCache = new Map();
 function teamLook(team, home, style) {
   style = style || (home ? 'home' : 'away');
@@ -386,7 +388,7 @@ function drawPlayer(g, p, G, at) {
       for (let i = 0; i < bands; i++) { const u = 0.22 + i * 0.14, bx = lerp(kx, fxp, u), by = lerp(ky, fyp - 2, u); g.beginPath(); g.moveTo(bx - 3.2, by); g.lineTo(bx + 3.2, by); g.stroke(); }
     }
     g.fillStyle = '#ffffff30'; g.beginPath(); g.arc(kx + 1, ky - 1, 2.2, 0, 7); g.fill(); // knee shine
-    const ck = textOn(look.pants) === '#111' ? '#f2f2f2' : '#151515';
+    const gc = p.gear && p.gear.cleats, ck = gc && gc !== 'auto' ? (gc === 'team' ? look.jersey : GEAR_COL[gc]) : textOn(look.pants) === '#111' ? '#f2f2f2' : '#151515';
     g.fillStyle = ck; g.strokeStyle = OUT; g.lineWidth = 1.2; g.beginPath(); g.ellipse(fxp + 3, fyp - 1, 6, 3.6, 0, 0, 7); g.fill(); g.stroke();
     g.fillStyle = look.trim === ck ? look.jersey : look.trim; g.fillRect(fxp - 0.5, fyp - 3, 5, 1.6);
     g.fillStyle = '#ffffff40'; g.fillRect(fxp + 1, fyp - 4, 4, 1);
@@ -422,7 +424,9 @@ function drawPlayer(g, p, G, at) {
       for (let i = 0; i < n; i++) { const u = 0.58 + i * (w + 0.07); g.beginPath(); g.moveTo(lerp(shx, ex, u), lerp(shy, ey, u)); g.lineTo(lerp(shx, ex, u + w), lerp(shy, ey, u + w)); g.stroke(); }
       g.lineCap = 'round';
     }
-    g.strokeStyle = SKIN[p.face.skin]; g.beginPath(); g.moveTo(ex, ey); g.lineTo(hx, hy); g.stroke();
+    const sl = p.gear && p.gear.sleeve && p.gear.sleeve !== 'none' ? (p.gear.sleeve === 'team' ? shade(look.jersey, -0.08) : GEAR_COL[p.gear.sleeve]) : null;
+    g.strokeStyle = sl || SKIN[p.face.skin]; g.beginPath(); g.moveTo(ex, ey); g.lineTo(hx, hy); g.stroke();
+    if (p.gear && p.gear.band === 'on') { g.strokeStyle = sl === '#f2f2f2' ? look.trim : '#f4f4f4'; g.lineCap = 'butt'; g.beginPath(); g.moveTo(lerp(ex, hx, 0.12), lerp(ey, hy, 0.12)); g.lineTo(lerp(ex, hx, 0.3), lerp(ey, hy, 0.3)); g.stroke(); g.lineCap = 'round'; }
     g.fillStyle = p.teamGloves ? look.trim : p.gloves || '#f2f2f2'; g.strokeStyle = OUT; g.lineWidth = 2;
     g.beginPath(); g.arc(hx, hy, 3.8, 0, 7); g.fill(); g.stroke();
     return { hx, hy };
@@ -574,7 +578,10 @@ function drawHead(g, R, team, p, look) {
   const mood = p.mouth === 'O' ? 'shock' : p.celebrate > 0 ? 'happy' : (p.engaged || !p.off) ? 'mad' : 'focus';
   const ey = fy - R * 0.14, e1 = fx - R * 0.1, e2 = fx + R * 0.3;
   if (face.visor) {
-    g.fillStyle = '#1a1f2bdd'; roundRect(g, fx - R * 0.36, ey - R * 0.2, R * 0.78, R * 0.34, R * 0.12); g.fill();
+    const vk = p.gear && VISOR_COL[p.gear.visor] ? p.gear.visor : 'dark';
+    if (vk === 'gold') { const vg = g.createLinearGradient(fx - R * 0.36, 0, fx + R * 0.42, 0); vg.addColorStop(0, '#f6d365'); vg.addColorStop(0.5, '#c77dff'); vg.addColorStop(1, '#4cc9f0'); g.fillStyle = vg; } else g.fillStyle = VISOR_COL[vk];
+    roundRect(g, fx - R * 0.36, ey - R * 0.2, R * 0.78, R * 0.34, R * 0.12); g.fill();
+    if (vk === 'clear') { for (const ex of [e1, e2]) { g.fillStyle = '#111'; g.beginPath(); g.arc(ex + R * 0.05, ey + R * 0.01, R * 0.09, 0, 7); g.fill(); } }
     g.fillStyle = '#ffffff55'; g.fillRect(fx - R * 0.25, ey - R * 0.14, R * 0.2, R * 0.06);
   } else {
     for (const ex of [e1, e2]) {
@@ -606,7 +613,10 @@ function drawHead(g, R, team, p, look) {
     g.moveTo(-R * 0.05, fy + R * 0.12); g.quadraticCurveTo(fx + R * 0.4, fy + R * 0.12, fx + R * 0.66, fy + R * 0.08);
     g.moveTo(-R * 0.02, fy + R * 0.44); g.quadraticCurveTo(fx + R * 0.35, fy + R * 0.5, fx + R * 0.6, fy + R * 0.42);
     g.moveTo(fx + R * 0.64, fy + R * 0.06); g.lineTo(fx + R * 0.58, fy + R * 0.6);
-    g.moveTo(fx + R * 0.2, fy + R * 0.13); g.lineTo(fx + R * 0.17, fy + R * 0.48); // center bar
+    const ms = p.gear && p.gear.mask || 'classic';
+    if (ms !== 'open') { g.moveTo(fx + R * 0.2, fy + R * 0.13); g.lineTo(fx + R * 0.17, fy + R * 0.48); } // center bar
+    if (ms === 'cage' || ms === 'robot') { g.moveTo(fx + R * 0.42, fy + R * 0.1); g.lineTo(fx + R * 0.4, fy + R * 0.5); g.moveTo(fx - R * 0.02, fy - R * 0.12); g.quadraticCurveTo(fx + R * 0.3, fy - R * 0.1, fx + R * 0.62, fy - R * 0.14); }
+    if (ms === 'robot') { g.moveTo(-R * 0.0, fy + R * 0.66); g.quadraticCurveTo(fx + R * 0.3, fy + R * 0.74, fx + R * 0.54, fy + R * 0.62); }
     g.stroke();
   }
   // where the cage bolts on

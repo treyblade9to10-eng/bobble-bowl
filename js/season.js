@@ -15,6 +15,11 @@ const Season = {
     const opp = [];
     while (opp.length < games) opp.push(...shuffle(others.slice()));
     opp.length = games;
+    // rivalry games are always on the schedule, and the last week of the year is Rivalry Week
+    const byId = id => TEAMS.find(t => t.id === id), rivals = others.filter(o => isRivalry(byId(teamId), byId(o)));
+    for (const r of rivals) if (!opp.includes(r)) { const i = opp.findIndex(o => !rivals.includes(o)); if (i >= 0) opp[i] = r; }
+    const ri = opp.findIndex(o => rivals.includes(o));
+    if (ri >= 0 && games > 1) { const [r] = opp.splice(ri, 1); opp.push(r); }
     const weeks = opp.map((o, w) => {
       const rest = shuffle(ids.filter(i => i !== teamId && i !== o));
       const games = [{ home: w % 2 === 0 ? teamId : o, away: w % 2 === 0 ? o : teamId }];

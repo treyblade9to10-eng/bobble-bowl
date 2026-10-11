@@ -380,6 +380,7 @@ const Career = {
     } else if (s.score[me] < s.score[them]) T.l++; else T.t++;
     this.save();
   },
+  addRivalTrophy(me, opp, year) { (this.tro.rivals || (this.tro.rivals = [])).push({ me, opp, year: year || 1, date: new Date().toISOString().slice(0, 10) }); this.save(); },
   addTitle(team, year) { this.tro.titles.push({ team, year: year || 1, date: new Date().toISOString().slice(0, 10) }); this.save(); },
   addAward(award, name, team, year) { this.tro.awards.push({ award, name, team, year }); this.save(); }
 };

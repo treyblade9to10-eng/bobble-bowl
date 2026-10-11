@@ -234,6 +234,7 @@ function startGame() {
   newGame(TEAMS[sel.idx[0]], TEAMS[sel.idx[1]], { qtr: +$('optQtr').value, diff: +$('optDiff').value, humanSide: sel.you,
     weather: pickWeather($('optWeather').value), night: $('optNight').value === '1', uni: [$('optUni0').value, $('optUni1').value],
     versus: $('optPlayers').value === '2' && G.mode !== 'mobile' });
+  Broadcast.show();
 }
 
 // ---------- play calling ----------
@@ -468,6 +469,7 @@ G.hooks.onGameOver = s => {
   $('btnAgain').textContent = G.challenge ? 'TRY AGAIN' : 'REMATCH';
   $('btnNewTeams').textContent = G.challenge ? 'CHALLENGES' : G.online ? 'MAIN MENU' : 'NEW TEAMS';
   if (G.online && Net.role === 'host') Net.over(s);
+  if (inSeason && won && G.rivalryMatch) { Career.addRivalTrophy(s.teams[me].id, s.teams[them].id, Season.data && Season.data.year); $('overChal').textContent = `RIVALRY TROPHY: you beat the ${s.teams[them].name}. It's in your Trophy Case.`; $('overChal').style.color = '#ffd23f'; }
   if (inSeason) { Season.addPlayedStats(G.pstats, G.teams); seasonGameDone(s.score); }
   const inCareer = !!G.career;
   $('btnSeasonCont').style.display = inSeason || inCareer ? '' : 'none';
@@ -482,6 +484,7 @@ function drawMvp(st, side) {
   if (!st) { $('mvpBox').style.display = 'none'; return; }
   $('mvpBox').style.display = '';
   const t = G.teams[side];
+  $('mvpBox').style.setProperty('--tc', t.c1);
   const all = t.off.map((p, i) => [p, true, i]).concat(t.def.map((p, i) => [p, false, i]));
   const found = all.find(([p]) => p[1] === st.name) || all[0];
   const p = makePlayer(side, found[1], found[2], found[0]);
@@ -498,7 +501,13 @@ function drawMvp(st, side) {
     g.clearRect(0, 0, 260, 300);
     const bg = g.createRadialGradient(130, 150, 10, 130, 150, 150); bg.addColorStop(0, t.c1 + 'aa'); bg.addColorStop(1, '#0000');
     g.fillStyle = bg; g.fillRect(0, 0, 260, 300);
+    g.globalAlpha = 0.18; Logo.draw(g, t, 130, 135, 230); g.globalAlpha = 1; // trading card: team logo behind him
     g.save(); g.scale(2.6, 2.6); drawPlayer(g, p, fake, { x: 50, y: 108 }); g.restore();
+    // OVR badge + position, like a card
+    g.fillStyle = '#0b0f16e0'; g.fillRect(8, 8, 58, 58); g.fillStyle = '#f6c31c'; g.fillRect(8, 62, 58, 4);
+    g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#fff'; g.font = 'italic 900 30px "Barlow Condensed", Arial, sans-serif'; g.fillText(p.ovr, 37, 30);
+    g.font = '800 13px "Barlow Condensed", Arial, sans-serif'; g.fillStyle = '#f6c31c'; g.fillText(st.pos, 37, 52);
+    g.drawImage(Logo.canvas(t, 96), 206, 10, 44, 44);
     if ($('over').classList.contains('show')) mvpAnim = requestAnimationFrame(loop);
   };
   setTimeout(loop, 1450);
