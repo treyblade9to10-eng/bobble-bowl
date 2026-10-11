@@ -10,4 +10,7 @@ const STADIUMS = {
   ATL: ['Peach Dome', 'dome', 'turf'], CAR: ['Queen City Stadium', 'open', 'turf'], NO: ['Bayou Superdome', 'dome', 'turf'], TB: ['Pirate Ship Stadium', 'open', 'grass'],
   ARI: ['Cactus Dome', 'dome', 'grass'], LAR: ['SoFly Stadium', 'dome', 'turf'], SF: ['Bay Gold Stadium', 'open', 'grass'], SEA: ['Sound Field', 'open', 'turf']
 };
-const stadiumOf = team => { if (team && team.custom) return { name: team.stadium || 'Home Field', dome: !!team.dome, turf: false }; const s = team && STADIUMS[team.id]; return s ? { name: s[0], dome: s[1] === 'dome', turf: s[2] === 'turf' } : { name: 'Bobble Bowl Stadium', dome: false, turf: false }; };
+// end zone paint for a few places (everyone else is solid)
+const EZ_STYLE = { DEN: 'stripes', KC: 'stripes', GB: 'checker', CHI: 'stripes', DAL: 'checker', TB: 'stripes', SEA: 'checker', NO: 'checker', PIT: 'stripes', BUF: 'checker', LV: 'stripes', JAX: 'checker' };
+const stadiumOf = team => { const st = stadiumBase(team); st.ez = team && !team.custom && EZ_STYLE[team.id] || 'solid'; return st; };
+const stadiumBase = team => { if (team && team.custom) return { name: team.stadium || 'Home Field', dome: !!team.dome, turf: false }; const s = team && STADIUMS[team.id]; return s ? { name: s[0], dome: s[1] === 'dome', turf: s[2] === 'turf' } : { name: 'Bobble Bowl Stadium', dome: false, turf: false }; };

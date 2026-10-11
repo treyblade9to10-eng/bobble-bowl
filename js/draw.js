@@ -68,6 +68,15 @@ function buildField(G) {
     const ez = g.createLinearGradient(x0, 0, x0 + 10 * PX, 0);
     ez.addColorStop(0, shade(t.c1, -0.15)); ez.addColorStop(0.5, t.c1); ez.addColorStop(1, shade(t.c1, -0.15));
     g.fillStyle = ez; g.fillRect(x0, fy(0), 10 * PX, FIELD_W * PY);
+    // some stadiums paint their end zones with stripes or a checkerboard
+    const ezs = stad.ez || 'solid';
+    if (ezs !== 'solid') {
+      g.save(); g.beginPath(); g.rect(x0, fy(0), 10 * PX, FIELD_W * PY); g.clip(); g.fillStyle = shade(t.c1, -0.22);
+      if (ezs === 'stripes') for (let k = -FIELD_W * PY; k < 10 * PX + FIELD_W * PY; k += 44) { g.beginPath(); g.moveTo(x0 + k, fy(0)); g.lineTo(x0 + k + 20, fy(0)); g.lineTo(x0 + k + 20 - FIELD_W * PY, fy(FIELD_W)); g.lineTo(x0 + k - FIELD_W * PY, fy(FIELD_W)); g.fill(); }
+      else for (let cx = 0; cx < 10; cx += 2.5) for (let cy = 0; cy < FIELD_W; cy += 2.5 * PX / PY / 1.7) if ((Math.round(cx / 2.5) + Math.round(cy / (2.5 * PX / PY / 1.7))) % 2) g.fillRect(x0 + cx * PX, fy(cy), 2.5 * PX, 2.5 * PX / 1.7);
+      g.restore();
+    }
+    if (typeof Logo !== 'undefined' && g.save) for (const ly of [FIELD_W * 0.13, FIELD_W * 0.87]) { g.save(); g.translate(x0 + 5 * PX, fy(ly)); g.scale(1, PY / PX * 1.15); Logo.draw(g, t, 0, 0, 7.4 * PX); g.restore(); }
     g.save(); g.translate(x0 + 5 * PX, fy(FIELD_W / 2)); g.rotate(s === 0 ? -Math.PI / 2 : Math.PI / 2);
     g.font = '900 86px "Barlow Condensed", "Arial Black", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
     g.lineWidth = 8; g.strokeStyle = shade(t.c1, -0.5); g.strokeText(t.name.toUpperCase(), 0, 0);
@@ -84,14 +93,13 @@ function buildField(G) {
     const n = yd <= 60 ? yd - 10 : 110 - yd;
     for (const ny of [8.5, 44.8]) { g.fillStyle = '#ffffffd8'; g.fillText(String(n), fx(yd), fy(ny)); }
   }
-  // midfield circle
-  // home team logo at midfield
+  // home team logo painted at midfield (squished like it's lying on the grass)
   const ht = G.teams[0];
-  g.fillStyle = ht.c1 + 'd0'; g.beginPath(); g.ellipse(fx(60), fy(FIELD_W / 2), 4.4 * PX, 4.4 * PY, 0, 0, 7); g.fill();
-  g.strokeStyle = ht.c2; g.lineWidth = 5; g.stroke();
-  g.font = 'italic 900 56px "Barlow Condensed", "Arial Black", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-  g.lineWidth = 6; g.strokeStyle = shade(ht.c1, -0.5); g.strokeText(ht.id, fx(60), fy(FIELD_W / 2) + 2);
-  g.fillStyle = ht.c2 === '#000000' ? '#fff' : ht.c2; g.fillText(ht.id, fx(60), fy(FIELD_W / 2) + 2);
+  if (typeof Logo !== 'undefined' && g.save) {
+    g.save(); g.translate(fx(60), fy(FIELD_W / 2)); g.scale(1, PY / PX * 1.1);
+    g.globalAlpha = 0.25; g.fillStyle = '#000'; g.beginPath(); g.arc(4, 6, 6.4 * PX, 0, 7); g.fill(); // soft shadow so it pops off the grass
+    g.globalAlpha = 0.95; Logo.draw(g, ht, 0, 0, 12.5 * PX); g.restore(); g.globalAlpha = 1;
+  }
   // sidelines
   g.strokeStyle = '#fff'; g.lineWidth = 7; g.strokeRect(fx(0), fy(0), 120 * PX, FIELD_W * PY);
   // goal posts at the back of each end zone (fake 3D: height goes up and leans outward)
@@ -745,13 +753,15 @@ function drawHUD(g, G) {
     // team name sits high so the timeout bars underneath get their own space
     const ny = y0 + 18;
     g.fillStyle = textOn(t.c1); g.font = 'italic 900 23px "Barlow Condensed", "Arial Black", sans-serif'; g.textAlign = 'left'; g.textBaseline = 'middle';
-    g.fillText(t.id, x + 10, ny);
-    if (G.versus) { const tg = G.online ? (G.teams.indexOf(t) === G.human ? 'YOU' : 'OPP') : G.teams.indexOf(t) === G.p1 ? 'P1' : 'P2'; g.font = '800 12px "Barlow Condensed", Arial, sans-serif'; g.fillStyle = tg === 'P1' || tg === 'YOU' ? '#ffe14d' : '#5ad1ff'; g.fillText(tg, x + 10, y0 + 9); g.font = 'italic 900 23px "Barlow Condensed", "Arial Black", sans-serif'; g.fillStyle = textOn(t.c1); }
-    if (poss) drawFootball(g, x + 10 + g.measureText(t.id).width + 16, ny, 0.9);
+    const lx = typeof Logo !== 'undefined' ? 40 : 10; // little logo at the left of the score cell
+    if (lx > 10) g.drawImage(Logo.canvas(t, 64), x + 4, y0 + 6, 34, 34);
+    g.fillText(t.id, x + lx, ny);
+    if (G.versus) { const tg = G.online ? (G.teams.indexOf(t) === G.human ? 'YOU' : 'OPP') : G.teams.indexOf(t) === G.p1 ? 'P1' : 'P2'; g.font = '800 12px "Barlow Condensed", Arial, sans-serif'; g.fillStyle = tg === 'P1' || tg === 'YOU' ? '#ffe14d' : '#5ad1ff'; g.fillText(tg, x + lx, y0 + 9); g.font = 'italic 900 23px "Barlow Condensed", "Arial Black", sans-serif'; g.fillStyle = textOn(t.c1); }
+    if (poss) drawFootball(g, x + lx + g.measureText(t.id).width + 16, ny, 0.9);
     g.font = 'italic 900 36px "Barlow Condensed", "Arial Black", sans-serif'; g.textAlign = 'right'; g.fillText(s, x + 192, y0 + H / 2 + 1);
     const side = G.teams.indexOf(t);
     if (G.timeouts) for (let i = 0; i < 3; i++) {
-      const tx = x + 10 + i * 20, ty = y0 + H - 16;
+      const tx = x + lx + i * 20, ty = y0 + H - 16;
       g.fillStyle = '#00000059'; g.fillRect(tx - 1, ty - 1, 16, 6);
       g.fillStyle = i < G.timeouts[side] ? '#ffd23f' : '#ffffff38'; g.fillRect(tx, ty, 14, 4);
     }
