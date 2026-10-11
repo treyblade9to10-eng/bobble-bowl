@@ -233,7 +233,25 @@ const Logo = (() => {
   };
   const specOf = t => (SPEC[t.id] && !t.custom) ? SPEC[t.id](t) : ['text', { text: t.id, fill: t.c1, out: t.c2 === t.c1 ? '#fff' : t.c2, size: t.id.length > 2 ? 44 : 58 }];
 
+  // real NFL logos come from ESPN's image server (not stored in this repo). Cartoon ones are the backup (custom teams, offline, or the Cartoon setting)
+  let style = 'real';
+  try { const o = JSON.parse(localStorage.getItem('bobbleOpts') || 'null'); if (o && o.optLogos) style = o.optLogos; } catch (e) {}
+  const REAL = {}, ready = [];
+  const espn = id => `https://a.espncdn.com/i/teamlogos/nfl/500/${id === 'WAS' ? 'wsh' : id.toLowerCase()}.png`;
+  let bump = null;
+  function realImg(t) {
+    if (style !== 'real' || !t || t.custom || !SPEC[t.id] || typeof Image === 'undefined') return null;
+    let im = REAL[t.id];
+    if (!im) {
+      im = REAL[t.id] = new Image(); im.crossOrigin = 'anonymous';
+      im.onload = () => { cache.clear(); clearTimeout(bump); bump = setTimeout(() => ready.forEach(f => f()), 120); };
+      im.src = espn(t.id);
+    }
+    return im.complete && im.naturalWidth ? im : null;
+  }
   function draw(g, t, x, y, size) {
+    const im = realImg(t);
+    if (im) { g.drawImage(im, x - size / 2, y - size / 2, size, size); return; }
     const [k, o] = specOf(t);
     g.save(); g.translate(x, y); g.scale(size / 100, size / 100);
     I[k](g, t, o);
@@ -249,5 +267,10 @@ const Logo = (() => {
     cache.set(key, cv); return cv;
   }
   function url(t, px = 96) { try { return canvas(t, px).toDataURL(); } catch (e) { return ''; } }
-  return { draw, canvas, url, has: t => !!(t && SPEC[t.id] && !t.custom) };
+  ready.push(() => { fieldKey = ''; }); // repaint the field once real logos arrive
+  const preload = () => { if (typeof TEAMS !== 'undefined') for (const t of TEAMS) realImg(t); };
+  preload();
+  return { draw, canvas, url, has: t => !!(t && SPEC[t.id] && !t.custom),
+    onReady(f) { ready.push(f); },
+    setStyle(s) { style = s; cache.clear(); preload(); ready.forEach(f => f()); }, style: () => style };
 })();

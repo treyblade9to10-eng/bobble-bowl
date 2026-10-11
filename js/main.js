@@ -221,8 +221,10 @@ const fillSel = (id, list, val) => { $(id).innerHTML = list.map(([v, t]) => `<op
 fillSel('optUni0', UNIFORMS, 'home');
 $('optPlayers').onchange = () => renderSelect(); fillSel('optUni1', UNIFORMS, 'away'); fillSel('optWeather', WEATHER, 'clear');
 try { const o = JSON.parse(localStorage.getItem('bobbleOpts') || 'null'); if (o) for (const k in o) if ($(k)) $(k).value = o[k]; } catch (e) {}
-function saveOpts() { const o = {}; for (const k of ['optUni0', 'optUni1', 'optWeather', 'optNight', 'optQtr', 'optDiff', 'optPlayers']) o[k] = $(k).value; try { localStorage.setItem('bobbleOpts', JSON.stringify(o)); } catch (e) {} }
-const cycPaint = [['optQtr', 'QUARTERS'], ['optDiff', 'CPU'], ['optWeather', 'WEATHER'], ['optNight', 'TIME'], ['optPlayers', 'PLAYERS']].map(([id, l]) => cycleBtn(id, l));
+function saveOpts() { const o = {}; for (const k of ['optUni0', 'optUni1', 'optWeather', 'optNight', 'optLogos', 'optQtr', 'optDiff', 'optPlayers']) o[k] = $(k).value; try { localStorage.setItem('bobbleOpts', JSON.stringify(o)); } catch (e) {} }
+const cycPaint = [['optQtr', 'QUARTERS'], ['optDiff', 'CPU'], ['optWeather', 'WEATHER'], ['optNight', 'TIME'], ['optLogos', 'LOGOS'], ['optPlayers', 'PLAYERS']].map(([id, l]) => cycleBtn(id, l));
+$('optLogos').addEventListener('change', () => { Logo.setStyle($('optLogos').value); renderSelect(); });
+Logo.onReady(() => { if ($('select').classList.contains('show')) renderSelect(); });
 const repaintCycles = () => cycPaint.forEach(f => f());
 $('optPlayersBtn').classList.add('optPl');
 
@@ -469,14 +471,19 @@ G.hooks.onGameOver = s => {
   $('btnAgain').textContent = G.challenge ? 'TRY AGAIN' : 'REMATCH';
   $('btnNewTeams').textContent = G.challenge ? 'CHALLENGES' : G.online ? 'MAIN MENU' : 'NEW TEAMS';
   if (G.online && Net.role === 'host') Net.over(s);
-  if (inSeason && won && G.rivalryMatch) { Career.addRivalTrophy(s.teams[me].id, s.teams[them].id, Season.data && Season.data.year); $('overChal').textContent = `RIVALRY TROPHY: you beat the ${s.teams[them].name}. It's in your Trophy Case.`; $('overChal').style.color = '#ffd23f'; }
+  if (won && (G.rivalryMatch || G.rivalry) && !G.versus && !G.challenge && !G.mini && !G.online) { Career.addRivalTrophy(s.teams[me].id, s.teams[them].id, inSeason && Season.data ? Season.data.year : 1); $('overChal').textContent = `RIVALRY TROPHY: you beat the ${s.teams[them].name}. It's in your Trophy Case.`; $('overChal').style.color = '#ffd23f'; }
   if (inSeason) { Season.addPlayedStats(G.pstats, G.teams); seasonGameDone(s.score); }
   const inCareer = !!G.career;
   $('btnSeasonCont').style.display = inSeason || inCareer ? '' : 'none';
   $('btnAgain').style.display = $('btnNewTeams').style.display = inSeason || inCareer ? 'none' : '';
   if (G.online) $('btnAgain').style.display = 'none';
   if (inSeason && G.playoff && won) $('overTitle').textContent = Season.data.phase === 'done' ? 'CHAMPIONS' : 'YOU ADVANCE!';
-  setTimeout(() => show('over'), 1400);
+  // the Bobble Bowl: trophy ceremony for the winners first
+  if (G.bigGame && !tie && !G.demo) {
+    const ws = s.score[0] > s.score[1] ? 0 : 1;
+    const best = Object.values(G.pstats || {}).filter(p => p.side === ws).sort((a, b) => score(b) - score(a))[0];
+    setTimeout(() => Ceremony.show(ws, best, () => show('over')), 1400);
+  } else setTimeout(() => show('over'), 1400);
 };
 function drawMvp(st, side) {
   const cvm = $('mvpCv'), g = cvm.getContext('2d');

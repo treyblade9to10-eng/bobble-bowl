@@ -1,5 +1,5 @@
 // ---- Offline support: network first (so updates show up right away), saved copy when there's no signal ----
-const CACHE = 'bobble-v6.3';
+const CACHE = 'bobble-v6.4';
 const FILES = [
   './',
   'index.html',
@@ -36,6 +36,7 @@ const FILES = [
   'js/locker.js',
   'js/gear.js',
   'js/broadcast.js',
+  'js/biggame.js',
   'js/careerui.js',
   'js/seasonui.js',
   'js/franchise.js',

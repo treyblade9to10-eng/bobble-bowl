@@ -25,7 +25,7 @@ function wy(py) { return (py - CH / 2 - VY) / PY + cam.y; }
 const FIELD_PAD_X = 6, FIELD_PAD_TOP = 8, FIELD_PAD_BOT = 5;
 let fieldCv = null, fieldKey = '';
 function buildField(G) {
-  const key = G.teams[0].id + G.teams[1].id + (G.demo ? 'd' : '');
+  const key = G.teams[0].id + G.teams[1].id + (G.demo ? 'd' : '') + (G.bigGame ? 'B' + G.bigGame.year : '') + (typeof Logo !== 'undefined' ? Logo.style() : '');
   if (fieldKey === key && fieldCv) return;
   fieldKey = key;
   const W = Math.ceil((120 + FIELD_PAD_X * 2) * PX), H = Math.ceil((FIELD_W + FIELD_PAD_TOP + FIELD_PAD_BOT) * PY);
@@ -69,7 +69,7 @@ function buildField(G) {
   g.globalAlpha = 1;
   // end zones
   for (let s = 0; s < 2; s++) {
-    const t = G.teams[s], x0 = fx(s === 0 ? 0 : 110);
+    const t = G.teams[G.bigGame ? s : 0], x0 = fx(s === 0 ? 0 : 110); // home team's stadium = both end zones are theirs (the Bobble Bowl splits them)
     const ez = g.createLinearGradient(x0, 0, x0 + 10 * PX, 0);
     ez.addColorStop(0, shade(t.c1, -0.15)); ez.addColorStop(0.5, t.c1); ez.addColorStop(1, shade(t.c1, -0.15));
     g.fillStyle = ez; g.fillRect(x0, fy(0), 10 * PX, FIELD_W * PY);
@@ -100,7 +100,14 @@ function buildField(G) {
   }
   // home team logo painted at midfield (squished like it's lying on the grass)
   const ht = G.teams[0];
-  if (typeof Logo !== 'undefined' && g.save) {
+  if (G.bigGame && g.save) { // Bobble Bowl field: the trophy and the Roman numerals at midfield
+    g.save(); g.translate(fx(60), fy(FIELD_W / 2)); g.scale(1, PY / PX * 1.1);
+    g.fillStyle = '#0b0f16c0'; g.beginPath(); g.arc(0, 0, 6.6 * PX, 0, 7); g.fill(); g.strokeStyle = '#d9a933'; g.lineWidth = 6; g.stroke();
+    drawTrophy(g, -2.2 * PX, 3.6 * PX, 7.6 * PX);
+    g.font = 'italic 900 70px "Barlow Condensed", "Arial Black", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#d9a933';
+    g.fillText(roman(bowlNo(G.bigGame.year)), 2.6 * PX, 0.6 * PX); g.font = '800 22px "Barlow Condensed", Arial, sans-serif'; g.fillStyle = '#fff'; g.fillText('BOBBLE BOWL', 2.6 * PX, -2.4 * PX);
+    g.restore();
+  } else if (typeof Logo !== 'undefined' && g.save) {
     g.save(); g.translate(fx(60), fy(FIELD_W / 2)); g.scale(1, PY / PX * 1.1);
     g.globalAlpha = 0.25; g.fillStyle = '#000'; g.beginPath(); g.arc(4, 6, 6.4 * PX, 0, 7); g.fill(); // soft shadow so it pops off the grass
     g.globalAlpha = 0.95; Logo.draw(g, ht, 0, 0, 12.5 * PX); g.restore(); g.globalAlpha = 1;
@@ -122,13 +129,22 @@ function buildField(G) {
     }
     g.fillStyle = '#ff3b30'; for (const yy of [MID_Y - half, MID_Y + half]) { const [px, py] = P(yy, top); g.fillRect(px - 2, py - 10, 5, 10); }
   }
+  // stands + a big video board behind each end zone
+  for (const side of [-1, 1]) {
+    const xa = side < 0 ? 0 : fx(120 + FIELD_PAD_X - 2.2), w = 2.2 * PX, top = fy(-1.2);
+    g.fillStyle = '#10151d'; g.fillRect(xa, top, w, H - top);
+    for (let yy = top + 6; yy < H; yy += 11) for (let xx = xa + 5; xx < xa + w - 3; xx += 11) { const hh = hashStr(side + ':' + xx + ':' + yy); g.fillStyle = cols[hh % cols.length]; g.beginPath(); g.arc(xx, yy, 4, 0, 7); g.fill(); }
+    const bx = side < 0 ? fx(-FIELD_PAD_X + 0.3) : fx(120 + FIELD_PAD_X - 1.9), by = fy(FIELD_W / 2) - 70, bw = 1.6 * PX, bh = 140;
+    g.fillStyle = '#05070a'; g.fillRect(bx - 4, by - 4, bw + 8, bh + 8); g.fillStyle = shade(G.teams[0].c1, -0.4); g.fillRect(bx, by, bw, bh);
+    if (typeof Logo !== 'undefined' && g.save) Logo.draw(g, G.teams[0], bx + bw / 2, by + bh / 2, Math.min(bw, bh) - 6);
+  }
   // team benches area
   g.fillStyle = '#ffffff10'; g.fillRect(fx(35), fy(FIELD_W) + 10, 50 * PX, 3 * PY);
 }
 
 function drawField(g, G) {
   buildField(G);
-  g.fillStyle = '#2b6b2e'; g.fillRect(0, 0, CW, CH);
+  g.fillStyle = '#0e1420'; g.fillRect(0, 0, CW, CH); // past the ends of the field = more stands
   blitWorld(g, fieldCv);
   // jumping fans when hyped
   if (G.crowdHype > 0.05) {

@@ -25,13 +25,13 @@ const Broadcast = {
   loop() {
     if (!this.on) return;
     const t = (performance.now() - this.t0) / 1000;
-    if (t > this.DUR) return this.close();
+    if (t > this.DUR + (G.bigGame ? 1.4 : 0)) return this.close();
     this.draw(t);
     requestAnimationFrame(() => this.loop());
   },
   draw(t) {
     const cv = $('bcCv'), g = cv.getContext('2d'), W = cv.width, H = 720, A = G.teams[1], B = G.teams[0];
-    const ein = u => 1 - Math.pow(1 - clamp(u, 0, 1), 3), slide = ein(t / 0.55), fade = clamp((this.DUR - t) / 0.35, 0, 1);
+    const ein = u => 1 - Math.pow(1 - clamp(u, 0, 1), 3), slide = ein(t / 0.55), fade = clamp((this.DUR + (G.bigGame ? 1.4 : 0) - t) / 0.35, 0, 1);
     g.clearRect(0, 0, W, H); g.save(); g.globalAlpha = fade;
     // two-color split with a gold seam
     const cut = 70;
@@ -46,9 +46,9 @@ const Broadcast = {
     g.fillStyle = '#d7263d'; g.fillRect(28, 18, 74, 28); g.fillStyle = '#fff'; g.font = '900 20px "Barlow Condensed", Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
     g.fillText('LIVE', 72, 33); g.beginPath(); g.arc(40, 32, 5, 0, 7); g.fillStyle = Math.sin(t * 8) > 0 ? '#fff' : '#ffffff55'; g.fill();
     g.textAlign = 'left'; g.fillStyle = '#fff'; g.font = 'italic 900 30px "Barlow Condensed", Arial, sans-serif';
-    const head = G.rivalryMatch || G.rivalry ? 'RIVALRY GAME' : G.night ? "TONIGHT'S MATCHUP" : "TODAY'S MATCHUP";
+    const head = G.bigGame ? G.bigGame.name.toUpperCase() : G.rivalryMatch || G.rivalry ? 'RIVALRY GAME' : G.night ? "TONIGHT'S MATCHUP" : "TODAY'S MATCHUP";
     g.fillText(head, 120, 34);
-    if (this.label) { g.textAlign = 'right'; g.fillStyle = '#f6c31c'; g.font = '800 22px "Barlow Condensed", Arial, sans-serif'; g.fillText(this.label.toUpperCase(), W - 30, 34); }
+    if (this.label && !G.bigGame) { g.textAlign = 'right'; g.fillStyle = '#f6c31c'; g.font = '800 22px "Barlow Condensed", Arial, sans-serif'; g.fillText(this.label.toUpperCase(), W - 30, 34); }
     // each team: logo, name, rating, player in uniform
     const team = (tm, side, x, dirIn, p) => {
       const off = (1 - slide) * 700 * dirIn;
@@ -65,10 +65,17 @@ const Broadcast = {
       g.restore();
     };
     team(A, 1, W * 0.27, -1, this.pl[0]); team(B, 0, W * 0.73, 1, this.pl[1]);
-    // VS
+    // VS (or the trophy, for the Bobble Bowl)
     const vs = ein((t - 0.35) / 0.4);
-    g.save(); g.translate(W / 2, 300); g.scale(0.5 + vs * 0.5, 0.5 + vs * 0.5); g.globalAlpha = fade * vs;
-    g.font = 'italic 900 96px "Barlow Condensed", Arial, sans-serif'; g.textAlign = 'center'; g.lineWidth = 12; g.strokeStyle = '#000'; g.strokeText(G.teams && 'VS', 0, 0); g.fillStyle = '#f6c31c'; g.fillText('VS', 0, 0); g.restore();
+    if (G.bigGame) {
+      g.save(); g.globalAlpha = fade * vs; const gl = g.createRadialGradient(W / 2, 300, 10, W / 2, 300, 220); gl.addColorStop(0, '#fff6d0aa'); gl.addColorStop(1, '#fff6d000'); g.fillStyle = gl; g.fillRect(W / 2 - 220, 80, 440, 440);
+      drawTrophy(g, W / 2, 440 - (1 - vs) * 60, 260, t);
+      g.textAlign = 'center'; g.font = 'italic 900 64px "Barlow Condensed", Arial, sans-serif'; g.lineWidth = 10; g.strokeStyle = '#000'; g.lineJoin = 'round';
+      const rn = roman(bowlNo(G.bigGame.year)); g.strokeText(rn, W / 2, 500); g.fillStyle = '#d9a933'; g.fillText(rn, W / 2, 500); g.restore();
+    } else {
+      g.save(); g.translate(W / 2, 300); g.scale(0.5 + vs * 0.5, 0.5 + vs * 0.5); g.globalAlpha = fade * vs;
+      g.font = 'italic 900 96px "Barlow Condensed", Arial, sans-serif'; g.textAlign = 'center'; g.lineWidth = 12; g.strokeStyle = '#000'; g.strokeText('VS', 0, 0); g.fillStyle = '#f6c31c'; g.fillText('VS', 0, 0); g.restore();
+    }
     // bottom ticker: where + conditions
     const wx = G.storm ? 'Storm' : G.fog ? 'Fog' : { clear: G.night ? 'Clear night' : 'Clear skies', rain: 'Rain', snow: 'Snow' }[G.weather] || '';
     const bits = [G.stadium && G.stadium.name, G.stadium && G.stadium.dome ? 'Indoors' : wx, G.wind && G.wind.mph ? `Wind ${G.wind.mph} mph` : ''].filter(Boolean);

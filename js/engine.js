@@ -54,7 +54,8 @@ function newGame(home, away, opts) {
     showBanner(sc.title, sc.sub, '#ffd23f', 2.6);
     return toPlayCall();
   }
-  if (G.rivalryMatch) { G.crowdHype = 1; showBanner('RIVALRY GAME', `${away.city} ${away.name} at ${home.city} ${home.name}  •  ${G.stadium.name}`, '#ff6040', 2.8); }
+  if (G.bigGame) { G.crowdHype = 1.5; showBanner(G.bigGame.name.toUpperCase(), `${away.city} ${away.name} vs ${home.city} ${home.name}  •  winner takes the trophy`, '#d9a933', 3); }
+  else if (G.rivalryMatch) { G.crowdHype = 1; showBanner('RIVALRY GAME', `${away.city} ${away.name} at ${home.city} ${home.name}  •  ${G.stadium.name}`, '#ff6040', 2.8); }
   else showBanner('KICKOFF!', `Live from ${G.stadium.name}  •  ${away.name} get the ball first`, '#fff', 2.4);
   startKickoff(0);
 }
@@ -67,7 +68,8 @@ function initGame(home, away, opts) {
     weather: stadiumOf(home).dome ? 'clear' : opts.weather === 'storm' ? 'rain' : opts.weather === 'fog' ? 'clear' : (opts.weather || 'clear'),
     storm: !stadiumOf(home).dome && opts.weather === 'storm', fog: !stadiumOf(home).dome && opts.weather === 'fog', ltn: null, night: !!opts.night, stadium: stadiumOf(home), uni: opts.uni || null, pbp: [], pbpShow: null, lastResult: null,
     versus: !!opts.versus, p1: opts.humanSide || 0, hd: [null, null], hp: [null, null], humanDef: null,
-    career: opts.career || false, lock: !!opts.lock, callBall: 0, sitOut: false, dirt: {}
+    career: opts.career || false, lock: !!opts.lock, callBall: 0, sitOut: false, dirt: {},
+    bigGame: opts.bigGame ? { year: opts.bigGame, name: bowlName(opts.bigGame) } : null
   });
   // big rivalries: the home team breaks out its rivalry set (unless someone picked uniforms on purpose)
   G.rivalryMatch = !opts.scenario && isRivalry(home, away);

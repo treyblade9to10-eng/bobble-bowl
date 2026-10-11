@@ -318,7 +318,7 @@ const CareerUI = {
       $('ccPlay').onclick = () => {
         const home = g.home === c.team, wx = d.phase === 'regular' && d.weather ? d.weather[d.week] : { w: pickWeather('random', d.games, d.games), night: chance(0.5) };
         G.season = true;
-        this.play(Season.team(g.home), Season.team(g.away), { humanSide: home ? 0 : 1, playoff: d.phase === 'playoffs', weather: wx.w, night: wx.night, career: 'nfl' });
+        this.play(Season.team(g.home), Season.team(g.away), { humanSide: home ? 0 : 1, playoff: d.phase === 'playoffs', bigGame: d.phase === 'playoffs' && d.bracket.round === 2 ? d.year : 0, weather: wx.w, night: wx.night, career: 'nfl' });
         G.season = true;
       };
       $('ccSim').onclick = () => { Sound.click(); this.simNFL(g); this.nfl(); };
@@ -443,7 +443,7 @@ function renderTrophies() {
   Career.load();
   const T = Career.tro, R = Records.get();
   const titles = T.titles.length
-    ? T.titles.map(t => { const tm = TEAMS.find(x => x.id === t.team); return `<div class="troph"><div class="tsvg">${TROPHY_SVG}</div><b>${t.team}</b><span>${tm ? tm.name : ''}${t.year > 1 ? `, Year ${t.year}` : ''}</span></div>`; }).join('')
+    ? T.titles.map(t => { const tm = TEAMS.find(x => x.id === t.team); return `<div class="troph"><div class="tsvg">${TROPHY_SVG}</div><b>${bowlName(t.year).toUpperCase()}</b><span>${tm ? `${tm.city} ${tm.name}` : t.team}</span></div>`; }).join('')
     : '<div class="troEmpty">No Bobble Bowls yet. Win a season and it goes right here.</div>';
   const riv = (T.rivals || []).map(r => `<div class="troph riv"><div class="tsvg">${TROPHY_SVG}</div><b>${r.me} vs ${r.opp}</b><span>Rivalry win${r.year > 1 ? `, Year ${r.year}` : ''}</span></div>`).join('');
   const rec = [

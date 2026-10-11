@@ -113,7 +113,7 @@ $('shPlay').onclick = () => {
   if (G.mode === 'mobile') goFullscreen();
   G.demo = false; G.season = true; show(null);
   const wx = d.phase === 'regular' && d.weather ? d.weather[d.week] : { w: pickWeather('random', d.games, d.games), night: d.bracket && d.bracket.round === 2 ? true : chance(0.5) };
-  newGame(Season.team(g.home), Season.team(g.away), { qtr: d.qtr, diff: d.diff, humanSide: g.home === d.team ? 0 : 1, playoff: d.phase === 'playoffs',
+  newGame(Season.team(g.home), Season.team(g.away), { qtr: d.qtr, diff: d.diff, humanSide: g.home === d.team ? 0 : 1, playoff: d.phase === 'playoffs', bigGame: d.phase === 'playoffs' && d.bracket.round === 2 ? d.year : 0,
     weather: wx ? wx.w : 'clear', night: wx ? wx.night : false });
   if (d.phase === 'playoffs') showBanner(Season.roundName(d.bracket.round).toUpperCase(), 'Lose and go home', '#ffd23f', 2.4);
   Broadcast.show(d.phase === 'playoffs' ? Season.roundName(d.bracket.round) : d.week === d.games - 1 && G.rivalryMatch ? 'Rivalry Week' : `Week ${d.week + 1}`);
