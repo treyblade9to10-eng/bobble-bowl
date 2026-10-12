@@ -908,7 +908,7 @@ img.badge { object-fit: contain; }
 #bcast { display: none; position: fixed; inset: 0; z-index: 80; background: #05070a; align-items: center; justify-content: center; cursor: pointer; }
 #bcast.on { display: flex; }
 #bcCv { width: 100%; height: 100%; object-fit: contain; }
-#bcSkip { position: absolute; right: 70px; top: 22px; font-family: var(--hd); font-weight: 800; font-size: 13px; letter-spacing: .14em; color: #ffffff80; }
+#bcSkip { position: absolute; right: 24px; bottom: 20px; font-family: var(--hd); font-weight: 800; font-size: 13px; letter-spacing: .14em; color: #ffffff80; }
 
 /* bobble bowl trophy ceremony */
 #cerem { display: none; position: fixed; inset: 0; z-index: 85; background: #05070a; align-items: center; justify-content: center; cursor: pointer; }

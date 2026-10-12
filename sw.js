@@ -1,5 +1,5 @@
 // ---- Offline support: network first (so updates show up right away), saved copy when there's no signal ----
-const CACHE = 'bobble-v6.7';
+const CACHE = 'bobble-v6.8';
 const FILES = [
   './',
   'index.html',
@@ -8,6 +8,7 @@ const FILES = [
   'icons/icon-192.png',
   'icons/icon-512.png',
   'icons/apple-180.png',
+  'icons/favicon-48.png',
   'js/teams.js',
   'js/util.js',
   'js/audio.js',
