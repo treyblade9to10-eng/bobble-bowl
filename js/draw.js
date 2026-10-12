@@ -98,18 +98,17 @@ function buildField(G) {
     const n = yd <= 60 ? yd - 10 : 110 - yd;
     for (const ny of [8.5, 44.8]) { g.fillStyle = '#ffffffd8'; g.fillText(String(n), fx(yd), fy(ny)); }
   }
-  // home team logo painted at midfield (squished like it's lying on the grass)
+  // home team logo painted at midfield
   const ht = G.teams[0];
   if (G.bigGame && g.save) { // Bobble Bowl field: the trophy and the Roman numerals at midfield
-    g.save(); g.translate(fx(60), fy(FIELD_W / 2)); g.scale(1, PY / PX * 1.1);
+    g.save(); g.translate(fx(60), fy(FIELD_W / 2)); g.scale(0.78, 0.78); // real shape, not squished
     g.fillStyle = '#0b0f16c0'; g.beginPath(); g.arc(0, 0, 6.6 * PX, 0, 7); g.fill(); g.strokeStyle = '#d9a933'; g.lineWidth = 6; g.stroke();
     drawTrophy(g, -2.2 * PX, 3.6 * PX, 7.6 * PX);
     g.font = 'italic 900 70px "Barlow Condensed", "Arial Black", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#d9a933';
     g.fillText(roman(bowlNo(G.bigGame.year)), 2.6 * PX, 0.6 * PX); g.font = '800 22px "Barlow Condensed", Arial, sans-serif'; g.fillStyle = '#fff'; g.fillText('BOBBLE BOWL', 2.6 * PX, -2.4 * PX);
     g.restore();
   } else if (typeof Logo !== 'undefined' && g.save) {
-    g.save(); g.translate(fx(60), fy(FIELD_W / 2)); g.scale(1, PY / PX * 1.1);
-    Logo.draw(g, ht, 0, 0, 12.5 * PX); g.restore();
+    Logo.draw(g, ht, fx(60), fy(FIELD_W / 2), 9 * PX); // real shape, not squished
   }
   // sidelines
   g.strokeStyle = '#fff'; g.lineWidth = 7; g.strokeRect(fx(0), fy(0), 120 * PX, FIELD_W * PY);
@@ -149,7 +148,7 @@ function buildField(G) {
     g.fillStyle = SKIN[(h >> 4) % 6]; g.beginPath(); g.arc(i * 13 + (row % 2) * 6 + 4, wy0 + 12 + row * 12, 3, 0, 7); g.fill();
   }
   // a tile of fans for everything past the edges of the field canvas (celly cam, end zones)
-  crowdCv = document.createElement('canvas'); crowdCv.width = 156; crowdCv.height = 72;
+  crowdPat = null; crowdCv = document.createElement('canvas'); crowdCv.width = 156; crowdCv.height = 72;
   const cg = crowdCv.getContext('2d');
   if (cg && cg.fillRect) {
     cg.fillStyle = '#10151d'; cg.fillRect(0, 0, 156, 72);
@@ -162,14 +161,17 @@ function buildField(G) {
     cg.fillStyle = 'rgba(5,8,14,0.35)'; cg.fillRect(0, 0, 156, 72); // in the shade of the upper deck
   }
 }
-let crowdCv = null;
+let crowdCv = null, crowdPat = null;
 
 function drawField(g, G) {
   buildField(G);
   // past the edges of the field = more fans (scrolls with the camera)
-  const pat = crowdCv && g.createPattern ? g.createPattern(crowdCv, 'repeat') : null;
+  // only needed when the camera can see past the field picture (edges, celly cam) - filling it every frame is slow on Chromebooks
+  const zoomed = cam.zoom > 1.001, edge = zoomed || wx(0) < -FIELD_PAD_X || wx(CW) > 120 + FIELD_PAD_X || wy(0) < -FIELD_PAD_TOP || wy(CH) > FIELD_W + FIELD_PAD_BOT;
+  if (edge && crowdCv && g.createPattern && !crowdPat) crowdPat = g.createPattern(crowdCv, 'repeat');
+  const pat = edge ? crowdPat : null;
   if (pat) { const ox = ((-cam.x * PX) % 156 + 156) % 156, oy = ((-cam.y * PY) % 72 + 72) % 72; g.save(); g.translate(ox - 156, oy - 72); g.fillStyle = pat; g.fillRect(-CW, -CH, CW * 3 + 312, CH * 3 + 144); g.restore(); }
-  else { g.fillStyle = '#0e1420'; g.fillRect(0, 0, CW, CH); }
+  else if (edge) { g.fillStyle = '#0e1420'; g.fillRect(0, 0, CW, CH); }
   blitWorld(g, fieldCv);
   // jumping fans when hyped
   if (G.crowdHype > 0.05) {
@@ -184,7 +186,7 @@ function drawField(g, G) {
 // draw a canvas laid out like the field canvas (same padding + scale) under the current camera
 function blitWorld(g, cv) {
   // draw a bit past the screen edges too, so the zoomed celly cam never runs off the painted area
-  const mx = CW * 0.75, my = CH * 0.75;
+  const z = cam.zoom > 1.001, mx = z ? CW * 0.75 : 40, my = z ? CH * 0.75 : 40; // 40px covers screen shake
   let srcX = (wx(-mx) + FIELD_PAD_X) * PX, srcY = (wy(-my) + FIELD_PAD_TOP) * PY;
   let dx = -mx, dy = -my, w = CW + mx * 2, h = CH + my * 2;
   if (srcX < 0) { dx -= srcX; w += srcX; srcX = 0; }
@@ -342,6 +344,56 @@ function dirtSpots(g, p, n, x0, y0, w, h, a) {
   g.globalAlpha = 1;
 }
 
+const torsoCache = new Map();
+function drawTorso(g, p, G, look, W, TH, big, dir) {
+  // torso
+  const tg = g.createLinearGradient(-W / 2, 0, W / 2, 0);
+  tg.addColorStop(0, shade(look.jersey, -0.18)); tg.addColorStop(0.45, look.jersey); tg.addColorStop(1, shade(look.jersey, -0.08));
+  g.fillStyle = tg; g.strokeStyle = OUT; g.lineWidth = 2.5;
+  g.beginPath();
+  g.moveTo(-W * 0.4, -2); g.lineTo(-W * 0.5, -TH + 6); g.quadraticCurveTo(-W * 0.55, -TH - 2, -W * 0.3, -TH - 3);
+  g.lineTo(W * 0.3, -TH - 3); g.quadraticCurveTo(W * 0.55, -TH - 2, W * 0.5, -TH + 6); g.lineTo(W * 0.4, -2); g.closePath();
+  g.fill(); g.stroke();
+  // inside the jersey: shoulder yoke, side panel, mud/snow, wet shine, light from the top left
+  g.save(); g.clip();
+  if (look.yoke) { g.fillStyle = look.trim; g.fillRect(-W * 0.6, -TH - 4, W * 1.2, 5); g.fillStyle = shade(look.jersey, 0.1); g.fillRect(-W * 0.6, -TH + 1, W * 1.2, 1.5); }
+  g.fillStyle = shade(look.jersey, -0.22); g.fillRect(W * 0.3, -TH + 6, W * 0.25, TH); // side panel
+  g.fillStyle = look.trim; g.fillRect(W * 0.28, -TH + 6, 1.4, TH);
+  dirtSpots(g, p, 5, -W * 0.45, -TH * 0.55, W * 0.9, TH * 0.55, 1);
+  g.fillStyle = G.weather === 'rain' ? '#ffffff30' : '#ffffff1c'; g.fillRect(-W * 0.55, -TH - 4, W * 0.32, TH + 4);
+  if (G.weather === 'rain') { g.fillStyle = '#ffffff40'; g.fillRect(-W * 0.36, -TH + 3, 2, TH - 8); } // soaked jersey sheen
+  g.restore();
+  // shoulder pads under the jersey
+  for (const sx0 of [-W * 0.4, W * 0.4]) {
+    const pg = g.createRadialGradient(sx0 - 1.5, -TH - 2, 1, sx0, -TH + 1, 8);
+    pg.addColorStop(0, shade(look.jersey, 0.28)); pg.addColorStop(1, shade(look.jersey, -0.12));
+    g.fillStyle = pg; g.strokeStyle = OUT; g.lineWidth = 2.2;
+    g.beginPath(); g.ellipse(sx0, -TH + 1, 7.5, 5.5, sx0 < 0 ? -0.35 : 0.35, 0, 7); g.fill(); g.stroke();
+  }
+  // collar
+  g.strokeStyle = look.trim; g.lineWidth = 2.2; g.beginPath(); g.arc(0, -TH - 3, 4.5, 0.15, Math.PI - 0.15); g.stroke();
+  // sleeve stripes
+  g.strokeStyle = look.trim; g.lineWidth = 2.5;
+  g.beginPath(); g.moveTo(W * 0.42, -TH + 2); g.lineTo(W * 0.5, -TH + 8); g.stroke();
+  g.beginPath(); g.moveTo(-W * 0.42, -TH + 2); g.lineTo(-W * 0.5, -TH + 8); g.stroke();
+  // number (un-flipped so it reads right)
+  g.save(); g.scale(dir, 1);
+  g.font = `900 ${big ? 14 : 13}px "Barlow Condensed", "Arial Black", sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineJoin = 'round';
+  g.lineWidth = 4.2; g.strokeStyle = shade(look.jersey, -0.6); g.strokeText(p.num, 0, -TH / 2 - 1);
+  g.lineWidth = 2.4; g.strokeStyle = look.numOut || shade(look.jersey, -0.55); g.strokeText(p.num, 0, -TH / 2 - 1);
+  g.fillStyle = look.num; g.fillText(p.num, 0, -TH / 2 - 1);
+  g.restore();
+}
+// soft round shadow under each player, painted once
+const shadowSprites = {};
+function shadowSprite(r) {
+  if (shadowSprites[r]) return shadowSprites[r];
+  const c = document.createElement('canvas'); c.width = c.height = r * 4; const g = c.getContext('2d');
+  if (!g || !g.createRadialGradient) return null;
+  const m = r * 2, shg = g.createRadialGradient(m, m, 2, m, m, m); shg.addColorStop(0, '#00000070'); shg.addColorStop(0.7, '#00000040'); shg.addColorStop(1, '#00000000');
+  g.fillStyle = shg; g.beginPath(); g.arc(m, m, m, 0, 7); g.fill();
+  return (shadowSprites[r] = c);
+}
 function drawPlayer(g, p, G, at) {
   const x = at ? at.x : sx(p.x), y = at ? at.y : sy(p.y);
   if (!at && (x < -80 - CW * 0.4 || x > CW * 1.4 + 80 || y < -40 || y > CH + 140)) return; // a bit wide so the zoomed celly cam never loses anyone
@@ -364,8 +416,7 @@ function drawPlayer(g, p, G, at) {
     g.beginPath(); g.ellipse(x, y, 22 * pulse, 9 * pulse, 0, 0, 7); g.stroke();
   }
   if (!at) drawXFRing(g, p, x, y);
-  { const sw0 = big ? 21 : 17, shg = g.createRadialGradient(x, y, 1, x, y, sw0); shg.addColorStop(0, '#00000070'); shg.addColorStop(0.7, '#00000040'); shg.addColorStop(1, '#00000000');
-    g.save(); g.translate(x, y); g.scale(1, 0.36); g.translate(-x, -y); g.fillStyle = shg; g.beginPath(); g.arc(x, y, sw0, 0, 7); g.fill(); g.restore(); }
+  { const sw0 = big ? 21 : 17, sh = shadowSprite(sw0); if (sh) g.drawImage(sh, x - sw0, y - sw0 * 0.36, sw0 * 2, sw0 * 0.72); }
   // stamina bar under the player you control: only while you're sprinting or getting your wind back, then it fades away
   if (p.isHuman && !at && G.phase === 'live' && p.stamina != null) {
     const st = clamp(p.stamina, 0, 1);
@@ -474,43 +525,19 @@ function drawPlayer(g, p, G, at) {
     return { hx, hy };
   };
   arm(false);
-  // torso
-  const tg = g.createLinearGradient(-W / 2, 0, W / 2, 0);
-  tg.addColorStop(0, shade(look.jersey, -0.18)); tg.addColorStop(0.45, look.jersey); tg.addColorStop(1, shade(look.jersey, -0.08));
-  g.fillStyle = tg; g.strokeStyle = OUT; g.lineWidth = 2.5;
-  g.beginPath();
-  g.moveTo(-W * 0.4, -2); g.lineTo(-W * 0.5, -TH + 6); g.quadraticCurveTo(-W * 0.55, -TH - 2, -W * 0.3, -TH - 3);
-  g.lineTo(W * 0.3, -TH - 3); g.quadraticCurveTo(W * 0.55, -TH - 2, W * 0.5, -TH + 6); g.lineTo(W * 0.4, -2); g.closePath();
-  g.fill(); g.stroke();
-  // inside the jersey: shoulder yoke, side panel, mud/snow, wet shine, light from the top left
-  g.save(); g.clip();
-  if (look.yoke) { g.fillStyle = look.trim; g.fillRect(-W * 0.6, -TH - 4, W * 1.2, 5); g.fillStyle = shade(look.jersey, 0.1); g.fillRect(-W * 0.6, -TH + 1, W * 1.2, 1.5); }
-  g.fillStyle = shade(look.jersey, -0.22); g.fillRect(W * 0.3, -TH + 6, W * 0.25, TH); // side panel
-  g.fillStyle = look.trim; g.fillRect(W * 0.28, -TH + 6, 1.4, TH);
-  dirtSpots(g, p, 5, -W * 0.45, -TH * 0.55, W * 0.9, TH * 0.55, 1);
-  g.fillStyle = G.weather === 'rain' ? '#ffffff30' : '#ffffff1c'; g.fillRect(-W * 0.55, -TH - 4, W * 0.32, TH + 4);
-  if (G.weather === 'rain') { g.fillStyle = '#ffffff40'; g.fillRect(-W * 0.36, -TH + 3, 2, TH - 8); } // soaked jersey sheen
-  g.restore();
-  // shoulder pads under the jersey
-  for (const sx0 of [-W * 0.4, W * 0.4]) {
-    const pg = g.createRadialGradient(sx0 - 1.5, -TH - 2, 1, sx0, -TH + 1, 8);
-    pg.addColorStop(0, shade(look.jersey, 0.28)); pg.addColorStop(1, shade(look.jersey, -0.12));
-    g.fillStyle = pg; g.strokeStyle = OUT; g.lineWidth = 2.2;
-    g.beginPath(); g.ellipse(sx0, -TH + 1, 7.5, 5.5, sx0 < 0 ? -0.35 : 0.35, 0, 7); g.fill(); g.stroke();
+  // torso: drawn once per look and reused (number text + gradients are slow to redraw every frame)
+  { const dk = p.dirt >= 0.04 ? Math.round(p.dirt * 20) : 0;
+    const key = [big ? 1 : 0, dir, look.jersey, look.trim, look.yoke ? 1 : 0, look.num, look.numOut, p.num, G.weather, dk, dk ? p.name : ''].join('|');
+    let c = torsoCache.get(key);
+    if (!c) {
+      const S = 2, BX = Math.ceil(W * 0.75), BY = TH + 8;
+      c = document.createElement('canvas'); c.width = BX * 2 * S; c.height = (BY + 6) * S; c.BX = BX; c.BY = BY;
+      const tg2 = c.getContext('2d');
+      if (tg2 && tg2.save) { tg2.scale(S, S); tg2.translate(BX, BY); drawTorso(tg2, p, G, look, W, TH, big, dir); if (torsoCache.size > 400) torsoCache.clear(); torsoCache.set(key, c); }
+      else { c = null; drawTorso(g, p, G, look, W, TH, big, dir); }
+    }
+    if (c) g.drawImage(c, -c.BX, -c.BY, c.BX * 2, c.BY + 6);
   }
-  // collar
-  g.strokeStyle = look.trim; g.lineWidth = 2.2; g.beginPath(); g.arc(0, -TH - 3, 4.5, 0.15, Math.PI - 0.15); g.stroke();
-  // sleeve stripes
-  g.strokeStyle = look.trim; g.lineWidth = 2.5;
-  g.beginPath(); g.moveTo(W * 0.42, -TH + 2); g.lineTo(W * 0.5, -TH + 8); g.stroke();
-  g.beginPath(); g.moveTo(-W * 0.42, -TH + 2); g.lineTo(-W * 0.5, -TH + 8); g.stroke();
-  // number (un-flipped so it reads right)
-  g.save(); g.scale(dir, 1);
-  g.font = `900 ${big ? 14 : 13}px "Barlow Condensed", "Arial Black", sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineJoin = 'round';
-  g.lineWidth = 4.2; g.strokeStyle = shade(look.jersey, -0.6); g.strokeText(p.num, 0, -TH / 2 - 1);
-  g.lineWidth = 2.4; g.strokeStyle = look.numOut || shade(look.jersey, -0.55); g.strokeText(p.num, 0, -TH / 2 - 1);
-  g.fillStyle = look.num; g.fillText(p.num, 0, -TH / 2 - 1);
-  g.restore();
   // front arm + ball
   const hand = arm(true);
   if (carrying) drawFootball(g, hand.hx - 2, hand.hy - 1, 0.95, 0.4);
@@ -572,7 +599,26 @@ function drawPlayer(g, p, G, at) {
   }
 }
 
+// heads are the most expensive thing on screen, so each look gets drawn once and reused as a picture (big speedup on Chromebooks)
+const headCache = new Map();
 function drawHead(g, R, team, p, look) {
+  const face = p.face, gear = p.gear || {};
+  const mood = p.mouth === 'O' ? 'shock' : p.celebrate > 0 ? 'happy' : (p.engaged || !p.off) ? 'mad' : 'focus';
+  const snow = G.weather === 'snow' && p.dirt > 0.1 ? Math.round(Math.min(1, p.dirt + 0.3) * 6) : 0;
+  const key = [R.toFixed(1), mood, face.dir, face.skin, face.visor ? 1 : 0, face.beard ? 1 : 0, look.helmet, look.stripe, look.hstripe, look.matte ? 1 : 0, look.mask, p.num, gear.visor, gear.mask, G.weather === 'rain' ? 'r' : '', snow].join('|');
+  let c = headCache.get(key);
+  if (!c) {
+    const S = 2, B = Math.ceil(R * 1.3 + 4); // drawn at 2x so the zoomed celly cam stays sharp
+    c = document.createElement('canvas'); c.width = c.height = B * 2 * S; c.B = B;
+    const hg = c.getContext('2d');
+    if (!hg || !hg.save) { drawHeadRaw(g, R, team, p, look); return; }
+    hg.scale(S, S); hg.translate(B, B); drawHeadRaw(hg, R, team, p, look);
+    if (headCache.size > 400) headCache.clear();
+    headCache.set(key, c);
+  }
+  g.drawImage(c, -c.B, -c.B, c.B * 2, c.B * 2);
+}
+function drawHeadRaw(g, R, team, p, look) {
   const face = p.face;
   // helmet shell with shine
   const hg = g.createRadialGradient(-R * 0.35, -R * 0.45, R * 0.15, 0, 0, R * 1.05);
