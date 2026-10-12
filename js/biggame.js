@@ -6,6 +6,8 @@ function roman(n) {
 }
 const bowlNo = year => 60 + (year || 1);
 const bowlName = year => `Bobble Bowl ${roman(bowlNo(year))}`;
+// Quick Game Bobble Bowls count up on their own: LXI, LXII, LXIII...
+function quickBowlYear() { let n = 1; try { n = (+localStorage.getItem('bobbleQuickBowl') || 0) + 1; localStorage.setItem('bobbleQuickBowl', n); } catch (e) {} return n; }
 
 // the trophy: a silver football standing on a tapered base (s = height in px, x/y = bottom center)
 function drawTrophy(g, x, y, s, shine = 0) {

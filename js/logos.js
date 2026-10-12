@@ -237,17 +237,27 @@ const Logo = (() => {
   let style = 'real';
   try { const o = JSON.parse(localStorage.getItem('bobbleOpts') || 'null'); if (o && o.optLogos) style = o.optLogos; } catch (e) {}
   const REAL = {}, ready = [];
-  const espn = id => `https://a.espncdn.com/i/teamlogos/nfl/500/${id === 'WAS' ? 'wsh' : id.toLowerCase()}.png`;
+  // the Rams get their yellow LA (the blue one disappears on their blue end zone and scorebug): ESPN's white version, tinted yellow
+  const TINT = { LAR: '#FFD100' };
+  const espn = id => `https://a.espncdn.com/i/teamlogos/nfl/${TINT[id] ? '500-dark' : '500'}/${id === 'WAS' ? 'wsh' : id.toLowerCase()}.png`;
   let bump = null;
   function realImg(t) {
     if (style !== 'real' || !t || t.custom || !SPEC[t.id] || typeof Image === 'undefined') return null;
     let im = REAL[t.id];
     if (!im) {
       im = REAL[t.id] = new Image(); im.crossOrigin = 'anonymous';
-      im.onload = () => { cache.clear(); clearTimeout(bump); bump = setTimeout(() => ready.forEach(f => f()), 120); };
+      im.onload = () => { if (TINT[t.id]) tint(t.id, im); cache.clear(); clearTimeout(bump); bump = setTimeout(() => ready.forEach(f => f()), 120); };
       im.src = espn(t.id);
     }
+    if (TINT[t.id]) return im.tinted || null;
     return im.complete && im.naturalWidth ? im : null;
+  }
+  function tint(id, im) {
+    const c = document.createElement('canvas'); c.width = im.naturalWidth; c.height = im.naturalHeight; const g = c.getContext('2d');
+    g.drawImage(im, 0, 0); g.globalCompositeOperation = 'source-in'; g.fillStyle = TINT[id]; g.fillRect(0, 0, c.width, c.height);
+    // a thin dark edge so it still reads on light backgrounds
+    const o = document.createElement('canvas'); o.width = c.width; o.height = c.height; const og = o.getContext('2d');
+    og.filter = 'drop-shadow(0 0 6px rgba(0,30,90,0.9))'; og.drawImage(c, 0, 0); im.tinted = o;
   }
   function draw(g, t, x, y, size) {
     const im = realImg(t);

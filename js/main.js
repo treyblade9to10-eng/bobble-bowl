@@ -221,8 +221,8 @@ const fillSel = (id, list, val) => { $(id).innerHTML = list.map(([v, t]) => `<op
 fillSel('optUni0', UNIFORMS, 'home');
 $('optPlayers').onchange = () => renderSelect(); fillSel('optUni1', UNIFORMS, 'away'); fillSel('optWeather', WEATHER, 'clear');
 try { const o = JSON.parse(localStorage.getItem('bobbleOpts') || 'null'); if (o) for (const k in o) if ($(k)) $(k).value = o[k]; } catch (e) {}
-function saveOpts() { const o = {}; for (const k of ['optUni0', 'optUni1', 'optWeather', 'optNight', 'optLogos', 'optQtr', 'optDiff', 'optPlayers']) o[k] = $(k).value; try { localStorage.setItem('bobbleOpts', JSON.stringify(o)); } catch (e) {} }
-const cycPaint = [['optQtr', 'QUARTERS'], ['optDiff', 'CPU'], ['optWeather', 'WEATHER'], ['optNight', 'TIME'], ['optLogos', 'LOGOS'], ['optPlayers', 'PLAYERS']].map(([id, l]) => cycleBtn(id, l));
+function saveOpts() { const o = {}; for (const k of ['optUni0', 'optUni1', 'optWeather', 'optNight', 'optGame', 'optLogos', 'optQtr', 'optDiff', 'optPlayers']) o[k] = $(k).value; try { localStorage.setItem('bobbleOpts', JSON.stringify(o)); } catch (e) {} }
+const cycPaint = [['optQtr', 'QUARTERS'], ['optDiff', 'CPU'], ['optWeather', 'WEATHER'], ['optNight', 'TIME'], ['optGame', 'GAME'], ['optLogos', 'LOGOS'], ['optPlayers', 'PLAYERS']].map(([id, l]) => cycleBtn(id, l));
 $('optLogos').addEventListener('change', () => { Logo.setStyle($('optLogos').value); renderSelect(); });
 Logo.onReady(() => { if ($('select').classList.contains('show')) renderSelect(); });
 const repaintCycles = () => cycPaint.forEach(f => f());
@@ -235,7 +235,7 @@ function startGame() {
   G.demo = false; G.season = false; G.challenge = null; G.mini = null; show(null);
   newGame(TEAMS[sel.idx[0]], TEAMS[sel.idx[1]], { qtr: +$('optQtr').value, diff: +$('optDiff').value, humanSide: sel.you,
     weather: pickWeather($('optWeather').value), night: $('optNight').value === '1', uni: [$('optUni0').value, $('optUni1').value],
-    versus: $('optPlayers').value === '2' && G.mode !== 'mobile' });
+    versus: $('optPlayers').value === '2' && G.mode !== 'mobile', bigGame: $('optGame').value === 'bowl' ? quickBowlYear() : 0 });
   Broadcast.show();
 }
 
@@ -478,7 +478,8 @@ G.hooks.onGameOver = s => {
   $('btnAgain').style.display = $('btnNewTeams').style.display = inSeason || inCareer ? 'none' : '';
   if (G.online) $('btnAgain').style.display = 'none';
   if (inSeason && G.playoff && won) $('overTitle').textContent = Season.data.phase === 'done' ? 'CHAMPIONS' : 'YOU ADVANCE!';
-  // the Bobble Bowl: trophy ceremony for the winners first
+  // the Bobble Bowl: trophy ceremony for the winners first (a Quick Game Bobble Bowl win goes in the Trophy Case too)
+  if (G.bigGame && won && !inSeason && !G.career && !G.versus && !G.online) Career.addTitle(s.teams[me].id, G.bigGame.year);
   if (G.bigGame && !tie && !G.demo) {
     const ws = s.score[0] > s.score[1] ? 0 : 1;
     const best = Object.values(G.pstats || {}).filter(p => p.side === ws).sort((a, b) => score(b) - score(a))[0];

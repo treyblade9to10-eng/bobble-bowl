@@ -81,7 +81,7 @@ function buildField(G) {
       else for (let cx = 0; cx < 10; cx += 2.5) for (let cy = 0; cy < FIELD_W; cy += 2.5 * PX / PY / 1.7) if ((Math.round(cx / 2.5) + Math.round(cy / (2.5 * PX / PY / 1.7))) % 2) g.fillRect(x0 + cx * PX, fy(cy), 2.5 * PX, 2.5 * PX / 1.7);
       g.restore();
     }
-    if (typeof Logo !== 'undefined' && g.save) for (const ly of [FIELD_W * 0.13, FIELD_W * 0.87]) { g.save(); g.translate(x0 + 5 * PX, fy(ly)); g.scale(1, PY / PX * 1.15); Logo.draw(g, t, 0, 0, 7.4 * PX); g.restore(); }
+    if (typeof Logo !== 'undefined' && g.save) for (const ly of [FIELD_W * 0.12, FIELD_W * 0.88]) Logo.draw(g, t, x0 + 5 * PX, fy(ly), 5.6 * PX); // logos keep their real shape
     g.save(); g.translate(x0 + 5 * PX, fy(FIELD_W / 2)); g.rotate(s === 0 ? -Math.PI / 2 : Math.PI / 2);
     g.font = '900 86px "Barlow Condensed", "Arial Black", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
     g.lineWidth = 8; g.strokeStyle = shade(t.c1, -0.5); g.strokeText(t.name.toUpperCase(), 0, 0);
@@ -109,8 +109,7 @@ function buildField(G) {
     g.restore();
   } else if (typeof Logo !== 'undefined' && g.save) {
     g.save(); g.translate(fx(60), fy(FIELD_W / 2)); g.scale(1, PY / PX * 1.1);
-    g.globalAlpha = 0.25; g.fillStyle = '#000'; g.beginPath(); g.arc(4, 6, 6.4 * PX, 0, 7); g.fill(); // soft shadow so it pops off the grass
-    g.globalAlpha = 0.95; Logo.draw(g, ht, 0, 0, 12.5 * PX); g.restore(); g.globalAlpha = 1;
+    Logo.draw(g, ht, 0, 0, 12.5 * PX); g.restore();
   }
   // sidelines
   g.strokeStyle = '#fff'; g.lineWidth = 7; g.strokeRect(fx(0), fy(0), 120 * PX, FIELD_W * PY);
@@ -140,11 +139,36 @@ function buildField(G) {
   }
   // team benches area
   g.fillStyle = '#ffffff10'; g.fillRect(fx(35), fy(FIELD_W) + 10, 50 * PX, 3 * PY);
+  // stands along the near sideline too (wall, then fans)
+  const wy0 = fy(FIELD_W + 3.4);
+  g.fillStyle = '#10151d'; g.fillRect(0, wy0, W, H - wy0); g.fillStyle = '#1b2433'; g.fillRect(0, wy0, W, 6);
+  for (let row = 0; wy0 + 14 + row * 12 < H + 6; row++) for (let i = 0; i < W / 13; i++) {
+    const h = hashStr('b' + row + ':' + i); g.fillStyle = cols[h % cols.length];
+    g.beginPath(); g.arc(i * 13 + (row % 2) * 6 + 4, wy0 + 18 + row * 12, 4.5, 0, 7); g.fill();
+    g.fillStyle = SKIN[(h >> 4) % 6]; g.beginPath(); g.arc(i * 13 + (row % 2) * 6 + 4, wy0 + 12 + row * 12, 3, 0, 7); g.fill();
+  }
+  // a tile of fans for everything past the edges of the field canvas (celly cam, end zones)
+  crowdCv = document.createElement('canvas'); crowdCv.width = 156; crowdCv.height = 72;
+  const cg = crowdCv.getContext('2d');
+  if (cg && cg.fillRect) {
+    cg.fillStyle = '#10151d'; cg.fillRect(0, 0, 156, 72);
+    for (let row = 0; row < 6; row++) for (let i = 0; i < 12; i++) {
+      const h = hashStr('c' + row + ':' + i);
+      for (const wrap of [0, -156]) { const x = i * 13 + (row % 2) * 6 + 4 + wrap; // wrap around so the tiles join with no seam
+        cg.fillStyle = cols[h % cols.length]; cg.beginPath(); cg.arc(x, 10 + row * 12, 4.5, 0, 7); cg.fill();
+        cg.fillStyle = SKIN[(h >> 4) % 6]; cg.beginPath(); cg.arc(x, 4 + row * 12, 3, 0, 7); cg.fill(); }
+    }
+    cg.fillStyle = 'rgba(5,8,14,0.35)'; cg.fillRect(0, 0, 156, 72); // in the shade of the upper deck
+  }
 }
+let crowdCv = null;
 
 function drawField(g, G) {
   buildField(G);
-  g.fillStyle = '#0e1420'; g.fillRect(0, 0, CW, CH); // past the ends of the field = more stands
+  // past the edges of the field = more fans (scrolls with the camera)
+  const pat = crowdCv && g.createPattern ? g.createPattern(crowdCv, 'repeat') : null;
+  if (pat) { const ox = ((-cam.x * PX) % 156 + 156) % 156, oy = ((-cam.y * PY) % 72 + 72) % 72; g.save(); g.translate(ox - 156, oy - 72); g.fillStyle = pat; g.fillRect(-CW, -CH, CW * 3 + 312, CH * 3 + 144); g.restore(); }
+  else { g.fillStyle = '#0e1420'; g.fillRect(0, 0, CW, CH); }
   blitWorld(g, fieldCv);
   // jumping fans when hyped
   if (G.crowdHype > 0.05) {
