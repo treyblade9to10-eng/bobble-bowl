@@ -9,10 +9,11 @@ const Broadcast = {
   on: false, t0: 0, DUR: 4.6,
   show(label) {
     if (G.demo || G.online || G.challenge || G.mini || G.scenario || !G.teams) return;
-    this.on = true; this.t0 = performance.now(); this.label = label || '';
+    this.on = true; this.t0 = performance.now(); this.label = label || ''; this.DUR = 6.2; // long enough to read the facts
     G.paused = true; G.introPause = true;
     // each team's QB in today's uniform
     this.pl = [1, 0].map(s => { const t = G.teams[s], p = makePlayer(s, true, 0, t.off[0]); p.face.dir = s === 1 ? 1 : -1; p.headScale = 1.1; p.celebrate = 0; return p; });
+    try { this.facts = [teamFacts(G.teams[0]), teamFacts(G.teams[1])]; } catch (e) { this.facts = null; }
     $('bcCv').width = CW; // match the game's width so wide phones get no side bars
     $('bcast').classList.add('on');
     this.loop();
@@ -61,6 +62,10 @@ const Broadcast = {
       const chip = `${rec}${teamOvr(tm)} OVR  ·  ${side === 0 ? 'HOME' : 'AWAY'}`;
       g.font = '800 20px "Barlow Condensed", Arial, sans-serif'; const w = g.measureText(chip).width + 28;
       g.fillStyle = '#0b0f16d0'; g.fillRect(x - w / 2, 486, w, 32); g.fillStyle = '#f6c31c'; g.fillText(chip, x, 503);
+      // two quick facts under each team
+      const facts = this.facts ? this.facts[side] : [];
+      g.font = '700 17px Barlow, Arial, sans-serif'; g.fillStyle = '#ffffffe0';
+      facts.forEach((f, i) => { const fw = Math.min(W * 0.3, g.measureText(f).width + 20); g.fillStyle = '#0b0f16a8'; g.fillRect(x - fw / 2, 530 + i * 30, fw, 26); g.fillStyle = '#fff'; g.fillText(f, x, 548 + i * 30, W * 0.3 - 16); });
       if (p) { p.anim += 0.04; p.speedNow = 0; g.save(); g.scale(2.5, 2.5); drawPlayer(g, p, G, { x: (x + (side === 1 ? -1 : 1) * Math.min(250, W * 0.2)) / 2.5, y: 650 / 2.5 }); g.restore(); }
       g.restore();
     };
@@ -89,3 +94,49 @@ const Broadcast = {
   $('bcast').addEventListener('pointerdown', skip);
   window.addEventListener('keydown', skip, true);
 })();
+
+// ---------- pregame facts: "Bears lead the league in passing" ----------
+// Season (2+ weeks in): real season numbers. Otherwise: who has the best players at each spot.
+function teamFacts(tm) {
+  const nm = tm.name, ord = n => n + (['th', 'st', 'nd', 'rd'][(n % 100 > 10 && n % 100 < 14) ? 0 : n % 10] || 'th');
+  const say = (rank, what, extra) => rank === 1 ? `${nm} lead the league in ${what}${extra ? ` (${extra})` : ''}` : `${nm} are ${ord(rank)} in the league in ${what}${extra ? ` (${extra})` : ''}`;
+  const facts = [];
+  const d = typeof Season !== 'undefined' && Season.data, gp = id => { const r = d && d.rec[id]; return r ? r.w + r.l + r.t : 0; };
+  if (G.season && d && gp(tm.id) >= 2) {
+    const ids = Object.keys(d.rec), tot = {};
+    for (const id of ids) tot[id] = { pass: 0, rush: 0, sack: 0, int: 0 };
+    for (const l of Object.values(d.stats || {})) if (tot[l.t]) { tot[l.t].pass += l.pass; tot[l.t].rush += l.rush; tot[l.t].sack += l.sack; tot[l.t].int += l.int; }
+    const per = (id, v) => v / Math.max(1, gp(id));
+    const rank = f => 1 + ids.filter(id => f(id) > f(tm.id) + 1e-9).length;
+    const cats = [
+      ['passing', id => per(id, tot[id].pass), v => `${Math.round(v)} yds a game`],
+      ['rushing', id => per(id, tot[id].rush), v => `${Math.round(v)} yds a game`],
+      ['scoring', id => per(id, d.rec[id].pf), v => `${v.toFixed(1)} pts a game`],
+      ['defense', id => -per(id, d.rec[id].pa), v => `${(-v).toFixed(1)} pts allowed`],
+      ['sacks', id => tot[id].sack, v => `${v}`],
+      ['interceptions', id => tot[id].int, v => `${v}`]
+    ].map(([w, f, fmt]) => ({ r: rank(f), t: say(rank(f), w, fmt(f(tm.id))) }));
+    cats.sort((a, b) => a.r - b.r); facts.push(...cats.slice(0, 2).map(c => c.t));
+    const r = d.rec[tm.id]; if (r.w >= 3 && r.l === 0) facts.unshift(`${nm} are still unbeaten at ${r.w}-0`);
+  } else {
+    const pool = TEAMS.map(t => (typeof Season !== 'undefined' && Season.data && G.season) ? Season.team(t.id) : t).filter(t => t.id !== tm.id).concat([tm]);
+    const avg = (t, f) => { const l = t.off.concat(t.def).filter(f); return l.length ? l.reduce((a, p) => a + p[3], 0) / l.length : 0; };
+    const best = (t, pos) => t.off.concat(t.def).filter(p => p[0] === pos).sort((a, b) => b[3] - a[3])[0];
+    const cats = [
+      ['QB', t => (best(t, 'QB') || [0, 0, 0, 0])[3], () => { const q = best(tm, 'QB'); return q ? `${q[1]}` : ''; }, 'quarterback'],
+      ['offense', t => avg(t, p => ['QB', 'RB', 'WR', 'TE', 'OL'].includes(p[0])), null, 'offense'],
+      ['defense', t => avg(t, p => ['DL', 'LB', 'CB', 'S'].includes(p[0])), null, 'defense'],
+      ['pass rush', t => avg(t, p => p[0] === 'DL'), null, 'pass rush'],
+      ['secondary', t => avg(t, p => p[0] === 'CB' || p[0] === 'S'), null, 'secondary'],
+      ['receivers', t => avg(t, p => p[0] === 'WR' || p[0] === 'TE'), null, 'receiving corps'],
+      ['speed', t => avg(t, () => true) * 0 + t.off.concat(t.def).reduce((a, p) => a + (p[4] || 0), 0), null, 'team speed'],
+      ['backfield', t => (best(t, 'RB') || [0, 0, 0, 0])[3] + (t.rb2 && t.rb2[3] >= 72 ? t.rb2[3] * 0.3 : 0), null, 'backfield']
+    ].map(([k, f, who, label]) => {
+      const r = 1 + pool.filter(t => f(t) > f(tm) + 1e-9).length, w = who && who();
+      return { r, t: k === 'QB' ? (r === 1 ? `${w} is the top-rated QB in the league` : `${w} is the ${ord(r)}-rated QB in the league`) : r === 1 ? `${nm} have the best ${label} in the league` : `${nm} have the ${ord(r)}-best ${label} in the league` };
+    });
+    cats.sort((a, b) => a.r - b.r); facts.push(...cats.slice(0, 2).map(c => c.t));
+    if (tm.rb2 && tm.rb2[3] >= 72 && tm.off[1] && tm.rb2[3] >= tm.off[1][3] - 14) facts.push(`Two-back team: ${lastName(tm.off[1][1])} and ${lastName(tm.rb2[1])} split the carries`);
+  }
+  return facts.slice(0, 2);
+}

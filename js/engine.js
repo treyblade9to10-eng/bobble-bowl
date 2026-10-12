@@ -284,6 +284,14 @@ function setupPlay(offPlay, defPlay, preview) {
   const P = [];
   const offT = G.teams[o], defT = G.teams[dsd];
   const offTuples = offT.off.slice();
+  // RB rotation: a team with two good backs gives RB2 a share of the carries (about 1 in 3, or half if they're close)
+  const rb1 = offTuples[1], rb2 = offT.rb2;
+  if (!preview && rb2 && rb1 && rb1[0] === 'RB' && !(rb1[6] && rb1[6].cap) && rb2[3] >= 72 && rb2[3] >= rb1[3] - 14 && !G.mini && !G.challenge) {
+    const key = G.los + ':' + G.down + ':' + Math.round(G.clock) + ':' + G.quarter;
+    if (G.rbKey !== key) { G.rbKey = key; G.rbSnap = G.rbSnap || [0, 0]; G.rbSnap[o]++; }
+    const n = G.rbSnap[o], close = rb2[3] >= rb1[3] - 3;
+    if (close ? n % 4 >= 2 : n % 6 >= 4) { offTuples[1] = rb2; G.rb2In = true; } else G.rb2In = false;
+  }
   if (offPlay.jet) { let f = 4; for (const k of [2, 3]) if ((offTuples[k][4] || 0) > (offTuples[f][4] || 0)) f = k; [offTuples[4], offTuples[f]] = [offTuples[f], offTuples[4]]; } // jet goes to the fastest receiver
   offTuples.forEach((t, i) => P.push(makePlayer(o, true, i, t)));
   defT.def.forEach((t, i) => P.push(makePlayer(dsd, false, i, t)));
@@ -293,6 +301,7 @@ function setupPlay(offPlay, defPlay, preview) {
   for (let k = 0; k <= 4; k++) { const [bk, w] = form.spots[k]; at(O[k], L - d * bk, clamp(by + ws * w, 4, FIELD_W - 4)); }
   if (offPlay.jet && !preview) at(O[4], L - d * 2.6, clamp(by - ws * 5, 3, FIELD_W - 3)); // jet guy lines up on the short side and flies across
   at(O[5], L - d * 0.7, by - 2.4); at(O[6], L - d * 0.7, by); at(O[7], L - d * 0.7, by + 2.4);
+  if (!preview && offT.rb2 && O[1].pos === 'RB') { G.rbOn = G.rbOn || ['', '']; if (G.rbOn[o] && G.rbOn[o] !== O[1].name) addText(O[1].x, O[1].y, `${lastName(O[1].name).toUpperCase()} IN`, '#7fd3ff', 15, 1.3); G.rbOn[o] = O[1].name; } // running back sub
 
   // offense roles
   for (const p of O) p.role = 'idle';

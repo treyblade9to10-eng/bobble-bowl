@@ -4,6 +4,7 @@ const BACKUP_FIRST = ['Tyler', 'Mason', 'Cooper', 'Jake', 'Brett', 'Drew', 'Kyle
 const BACKUP_LAST = ['Hollis', 'Kerrigan', 'Mabry', 'Stroud-Lee', 'Pruett', 'Vance', 'Dobbins', 'Rourke', 'Calloway', 'Sutter', 'Whitlock', 'Bramlett', 'Okafor', 'Delacroix', 'Fenwick', 'Tisdale'];
 // every team's backup QB (made-up names): about 64-72 OVR
 function backupQB(team) {
+  if (team.qb2) return [...team.qb2, null].slice(0, 6); // the real QB2 from the depth chart
   const h = hashStr(team.id + 'bqb'), start = team.off[0];
   const ovr = 64 + (h % 9), spd = 70 + ((h >> 4) % 18);
   return ['QB', `${BACKUP_FIRST[h % 16]} ${BACKUP_LAST[(h >> 8) % 16]}`, [7, 8, 11, 12, 14, 16, 19][(h >> 12) % 7], ovr, spd, (h >> 16) % 6];
