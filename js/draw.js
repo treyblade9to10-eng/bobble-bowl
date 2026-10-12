@@ -130,8 +130,9 @@ function buildField(G) {
   }
   // stands + a big video board behind each end zone
   for (const side of [-1, 1]) {
-    const xa = side < 0 ? 0 : fx(120 + FIELD_PAD_X - 2.2), w = 2.2 * PX, top = fy(-1.2);
+    const xa = side < 0 ? 0 : fx(122.6), w = side < 0 ? fx(-2.6) : W - fx(122.6), top = fy(-1.2); // stands start right behind the wall (Lambeau Leap territory)
     g.fillStyle = '#10151d'; g.fillRect(xa, top, w, H - top);
+    g.fillStyle = shade(G.teams[0].c1, -0.2); g.fillRect(side < 0 ? xa + w - 7 : xa, top, 7, H - top); // padded wall
     for (let yy = top + 6; yy < H; yy += 11) for (let xx = xa + 5; xx < xa + w - 3; xx += 11) { const hh = hashStr(side + ':' + xx + ':' + yy); g.fillStyle = cols[hh % cols.length]; g.beginPath(); g.arc(xx, yy, 4, 0, 7); g.fill(); }
     const bx = side < 0 ? fx(-FIELD_PAD_X + 0.3) : fx(120 + FIELD_PAD_X - 1.9), by = fy(FIELD_W / 2) - 70, bw = 1.6 * PX, bh = 140;
     g.fillStyle = '#05070a'; g.fillRect(bx - 4, by - 4, bw + 8, bh + 8); g.fillStyle = shade(G.teams[0].c1, -0.4); g.fillRect(bx, by, bw, bh);
@@ -182,11 +183,12 @@ function drawField(g, G) {
 }
 // draw a canvas laid out like the field canvas (same padding + scale) under the current camera
 function blitWorld(g, cv) {
-  const x0 = wx(0), y0 = wy(0);
-  let srcX = (x0 + FIELD_PAD_X) * PX, srcY = (y0 + FIELD_PAD_TOP) * PY;
-  let dx = 0, dy = 0, w = CW, h = CH;
-  if (srcX < 0) { dx = -srcX; w -= dx; srcX = 0; }
-  if (srcY < 0) { dy = -srcY; h -= dy; srcY = 0; }
+  // draw a bit past the screen edges too, so the zoomed celly cam never runs off the painted area
+  const mx = CW * 0.75, my = CH * 0.75;
+  let srcX = (wx(-mx) + FIELD_PAD_X) * PX, srcY = (wy(-my) + FIELD_PAD_TOP) * PY;
+  let dx = -mx, dy = -my, w = CW + mx * 2, h = CH + my * 2;
+  if (srcX < 0) { dx -= srcX; w += srcX; srcX = 0; }
+  if (srcY < 0) { dy -= srcY; h += srcY; srcY = 0; }
   w = Math.min(w, cv.width - srcX); h = Math.min(h, cv.height - srcY);
   if (w > 0 && h > 0) g.drawImage(cv, srcX, srcY, w, h, dx, dy, w, h);
 }
@@ -342,7 +344,7 @@ function dirtSpots(g, p, n, x0, y0, w, h, a) {
 
 function drawPlayer(g, p, G, at) {
   const x = at ? at.x : sx(p.x), y = at ? at.y : sy(p.y);
-  if (!at && (x < -80 || x > CW + 80 || y < -40 || y > CH + 140)) return;
+  if (!at && (x < -80 - CW * 0.4 || x > CW * 1.4 + 80 || y < -40 || y > CH + 140)) return; // a bit wide so the zoomed celly cam never loses anyone
   const team = G.teams[p.side], look = teamLook(team, p.side === 0, G.uni && G.uni[p.side]);
   const big = p.pos === 'OL' || p.pos === 'DL';
   let k = Math.min(1, p.speedNow / 5);

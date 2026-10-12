@@ -14,14 +14,26 @@ const CELLYS = [
   { id: 'angel', name: 'SNOW ANGEL', keys: ['KeyR'], dur: 3.0, say: 'SNOW ANGEL!', wx: 'snow' },
   { id: 'slide', name: 'MUD SLIDE', keys: ['KeyC'], dur: 2.4, say: 'SLIP AND SLIDE!', wx: 'rain' }
 ];
-// weather cellys only work when the field has snow / is soaked
-const cellyOk = c => !c.wx || c.wx === G.weather;
+// team signature cellys (key G): only the team they belong to can do them
+CELLYS.push(
+  { id: 'lambeau', name: 'LAMBEAU LEAP', keys: ['KeyG'], dur: 3.6, say: 'LAMBEAU LEAP!', club: ['GB'] },
+  { id: 'flap', name: 'BIRD GANG', keys: ['KeyG'], dur: 2.4, say: 'FLY EAGLES FLY!', club: ['PHI'] },
+  { id: 'skol', name: 'SKOL CLAP', keys: ['KeyG'], dur: 3.0, say: 'SKOL!', club: ['MIN'] },
+  { id: 'salute', name: 'MILE HIGH SALUTE', keys: ['KeyG'], dur: 2.2, say: 'MILE HIGH SALUTE!', club: ['DEN'] },
+  { id: 'towel', name: 'TERRIBLE TOWEL', keys: ['KeyG'], dur: 2.6, say: 'HERE WE GO!', club: ['PIT'] },
+  { id: 'twelve', name: '12TH MAN', keys: ['KeyG'], dur: 2.4, say: 'GET LOUD!', club: ['SEA'] },
+  { id: 'bark', name: 'DAWG POUND', keys: ['KeyG'], dur: 2.4, say: 'WOOF WOOF!', club: ['CLE'] },
+  { id: 'roar', name: 'ROAR', keys: ['KeyG'], dur: 2.2, say: 'ROAR!', club: ['DET', 'CHI', 'JAX', 'CIN', 'CAR'] }
+);
+// weather cellys only work when the field has snow / is soaked; team cellys only for their team
+const cellyOk = (c, cg) => (!c.wx || c.wx === G.weather) && (!c.club || (cg && G.teams && c.club.includes(G.teams[cg.side].id)));
+const clubCelly = cg => cg && G.teams && CELLYS.find(c => c.club && c.club.includes(G.teams[cg.side].id));
 const ease = t => t < 0 ? 0 : t > 1 ? 1 : t * t * (3 - 2 * t);
 
 const Celly = {
   // human: check the celly keys
   input(cg) {
-    for (const c of CELLYS) if (cellyOk(c) && Input.hit(...c.keys)) return this.start(cg, c.id);
+    for (const c of CELLYS) if (cellyOk(c, cg) && Input.hit(...c.keys)) return this.start(cg, c.id);
   },
   start(cg, id) {
     const c = CELLYS.find(k => k.id === id); if (!c || !cg) return;
@@ -35,7 +47,7 @@ const Celly = {
     if (c.team) this.setupBowl(cg);
   },
   // CPU scorers celebrate too
-  cpu(cg) { if (cg && chance(0.85)) setTimeout(() => { if (G.phase === 'dead' && G.players.includes(cg) && !cg.celly) this.start(cg, (wet() && chance(0.5) ? CELLYS.find(c => c.wx === G.weather) : null || pick(CELLYS.filter(cellyOk))).id); }, 450); },
+  cpu(cg) { if (cg && chance(0.85)) setTimeout(() => { if (G.phase === 'dead' && G.players.includes(cg) && !cg.celly) this.start(cg, (clubCelly(cg) && chance(0.55) ? clubCelly(cg) : wet() && chance(0.5) ? CELLYS.find(c => c.wx === G.weather) : null || pick(CELLYS.filter(c => cellyOk(c, cg) && !c.club))).id); }, 450); },
   setupBowl(cg) {
     const d = cg.face.dir || 1;
     const mates = G.players.filter(p => p.side === cg.side && p !== cg).sort((a, b) => dist(a, cg) - dist(b, cg)).slice(0, 3);
@@ -60,6 +72,17 @@ const Celly = {
     if (c.type === 'shush' && t > 0.4 && !f.quiet) { f.quiet = 1; G.crowdHype = 0; }
     if (c.type === 'nap' && t > 0.6 && Math.floor(t / 0.5) !== f.z) { f.z = Math.floor(t / 0.5); G.fx.push({ kind: 'zzz', x: cg.x - d * 0.4, y: cg.y, z: 30, vz: 22, life: 1.3, max: 1.3, dx: d }); }
     if (c.type === 'bowl') this.updateBowl(cg, dt);
+    if (c.type === 'lambeau') { // run to the back of the end zone and jump into the stands
+      const gd = dirOf(cg.side), wallX = gd > 0 ? 122.5 : -2.5; cg.face.dir = gd;
+      if (t < 1.0) { const dx = wallX - gd * 0.7 - cg.x; if (Math.abs(dx) > 0.1) { cg.x += Math.sign(dx) * Math.min(Math.abs(dx), 10 * dt); cg.anim += dt * 16; } }
+      else if (t < 1.35) { cg.x = lerp(cg.x, wallX + gd * 0.5, Math.min(1, dt * 8)); if (!f.jump) { f.jump = 1; Sound.boing(); } }
+      else if (t < 3.1) { if (!f.fans) { f.fans = 1; G.crowdHype = 2.2; cam.shake = 4; Sound.crowd(true); } }
+      else if (!f.down) { f.down = 1; cg.x = wallX - gd * 0.4; addDust(cg.x, cg.y, 6); }
+    }
+    if ((c.type === 'skol') && Math.floor(t / (t < 1.5 ? 0.6 : 0.32)) !== f.clap && t > 0.3) { f.clap = Math.floor(t / (t < 1.5 ? 0.6 : 0.32)); Sound.tone(90, 0.14, 'sine', 0.22, -20); G.fx.push({ kind: 'ring', x: cg.x, y: cg.y, life: 0.35, max: 0.35, z: 0, vz: 0, color: '#ffc62f' }); G.crowdHype = 2; }
+    if (c.type === 'twelve' && t > 0.4 && !f.loud) { f.loud = 1; G.crowdHype = 2.5; Sound.crowd(true); cam.shake = 5; }
+    if (c.type === 'bark' && Math.floor(t / 0.5) !== f.w && t > 0.3) { f.w = Math.floor(t / 0.5); addText(cg.x + (cg.face.dir || 1) * 1.5, cg.y - 1.5, 'WOOF', '#ff7a1a', 16, 0.6); Sound.tone(180, 0.1, 'sawtooth', 0.1, -80); }
+    if (c.type === 'roar' && t > 0.35 && !f.roar) { f.roar = 1; cam.shake = 7; Sound.noise(0.6, 0.3, 120); for (let k = 0; k < 2; k++) G.fx.push({ kind: 'ring', x: cg.x, y: cg.y, life: 0.6 + k * 0.2, max: 0.6 + k * 0.2, z: 0, vz: 0, color: '#fff' }); }
     if (c.type === 'angel') { // flop on your back and flap: leaves an angel in the snow
       if (t > 0.45 && !f.flop) { f.flop = 1; addDust(cg.x, cg.y, 10); Sound.tone(120, 0.15, 'sine', 0.15); }
       if (t > 0.6 && t < 2.5 && Math.floor(t / 0.3) !== f.flap) { f.flap = Math.floor(t / 0.3); addDust(cg.x - d * 0.8, cg.y, 3); for (const s of [-1, 1]) groundMark(cg.x - d * 0.6 + s * 0.2, cg.y + s * 0.9, 1.3, true); groundMark(cg.x - d * 1.6, cg.y, 1.1, true); }
@@ -143,6 +166,34 @@ const Celly = {
       else if (t < 1.6) { const a = ease((t - 0.45) / 0.15); P.rot = 1.35 * a; P.hop = -4 * a; P.legK = 0; }
       else { const u = ease((t - 1.6) / 0.35); P.rot = 1.35 * (1 - u); P.hop = u * Math.abs(Math.sin(t * 9)) * 10; }
       P.arm = (front, shx, shy) => t < 0.45 ? null : t < 1.6 ? { ex: shx + 10, ey: shy - 4, hx: shx + 20, hy: shy - 8 } : up(front, shx, shy);
+    } else if (type === 'lambeau') {
+      if (t < 1.0) { P.legK = 1; P.rot = 0.12; }
+      else if (t < 1.35) { const u = (t - 1.0) / 0.35; P.hop = Math.sin(u * Math.PI * 0.6) * 60; P.rot = -0.2; }
+      else if (t < 3.1) { P.hop = 40 + Math.sin(t * 6) * 4; P.rot = -0.35 + Math.sin(t * 5) * 0.08; P.legK = 0.6; P.head = Math.sin(t * 7) * 0.12; } // held up by the fans
+      else { const u = Math.min(1, (t - 3.1) / 0.3); P.hop = 40 * (1 - u); }
+      P.arm = (front, shx, shy) => t < 1.0 ? null : up(front, shx, shy);
+    } else if (type === 'flap') {
+      const fl = Math.sin(t * 13); P.hop = 6 + Math.abs(fl) * 10;
+      P.arm = (front, shx, shy) => { const o = front ? 1 : -1; return { ex: shx + o * 11, ey: shy - 2 + fl * 6, hx: shx + o * 22, hy: shy - 4 + fl * 12 }; };
+    } else if (type === 'skol') {
+      const per = t < 1.5 ? 0.6 : 0.32, u = (t % per) / per, clap = u < 0.25;
+      P.hop = clap ? 4 : 0;
+      P.arm = (front, shx, shy) => { const o = front ? 1 : -1, w = clap ? 1 : 8; return { ex: shx + o * 6, ey: shy - 14, hx: shx + o * w * 0.5 + 2, hy: shy - 27 }; };
+    } else if (type === 'salute') {
+      const a = ease(t / 0.3); P.head = -0.05;
+      P.arm = (front, shx, shy) => front ? { ex: shx + 10 * a, ey: shy - 6 * a, hx: shx + 8 + 6 * a, hy: shy - 20 * a } : null;
+    } else if (type === 'towel') {
+      const w = Math.sin(t * 12); P.hop = Math.abs(w) * 5;
+      P.arm = (front, shx, shy) => front ? { ex: shx + 4 + w * 3, ey: shy - 12, hx: shx + 6 + w * 8, hy: shy - 25 } : null;
+    } else if (type === 'twelve') {
+      P.hop = t < 0.3 ? t * 30 : Math.abs(Math.sin(t * 6)) * 6;
+      P.arm = (front, shx, shy) => front ? { ex: shx + 2, ey: shy - 13, hx: shx + 3, hy: shy - 27 } : { ex: shx - 6, ey: shy - 8, hx: shx - 10, hy: shy - 18 };
+    } else if (type === 'bark') {
+      P.rot = 0.45; P.sy = 0.92; P.head = -0.25 + Math.sin(t * 12) * 0.08;
+      P.arm = (front, shx, shy) => ({ ex: shx + 6, ey: shy + 8, hx: shx + 10, hy: shy + 18 });
+    } else if (type === 'roar') {
+      const a = ease(t / 0.35); P.head = -0.35 * a; P.sy = 1 + 0.06 * a; P.rot = -0.08 * a;
+      P.arm = (front, shx, shy) => { const o = front ? 1 : -1; return { ex: shx + o * 10 * a, ey: shy - 6 * a, hx: shx + o * 16 * a, hy: shy - 16 * a }; };
     } else if (type === 'bowl') {
       const wind = t > 0.6 && t < 1.2 ? ease((t - 0.6) / 0.6) : 0, rel = t >= 1.2 ? Math.min(1, (t - 1.2) * 5) : 0;
       P.rot = wind * 0.35 + rel * 0.5 - (t > 1.6 && t < 2 ? 0 : 0); P.sy = 1 - wind * 0.1;
@@ -154,6 +205,20 @@ const Celly = {
   // extra drawing on top of the player (screen space)
   overlay(g, p, x, y, hop) {
     const c = p.celly; if (!c) return;
+    const dir = p.face.dir || 1, tm = G.teams && G.teams[p.side];
+    if (c.type === 'lambeau' && c.t > 1.2 && c.t < 3.2) { // fans grabbing him from the stands
+      for (let k = 0; k < 7; k++) {
+        const fx0 = x + dir * (14 + (k % 3) * 10) + (k - 3) * 9, fy0 = y + 10 + (k % 2) * 8, reach = Math.sin(c.t * 9 + k) * 4;
+        g.strokeStyle = SKIN[k % 6]; g.lineWidth = 5; g.lineCap = 'round'; g.beginPath(); g.moveTo(fx0, fy0); g.lineTo(x + (k - 3) * 5, y - hop - 18 + reach); g.stroke();
+        g.fillStyle = k % 2 ? (tm ? tm.c2 : '#ffb612') : (tm ? tm.c1 : '#203731'); g.beginPath(); g.arc(fx0, fy0 + 6, 7, 0, 7); g.fill();
+      }
+    }
+    if (c.type === 'towel') { // the towel spins over his head
+      const w = Math.sin(c.t * 12), tx = x + dir * (8 + w * 8), ty = y - hop - 112;
+      g.save(); g.translate(tx, ty); g.rotate(w * 0.8); g.fillStyle = '#ffb612'; g.strokeStyle = '#14110f'; g.lineWidth = 2;
+      g.beginPath(); g.moveTo(-3, 0); g.quadraticCurveTo(10, -10 - w * 6, 24, -2); g.lineTo(22, 12); g.quadraticCurveTo(10, 4, -3, 12); g.closePath(); g.fill(); g.stroke(); g.restore();
+    }
+    if (c.type === 'twelve' && c.t > 0.3) { g.save(); g.globalAlpha = Math.min(1, (c.t - 0.3) * 3); g.font = 'italic 900 40px "Barlow Condensed", Arial, sans-serif'; g.textAlign = 'center'; g.lineWidth = 7; g.strokeStyle = '#002244'; g.strokeText('12', x + dir * 6, y - hop - 140); g.fillStyle = '#69be28'; g.fillText('12', x + dir * 6, y - hop - 140); g.restore(); }
     if (c.type === 'shush' && c.t > 0.35 && c.t < 2) { g.font = 'italic 900 18px "Barlow Condensed", Arial, sans-serif'; g.textAlign = 'center'; g.fillStyle = '#fff'; g.globalAlpha = Math.min(1, (2 - c.t) * 2); g.fillText('shhh', x + p.face.dir * 30, y - hop - 95 - (c.t - 0.35) * 10); g.globalAlpha = 1; }
   }
 };

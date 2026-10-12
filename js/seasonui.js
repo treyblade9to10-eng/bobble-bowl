@@ -47,7 +47,7 @@ function renderHub() {
     nx.style.background = 'var(--panel)';
     const ch = d.champ && Season.team(d.champ);
     const msg = d.phase === 'done' && d.champ === d.team ? `You won the Bobble Bowl.` :
-      d.phase === 'missed' ? `You missed the playoffs (top 4 get in).` : d.phase === 'eliminated' ? `Your season ended in the playoffs.` : 'Season over.';
+      d.phase === 'missed' ? `You missed the playoffs (top ${d.bracket && d.bracket.full ? '7' : '4'} in each conference get in).` : d.phase === 'eliminated' ? `Your season ended in the playoffs.` : 'Season over.';
     const aw = (d.awards || []).map(a => `<div class="awLine"><b>${a.award}</b> ${a.name} <span>${a.pos}, ${a.team}  ·  ${a.line}</span></div>`).join('');
     nx.innerHTML = `<div class="mu">${msg}</div><div class="sub">${ch ? `Bobble Bowl champion: <b>${ch.city} ${ch.name}</b>` : ''}</div>
       ${aw ? `<div class="awards">${aw}</div>` : ''}
@@ -68,7 +68,7 @@ function renderHub() {
   });
   if (d.log.length) {
     sched += `<div style="margin-top:6px;color:var(--gold);font-weight:bold">PLAYOFFS</div>`;
-    for (const r of d.log) sched += `<div style="opacity:.8;margin-top:3px">${Season.roundName(r.round)}</div><div class="bracket">${r.games.map(x => `<div class="bgame"><div class="${x.score[0] > x.score[1] ? 'win' : ''}">${dotFor(x.home)}${x.home} ${x.score[0]}</div><div class="${x.score[1] > x.score[0] ? 'win' : ''}">${dotFor(x.away)}${x.away} ${x.score[1]}</div></div>`).join('')}</div>`;
+    for (const r of d.log) sched += `<div style="opacity:.8;margin-top:3px">${Season.roundName(r.round)}${r.bye ? ` <span style="opacity:.7">(bye: ${r.bye.AFC}, ${r.bye.NFC})</span>` : ''}</div><div class="bracket">${r.games.map(x => `<div class="bgame"><div class="${x.score[0] > x.score[1] ? 'win' : ''}">${dotFor(x.home)}${x.home} ${x.score[0]}</div><div class="${x.score[1] > x.score[0] ? 'win' : ''}">${dotFor(x.away)}${x.away} ${x.score[1]}</div></div>`).join('')}</div>`;
   }
   $('shSched').innerHTML = sched;
   renderHubTab();
@@ -112,8 +112,8 @@ $('shPlay').onclick = () => {
   Sound.init(); Sound.whistle(); Sound.crowd(false);
   if (G.mode === 'mobile') goFullscreen();
   G.demo = false; G.season = true; show(null);
-  const wx = d.phase === 'regular' && d.weather ? d.weather[d.week] : { w: pickWeather('random', d.games, d.games), night: d.bracket && d.bracket.round === 2 ? true : chance(0.5) };
-  newGame(Season.team(g.home), Season.team(g.away), { qtr: d.qtr, diff: d.diff, humanSide: g.home === d.team ? 0 : 1, playoff: d.phase === 'playoffs', bigGame: d.phase === 'playoffs' && d.bracket.round === 2 ? d.year : 0,
+  const wx = d.phase === 'regular' && d.weather ? d.weather[d.week] : { w: pickWeather('random', d.games, d.games), night: Season.isFinal() ? true : chance(0.5) };
+  newGame(Season.team(g.home), Season.team(g.away), { qtr: d.qtr, diff: d.diff, humanSide: g.home === d.team ? 0 : 1, playoff: d.phase === 'playoffs', bigGame: d.phase === 'playoffs' && Season.isFinal() ? d.year : 0,
     weather: wx ? wx.w : 'clear', night: wx ? wx.night : false });
   if (d.phase === 'playoffs') showBanner(Season.roundName(d.bracket.round).toUpperCase(), 'Lose and go home', '#ffd23f', 2.4);
   Broadcast.show(d.phase === 'playoffs' ? Season.roundName(d.bracket.round) : d.week === d.games - 1 && G.rivalryMatch ? 'Rivalry Week' : `Week ${d.week + 1}`);

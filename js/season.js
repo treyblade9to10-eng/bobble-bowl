@@ -120,46 +120,77 @@ const Season = {
       .sort((a, b) => this.pct(b) - this.pct(a) || (this.data.rec[b].pf - this.data.rec[b].pa) - (this.data.rec[a].pf - this.data.rec[a].pa) || this.data.rec[b].pf - this.data.rec[a].pf);
   },
 
-  // ---- playoffs: top 4 in each conference, then the Bobble Bowl ----
+  // ---- playoffs. Full 17-game season = the real NFL setup: 7 teams per conference (4 division winners + 3 wild cards),
+  // the 1 seed gets a bye, then Wild Card, Divisional, Conference Championship, Bobble Bowl. Shorter seasons: top 4, three rounds ----
   startPlayoffs() {
     const d = this.data;
-    const myConf = this.team(d.team).conf;
-    const seeds = { AFC: this.standings('AFC').slice(0, 4), NFC: this.standings('NFC').slice(0, 4) };
-    d.bracket = { seeds, round: 0, games: [] };
+    const myConf = this.team(d.team).conf, full = d.games >= 17;
+    const seedConf = c => {
+      const st = this.standings(c);
+      if (!full) return st.slice(0, 4);
+      const divs = ['East', 'North', 'South', 'West'], win = divs.map(v => st.find(id => this.team(id).div === v)).filter(Boolean);
+      win.sort((a, b) => st.indexOf(a) - st.indexOf(b));
+      return win.concat(st.filter(id => !win.includes(id)).slice(0, 7 - win.length));
+    };
+    const seeds = { AFC: seedConf('AFC'), NFC: seedConf('NFC') };
+    d.bracket = { seeds, round: 0, games: [], full, final: full ? 3 : 2, alive: { AFC: seeds.AFC.slice(), NFC: seeds.NFC.slice() } };
     d.phase = seeds[myConf].includes(d.team) ? 'playoffs' : 'missed';
     this.makeRound();
-    if (d.phase === 'missed') this.simRestOfPlayoffs();
+    if (d.phase === 'missed') this.simRestOfPlayoffs(); else this.skipBye();
     this.save();
   },
+  isFinal() { const b = this.data && this.data.bracket; return !!b && b.round === (b.final != null ? b.final : 2); },
   makeRound() {
-    const b = this.data.bracket;
-    if (b.round === 0) b.games = ['AFC', 'NFC'].flatMap(c => [{ conf: c, home: b.seeds[c][0], away: b.seeds[c][3] }, { conf: c, home: b.seeds[c][1], away: b.seeds[c][2] }]);
-    else if (b.round === 1) b.games = ['AFC', 'NFC'].map(c => { const w = b.winners.filter(x => x.conf === c).map(x => x.id).sort((x, y) => b.seeds[c].indexOf(x) - b.seeds[c].indexOf(y)); return { conf: c, home: w[0], away: w[1] }; });
-    else if (b.round === 2) { const a = b.winners.find(x => x.conf === 'AFC').id, n = b.winners.find(x => x.conf === 'NFC').id; b.games = [{ conf: 'BOWL', home: chance(0.5) ? a : n, away: null }]; b.games[0].away = b.games[0].home === a ? n : a; }
+    const b = this.data.bracket, fin = b.final != null ? b.final : 2;
+    if (!b.alive) { b.alive = { AFC: [], NFC: [] }; for (const w of b.winners || []) if (b.alive[w.conf]) b.alive[w.conf].push(w.id); } // old saves
+    const bySeed = c => b.alive[c].slice().sort((x, y) => b.seeds[c].indexOf(x) - b.seeds[c].indexOf(y));
+    if (b.round === fin) {
+      const a = b.alive.AFC[0], n = b.alive.NFC[0];
+      b.games = [{ conf: 'BOWL', home: chance(0.5) ? a : n, away: null }]; b.games[0].away = b.games[0].home === a ? n : a;
+      return;
+    }
+    b.games = [];
+    for (const c of ['AFC', 'NFC']) {
+      const s = bySeed(c);
+      if (b.full && b.round === 0) { b.bye = b.bye || {}; b.bye[c] = s[0]; b.games.push({ conf: c, home: s[1], away: s[6] }, { conf: c, home: s[2], away: s[5] }, { conf: c, home: s[3], away: s[4] }); }
+      else for (let k = 0; k < s.length / 2; k++) b.games.push({ conf: c, home: s[k], away: s[s.length - 1 - k] }); // best left vs worst left
+    }
   },
-  roundName(r) { return ['Semifinal', 'Conference Championship', bowlName(this.data && this.data.year)][r]; },
+  roundName(r) {
+    const b = this.data && this.data.bracket, bowl = bowlName(this.data && this.data.year);
+    return (b && b.full ? ['Wild Card', 'Divisional Round', 'Conference Championship', bowl] : ['Semifinal', 'Conference Championship', bowl])[r] || bowl;
+  },
   myPlayoffGame() { const b = this.data.bracket; return b && b.games.find(g => g.home === this.data.team || g.away === this.data.team); },
   playoffSim(home, away) { let s = this.simScore(home, away); if (s[0] === s[1]) s[chance(0.5) ? 0 : 1] += 3; return s; },
+  // the 1 seed sits out Wild Card weekend: play the round without us
+  skipBye() { const d = this.data; if (d.phase === 'playoffs' && !this.myPlayoffGame()) this.finishPlayoffRound(null); },
   finishPlayoffRound(myScore) {
-    const d = this.data, b = d.bracket;
+    const d = this.data, b = d.bracket, fin = b.final != null ? b.final : 2;
     b.winners = [];
     for (const g of b.games) {
       g.score = (g.home === d.team || g.away === d.team) && myScore ? myScore : this.playoffSim(g.home, g.away);
       b.winners.push({ conf: g.conf, id: g.score[0] > g.score[1] ? g.home : g.away });
     }
-    d.log.push({ round: b.round, games: b.games.map(g => ({ ...g })) });
-    const iWon = b.winners.some(w => w.id === d.team);
-    if (b.round === 2) { d.champ = b.winners[0].id; d.phase = 'done'; this.finishSeason(); }
-    else { b.round++; this.makeRound(); if (!iWon) { d.phase = 'eliminated'; this.simRestOfPlayoffs(); } }
+    d.log.push({ round: b.round, games: b.games.map(g => ({ ...g })), bye: b.full && b.round === 0 ? b.bye : null });
+    this.advance(b);
+    const alive = b.round === fin ? b.winners.some(w => w.id === d.team) : (b.alive.AFC.includes(d.team) || b.alive.NFC.includes(d.team));
+    if (b.round === fin) { d.champ = b.winners[0].id; d.phase = 'done'; this.finishSeason(); }
+    else { b.round++; this.makeRound(); if (!alive) { d.phase = 'eliminated'; this.simRestOfPlayoffs(); } else this.skipBye(); }
     this.save();
   },
+  // losers go home; the bye team stays in
+  advance(b) {
+    if (!b.alive || b.round === (b.final != null ? b.final : 2)) return;
+    for (const c of ['AFC', 'NFC']) b.alive[c] = b.winners.filter(w => w.conf === c).map(w => w.id).concat(b.full && b.round === 0 && b.bye ? [b.bye[c]] : []);
+  },
   simRestOfPlayoffs() {
-    const d = this.data, b = d.bracket;
-    while (b.round <= 2 && !d.champ) {
+    const d = this.data, b = d.bracket, fin = b.final != null ? b.final : 2;
+    while (b.round <= fin && !d.champ) {
       b.winners = [];
       for (const g of b.games) { g.score = this.playoffSim(g.home, g.away); b.winners.push({ conf: g.conf, id: g.score[0] > g.score[1] ? g.home : g.away }); }
-      d.log.push({ round: b.round, games: b.games.map(g => ({ ...g })) });
-      if (b.round === 2) d.champ = b.winners[0].id; else { b.round++; this.makeRound(); }
+      d.log.push({ round: b.round, games: b.games.map(g => ({ ...g })), bye: b.full && b.round === 0 ? b.bye : null });
+      this.advance(b);
+      if (b.round === fin) d.champ = b.winners[0].id; else { b.round++; this.makeRound(); }
     }
     this.finishSeason();
     this.save();

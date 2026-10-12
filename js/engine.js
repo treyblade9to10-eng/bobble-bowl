@@ -2036,7 +2036,9 @@ function updateCamera(dt) {
   const half = CW / 2 / PX;
   const kicking = G.phase === 'kick' || G.phase === 'kickmeter';
   if (G.phase === 'kickmeter' && G.km && G.km.kind !== 'punt') tx = lerp(G.los, goalX(G.poss) + dirOf(G.poss) * 10, 0.6); // show the posts while you aim
-  tx = clamp(tx, half - (kicking ? 9 : 5), (kicking ? 129 : 125) - half);
+  const cel = G.phase === 'dead' ? G.players.find(p => p.celly) : null;
+  if (cel) tx = cel.x; // follow the celebration (the Lambeau Leap goes right into the stands)
+  tx = clamp(tx, half - (kicking || cel ? 9 : 5), (kicking || cel ? 129 : 125) - half);
   cam.x = lerp(cam.x, tx, 1 - Math.exp(-dt * 4));
   let ty = MID;
   if (b && (G.phase === 'live' || G.phase === 'dead')) ty = lerp(MID, b.holder ? b.holder.y : b.y, 0.4);
@@ -2050,7 +2052,7 @@ function updateCamera(dt) {
 function updateHint() {
   if (!G.teams) return;
   if (G.phase === 'kickmeter' || G.mini) { G.hint = ''; return; }
-  if (G.cellyGuy && G.phase === 'dead') { G.hint = G.versus && !G.online ? `${pName(G.cellyGuy.side)}: CELEBRATE!` : G.mode === 'mobile' ? '' : 'CELLY:  ↑ Leap  ↓ Griddy  ← Spike  → Dab   1 Flex  2 Bow  3 Shush  4 Moonwalk   E Nap   F Bowling' + (G.weather === 'snow' ? '   R Snow Angel' : G.weather === 'rain' ? '   C Mud Slide' : ''); return; }
+  if (G.cellyGuy && G.phase === 'dead') { G.hint = G.versus && !G.online ? `${pName(G.cellyGuy.side)}: CELEBRATE!` : G.mode === 'mobile' ? '' : 'CELLY:  ↑ Leap  ↓ Griddy  ← Spike  → Dab   1 Flex  2 Bow  3 Shush  4 Moonwalk   E Nap   F Bowling' + (G.weather === 'snow' ? '   R Snow Angel' : G.weather === 'rain' ? '   C Mud Slide' : '') + (clubCelly(G.cellyGuy) ? `   G ${clubCelly(G.cellyGuy).name}` : ''); return; }
   if (G.mode === 'mobile') return updateHintMobile();
   if (G.versus && !G.online) {
     const k = s => s === G.p1 ? 'SPACE' : 'ENTER';
