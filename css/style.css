@@ -927,3 +927,9 @@ img.badge { object-fit: contain; }
 #cerem.on { display: flex; }
 #ceCv { width: 100%; height: 100%; object-fit: contain; }
 #ceSkip { position: absolute; right: 24px; top: 20px; font-family: var(--hd); font-weight: 800; font-size: 13px; letter-spacing: .14em; color: #ffffff80; }
+
+.devRow small { color: var(--dim); font-size: 11px; margin-left: 6px; letter-spacing: .06em; }
+.devTag { font-style: normal; font-family: var(--hd); font-weight: 800; font-size: 10px; letter-spacing: .08em; padding: 1px 6px; margin-left: 6px; background: #ffffff14; }
+.devTag.up { color: #4fe08a; } .devTag.down { color: #ff6b6b; } .devTag.xf { color: #ff8a1a; }
+.rsXf { color: #ff8a1a; font-size: 10px; letter-spacing: .06em; } .rsRk { color: #4fe08a; font-size: 10px; letter-spacing: .06em; } .leadRow i.oldAge { color: #ff6b6b; }
+.dFilt { margin: 2px 0 6px; flex-wrap: wrap; } .dFilt button { padding: 3px 9px; font-size: 12px; }

@@ -89,6 +89,21 @@ function renderHubTab() {
     const cats = [['pass', 'PASSING YDS'], ['rush', 'RUSHING YDS'], ['rec', 'RECEIVING YDS'], ['td', 'TOUCHDOWNS'], ['sack', 'SACKS'], ['int', 'INTERCEPTIONS']];
     h = '<div class="leadGrid">' + cats.map(([k, lbl]) => `<div class="leadBox"><div class="leadHead">${lbl}</div>` +
       (Season.leaders(k).map((l, i) => `<div class="leadRow ${l.t === d.team ? 'me' : ''}"><span>${i + 1}. ${dotFor(l.t)}${lastName(l.name)} <i>${l.t}</i></span><b>${l[k]}</b></div>`).join('') || '<div class="note">No stats yet</div>') + '</div>').join('') + '</div>';
+  } else if (hubTab === 'ros') { // your guys with their ages (they get older every year)
+    Season.ensureAges();
+    if (Season.bench) Season.bench(d.team);
+    const me = Season.team(d.team), R = Season.ensureRosters()[d.team], xf = new Set(teamXFactors(me).map(x => x.name));
+    const row = p => { const a = p[6] && p[6].age, old = xfTooOld(p);
+      return `<div class="leadRow"><span>${p[0]} ${p[1]}${xf.has(p[1]) ? ' <b class="rsXf">X-FACTOR</b>' : ''}${p[6] && p[6].rookie ? ' <b class="rsRk">ROOKIE</b>' : ''}</span><i class="${old ? 'oldAge' : ''}">AGE ${a || '?'}  ·  <b>${p[3]}</b></i></div>`; };
+    h = `<div class="leadHead">STARTERS</div>${me.off.concat(me.def).map(row).join('')}` + ((R.bench || []).length ? `<div class="leadHead" style="margin-top:8px">BENCH</div>${R.bench.map(row).join('')}` : '')
+      + `<div class="note">Players peak in their mid 20s (QBs later, RBs sooner). Ages in red are too old to be an X-Factor.</div>`;
+  } else if (hubTab === 'draft') { // who you could get: tank for a franchise QB
+    const slot = Season.pickSlot(d.team), prev = Season.draftPreview(12), yr = Season.draftYear();
+    const owns = Season.picksOf ? Season.picksOf(d.team) : [d.team];
+    h = `<div class="leadHead">${yr} DRAFT  ·  ${owns.includes(d.team) ? `YOUR PICK IS PROJECTED #${slot}` : 'YOU TRADED YOUR PICK'}</div>
+      <div class="note">Worst record picks first. The champion picks last.</div>`
+      + (prev ? prev.map((r, i) => `<div class="leadRow"><span>${i + 1}. ${r[0]} ${r[1]} <i>${r[6]}</i></span><i>POT ${r[7]}  ·  <b>${r[3]}</b></i></div>`).join('')
+        : '<div class="note">Scouts haven\'t seen this class yet. It\'ll be a brand-new group of prospects.</div>');
   } else if (hubTab === 'news') {
     h = (d.news || []).length ? d.news.map(n => `<div class="newsRow"><span>WK ${n.week}</span>${n.text}</div>`).join('') : '<div class="note">League news (CPU trades, the deadline, draft picks) shows up here.</div>';
   } else {
@@ -128,9 +143,12 @@ $('btnSeasonCont').onclick = () => { G.season = false; G.teams = null; G.phase =
 // ---- offseason: who got better, who slipped ----
 function renderOffseason(changes) {
   const d = Season.data, me = Season.team(d.team);
-  const row = c => { const dv = c.to - c.from; return `<div class="devRow"><span>${c.pos} ${c.name}</span><b class="${dv > 0 ? 'up' : dv < 0 ? 'down' : ''}">${c.from} → ${c.to}${dv ? ` (${dv > 0 ? '+' : ''}${dv})` : ''}</b></div>`; };
+  const tag = (t, cls) => `<em class="devTag ${cls}">${t}</em>`;
+  const row = c => { const dv = c.to - c.from;
+    const tags = (c.retired ? tag('RETIRED', 'down') : '') + (c.big ? tag('BIG YEAR', 'up') : '') + (c.xfNew ? tag('NEW X-FACTOR', 'xf') : '') + (c.xfLost ? tag('LOST X-FACTOR', 'down') : '');
+    return `<div class="devRow"><span>${c.pos} ${c.name}${c.age ? ` <small>AGE ${c.age}</small>` : ''}${tags}</span>${c.retired ? '<b class="down">GONE</b>' : `<b class="${dv > 0 ? 'up' : dv < 0 ? 'down' : ''}">${c.from} → ${c.to}${dv ? ` (${dv > 0 ? '+' : ''}${dv})` : ''}</b>`}</div>`; };
   $('osBody').innerHTML = `<div class="osHead">${me.city.toUpperCase()} ${me.name.toUpperCase()}  ·  YEAR ${d.year}</div>
-    <div class="osNote">Every player in the league trained this offseason. Here's how your guys came back:</div>
+    <div class="osNote">Everyone got a year older. Young players grow, big seasons pay off, veterans slow down and some retire. Here's how your guys came back:</div>
     <div class="devList">${changes.map(row).join('')}</div>
     <div class="osNote">Team overall is now <b>${teamOvr(me)}</b>. Want to shake up the roster? Hit TRADE from the season screen any time during the regular season.</div>`;
   show('offseason');

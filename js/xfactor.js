@@ -11,7 +11,7 @@ const XF_PLAYS = 8; // how long it stays on
 
 // pick each team's X-Factor players (top 2 stars, 92+; if nobody, their best 89+ guy)
 function teamXFactors(team) {
-  const all = team.off.concat(team.def).filter(t => XF_FOR[t[0]] && !(t[6] && t[6].cap && t[3] < 85)).sort((a, b) => b[3] - a[3]);
+  const all = team.off.concat(team.def).filter(t => XF_FOR[t[0]] && !(t[6] && t[6].cap && t[3] < 85) && !(typeof xfTooOld !== 'undefined' && xfTooOld(t) && !(t[6] && t[6].cap))).sort((a, b) => b[3] - a[3]);
   let list = all.filter(t => t[3] >= 92).slice(0, 2);
   if (!list.length) list = all.filter(t => t[3] >= 89).slice(0, 1);
   const cap = team.off.concat(team.def).find(t => t[6] && t[6].cap && t[3] >= 85); // My Player unlocks his at 85

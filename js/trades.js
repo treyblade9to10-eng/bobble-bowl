@@ -102,7 +102,7 @@ Object.assign(Season, {
     });
     // the original slot position stays the same (the game needs a QB in the QB spot, etc.)
     bench.sort((a, b) => b[3] - a[3]);
-    while (bench.length > BENCH_MAX) { const cut = bench.pop(); if (id === this.data.team) this.news(`${id} released ${cut[0]} ${cut[1]} (${cut[3]}). The bench was full.`); }
+    while (bench.length > BENCH_MAX) { let ci = bench.length - 1; while (ci > 0 && bench[ci][6] && bench[ci][6].rookie) ci--; const cut = bench.splice(ci, 1)[0]; /* keeps new draft picks */ if (id === this.data.team) this.news(`${id} released ${cut[0]} ${cut[1]} (${cut[3]}). The bench was full.`); }
   },
   // CPU teams sometimes call you with an offer
   makeOffer() {
@@ -154,9 +154,8 @@ Season.draftPick = function (team, k) {
 };
 const _nextYear = Season.nextYear.bind(Season);
 Season.nextYear = function () {
-  // bench guys develop too
+  // bench guys develop in Season.develop (aging.js) along with everyone else
   const R = this.ensureRosters();
-  for (const id in R) (R[id].bench || []).forEach(p => { p[3] = clamp(Math.round(p[3] + rand(-2, 3) + (p[3] < 75 ? 1.5 : 0)), 55, 99); });
   const keepBench = {}; for (const id in R) keepBench[id] = R[id].bench;
   const ch = _nextYear();
   this.data.pickOwner = {};

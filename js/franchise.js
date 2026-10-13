@@ -5,7 +5,7 @@ const LAST = ['Okafor', 'Brightwater', 'McAllister', 'Stonebrook', 'Fairley', 'D
   'Rucker', 'Langston', 'Whitfield', 'Nwosu', 'Castellano', 'Brannigan', 'Sowell', 'Easley', 'Holloway', 'Pettiford', 'Quarles', 'Dupree', 'Lockett', 'Ferrante', 'Gaines', 'Mosley'];
 const SCHOOLS = ['Alabama', 'Ohio State', 'Georgia', 'LSU', 'Michigan', 'Texas', 'Oregon', 'USC', 'Clemson', 'Penn State', 'Florida State', 'Miami', 'Notre Dame', 'Wisconsin',
   'Iowa', 'Utah', 'Tennessee', 'Ole Miss', 'Washington', 'Boise State', 'TCU', 'Auburn'];
-const DRAFT_POS = ['QB', 'RB', 'WR', 'WR', 'WR', 'TE', 'OL', 'OL', 'OL', 'DL', 'DL', 'DL', 'LB', 'LB', 'CB', 'CB', 'S'];
+const DRAFT_POS = ['QB', 'QB', 'RB', 'WR', 'WR', 'WR', 'TE', 'OL', 'OL', 'OL', 'DL', 'DL', 'DL', 'LB', 'LB', 'CB', 'CB', 'S'];
 const ROOKIE_SPD = { QB: [70, 90], RB: [86, 95], WR: [87, 97], TE: [78, 88], OL: [60, 72], DL: [72, 87], LB: [80, 90], CB: [89, 97], S: [86, 93] };
 
 Object.assign(Season, {
@@ -36,9 +36,16 @@ Object.assign(Season, {
     const ovr = Math.round(r < 0.06 ? rand(80, 85) : r < 0.3 ? rand(74, 80) : rand(64, 74));
     const [s0, s1] = ROOKIE_SPD[pos];
     const spd = Math.round(rand(s0, s1));
-    const t = [pos, `${pick(FIRST)} ${pick(LAST)}`, 1 + Math.floor(Math.random() * 98), ovr, spd, Math.floor(Math.random() * 6), { rookie: this.data.year + 1 }];
-    t.school = pick(SCHOOLS); t.pot = ovr >= 78 || chance(0.25) ? 'A' : chance(0.5) ? 'B' : 'C';
+    const pot = ovr >= 78 || chance(0.25) ? 'A' : chance(0.5) ? 'B' : 'C';
+    const t = [pos, `${pick(FIRST)} ${pick(LAST)}`, 1 + Math.floor(Math.random() * 98), ovr, spd, Math.floor(Math.random() * 6), { rookie: this.data.year + 1, pot, age: chance(0.6) ? 22 : chance(0.5) ? 21 : 23 }];
+    t.school = pick(SCHOOLS); t.pot = pot;
     return t;
+  },
+  draftYear() { return 2026 + this.data.year; }, // year 1 = the 2026 season, so its draft is the 2027 draft
+  // who's coming out next draft (for the season hub)
+  draftPreview(n = 10) {
+    const real = typeof DRAFT_CLASSES !== 'undefined' && DRAFT_CLASSES[this.draftYear()];
+    return real ? real.slice().sort((a, b) => b[3] - a[3]).slice(0, n) : null;
   },
   // which roster spot a prospect would take (the weakest guy at his position), and by how much he's better
   fit(teamId, pr) {
@@ -56,9 +63,12 @@ Object.assign(Season, {
     // worst record picks first, champion picks last
     const order = TEAMS.map(t => t.id).sort((a, b) => this.pct(a) - this.pct(b) || (d.rec[a].pf - d.rec[a].pa) - (d.rec[b].pf - d.rec[b].pa));
     if (d.champ) { order.splice(order.indexOf(d.champ), 1); order.push(d.champ); }
-    const pool = []; for (let i = 0; i < 48; i++) pool.push(this.makeProspect());
+    // the next few years are REAL college players (draftclasses.js); after that, made-up classes
+    const year = this.draftYear(), real = typeof DRAFT_CLASSES !== 'undefined' && DRAFT_CLASSES[year] || [];
+    const pool = real.map(r => { const t = r.slice(0, 6); t.push({ rookie: d.year + 1, pot: r[7], age: r[8] || 22, real: 1 }); t.school = r[6]; t.pot = r[7]; return t; });
+    while (pool.length < 48) pool.push(this.makeProspect());
     pool.sort((a, b) => b[3] - a[3]);
-    d.draft = { order, pool: pool.map(p => ({ t: p.slice(0, 7), school: p.school, pot: p.pot })), picks: [], i: 0 };
+    d.draft = { order, year, real: real.length > 0, pool: pool.map(p => ({ t: p.slice(0, 7), school: p.school, pot: p.pot })), picks: [], i: 0 };
     this.save();
   },
   // CPU teams pick until it's your turn (or the draft is over). Returns true if it's your pick.
@@ -85,13 +95,7 @@ Object.assign(Season, {
   }
 });
 
-// rookies grow faster: hook the yearly development
-const _develop = Season.develop.bind(Season);
-Season.develop = function () {
-  const R = this.ensureRosters();
-  for (const id in R) for (const side of ['off', 'def']) R[id][side].forEach(p => { if (p[6] && p[6].rookie) { p[3] = clamp(p[3] + Math.round(rand(1, 4)), 55, 99); if (p[6].rookie < this.data.year - 1) delete p[6].rookie; } });
-  return _develop();
-};
+// rookie growth, aging and big seasons: see aging.js
 // CPU trades happen as the weeks go by
 const _finishWeek = Season.finishWeek.bind(Season);
 Season.finishWeek = function (s) {
@@ -109,24 +113,28 @@ function openDraft() {
   renderDraft(mine);
   show('draft');
 }
+let draftPos = 'ALL';
 function renderDraft(myTurn) {
   const d = Season.data, dr = d.draft, me = Season.team(d.team);
   const recent = dr.picks.slice(-6).reverse().map(p => `<div class="dpRow"><span>#${p.n} ${dotFor(p.team)}${p.team}${p.via ? ` <small>via ${p.via}</small>` : ''}</span><b>${p.pos} ${p.name}</b><i>${p.ovr} OVR</i></div>`).join('');
   let board = '';
   if (myTurn) {
-    board = dr.pool.slice(0, 24).map((pr, k) => {
+    const tabs = `<div class="tlTabs dFilt">${['ALL', 'QB', 'RB', 'WR', 'TE', 'OL', 'DL', 'LB', 'CB', 'S'].map(f => `<button data-f="${f}" class="${draftPos === f ? 'on' : ''}">${f}</button>`).join('')}</div>`;
+    const shown = dr.pool.map((pr, k) => [pr, k]).filter(([pr]) => draftPos === 'ALL' || pr.t[0] === draftPos).slice(0, draftPos === 'ALL' ? 30 : 48);
+    board = tabs + (shown.length ? '' : `<div class="note">No ${draftPos}s left on the board.</div>`) + shown.map(([pr, k]) => {
       const f = Season.fit(d.team, Object.assign(pr.t.slice(), { pot: pr.pot }));
       const note = f ? (pr.t[3] > f.cur[3] ? `<span class="up">starts over ${lastName(f.cur[1])} (${f.cur[3]})</span>` : `<span>backup to ${lastName(f.cur[1])} (${f.cur[3]})</span>`) : '';
-      return `<div class="dRow" tabindex="0" data-k="${k}"><span class="pos">${pr.t[0]}</span><b>${pr.t[3]}</b><span class="nm">${pr.t[1]}<i>${pr.school}  •  SPD ${pr.t[4]}  •  POT ${pr.pot}</i></span>${note}</div>`;
+      return `<div class="dRow" tabindex="0" data-k="${k}"><span class="pos">${pr.t[0]}</span><b>${pr.t[3]}</b><span class="nm">${pr.t[1]}<i>${pr.school}  •  AGE ${(pr.t[6] && pr.t[6].age) || 22}  •  SPD ${pr.t[4]}  •  POT ${pr.pot}</i></span>${note}</div>`;
     }).join('');
   } else {
     const mineP = dr.picks.find(p => p.team === d.team);
     board = `<div class="dDone">DRAFT COMPLETE</div>${mineP ? `<div class="dMine">Your pick: <b>#${mineP.n} ${mineP.pos} ${mineP.name}</b> (${mineP.ovr} OVR, potential ${mineP.pot}, ${mineP.school})<br>${mineP.starts ? `He starts right away over ${mineP.replaced}.` : 'He sits behind your starters for now.'}</div>` : ''}
       <div class="dTop">${dr.picks.slice(0, 8).map(p => `<div class="dpRow"><span>#${p.n} ${dotFor(p.team)}${p.team}</span><b>${p.pos} ${p.name}</b><i>${p.ovr}</i></div>`).join('')}</div>`;
   }
-  $('drBody').innerHTML = `<div class="dHead">${me.city.toUpperCase()} ${me.name.toUpperCase()}  ·  YEAR ${d.year + 1} DRAFT  ·  ${myTurn ? `YOU'RE ON THE CLOCK (PICK #${dr.i + 1})` : 'ALL 32 PICKS ARE IN'}</div>
+  $('drBody').innerHTML = `<div class="dHead">${me.city.toUpperCase()} ${me.name.toUpperCase()}  ·  ${dr.year || Season.draftYear()} DRAFT${dr.real ? ' (REAL CLASS)' : ''}  ·  ${myTurn ? `YOU'RE ON THE CLOCK (PICK #${dr.i + 1})` : 'ALL 32 PICKS ARE IN'}</div>
     <div class="dWrap"><div class="dBoard">${board}</div><div class="dSide"><div class="leadHead">LATEST PICKS</div>${recent || '<div class="note">Nobody has picked yet</div>'}</div></div>`;
   $('drGo').textContent = myTurn ? 'AUTO PICK FOR ME' : `START YEAR ${d.year + 1}`;
+  document.querySelectorAll('.dFilt button').forEach(b => b.onclick = () => { Sound.click(); draftPos = b.dataset.f; renderDraft(myTurn); });
   document.querySelectorAll('.dRow').forEach(r => r.onclick = () => { Sound.td(); Season.draftPick(d.team, +r.dataset.k); Season.draftRun(); renderDraft(false); });
   $('drGo').onclick = () => {
     if (myTurn) { let bi = 0, bs = -1e9; dr.pool.forEach((pr, k) => { const f = Season.fit(d.team, Object.assign(pr.t.slice(), { pot: pr.pot })); const sc = (f ? f.gain : -20) + pr.t[3] * 0.25; if (sc > bs) { bs = sc; bi = k; } }); Season.draftPick(d.team, bi); Season.draftRun(); Sound.click(); return renderDraft(false); }
