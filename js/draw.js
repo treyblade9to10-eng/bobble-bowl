@@ -25,7 +25,7 @@ function wy(py) { return (py - CH / 2 - VY) / PY + cam.y; }
 const FIELD_PAD_X = 6, FIELD_PAD_TOP = 8, FIELD_PAD_BOT = 5;
 let fieldCv = null, fieldKey = '';
 function buildField(G) {
-  const key = G.teams[0].id + G.teams[1].id + (G.demo ? 'd' : '') + (G.bigGame ? 'B' + G.bigGame.year : '') + (typeof Logo !== 'undefined' ? Logo.style() : '');
+  const key = G.teams[0].id + G.teams[1].id + (G.demo ? 'd' : '') + (G.bigGame ? 'B' + G.bigGame.year : '') + (typeof Logo !== 'undefined' ? Logo.style() : '') + (G.teams[0].logo ? G.teams[0].logo.length + G.teams[0].logo.slice(-24) : '') + (G.teams[1].logo ? G.teams[1].logo.length : '');
   if (fieldKey === key && fieldCv) return;
   fieldKey = key;
   const W = Math.ceil((120 + FIELD_PAD_X * 2) * PX), H = Math.ceil((FIELD_W + FIELD_PAD_TOP + FIELD_PAD_BOT) * PY);
@@ -290,7 +290,7 @@ const lookCache = new Map();
 function teamLook(team, home, style) {
   style = style || (home ? 'home' : 'away');
   if (style.startsWith('mix:')) { // mix and match: helmet from one set, jersey from another, pants from a third
-    const key = team.id + team.c1 + team.c2 + team.helmet + team.mask + team.pants + home + style; let m = lookCache.get(key);
+    const key = team.id + team.c1 + team.c2 + team.helmet + team.mask + team.pants + home + style + (team.unis ? JSON.stringify(team.unis) : ''); let m = lookCache.get(key);
     if (!m) {
       const [h, j, p] = style.slice(4).split(',').map(k => teamLook(team, home, k));
       m = { helmet: h.helmet, stripe: h.stripe, mask: h.mask, hstripe: h.hstripe, matte: h.matte,
@@ -302,7 +302,16 @@ function teamLook(team, home, style) {
   const lk = baseLook(team, style);
   return { ...(UNI_CUT[style] || UNI_CUT.home), ...lk, numOut: lk.numOut || numOutline(lk, style) };
 }
+// created teams can set every color of each uniform by hand (helmet, jersey, numbers, pants...)
+const UNI_PARTS = ['helmet', 'stripe', 'mask', 'jersey', 'num', 'trim', 'pants', 'sock'];
 function baseLook(team, style) {
+  const lk = autoLook(team, style), cu = team.custom && team.unis && team.unis[style];
+  if (!cu) return lk;
+  const out = { ...lk }; for (const k of UNI_PARTS) if (cu[k]) out[k] = cu[k];
+  if (cu.num || cu.jersey || cu.trim) delete out.numOut; // let the number outline match the new colors
+  return out;
+}
+function autoLook(team, style) {
   const base = { helmet: team.helmet, stripe: team.c2, mask: team.mask };
   const light = c => textOn(c) === '#111';
   if (style === 'throwback') {

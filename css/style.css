@@ -729,7 +729,18 @@ button.pulse { animation: pulse 1.2s infinite; }
 #tlCv { width: 260px; height: auto; aspect-ratio: 240 / 280; background: #0c1016; border-bottom: 4px solid var(--gold); }
 #tlPrevName { display: flex; gap: 10px; align-items: center; background: var(--panel); padding: 8px 10px; }
 #tlPrevName .tlNm { font-size: 22px; max-width: 160px; }
-#tlKit button { flex: 1; font-size: 12px; padding: 5px 4px; }
+#tlKit { flex-wrap: wrap; }
+#tlKit button { flex: 1 1 30%; font-size: 12px; padding: 5px 4px; }
+.tlLogo { display: flex; gap: 14px; align-items: center; }
+.tlLogoBox { width: 84px; height: 84px; flex: none; display: flex; align-items: center; justify-content: center; border: 2px dashed var(--line2);
+  background: repeating-conic-gradient(#ffffff10 0 25%, transparent 0 50%) 0 0 / 16px 16px; }
+.tlLogoBox img { width: 76px; height: 76px; object-fit: contain; }
+.tlLogoBox span { font-family: var(--hd); font-weight: 800; font-size: 11px; letter-spacing: .1em; color: var(--dim); }
+.tlLogoR { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.tlLogoBtns { display: flex; flex-wrap: wrap; gap: 6px; }
+.tlLogoBtns .tlMini { margin: 0; }
+img.badge { object-fit: contain; }
+.tlSecSub { color: var(--dim); font-size: 11px; letter-spacing: .1em; }
 #tlPane { flex: 1; overflow-y: auto; background: var(--panel); padding: 6px 16px 16px; min-width: 0; }
 .tlSec { display: flex; align-items: center; gap: 10px; font-family: var(--hd); font-weight: 800; font-size: 13px; letter-spacing: .16em; color: var(--gold); margin: 14px 0 8px; padding-bottom: 4px; border-bottom: 1px solid var(--line); }
 .tlMini { margin: 0 0 0 auto; padding: 3px 12px; font-size: 12px; letter-spacing: .08em; }
@@ -870,6 +881,7 @@ button.pulse { animation: pulse 1.2s infinite; }
 .cpCard #capCv { background: transparent; }
 .cpRow2 .tlF.cpNum input { width: 70px; }
 img.badge { object-fit: contain; }
+.tlSecSub { color: var(--dim); font-size: 11px; letter-spacing: .1em; }
 .troph.riv svg { fill: #c9ced6; stroke: #c9ced6; }
 
 /* gear locker */

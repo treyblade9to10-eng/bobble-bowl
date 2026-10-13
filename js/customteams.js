@@ -33,8 +33,23 @@ const CT = {
       c1: this.col(t.c1, '#1F3A93'), c2: this.col(t.c2, '#F6C31C'), helmet: this.col(t.helmet, '#1F3A93'), mask: this.col(t.mask, '#FFFFFF'), pants: this.col(t.pants, '#FFFFFF'),
       shape: this.SHAPES.includes(t.shape) ? t.shape : 'shield', stadium: this.str(t.stadium, 24) || 'Home Field', dome: !!t.dome,
       off: this.OFF.map((pos, i) => pl(t.off && t.off[i], pos)), def: this.DEF.map((pos, i) => pl(t.def && t.def[i], pos)),
-      k: ks(t.k, 'Kicker'), p: ks(t.p, 'Punter')
+      k: ks(t.k, 'Kicker'), p: ks(t.p, 'Punter'),
+      ...(this.logo(t.logo) ? { logo: t.logo } : {}), ...(this.unis(t.unis) ? { unis: this.unis(t.unis) } : {})
     };
+  },
+  // uploaded logo: a small square PNG made by the editor (nothing else gets through)
+  logo(v) { return typeof v === 'string' && v.length < 400000 && /^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(v); },
+  // hand-picked colors for each uniform: { home: { helmet, jersey, ... }, away: {...}, ... }
+  UNIS: ['home', 'away', 'rush', 'throwback', 'rivalry'],
+  unis(u) {
+    if (!u || typeof u !== 'object') return null;
+    const out = {};
+    for (const st of this.UNIS) {
+      const k = u[st]; if (!k || typeof k !== 'object') continue;
+      const o = {}; for (const part of UNI_PARTS) { const c = this.col(k[part], null); if (c) o[part] = c; }
+      if (Object.keys(o).length) out[st] = o;
+    }
+    return Object.keys(out).length ? out : null;
   },
   newUid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); },
   // abbreviations must be unique (they're the team's id everywhere)
@@ -52,7 +67,8 @@ const CT = {
     this.mode = 'league'; this.swap = swap || null;
     TEAMS.length = 0; TEAMS.push(...this.NFL);
     if (swap && swap.team) {
-      const i = TEAMS.findIndex(t => t.id === swap.out), t = this.clean(swap.team);
+      const i = TEAMS.findIndex(t => t.id === swap.out), t = this.clean(swap.team), cur = t && this.mine.find(m => m.uid === t.uid);
+      if (cur) { for (const k of ['c1', 'c2', 'helmet', 'mask', 'pants', 'shape', 'logo', 'unis']) { if (cur[k] !== undefined) t[k] = cur[k]; else delete t[k]; } } // latest look from the editor
       if (i >= 0 && t) TEAMS[i] = { ...t, conf: this.NFL[i].conf, div: this.NFL[i].div, replaces: swap.out };
     }
     this.fixSel();
@@ -90,7 +106,7 @@ const CT = {
   isClean(t) { return ![t.city, t.name, t.id, t.stadium, t.by, ...t.off.map(p => p[1]), ...t.def.map(p => p[1]), t.k[0], t.p[0]].some(s => this.BAD.test(String(s).toLowerCase().replace(/[^a-z]+/g, ' '))); },
   async publish(t) {
     if (!this.isClean(t)) throw new Error('Some words in this team are not allowed. Change them and try again.');
-    const body = { ...t, pub: true, at: Date.now() }; delete body.custom; delete body.conf; delete body.div;
+    const body = { ...t, pub: true, at: Date.now() }; delete body.custom; delete body.conf; delete body.div; delete body.logo; // uploaded pictures stay on this device
     const r = await fetch(`${this.DB}/${t.uid}.json`, { method: 'PUT', body: JSON.stringify(body) });
     if (!r.ok) throw new Error('Could not reach the team database (' + r.status + ').');
   },

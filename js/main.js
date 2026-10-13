@@ -154,6 +154,7 @@ function buildGrid() { renderSelect(); }
 
 // team badge: our own shield in the team colors (no real logos)
 function teamBadge(t) {
+  if (t && t.custom && t.logo) return `<img class="badge" src="${t.logo}" alt="${t.id}">`;
   if (typeof Logo !== 'undefined' && Logo.has(t)) { const u = Logo.url(t, 128); if (u) return `<img class="badge" src="${u}" alt="${t.id}">`; }
   const fg = textOn(t.c1), fs = t.id.length > 3 ? 18 : t.id.length > 2 ? 22 : 27;
   const SHAPE = { shield: 'M32 3 L59 12 V36 C59 53 47 64 32 69 C17 64 5 53 5 36 V12 Z', round: 'M32 6 A29 29 0 1 1 31.9 6 Z', diamond: 'M32 3 L61 36 L32 69 L3 36 Z', hex: 'M32 3 L60 19 V53 L32 69 L4 53 V19 Z' };

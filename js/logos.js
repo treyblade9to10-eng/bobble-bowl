@@ -259,8 +259,20 @@ const Logo = (() => {
     const o = document.createElement('canvas'); o.width = c.width; o.height = c.height; const og = o.getContext('2d');
     og.filter = 'drop-shadow(0 0 6px rgba(0,30,90,0.9))'; og.drawImage(c, 0, 0); im.tinted = o;
   }
+  // a picture the player uploaded for their created team (stored as a data URL, already trimmed + square)
+  const MINE = new Map();
+  function ownImg(t) {
+    if (!t || !t.custom || !t.logo || typeof Image === 'undefined') return null;
+    let im = MINE.get(t.logo);
+    if (!im) {
+      im = new Image(); MINE.set(t.logo, im);
+      im.onload = () => { cache.clear(); clearTimeout(bump); bump = setTimeout(() => ready.forEach(f => f()), 60); };
+      im.src = t.logo;
+    }
+    return im.complete && im.naturalWidth ? im : null;
+  }
   function draw(g, t, x, y, size) {
-    const im = realImg(t);
+    const im = ownImg(t) || realImg(t);
     if (im) { g.drawImage(im, x - size / 2, y - size / 2, size, size); return; }
     const [k, o] = specOf(t);
     g.save(); g.translate(x, y); g.scale(size / 100, size / 100);
@@ -269,7 +281,7 @@ const Logo = (() => {
   }
   const cache = new Map();
   function canvas(t, px) {
-    const key = t.id + t.c1 + t.c2 + (t.custom ? 'c' : '') + px;
+    const key = t.id + t.c1 + t.c2 + (t.custom ? 'c' : '') + (t.logo ? t.logo.length + t.logo.slice(-24) : '') + px;
     let cv = cache.get(key); if (cv) return cv;
     cv = document.createElement('canvas'); cv.width = cv.height = px;
     const g = cv.getContext('2d'); if (!g || !g.save) return cv;
@@ -280,7 +292,7 @@ const Logo = (() => {
   ready.push(() => { fieldKey = ''; }); // repaint the field once real logos arrive
   const preload = () => { if (typeof TEAMS !== 'undefined') for (const t of TEAMS) realImg(t); };
   preload();
-  return { draw, canvas, url, has: t => !!(t && SPEC[t.id] && !t.custom),
+  return { draw, canvas, url, has: t => !!(t && ((SPEC[t.id] && !t.custom) || (t.custom && t.logo))), own: ownImg,
     onReady(f) { ready.push(f); },
     setStyle(s) { style = s; cache.clear(); preload(); ready.forEach(f => f()); }, style: () => style };
 })();

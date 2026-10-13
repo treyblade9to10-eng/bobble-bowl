@@ -20,7 +20,7 @@ screens.push('tlHub', 'tlEdit'); menuScreens.push('tlHub', 'tlEdit');
       <div id="tlPrev">
         <canvas id="tlCv" width="240" height="280"></canvas>
         <div id="tlPrevName"></div>
-        <div class="tlTabs" id="tlKit"><button data-k="home">HOME</button><button data-k="away">AWAY</button><button data-k="rush">COLOR RUSH</button></div>
+        <div class="tlTabs" id="tlKit"><button data-k="home">HOME</button><button data-k="away">AWAY</button><button data-k="rush">RUSH</button><button data-k="throwback">THROWBACK</button><button data-k="rivalry">RIVALRY</button></div>
       </div>
       <div id="tlPane"></div>
     </div>
@@ -30,6 +30,58 @@ screens.push('tlHub', 'tlEdit'); menuScreens.push('tlHub', 'tlEdit');
 
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const TL_PALETTE = ['#0B162A', '#1F3A93', '#0076B6', '#6CACE4', '#00A3AD', '#125740', '#2B8A3E', '#7BC043', '#4F2683', '#9B59B6', '#C8102E', '#E8401C', '#FB4F14', '#FF8200', '#F6C31C', '#FFD700', '#A5ACAF', '#5A5A5A', '#151515', '#FFFFFF', '#D8CDB0', '#7A5230', '#A71930', '#E31837'];
+
+// any CSS-ish color -> #RRGGBB (uniform colors can come out as #fff or rgb())
+function hex6(c) {
+  c = String(c || '#000000').trim();
+  if (/^#[0-9a-f]{3}$/i.test(c)) c = '#' + c.slice(1).split('').map(x => x + x).join('');
+  if (/^#[0-9a-f]{6}/i.test(c)) return c.slice(0, 7).toUpperCase();
+  const m = c.match(/(\d+)\D+(\d+)\D+(\d+)/); if (m) return '#' + [m[1], m[2], m[3]].map(v => (+v).toString(16).padStart(2, '0')).join('').toUpperCase();
+  return '#000000';
+}
+function loadImg(src) { return new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = src; }); }
+// turn any picture into a logo: optional background cut-out, trim the empty edges, center it on a 256x256 see-through square
+function makeLogo(img, clearBg) {
+  const k = Math.min(1, 512 / Math.max(img.naturalWidth || img.width, img.naturalHeight || img.height));
+  const w = Math.max(1, Math.round((img.naturalWidth || img.width) * k)), h = Math.max(1, Math.round((img.naturalHeight || img.height) * k));
+  const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d');
+  g.drawImage(img, 0, 0, w, h);
+  const d = g.getImageData(0, 0, w, h), px = d.data;
+  if (clearBg) { // flood fill from the edges: everything touching the border that's close to the corner color goes see-through
+    // the background color = the most common solid color around the edge (padding from an earlier pass is already see-through, skip it)
+    const seen = new Uint8Array(w * h), stack = [], votes = new Map();
+    const opaque = i => px[i * 4 + 3] > 200;
+    const edgeHit = i => { stack.push(i); if (!opaque(i)) return; const q = (px[i * 4] >> 4) << 8 | (px[i * 4 + 1] >> 4) << 4 | (px[i * 4 + 2] >> 4); votes.set(q, (votes.get(q) || [0, i]).map((v, j) => j ? v : v + 1)); };
+    for (let x = 0; x < w; x++) { edgeHit(x); edgeHit((h - 1) * w + x); }
+    for (let y = 0; y < h; y++) { edgeHit(y * w); edgeHit(y * w + w - 1); }
+    // also look just inside see-through padding: first solid pixel in from each edge, middle of each side
+    for (const [i0, step, n] of [[Math.floor(w / 2), w, h], [(h - 1) * w + Math.floor(w / 2), -w, h], [Math.floor(h / 2) * w, 1, w], [Math.floor(h / 2) * w + w - 1, -1, w]]) {
+      for (let k = 0, i = i0; k < n; k++, i += step) if (opaque(i)) { edgeHit(i); break; }
+    }
+    if (!votes.size) throw new Error('The background is already see-through.');
+    const top = [...votes.values()].sort((a, b) => b[0] - a[0])[0][1], r = [px[top * 4], px[top * 4 + 1], px[top * 4 + 2]];
+    const near = i => px[i * 4 + 3] <= 12 || Math.abs(px[i * 4] - r[0]) + Math.abs(px[i * 4 + 1] - r[1]) + Math.abs(px[i * 4 + 2] - r[2]) < 90;
+    while (stack.length) {
+      const i = stack.pop(); if (seen[i]) continue; seen[i] = 1;
+      if (!near(i)) continue;
+      px[i * 4 + 3] = 0;
+      const x = i % w;
+      if (x > 0) stack.push(i - 1); if (x < w - 1) stack.push(i + 1); if (i >= w) stack.push(i - w); if (i < w * (h - 1)) stack.push(i + w);
+    }
+    g.putImageData(d, 0, 0);
+  }
+  let x0 = w, y0 = h, x1 = -1, y1 = -1, see = false;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const a = px[(y * w + x) * 4 + 3]; if (a < 250) see = true; if (a > 12) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; } }
+  if (x1 < 0) throw new Error('That picture is empty.');
+  for (const S of [256, 192, 128]) {
+    const o = document.createElement('canvas'); o.width = o.height = S; const og = o.getContext('2d');
+    const bw = x1 - x0 + 1, bh = y1 - y0 + 1, f = (S - 8) / Math.max(bw, bh);
+    og.imageSmoothingQuality = 'high';
+    og.drawImage(c, x0, y0, bw, bh, (S - bw * f) / 2, (S - bh * f) / 2, bw * f, bh * f);
+    const url = o.toDataURL('image/png');
+    if (url.length < 350000 || S === 128) return { url, seeThrough: see };
+  }
+}
 
 const TeamLab = {
   tab: 'mine', sort: 'new', db: null, dbErr: '', loading: false,
@@ -119,8 +171,14 @@ const TeamLab = {
     return `<div class="tlSec">TEAM</div>
       ${this.field('City', 'tlCityIn', t.city, 16)}${this.field('Team name', 'tlNameIn', t.name, 16)}
       ${this.field('Abbreviation', 'tlIdIn', t.id, 4, 'class="tlIdIn"')}<div class="tlHint" id="tlIdHint">2-4 letters. Shows on the scoreboard and at midfield.</div>
-      <div class="tlSec">BADGE</div>
-      <div class="tlShapes">${CT.SHAPES.map(s => `<button class="tlShape${t.shape === s ? ' on' : ''}" data-s="${s}">${teamBadge({ ...t, shape: s })}<span>${s.toUpperCase()}</span></button>`).join('')}</div>
+      <div class="tlSec">LOGO</div>
+      <div class="tlLogo"><div class="tlLogoBox">${t.logo ? `<img src="${t.logo}" alt="">` : '<span>NO LOGO</span>'}</div>
+        <div class="tlLogoR"><div class="tlLogoBtns"><button class="tlMini" id="tlLogoUp">${t.logo ? 'CHANGE PICTURE' : 'UPLOAD PICTURE'}</button>${t.logo ? '<button class="tlMini" id="tlLogoBg">CLEAR BACKGROUND</button><button class="tlMini tlDel" id="tlLogoRm">REMOVE</button>' : ''}</div>
+        <div class="tlHint" id="tlLogoHint">${t.logo ? 'Shows at midfield, in the end zones and on the scoreboard.' : 'PNG with a see-through background works best. No logo = the badge below.'}</div>
+        <div class="tlHint">Your picture stays on this device. Public teams show the badge in the Team Database.</div></div>
+        <input type="file" id="tlLogoFile" accept="image/*" hidden></div>
+      <div class="tlSec">BADGE${t.logo ? ' <span class="tlSecSub">USED IN THE TEAM DATABASE</span>' : ''}</div>
+      <div class="tlShapes">${CT.SHAPES.map(s => `<button class="tlShape${t.shape === s ? ' on' : ''}" data-s="${s}">${teamBadge({ ...t, shape: s, logo: undefined })}<span>${s.toUpperCase()}</span></button>`).join('')}</div>
       <div class="tlSec">STADIUM</div>
       ${this.field('Stadium', 'tlStadIn', t.stadium, 24)}
       <div class="tlF"><span>Roof</span><div class="tlTabs" id="tlRoof"><button data-d="0" class="${t.dome ? '' : 'on'}">OPEN AIR</button><button data-d="1" class="${t.dome ? 'on' : ''}">DOME</button></div></div>`;
@@ -133,28 +191,63 @@ const TeamLab = {
       const v = $('tlIdIn').value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4); $('tlIdIn').value = v; t.id = v;
       const bad = v.length < 2 ? 'Needs at least 2 letters.' : CT.idTaken(v, t.uid) ? `${v} is already taken. Try another.` : '';
       $('tlIdHint').textContent = bad || '2-4 letters. Shows on the scoreboard and at midfield.'; $('tlIdHint').classList.toggle('bad', !!bad);
-      this.renderName(); document.querySelectorAll('.tlShape').forEach(b => { b.querySelector('svg').outerHTML = teamBadge({ ...t, shape: b.dataset.s }); });
+      this.renderName(); document.querySelectorAll('.tlShape').forEach(b => { b.querySelector('svg').outerHTML = teamBadge({ ...t, shape: b.dataset.s, logo: undefined }); });
     });
     document.querySelectorAll('.tlShape').forEach(b => b.onclick = () => { t.shape = b.dataset.s; Sound.click(); this.renderEd(); });
     document.querySelectorAll('#tlRoof button').forEach(b => b.onclick = () => { t.dome = b.dataset.d === '1'; Sound.click(); this.renderEd(); });
     for (const id of ['tlCityIn', 'tlNameIn', 'tlIdIn', 'tlStadIn']) $(id).addEventListener('keydown', e => e.stopPropagation());
+    $('tlLogoUp').onclick = () => { Sound.click(); $('tlLogoFile').click(); };
+    $('tlLogoFile').onchange = async () => {
+      const f = $('tlLogoFile').files[0]; if (!f) return;
+      const hint = $('tlLogoHint'); hint.classList.remove('bad'); hint.textContent = 'Loading...';
+      try {
+        const img = await loadImg(URL.createObjectURL(f));
+        const r = makeLogo(img, false);
+        t.logo = r.url; this.renderEd();
+        if (!r.seeThrough) { $('tlLogoHint').textContent = 'This picture has a solid background. Tap CLEAR BACKGROUND to cut it out.'; }
+      } catch (e) { hint.textContent = 'Could not use that file. Try a PNG or JPG picture.'; hint.classList.add('bad'); }
+    };
+    if ($('tlLogoBg')) $('tlLogoBg').onclick = async () => {
+      Sound.click();
+      try { const r = makeLogo(await loadImg(t.logo), true); t.logo = r.url; this.renderEd(); }
+      catch (e) { $('tlLogoHint').textContent = e.message || 'Could not clear that background.'; $('tlLogoHint').classList.add('bad'); }
+    };
+    if ($('tlLogoRm')) $('tlLogoRm').onclick = () => { Sound.click(); delete t.logo; this.renderEd(); };
   },
-  COLORS: [['c1', 'Main color', 'Jersey'], ['c2', 'Second color', 'Numbers + trim'], ['helmet', 'Helmet', 'Shell'], ['mask', 'Facemask', 'Cage'], ['pants', 'Pants', 'Home pants']],
+  COLORS: [['c1', 'Main color', 'Badge, end zones, fans'], ['c2', 'Second color', 'Accents']],
+  PARTS: [['helmet', 'Helmet', 'Shell'], ['stripe', 'Helmet stripe', 'Stripe + side number'], ['mask', 'Facemask', 'Cage'], ['jersey', 'Jersey', 'Body + sleeves'],
+    ['num', 'Numbers', 'Jersey numbers'], ['trim', 'Trim', 'Sleeve, collar + pants stripes'], ['pants', 'Pants', ''], ['sock', 'Socks', '']],
+  KITS: { home: 'HOME', away: 'AWAY', rush: 'COLOR RUSH', throwback: 'THROWBACK', rivalry: 'RIVALRY' },
+  colRow(k, n, sub, val, attr) {
+    val = hex6(val);
+    return `<div class="tlColRow">
+      <div class="tlColL"><i style="background:${val}"></i><div><b>${n}</b><span>${sub}</span></div></div>
+      <div class="tlSw">${TL_PALETTE.map(c => `<button class="tlC${val === c ? ' on' : ''}" ${attr}="${k}" data-c="${c}" style="background:${c}"></button>`).join('')}
+      <label class="tlPick" title="Any color"><input type="color" ${attr}="${k}" value="${val.toLowerCase()}"><span>+</span></label></div></div>`;
+  },
   pane_col() {
-    const t = this.t;
-    return `<div class="tlSec">COLORS <button class="tlMini" id="tlShuffle">SHUFFLE</button></div>` + this.COLORS.map(([k, n, sub]) => `<div class="tlColRow">
-      <div class="tlColL"><i style="background:${t[k]}"></i><div><b>${n}</b><span>${sub}</span></div></div>
-      <div class="tlSw">${TL_PALETTE.map(c => `<button class="tlC${t[k] === c ? ' on' : ''}" data-k="${k}" data-c="${c}" style="background:${c}"></button>`).join('')}
-      <label class="tlPick" title="Any color"><input type="color" data-k="${k}" value="${t[k].toLowerCase()}"><span>+</span></label></div></div>`).join('');
+    const t = this.t, kit = this.kit, lk = teamLook(t, kit !== 'away', kit), mine = t.unis && t.unis[kit];
+    return `<div class="tlSec">TEAM COLORS <button class="tlMini" id="tlShuffle">SHUFFLE</button></div>`
+      + this.COLORS.map(([k, n, sub]) => this.colRow(k, n, sub, t[k], 'data-k')).join('')
+      + `<div class="tlSec">${this.KITS[kit]} UNIFORM ${mine ? '<button class="tlMini" id="tlUniReset">RESET</button>' : ''}</div>
+      <div class="tlHint">Pick a uniform under the player to change a different one. ${mine ? 'Custom colors.' : 'Using team colors until you change something.'}</div>`
+      + this.PARTS.map(([k, n, sub]) => this.colRow(k, n, sub, lk[k], 'data-u')).join('');
   },
   wire_col() {
-    const t = this.t;
-    document.querySelectorAll('.tlC').forEach(b => b.onclick = () => { t[b.dataset.k] = b.dataset.c; Sound.click(); this.renderEd(); });
-    document.querySelectorAll('.tlPick input').forEach(i => i.addEventListener('change', () => { t[i.dataset.k] = i.value.toUpperCase(); this.renderEd(); }));
+    const t = this.t, kit = this.kit;
+    const setTeam = (k, c) => { t[k] = c; this.renderEd(); };
+    const setUni = (k, c) => {
+      t.unis = t.unis || {};
+      if (!t.unis[kit]) { const lk = teamLook(t, kit !== 'away', kit); t.unis[kit] = {}; for (const [p] of this.PARTS) t.unis[kit][p] = hex6(lk[p]); } // lock in the whole set the first time
+      t.unis[kit][k] = c; this.renderEd();
+    };
+    document.querySelectorAll('.tlC').forEach(b => b.onclick = () => { Sound.click(); b.dataset.k ? setTeam(b.dataset.k, b.dataset.c) : setUni(b.dataset.u, b.dataset.c); });
+    document.querySelectorAll('.tlPick input').forEach(i => i.addEventListener('change', () => { const c = i.value.toUpperCase(); i.dataset.k ? setTeam(i.dataset.k, c) : setUni(i.dataset.u, c); }));
+    if ($('tlUniReset')) $('tlUniReset').onclick = () => { Sound.click(); delete t.unis[kit]; if (!Object.keys(t.unis).length) delete t.unis; this.renderEd(); };
     $('tlShuffle').onclick = () => {
       const a = pick(TL_PALETTE.filter(c => c !== '#FFFFFF')); let b; do { b = pick(TL_PALETTE); } while (b === a || colorGap(a, b) < 120);
       Object.assign(t, { c1: a, c2: b, helmet: chance(0.6) ? a : chance(0.5) ? b : '#FFFFFF', mask: chance(0.5) ? b : pick(['#FFFFFF', '#151515', '#A5ACAF']), pants: chance(0.5) ? '#FFFFFF' : chance(0.5) ? b : '#A5ACAF' });
-      Sound.click(); this.renderEd();
+      delete t.unis; Sound.click(); this.renderEd();
     };
   },
   pane_ros() {
