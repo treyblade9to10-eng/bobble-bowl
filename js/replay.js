@@ -4,9 +4,10 @@ const Replay = {
   enabled: (() => { try { return localStorage.getItem('bobbleReplay') !== 'off'; } catch (e) { return true; } })(),
   setEnabled(v) { this.enabled = v; try { localStorage.setItem('bobbleReplay', v ? 'on' : 'off'); } catch (e) {} },
 
-  begin() { this.frames = []; this.rec = !G.demo; },
+  begin() { this.frames = []; this.rec = !G.demo; this.deadFrames = 0; },
   record() {
     if (!this.rec || !G.ball || this.frames.length > 60 * 20) return;
+    if (G.phase === 'dead' && ++this.deadFrames > 45) return; // a beat after the whistle, not the whole celebration
     const b = G.ball;
     this.frames.push({
       ps: G.players.map(p => [p.x, p.y, p.vx, p.vy, p.anim, p.speedNow, p.face.dir, p.down, p.downDir, p.dive, p.jump || 0, p.spin, p.stiff, p.throwAnim, p.celebrate,
@@ -22,6 +23,7 @@ const Replay = {
     this.save = this.frames[this.frames.length - 1];
     this.endState = { celly: G.cellyGuy, time: G.time };
     this.t = Math.max(0, this.frames.length - 60 * 6.5); // last 6.5 seconds
+    for (const p of G.players) { if (p.celly) Celly.end(p); p.tdRun = null; } // the celly already happened: the replay is just the play
     G.phase = 'replay'; G.banner = null; G.fx = G.fx.filter(f => f.kind === 'flag'); G.showTarget = false; G.aim = null;
     Sound.tone(880, 0.08, 'square', 0.04); Sound.tone(660, 0.1, 'square', 0.04, 0, 0.09);
   },
@@ -47,7 +49,7 @@ const Replay = {
     this.on = false;
     this.apply(this.save); G.cellyGuy = null;
     for (const p of G.players) { p.celly = null; p.engaged = null; }
-    G.phase = 'dead'; G.deadT = 0;
+    G.phase = 'dead'; G.deadT = 0; cam.zoom = 1; cam.focus = null;
     afterPlay();
   },
   drawOverlay(g) {

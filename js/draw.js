@@ -163,7 +163,19 @@ function buildField(G) {
 }
 let crowdCv = null, crowdPat = null;
 
+// Chromebooks can drop canvas memory (GPU reset, low memory, waking from sleep). When that happens every pre-drawn picture
+// comes back blank, so throw them all away and draw them again
+function resetGfx() {
+  fieldKey = ''; fieldCv = null; crowdCv = null; crowdPat = null;
+  if (typeof headCache !== 'undefined') headCache.clear();
+  if (typeof torsoCache !== 'undefined') torsoCache.clear();
+  for (const k in shadowSprites) delete shadowSprites[k];
+  if (typeof Logo !== 'undefined' && Logo.reset) Logo.reset();
+  if (typeof wxCv !== 'undefined') wxCv = null;
+}
+let gfxCheck = 0;
 function drawField(g, G) {
+  if (++gfxCheck % 30 === 0 && fieldCv) { const fg = fieldCv.getContext('2d'); if (fg && fg.isContextLost && fg.isContextLost()) resetGfx(); }
   buildField(G);
   // past the edges of the field = more fans (scrolls with the camera)
   // only needed when the camera can see past the field picture (edges, celly cam) - filling it every frame is slow on Chromebooks
@@ -542,7 +554,7 @@ function drawPlayer(g, p, G, at) {
       const S = 2, BX = Math.ceil(W * 0.75), BY = TH + 8;
       c = document.createElement('canvas'); c.width = BX * 2 * S; c.height = (BY + 6) * S; c.BX = BX; c.BY = BY;
       const tg2 = c.getContext('2d');
-      if (tg2 && tg2.save) { tg2.scale(S, S); tg2.translate(BX, BY); drawTorso(tg2, p, G, look, W, TH, big, dir); if (torsoCache.size > 400) torsoCache.clear(); torsoCache.set(key, c); }
+      if (tg2 && tg2.save) { tg2.scale(S, S); tg2.translate(BX, BY); drawTorso(tg2, p, G, look, W, TH, big, dir); if (torsoCache.size > 160) torsoCache.clear(); torsoCache.set(key, c); }
       else { c = null; drawTorso(g, p, G, look, W, TH, big, dir); }
     }
     if (c) g.drawImage(c, -c.BX, -c.BY, c.BX * 2, c.BY + 6);
@@ -622,7 +634,7 @@ function drawHead(g, R, team, p, look) {
     const hg = c.getContext('2d');
     if (!hg || !hg.save) { drawHeadRaw(g, R, team, p, look); return; }
     hg.scale(S, S); hg.translate(B, B); drawHeadRaw(hg, R, team, p, look);
-    if (headCache.size > 400) headCache.clear();
+    if (headCache.size > 160) headCache.clear(); // keep graphics memory small (Chromebooks)
     headCache.set(key, c);
   }
   g.drawImage(c, -c.B, -c.B, c.B * 2, c.B * 2);

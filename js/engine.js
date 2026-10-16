@@ -108,10 +108,11 @@ function toPlayCall() {
   G.koPending = false; G.special = null; G.kickoffSide = null; G.callStart = G.time; G.timeoutCalled = false;
   if (G.patSide != null && !G.twoPt) {
     if (isHumanSide(G.patSide)) G.hooks.onPlayCall({ mode: 'pat', side: G.patSide });
-    else { const two = chance(0.12) || (G.quarter >= 4 && G.score[G.patSide] - G.score[1 - G.patSide] === -2); setTimeout(() => choosePAT(two ? 'two' : 'xp'), 700); }
+    else { const two = cpuGoForTwo(G.patSide); setTimeout(() => choosePAT(two ? 'two' : 'xp'), 700); }
     return;
   }
   cpuTimeoutCheck();
+  if (cpuSpikeCheck()) { setTimeout(() => { if (G.phase === 'playcall') { if (G.hooks.onClockOut) G.hooks.onClockOut(); spikeBall(true); addPbp(`${G.teams[G.poss].name} spike it to stop the clock.`); } }, 500); }
   if (typeof SaveGame !== 'undefined') SaveGame.save();
   G.sitOut = lockSitsOut();
   if (G.sitOut) { // Player Lock: your guy is on the sideline, so the coach calls it and the play runs itself (fast)
@@ -136,55 +137,116 @@ function playCallCtx() {
     timeouts: G.timeouts ? G.timeouts[G.human] : 0, kneel: G.poss === G.human && canKneelOut(), canSpike: humanOff && G.down < 4 && !G.twoPt && G.pendingRunoff > 0, lastKey: humanOff ? G.lastOffKey : G.lastDefKey };
 }
 
-// does the CPU go for it on 4th down? Thinks about the score, the clock and the field like a real coach
+// ---- CPU coach: reads the score, the clock, timeouts and field position ----
+// rough game-clock costs in this game: a hurry-up play ~11s, a normal play ~15s, a team milking the clock ~38s a snap
+function situation(side = G.poss) {
+  const margin = G.score[side] - G.score[1 - side], own = fromOwn(side, G.los), q = G.quarter;
+  const tos = G.timeouts ? G.timeouts[side] : 0, oppTos = G.timeouts ? G.timeouts[1 - side] : 0;
+  const fgDist = Math.abs(goalX(side) - G.los) + 17, fgMax = fgRange(kickerOf(side, 'fg').ovr);
+  const endGame = q >= 4 ? G.clock : Infinity, endHalf = q === 2 || q >= 4 ? G.clock : Infinity;
+  const needScores = margin >= 0 ? 0 : Math.ceil(-margin / 8);
+  // how long until we get the ball back if we give it away now (they milk it, we burn timeouts)
+  const backIn = Math.max(20, 3 * 38 - tos * 32) + 12;
+  return { margin, own, q, tos, oppTos, fgDist, fgOk: fgDist <= fgMax - 4, fgLong: fgDist <= fgMax, endGame, endHalf, needScores, backIn,
+    toGo: Math.abs(G.firstDownX - G.los), clockRunning: G.pendingRunoff > 0 };
+}
+// does the CPU go for it on 4th down?
 function cpuGoForIt(toGo, fgOk) {
-  const margin = G.score[G.poss] - G.score[1 - G.poss], own = fromOwn(G.poss, G.los);
-  const q = G.quarter, left = G.clock / (G.qtrLen || 300); // share of the quarter left
-  const late = q >= 4 && left < 0.5, veryLate = q >= 4 && left < 0.2;
-  if (q >= 4 && margin < 0) {
-    if (fgOk && margin >= -3 && (veryLate || toGo > 3)) return false;    // a field goal ties it or wins it: kick it
-    if (veryLate) return true;                                           // a field goal doesn't save us: must go
-    if (late && margin < -3 && (own > 40 || toGo <= 4)) return true;     // down more than a field goal late: go
-    if (late && margin < -8 && own > 25) return true;                    // two scores down: can't give it back
+  const S = situation(), { margin, own, q, endGame } = S;
+  const fgPts = fgOk ? 3 : 0;
+  if (q >= 4) {
+    if (margin < 0) {
+      const down = -margin;
+      if (fgOk && down <= 3) return toGo <= 1 && own >= 92 && endGame > 30 ? true : false; // a field goal ties or wins it
+      // not enough time to punt, stop them, and still score what we need: go
+      const timeToScore = S.needScores * 55;
+      if (endGame < S.backIn + timeToScore) {
+        if (fgOk && down <= 8 && endGame > S.backIn + 50) return false; // kick it, there's time for one more drive
+        return true;
+      }
+      if (down > 8 && own >= 45 && toGo <= 5) return true;    // two scores down: be aggressive past midfield
+    } else if (margin > 0) {
+      if (fgOk) return toGo <= 1 && own >= 95 && margin <= 3 && chance(0.5); // take the points (or punch it in from the 1)
+      if (toGo <= 1 && own >= 50 && endGame < 75) return true; // one yard ices it
+      return false;                                              // protecting a lead: punt it away
+    } else if (endGame < 60) {                                   // tied late
+      if (fgOk) return false;
+      return own >= 50 && toGo <= 3;
+    }
   }
-  if (q >= 4 && margin > 0 && own < 60) return false;                    // protecting a lead: punt it away
-  if (q === 2 && left < 0.08 && fgOk) return false;                      // end of half: take the points
-  if (toGo <= 1 && own >= 40) return true;                               // 4th and inches past midfield
-  if (toGo <= 2 && own >= 55 && !fgOk) return true;                      // no man's land
-  if (toGo <= 3 && own >= 62 && own <= 80 && chance(0.4)) return true;
+  if (q === 2 && S.endHalf < 25) return fgOk ? false : own >= 55 && toGo <= 3; // end of half: points if we can get them
+  // the normal book (modern analytics: go for it more than old coaches did)
+  if (fgOk) {
+    if (toGo <= 1 && own >= 85) return chance(0.6);                 // goal line: try to punch it in
+    if (toGo <= 2 && own >= 70 && own < 85) return chance(0.35);
+    return false;
+  }
+  if (toGo <= 1 && own >= 35) return true;                           // 4th and inches
+  if (toGo <= 2 && own >= 50) return true;
+  if (toGo <= 4 && own >= 58) return chance(0.55);                   // no man's land: too far to kick, too close to punt
+  if (toGo <= 1 && own >= 25 && margin < 0 && q >= 3) return chance(0.5);
   return false;
+}
+// should the CPU kick a field goal right now, on ANY down? (clock about to run out)
+function lastSecondKick(S) {
+  if (!S.fgLong || G.twoPt || G.patSide != null) return false;
+  const t = S.endHalf; if (t === Infinity) return false;
+  const left = S.clockRunning ? t - (S.tos > 0 ? 99 : 0) : t; // with a timeout left there's no rush
+  if (left > (S.clockRunning ? 16 : 7)) return false;
+  if (G.quarter === 2) return true;
+  return S.margin >= -3 && S.margin <= 0 || (S.margin > 0 && S.margin <= 5);
 }
 function cpuOffCall() {
   if (canKneelOut()) return 'kneel';
-  const toGo = Math.abs(G.firstDownX - G.los);
-  const margin = G.score[G.poss] - G.score[1 - G.poss], left = G.clock / (G.qtrLen || 300);
-  const hurry = (G.quarter >= 4 && margin < 0 && left < 0.4) || (G.quarter === 2 && left < 0.15); // need to score: pass and get out of bounds
-  const milk = G.quarter >= 4 && margin > 0 && left < 0.4;                                          // ahead late: run the clock
+  const S = situation(), toGo = S.toGo, margin = S.margin;
+  if (lastSecondKick(S)) return 'fg';
+  const twoMin = (S.q >= 4 && margin < 0 && S.endGame < Math.max(60, S.needScores * 70)) || (S.q === 2 && S.endHalf < 45);
+  const hurry = twoMin || (S.q >= 4 && margin < -8 && S.endGame < 150);            // need points fast: throw, get out of bounds
+  const milk = S.q >= 4 && margin > 0 && S.endGame < Math.max(90, (G.qtrLen || 180) * 0.45); // ahead late: run, stay in bounds
+  G.cpuHurry = hurry && !milk; G.cpuMilk = milk;
   if (G.down === 4 && !G.twoPt) {
-    const fg = Math.abs(goalX(G.poss) - G.los) + 17;
-    const fgOk = fg <= fgRange(kickerOf(G.poss, 'fg').ovr) - 4;
+    const fgOk = S.fgOk;
     if (!cpuGoForIt(toGo, fgOk)) {
-      if (toGo <= 5 && !hurry && !milk && chance(0.04)) return fgOk ? 'fakefg' : 'fakepunt';
-      return fgOk ? 'fg' : 'punt';
+      if (toGo <= 5 && !hurry && !milk && S.q < 4 && chance(0.03)) return fgOk ? 'fakefg' : 'fakepunt';
+      return fgOk ? 'fg' : (S.own >= 62 && S.fgLong ? 'fg' : 'punt'); // a long FG beats punting it into the end zone
     }
     // going for it: pick a play that can actually get the yards
-    if (toGo <= 1) return pick(['sneak', 'power', 'sneak', 'zone']);
-    if (toGo <= 3) return pick(['power', 'slants', 'mesh', 'zone', 'mflat']);
-    if (toGo <= 9) return pick(['curls', 'smash', 'ycross', 'slants', 'outs', 'mesh']);
-    return pick(['verts', 'flood', 'ycross', 'drive', 'stopgo']);
+    if (toGo <= 1) return pick(['sneak', 'power', 'sneak', 'zone', 'dive']);
+    if (toGo <= 3) return pick(['power', 'slants', 'mesh', 'zone', 'mflat', 'curls']);
+    if (toGo <= 9) return pick(['curls', 'smash', 'ycross', 'slants', 'outs', 'mesh', 'drive']);
+    return pick(['verts', 'flood', 'ycross', 'drive', 'stopgo', 'smash']);
   }
-  if (G.clock < 8 && G.quarter % 2 === 0 && fromOwn(G.poss, G.los) > 45 && margin <= 0) return 'hail';
+  // end of half/game with the ball and time for one shot only
+  if (S.endHalf < 8 && S.own > 45 && margin <= 0 && !S.fgLong) return 'hail';
+  if (S.endHalf < 8 && S.q === 2 && S.own > 45 && !S.fgLong) return 'hail';
   let runW = toGo <= 3 ? 0.55 : toGo >= 8 ? 0.15 : 0.35;
-  if (hurry) runW = toGo <= 2 ? 0.3 : 0.08;
-  if (milk) runW = toGo >= 10 ? 0.35 : 0.75;
-  if (toGo <= 1 && chance(0.35)) return 'sneak';
+  if (G.down === 3) runW *= toGo <= 2 ? 1 : 0.5;                     // 3rd and long: throw it
+  if (hurry) runW = toGo <= 1 ? 0.35 : 0.05;
+  if (milk) runW = toGo >= 10 ? 0.4 : 0.85;
+  if (toGo <= 1 && chance(0.35) && !hurry) return 'sneak';
   if (chance(runW)) return milk ? pick(['zone', 'power', 'dive', 'counter', 'power']) : pick(['zone', 'zone', 'toss', 'qbdraw', 'dive', 'counter', 'jet', 'power', 'power']);
-  if (hurry) return toGo >= 10 ? pick(['verts', 'flood', 'outs', 'drive', 'ycross', 'smash']) : pick(['outs', 'smash', 'flood', 'curls', 'outs', 'slants', 'mesh']); // sideline routes stop the clock
+  if (hurry) return toGo >= 10 ? pick(['verts', 'flood', 'outs', 'drive', 'smash', 'outs']) : pick(['outs', 'smash', 'flood', 'curls', 'outs', 'slants']); // sideline routes stop the clock
+  if (milk) return pick(['screen', 'bubble', 'slants', 'mesh', 'curls']); // safe, short, keep the clock moving
   return toGo >= 12 ? pick(['verts', 'pa', 'mesh', 'curls', 'verts', 'ycross', 'flood', 'stopgo', 'drive', 'mwheel', 'mseam']) : pick(['slants', 'mesh', 'curls', 'screen', 'pa', 'verts', 'slants', 'outs', 'bubble', 'smash', 'drive', 'ycross', 'mflat', 'mdrag', 'mseam', 'mwheel']);
+}
+// the CPU's PAT choice: the real two-point chart late in games
+function cpuGoForTwo(side) {
+  const m = G.score[side] - G.score[1 - side], late = G.quarter >= 4 || (G.quarter === 3 && G.clock < (G.qtrLen || 180) * 0.3);
+  if (!late) return chance(0.06);
+  if ([-2, -5, -10, -9, 1, 5, 12, -16].includes(m)) return true;   // down 2 -> tie, up 1 -> up 3, down 5 -> down 3, ...
+  if (m === -1) return G.clock < 30;                                // last-second try for the win
+  return false;
 }
 function cpuDefCall() {
   const toGo = Math.abs(G.firstDownX - G.los);
-  if (G.down === 4 && !G.twoPt && toGo > 2 && chance(0.75)) return 'alldrop';
+  const S = situation(1 - G.poss), oppOwn = fromOwn(G.poss, G.los);
+  // protecting a lead late and they need a big play: keep everything in front
+  if (S.q >= 4 && S.margin > 0 && S.margin <= 8 && S.endGame < 60 && oppOwn < 70) return pick(['prevent', 'c4', 'prevent', 'c3']);
+  if (S.endHalf < 8 && oppOwn >= 45) return 'prevent';                         // hail mary coming
+  if (oppOwn >= 95 || (G.twoPt && chance(0.5))) return pick(['run', 'man', 'c0', 'blitz']); // goal line: pack it in
+  if (G.down === 4 && !G.twoPt && toGo > 2 && chance(0.6)) return pick(['alldrop', 'c3', 'c4', 'man']);
+  if (G.down === 4 && toGo <= 2) return pick(['run', 'man', 'blitz', 'run']);
+  if (G.down === 3 && toGo >= 8 && chance(0.5)) return pick(['c3', 'c4', 'fire', 'blitz', 'tampa']);
   if (toGo <= 2 && chance(0.5)) return 'run';
   if (toGo >= 15 && chance(0.4)) return 'prevent';
   const menu = ['man', 'c2', 'c3', 'blitz', 'man', 'c3', 'cb', 'run', 'c1', 'c4', 'tampa', 'fire', toGo > 6 ? 'c4' : 'c0'];
@@ -449,7 +511,7 @@ function snap() {
   // the CPU offense takes its time in the huddle (you see the clock jump); way more when it's protecting a lead late
   if (G.pendingRunoff > 0 && !isHumanSide(G.poss) && !G.twoPt && G.clock > 0) {
     const lead = G.score[G.poss] - G.score[1 - G.poss], milk = lead > 0 && G.quarter >= 4;
-    const extra = Math.max(0, (milk || G.play.off.kneel ? 32 : 9) - (G.time - (G.runFrom || G.time)));
+    const extra = Math.max(0, (milk || G.play.off.kneel ? 32 : G.cpuHurry ? 4 : 9) - (G.time - (G.runFrom || G.time)));
     const c0 = G.clock;
     G.clock = Math.max(0, G.clock - extra);
     if (crossedTwoMin(c0)) { G.clock = 120; G.pendingRunoff = 0; twoMinWarning(); }
@@ -498,6 +560,7 @@ function update(dt) {
     livePlay(dt);
   } else if (G.phase === 'dead') {
     for (const p of G.players) { p.dvx = 0; p.dvy = 0; applyMove(p, dt); if (p.celly) Celly.update(p, dt); }
+    if (G.tdScorer) Celly.stage(G.tdScorer, dt);
     const cg = G.cellyGuy;
     if (cg) withSide(cg.side, () => Celly.input(cg));
     updateBallPhysicsDead(dt);
@@ -1200,7 +1263,9 @@ function cpuQB(dt) {
     if (G.lock && r.cap && G.poss === G.human) sc += G.callBall > 0 ? 0.9 : 0; // your QB looks for you (more when you call for it)
     if (op < 1.2) sc -= 2.5; // don't throw into a defender
     sc += [-0.6, 0, 0.3, 0.6][G.diff] * (op > 2 ? 1 : 0);
-    if (down < Math.abs(G.firstDownX - G.los) && G.down >= 3) sc -= 0.8;
+    if (down < Math.abs(G.firstDownX - G.los) && G.down >= 3) sc -= G.down === 4 ? 2 : 0.8; // 4th down: short of the sticks is a turnover
+    if (G.cpuHurry && !isHumanSide(G.poss) && (r.y < 8 || r.y > FIELD_W - 8)) sc += 0.6;        // two-minute drill: sideline throws stop the clock
+    if (G.cpuMilk && !isHumanSide(G.poss) && op < 2.5) sc -= 1;                                 // ahead late: no risky throws
     sc += rand(-0.3, 0.3);
     if (sc > bs) { bs = sc; best = r; }
   }
@@ -1333,6 +1398,8 @@ function aiEscort(p, car) {
 
 function aiRunner(p, dt) {
   const d = dirOf(p.side);
+  // clock: a CPU runner who's behind late heads for the sideline once he's got a few yards (or is about to be hit)
+  const cpuClock = !isHumanSide(p.side) && p.side === G.poss && G.cpuHurry && (G.timeouts[p.side] <= 1 || G.clock < 30) ? 'out' : '';
   // follow a designed run path first
   if (p.role === 'runpath' && p.route && p.route.i < p.route.pts.length && d * (p.x - G.los) < 1) {
     while (p.route.i < p.route.pts.length - 1 && d * (p.route.pts[p.route.i].x - p.x) < -0.5) p.route.i++; // never run backward to a spot you already passed
@@ -1354,8 +1421,9 @@ function aiRunner(p, dt) {
         const dd = Math.hypot(f.x - px, f.y - py);
         if (dd < 6) sc -= (behind ? 0.5 : 1.6) / (dd + 0.5) * (L > 3 ? 0.6 : 1);
       }
-      if (py < 1.5 || py > FIELD_W - 1.5) sc -= 5;
+      if (py < 1.5 || py > FIELD_W - 1.5) sc -= (cpuClock === 'out' ? 0 : 5);
     }
+    if (cpuClock === 'out' && d * (p.x - G.los) > 1) { const side = p.y < MID ? -1 : 1; sc += vy * side * 2.2; } // late and behind: get out of bounds
     if (sc > bs) { bs = sc; best = r; }
   }
   p.runAng = best;
@@ -1772,6 +1840,9 @@ function endPlay(res) {
   } else if (res.type === 'td') {
     G.score[cs] += 6; G.deadT = isHumanSide(cs) ? 3.8 : 2.5;
     if (isHumanSide(cs)) { G.cellyGuy = car; car.down = 0; car.dive = 0; } else { car.down = 0; car.dive = 0; Celly.cpu(car); }
+    // he trots a few yards into the end zone so the celly isn't buried in the pile
+    const gx = goalX(cs), gd = dirOf(cs); G.tdScorer = car;
+    car.tdRun = { x: gd * (car.x - gx) >= 3 ? car.x : gx + gd * 3.5, y: clamp(car.y, 9, FIELD_W - 9) };
     showBanner('TOUCHDOWN!', `${car.name} • ${G.teams[cs].city} ${G.teams[cs].name}`, isHumanSide(cs) ? '#ffd23f' : '#ff6040', 2.6);
     Sound.td(); G.crowdHype = 1.5; stat(car).td++; G.slowmo = 0.9;
     for (const q of G.players) if (q.side === cs) q.celebrate = 2.6;
@@ -1823,8 +1894,8 @@ function advanceDown(x, moved) {
 function afterPlay() {
   const n = G.next; G.next = null;
   Injury.announce();
-  for (const p of G.players) if (p.celly) Celly.end(p);
-  G.cellyGuy = null;
+  for (const p of G.players) { if (p.celly) Celly.end(p); p.tdRun = null; p.cellyNext = null; }
+  G.cellyGuy = null; G.tdScorer = null;
   G.runoff = 0;
   if (G.twoMinAfterPlay) { G.pendingRunoff = 0; if (G.quarter === G.twoMinQ || G.clock <= 0) G.twoMinAfterPlay = false; else twoMinWarning(); }
   if (G.mini && typeof miniAfterPlay === 'function') return miniAfterPlay();

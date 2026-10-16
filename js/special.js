@@ -201,18 +201,38 @@ function callTimeout(side) {
 }
 // CPU uses timeouts to save clock when it's behind late in a half
 function cpuTimeoutCheck() {
-  const cpu = 1 - G.human;
-  if (G.versus || G.human < 0 || !G.pendingRunoff || G.timeouts[cpu] <= 0) return;
-  if (!(G.quarter === 2 || G.quarter >= 4) || G.clock > 120) return;
-  const behind = G.score[G.human] - G.score[cpu];
-  if ((G.poss === cpu && behind >= 0) || (G.poss === G.human && behind > 0 && behind <= 16)) callTimeout(cpu);
+  if (G.versus) return;
+  for (const cpu of [0, 1]) {
+    if (isHumanSide(cpu) || !G.pendingRunoff || G.timeouts[cpu] <= 0 || G.clock <= 1) continue;
+    const S = situation(cpu), q = G.quarter;
+    if (G.poss === cpu) {
+      if (G.down === 4 && !cpuGoForIt(S.toGo, S.fgOk)) continue; // kicking anyway: save it
+      // our ball, clock running: save time when we need points (end of half, or behind/tied late)
+      if (q === 2 && G.clock < 40 && S.own >= 35) callTimeout(cpu);
+      else if (q >= 4 && S.margin <= 0 && G.clock < Math.max(90, S.needScores * 70)) callTimeout(cpu);
+    } else if (q >= 4 && S.margin < 0 && S.margin >= -16) {
+      // their ball, we're behind: stop the clock so we get it back with time left (not when a kneel ends it anyway)
+      if (G.clock < 3 * 38 + 20 && !canKneelOut()) callTimeout(cpu);
+    } else if (q === 2 && G.poss !== cpu && G.clock < 50 && G.down >= 3 && fromOwn(G.poss, G.los) < 40 && S.tos >= 2) callTimeout(cpu); // make them punt with time on the clock
+  }
+}
+// CPU spikes it when the clock is running, it's out of timeouts and the seconds matter
+function cpuSpikeCheck() {
+  const s = G.poss;
+  if (isHumanSide(s) || G.versus || !G.pendingRunoff || G.down >= 4 || G.patSide != null || G.twoPt) return false;
+  if (G.timeouts[s] > 0 || !(G.quarter === 2 || G.quarter >= 4) || G.clock > 22 || G.clock < 3) return false;
+  const S = situation(s);
+  if (G.quarter >= 4 && S.margin > 0) return false;
+  if (lastSecondKick(S)) return false; // just kick it
+  if (S.fgLong && (G.quarter === 2 || (S.margin >= -3 && S.margin <= 0))) return true;   // stop it, then kick
+  return S.own > 40 && G.down <= 2;
 }
 // the clock already ran live during the huddle (see update()); snapping or spiking just stops it running
 function burnHuddleClock() {
   G.pendingRunoff = 0;
 }
-function spikeBall() {
-  if (!(G.phase === 'playcall' || G.phase === 'presnap') || !isHumanSide(G.poss) || G.down >= 4 || G.patSide != null) return;
+function spikeBall(cpu) {
+  if (!(G.phase === 'playcall' || G.phase === 'presnap') || (!cpu && !isHumanSide(G.poss)) || G.down >= 4 || G.patSide != null) return;
   burnHuddleClock();
   G.clock = Math.max(0, G.clock - 1);
   showBanner('SPIKED!', 'Clock stopped', '#fff', 1.1); Sound.tackle();

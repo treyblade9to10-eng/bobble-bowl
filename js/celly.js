@@ -37,8 +37,10 @@ const Celly = {
   },
   start(cg, id) {
     const c = CELLYS.find(k => k.id === id); if (!c || !cg) return;
+    if (cg.tdRun) { cg.cellyNext = id; return; } // still trotting into the end zone: dance when he gets there
     if (cg.celly && cg.celly.t < 0.5) return; // let the last one get going first
-    cg.celly = { type: id, t: 0, fx: {} }; cg.celebrate = c.dur + 0.5; cg.down = 0; cg.dive = 0;
+    cg.celly = { type: id, t: 0, fx: {} }; cg.celebrate = c.dur + 0.5; cg.down = 0; cg.dive = 0; cg.tdRun = null; cg.speedNow = 0;
+    if (c.id === 'slide' || c.id === 'moon') cg.face.dir = c.id === 'slide' ? -dirOf(cg.side) : dirOf(cg.side); // slide back toward the field, moonwalk deeper
     cg.cx0 = cg.x; cg.cy0 = cg.y;
     addText(cg.x, cg.y - 2.5, c.say, '#ffd23f', 26, 1.1);
     if (G.banner && G.banner.dur - G.banner.t > 0.35) G.banner.t = G.banner.dur - 0.35; // clear the TOUCHDOWN banner so you can see it
@@ -47,18 +49,34 @@ const Celly = {
     if (c.team) this.setupBowl(cg);
   },
   // CPU scorers celebrate too
-  cpu(cg) { if (cg && chance(0.85)) setTimeout(() => { if (G.phase === 'dead' && G.players.includes(cg) && !cg.celly) this.start(cg, (clubCelly(cg) && chance(0.55) ? clubCelly(cg) : wet() && chance(0.5) ? CELLYS.find(c => c.wx === G.weather) : null || pick(CELLYS.filter(c => cellyOk(c, cg) && !c.club))).id); }, 450); },
+  cpu(cg) { if (cg && chance(0.85)) setTimeout(() => { if (G.phase === 'dead' && G.players.includes(cg) && !cg.celly) this.start(cg, (clubCelly(cg) && chance(0.55) ? clubCelly(cg) : wet() && chance(0.5) ? CELLYS.find(c => c.wx === G.weather) : null || pick(CELLYS.filter(c => cellyOk(c, cg) && !c.club))).id); }, 900); }, // after he trots into the end zone
   setupBowl(cg) {
     const d = cg.face.dir || 1;
     const mates = G.players.filter(p => p.side === cg.side && p !== cg).sort((a, b) => dist(a, cg) - dist(b, cg)).slice(0, 3);
     cg.celly.pins = mates;
     mates.forEach((m, i) => { m.pinAt = { x: cg.x + d * 7.5 + (i === 0 ? 0 : 0.9) * d, y: cg.y + [0, -1.1, 1.1][i] }; m.celebrate = 3.4; });
   },
+  // after a TD: the scorer trots into the end zone, everybody else backs off so you can see the celly
+  stage(cg, dt) {
+    if (!G.players.includes(cg)) return;
+    const r = cg.tdRun;
+    if (r && !cg.celly) {
+      const dx = r.x - cg.x, dy = r.y - cg.y, l = Math.hypot(dx, dy);
+      if (l > 0.2) { const sp = Math.min(l * 3, 6.5) * dt; cg.x += dx / l * sp; cg.y += dy / l * sp; cg.anim += dt * 14; cg.speedNow = 5; cg.face.dir = dirOf(cg.side); }
+      else { cg.tdRun = null; cg.speedNow = 0; if (cg.cellyNext) { const id = cg.cellyNext; cg.cellyNext = null; this.start(cg, id); } }
+    }
+    const pins = (cg.celly && cg.celly.pins) || [];
+    for (const o of G.players) {
+      if (o === cg || pins.includes(o)) continue;
+      const dx = o.x - cg.x, dy = o.y - cg.y, l = Math.hypot(dx, dy), room = o.side === cg.side ? 3.4 : 7; // teammates crowd in a little, defenders walk away
+      if (l < room) { const ux = l > 0.05 ? dx / l : -dirOf(cg.side), uy = l > 0.05 ? dy / l : 0; const sp = (o.down > 0 ? 1.2 : 5) * dt; o.x += ux * sp; o.y += uy * sp; if (o.down <= 0) { o.anim += dt * 8; o.speedNow = 3; } }
+    }
+  },
   update(cg, dt) {
     const c = cg.celly; if (!c) return;
     c.t += dt; const t = c.t, f = c.fx, d = cg.face.dir || 1;
-    // give him the stage: anybody from the other team standing on top of him walks off
-    for (const o of G.players) if (o.side !== cg.side && o.down <= 0) { const dx = o.x - cg.x, dy = o.y - cg.y, l = Math.hypot(dx, dy); if (l < 3.2) { const ux = l > 0.05 ? dx / l : 0, uy = l > 0.05 ? dy / l : 1; o.x += ux * 3.5 * dt; o.y += uy * 3.5 * dt; o.anim += dt * 8; o.speedNow = 3; } }
+    // moonwalks and mud slides stay inside the end zone (no sliding into the stands)
+    { const gx = goalX(cg.side), gd = dirOf(cg.side), lo = Math.min(gx + gd * 0.5, gx + gd * 9.3), hi = Math.max(gx + gd * 0.5, gx + gd * 9.3); if (c.type !== 'lambeau' && Math.abs(cg.x - gx) < 12) cg.x = clamp(cg.x, lo, hi); }
     if (c.type === 'leap' && t > 1.0 && !f.land) { f.land = 1; addDust(cg.x, cg.y, 10); cam.shake = 6; Sound.tone(110, 0.1, 'sine', 0.15); }
     if (c.type === 'griddy' || c.type === 'moon') cg.anim += dt * (c.type === 'griddy' ? 14 : 9);
     if (c.type === 'moon' && t < 2.2) { cg.x -= d * 2.0 * dt; if (Math.floor(t * 6) !== f.step) { f.step = Math.floor(t * 6); addDust(cg.x + d * 0.6, cg.y, 1); } }

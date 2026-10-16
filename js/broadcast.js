@@ -27,7 +27,7 @@ const Broadcast = {
     if (!this.on) return;
     const t = (performance.now() - this.t0) / 1000;
     if (t > this.DUR + (G.bigGame ? 1.4 : 0)) return this.close();
-    this.draw(t);
+    try { this.draw(t); } catch (e) { console.error('intro', e); return this.close(); } // never leave the game stuck behind a broken intro
     requestAnimationFrame(() => this.loop());
   },
   draw(t) {

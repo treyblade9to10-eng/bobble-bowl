@@ -622,7 +622,7 @@ function updateMobileButtons() {
     else if (h.side !== G.poss || (b.holder && b.holder.side !== h.side)) st = 'def';
     else if (G.lock && h !== G.O[0] && G.bstate === 'snap' && !b.flight) st = 'call';
   }
-  if (G.phase === 'dead' && G.cellyGuy && !G.cellyGuy.celly && !G.demo && (!G.online || G.cellyGuy.side === G.human)) st = 'celly'; // buttons hide once he's celebrating
+  if (G.phase === 'dead' && G.cellyGuy && !G.cellyGuy.celly && !G.cellyGuy.cellyNext && !G.demo && (!G.online || G.cellyGuy.side === G.human)) st = 'celly'; // buttons hide once he's celebrating
   if (G.phase === 'presnap' && !G.demo) st = 'presnap';
   const joyOn = G.phase === 'live' && !G.demo && !!h; // stays up the whole play so your thumb never loses it
   $('joy').classList.toggle('on', !!joyOn);
@@ -699,10 +699,20 @@ function demoSetup() {
 // ---------- main loop ----------
 const menuScreens = ['title', 'how', 'select', 'mode', 'seasonNew', 'seasonHub', 'modes', 'miniOver', 'cap', 'trophies'];
 let last = performance.now();
+let errRun = 0, errPhase = '';
 function frame(now) {
   requestAnimationFrame(frame); // schedule first so one bad frame can't freeze the game
-  try { step(now); } catch (e) { console.error(e); if (G.demo) G.phase = 'over'; }
+  try { step(now); errRun = 0; } catch (e) {
+    if (errRun++ % 120 === 0) console.error(e);
+    if (G.demo) G.phase = 'over';
+    try { render(); } catch (e2) {} // keep the picture up even if the game logic tripped
+    // the same thing keeps breaking for 2 seconds: skip ahead to the next play instead of hanging
+    if (errRun > 120 && G.teams && !G.demo) { errRun = 0; try { G.paused = false; for (const p of G.players) p.celly = null; G.cellyGuy = null; G.tdScorer = null; if (['live', 'dead', 'replay', 'kick'].includes(G.phase)) { G.phase = 'dead'; afterPlay(); } else toPlayCall(); } catch (e3) { console.error(e3); } }
+  }
 }
+// if the browser drops the canvas (GPU reset / low memory), redraw everything from scratch
+cv.addEventListener('contextlost', () => resetGfx());
+cv.addEventListener('contextrestored', () => resetGfx());
 function step(now) {
   const dt = clamp((now - last) / 1000, 0, 0.033); last = now;
   if (Input.pointer.down) Input.pointer.t += dt;
@@ -739,23 +749,30 @@ function render() {
     ctx.translate(lerp(fx, CW / 2, k), lerp(fy, CH * (G.mode === 'mobile' ? 0.56 : 0.66), k)); ctx.scale(cam.zoom, cam.zoom); ctx.translate(-fx, -fy);
   }
   if (G.teams) {
-    drawField(ctx, G);
-    drawWeatherGround(ctx, G);
-    drawLines(ctx, G);
-    drawRoutes(ctx, G);
+    safeDraw('field', () => drawField(ctx, G), () => { resetGfx(); ctx.fillStyle = '#2f7a32'; ctx.fillRect(0, 0, CW, CH); });
+    safeDraw('ground', () => drawWeatherGround(ctx, G));
+    safeDraw('lines', () => { drawLines(ctx, G); drawRoutes(ctx, G); });
     const ps = G.players.concat(G.refs || []).sort((a, b) => a.y - b.y);
-    for (const p of ps) p.slot === undefined ? drawRef(ctx, p, G) : drawPlayer(ctx, p, G);
-    if (G.mini) drawMini(ctx, G);
-    if (G.ball) drawBallFree(ctx, G);
-    drawAim(ctx, G);
-    drawFx(ctx, G);
-    drawWeather(ctx, G);
+    for (const p of ps) safeDraw('player', () => p.slot === undefined ? drawRef(ctx, p, G) : drawPlayer(ctx, p, G));
+    if (G.mini) safeDraw('mini', () => drawMini(ctx, G));
+    safeDraw('ball', () => { if (G.ball) drawBallFree(ctx, G); drawAim(ctx, G); });
+    safeDraw('fx', () => { drawFx(ctx, G); drawWeather(ctx, G); });
   }
   ctx.restore();
   if (G.teams && !G.demo) {
-    if (G.phase === 'replay') Replay.drawOverlay(ctx);
-    else { drawBanner(ctx, G); if (G.mini) drawMiniHUD(ctx, G); else { drawHUD(ctx, G); drawTicker(ctx, G); } drawKickMeter(ctx, G); }
+    if (G.phase === 'replay') safeDraw('replay', () => Replay.drawOverlay(ctx));
+    else safeDraw('hud', () => { drawBanner(ctx, G); if (G.mini) drawMiniHUD(ctx, G); else { drawHUD(ctx, G); drawTicker(ctx, G); } drawKickMeter(ctx, G); });
   }
+}
+// draw one piece; if it throws, put the canvas state back and keep going (the rest of the frame still shows)
+const drawErrs = {};
+function safeDraw(name, f, onFail) {
+  ctx.save();
+  try { f(); } catch (e) {
+    if (!drawErrs[name] || performance.now() - drawErrs[name] > 5000) { drawErrs[name] = performance.now(); console.error('draw ' + name, e); }
+    if (onFail) try { onFail(); } catch (e2) {}
+  }
+  ctx.restore();
 }
 
 requestAnimationFrame(frame);

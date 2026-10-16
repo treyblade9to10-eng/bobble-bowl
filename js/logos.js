@@ -294,5 +294,6 @@ const Logo = (() => {
   preload();
   return { draw, canvas, url, has: t => !!(t && ((SPEC[t.id] && !t.custom) || (t.custom && t.logo))), own: ownImg,
     onReady(f) { ready.push(f); },
+    reset() { cache.clear(); for (const id in REAL) if (REAL[id].tinted) { delete REAL[id].tinted; if (REAL[id].complete) tint(id, REAL[id]); } },
     setStyle(s) { style = s; cache.clear(); preload(); ready.forEach(f => f()); }, style: () => style };
 })();

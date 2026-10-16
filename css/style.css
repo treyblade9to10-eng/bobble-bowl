@@ -14,7 +14,7 @@
 html, body { margin: 0; height: 100%; background: var(--ink); overflow: hidden;
   font-family: var(--bd); font-weight: 500; color: var(--text); user-select: none; -webkit-user-select: none; touch-action: none; }
 #stage { position: relative; width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; }
-canvas { width: min(100vw, calc(100vh * var(--ar, 1.7778))); height: min(calc(100vw / var(--ar, 1.7778)), 100vh); display: block; background: #2f7a32; }
+canvas { width: min(100vw, calc(100vh * var(--ar, 1.7778))); height: min(calc(100vw / var(--ar, 1.7778)), 100vh); display: block; background: #0e1420; }
 b { font-weight: 700; }
 
 /* buttons: flat, slanted, condensed caps */
@@ -112,8 +112,8 @@ body.mobile #mbtns { display: flex; }
 #mbtns button.on { display: block; }
 #mbtns.pre button { width: 136px; height: 54px; font-size: 17px; background: #0c1016b8; border-width: 2px; }
 #mbtns button:active { background: var(--gold); color: #111; }
-body.mobile #mbtns.cel { display: grid; grid-template-columns: repeat(5, auto); gap: 8px; right: 50%; transform: translateX(50%); bottom: max(18px, calc(env(safe-area-inset-bottom) + 10px)); }
-#mbtns.cel button { width: 92px; height: 38px; font-size: 14px; padding: 0 4px; background: #0c1016a8; border-width: 1px; }
+body.mobile #mbtns.cel { display: grid; grid-template-columns: repeat(7, auto); gap: 8px; right: 50%; transform: translateX(50%); bottom: max(18px, calc(env(safe-area-inset-bottom) + 10px)); }
+#mbtns.cel button { width: 78px; height: 30px; font-size: 12px; padding: 0 3px; background: #0c1016a8; border-width: 1px; }
 body.mobile #mbtns.cel { gap: 6px; bottom: max(8px, calc(env(safe-area-inset-bottom) + 4px)); }
 #rotate { display: none; position: absolute; inset: 0; z-index: 50; background: var(--ink); flex-direction: column; align-items: center; justify-content: center;
   text-align: center; font-family: var(--hd); font-weight: 800; font-size: 24px; letter-spacing: .08em; text-transform: uppercase; }
