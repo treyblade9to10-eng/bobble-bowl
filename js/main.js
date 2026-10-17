@@ -256,7 +256,7 @@ function onPlayCall(c) {
               { key: 'two', name: 'Go For 2', desc: 'One play from the 3-yard line.', special: true }];
   } else {
     $('pcHead').innerHTML = `${who}${humanOff ? 'OFFENSE' : 'DEFENSE'} <span class="pcsub">${G.downText()}</span>`;
-    pcList = humanOff ? OFF_PLAYS.slice() : DEF_PLAYS.slice();
+    pcList = typeof Playbook !== 'undefined' ? Playbook.list(humanOff) : humanOff ? OFF_PLAYS.slice() : DEF_PLAYS.slice(); // your playbook (js/playbook.js)
     if (humanOff && !c.twoPt) {
       const sp = [];
       if (c.fourth) sp.push(SPECIAL_PLAYS[0]);
@@ -692,7 +692,7 @@ function demoSetup() {
   Object.assign(G, { teams: [a, b], human: -1, diff: 1, poss: 0, los: rand(30, 70), ballY: MID, down: 1, score: [0, 0], quarter: 1, clock: 180, demo: true, fx: [], weather: 'clear', night: false, uni: null, versus: false, xf: null,
     pstats: {}, tstats: [{ pass: 0, rush: 0, to: 0 }, { pass: 0, rush: 0, to: 0 }], patSide: null, twoPt: false, next: null, paused: false, slowmo: 0, banner: null });
   setFirstDown();
-  setupPlay(pick(OFF_PLAYS), pick(DEF_PLAYS));
+  setupPlay(pick(OFF_PLAYS.filter(p => !p.custom)), pick(DEF_PLAYS));
   snap();
 }
 
