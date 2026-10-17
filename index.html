@@ -158,12 +158,13 @@
         <div id="shSched"></div>
       </div>
       <div id="shRight">
-        <div id="shTabs"><button data-tab="stand" class="on">STANDINGS</button><button data-tab="lead">LEADERS</button><button data-tab="ros">ROSTER</button><button data-tab="draft">DRAFT</button><button data-tab="news">NEWS</button><button data-tab="hist">HISTORY</button></div>
+        <div id="shTabs"><button data-tab="stand" class="on">STANDINGS</button><button data-tab="lead">LEADERS</button><button data-tab="ros">ROSTER</button><button data-tab="inj">INJURIES</button><button data-tab="draft">DRAFT</button><button data-tab="news">NEWS</button><button data-tab="hist">HISTORY</button></div>
         <div id="shStand"></div>
       </div>
     </div>
     <div class="row">
       <button id="shTrade">TRADE</button>
+      <button id="shDepth">DEPTH CHART</button>
       <button id="shMenu">MENU</button>
       <button id="shQuit">ABANDON SEASON</button>
     </div>
@@ -192,6 +193,22 @@
     <h2>Rookie Draft</h2>
     <div id="drBody"></div>
     <button class="big gold" id="drGo">AUTO PICK FOR ME</button>
+  </div>
+
+  <!-- Franchise: game recap, depth chart, scouting combine -->
+  <div id="recap" class="screen">
+    <div id="rcBody"></div>
+    <button class="big gold" id="rcGo">TO THE SEASON</button>
+  </div>
+  <div id="depth" class="screen">
+    <h2>Depth Chart</h2>
+    <div id="dcBody"></div>
+    <div class="row"><button id="dcAuto">BEST PLAYERS START</button><button class="big gold" id="dcBack">DONE</button></div>
+  </div>
+  <div id="combine" class="screen">
+    <h2>Scouting Combine</h2>
+    <div id="cbBody"></div>
+    <button class="big gold" id="cbGo">TO THE DRAFT</button>
   </div>
 
   <!-- Franchise: trades -->
@@ -367,5 +384,6 @@
 <script src="js/careerui.js"></script>
 <script src="js/tutorial.js"></script>
 <script src="js/teamlab.js"></script>
+<script src="js/franchise2.js"></script>
 </body>
 </html>

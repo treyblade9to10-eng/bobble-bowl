@@ -94,15 +94,16 @@ Object.assign(Season, {
   // fill empty spots and start the best player at each position; extra guys sit on the bench
   setLineup(id) {
     const R = this.ensureRosters()[id], bench = this.bench(id), base = TEAMS.find(t => t.id === id);
+    const hurt = p => !!(p && p[6] && p[6].inj); // injured guys sit (franchise2.js)
     for (const side of ['off', 'def']) R[side].forEach((cur, i) => {
       const grp = posGroup(base[side][i][0]);
       let bi = -1;
-      bench.forEach((b, j) => { if (posGroup(b[0]) === grp && (bi < 0 || b[3] > bench[bi][3])) bi = j; });
-      if (bi >= 0 && (!cur || bench[bi][3] > cur[3])) { const b = bench.splice(bi, 1)[0]; if (cur) bench.push(cur); R[side][i] = b; }
+      bench.forEach((b, j) => { if (!hurt(b) && posGroup(b[0]) === grp && (bi < 0 || b[3] > bench[bi][3])) bi = j; });
+      if (bi >= 0 && (!cur || hurt(cur) || bench[bi][3] > cur[3])) { const b = bench.splice(bi, 1)[0]; if (cur) bench.push(cur); R[side][i] = b; }
     });
     // the original slot position stays the same (the game needs a QB in the QB spot, etc.)
     bench.sort((a, b) => b[3] - a[3]);
-    while (bench.length > BENCH_MAX) { let ci = bench.length - 1; while (ci > 0 && bench[ci][6] && bench[ci][6].rookie) ci--; const cut = bench.splice(ci, 1)[0]; /* keeps new draft picks */ if (id === this.data.team) this.news(`${id} released ${cut[0]} ${cut[1]} (${cut[3]}). The bench was full.`); }
+    while (bench.length > BENCH_MAX) { let ci = bench.length - 1; while (ci > 0 && bench[ci][6] && (bench[ci][6].rookie || bench[ci][6].inj)) ci--; const cut = bench.splice(ci, 1)[0]; /* keeps new draft picks */ if (id === this.data.team) this.news(`${id} released ${cut[0]} ${cut[1]} (${cut[3]}). The bench was full.`); }
   },
   // CPU teams sometimes call you with an offer
   makeOffer() {
