@@ -301,6 +301,7 @@ function choosePlay(key, defPick) {
   Input.pressed = {}; Input.taps.length = 0; // the key/tap that picked the play doesn't count as a hot route or snap
   G.snapTimer = humanOff && !G.sitOut ? Infinity : G.cpuMotion != null ? 2.4 : 1.6;
   if (G.play && G.play.off && G.play.off.motion) { G.cpuMotion = null; startMotion(); if (!humanOff) G.snapTimer = 2.2; } // motion plays: he takes off right away
+  if (!humanOff && !G.sitOut && (G.mode === 'mobile' || (G.online && G.netModes && G.netModes.includes('mobile')))) G.snapTimer += 1.2; // phones: a beat longer to tap SWITCH / a defender
 }
 
 function choosePAT(kind) {
@@ -625,6 +626,12 @@ function presnapInput(dt) {
     if (Input.hit('KeyB')) defShift('show');
     if (G.cpuMotion != null && G.snapTimer < G.cpuMotion) { G.cpuMotion = null; startMotion(); }
     if (Input.hit('KeyQ') || Input.hit('Tab')) presnapSwitch();
+    for (const c of Input.taps) { // mobile: tap a defender to take him
+      if (G.lock && lockedGuy()) break;
+      let best = null, bd = 55;
+      for (const d of G.D) { const dd = Math.hypot(sx(d.x) - c.x, sy(d.y) - 30 - c.y); if (dd < bd) { bd = dd; best = d; } }
+      if (best && best !== G.humanDef) { G.humanDef = best; Sound.click(); updateHuman(); G.snapTimer = Math.max(G.snapTimer, 0.9); }
+    }
     if (G.snapTimer <= 0) snap();
   }
 }
@@ -2173,7 +2180,7 @@ function updateHintMobile() {
   const humanOff = G.poss === G.human, b = G.ball, h = G.humanPlayer;
   if (G.lock && G.phase === 'live' && humanOff && h && h !== G.O[0] && b.holder !== h && !b.flight) { G.hint = 'PLAYER LOCK  •  hold to steer  •  TAP = call for the ball'; return; }
   if (G.lock && G.phase === 'presnap' && !humanOff) { G.hint = 'PLAYER LOCK: you play your guy'; return; }
-  if (G.phase === 'presnap') G.hint = humanOff ? (G.play.off.type === 'pass' ? 'TAP field to snap  •  TAP a receiver = hot route' : 'TAP to snap') : 'SWITCH = pick your defender';
+  if (G.phase === 'presnap') G.hint = humanOff ? (G.play.off.type === 'pass' ? 'TAP field to snap  •  TAP a receiver = hot route' : 'TAP to snap') : 'SWITCH or TAP a defender to pick your guy';
   else if (G.phase === 'kickmeter') G.hint = '';
   else if (G.phase === 'live') {
     if (humanCanThrow()) G.hint = 'DRAG BACK to throw  •  drag FORWARD = QB run  •  or tap a receiver';
