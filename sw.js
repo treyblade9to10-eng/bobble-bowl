@@ -51,6 +51,7 @@ const FILES = [
   'js/tutorial.js',
   'js/teamlab.js',
   'js/franchise2.js',
+  'js/playbook.js',
   'fonts/barlow-500.woff2',
   'fonts/barlow-700.woff2',
   'fonts/bc-600.woff2',
