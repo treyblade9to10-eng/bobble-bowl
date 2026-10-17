@@ -32,6 +32,8 @@ const FILES = [
   'js/savegame.js',
   'js/gamepad.js',
   'js/lib/peerjs.min.js',
+  'js/lib/firebase-app-compat.js',
+  'js/lib/firebase-database-compat.js',
   'js/net.js',
   'js/main.js',
   'js/locker.js',
