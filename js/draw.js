@@ -472,15 +472,23 @@ function drawPlayer(g, p, G, at) {
   const spinScale = p.spin > 0 ? Math.cos(p.spin * 20) : 1;
   g.scale(dir * (Math.abs(spinScale) < 0.15 ? 0.15 * Math.sign(spinScale || 1) : spinScale), 1);
 
-  const W = big ? 30 : 24, TH = big ? 24 : 22, HIP = big ? 17 : 18;
-  const lean = (p.down > 0 ? 0 : k * 0.18) + (p.engaged ? 0.25 : 0);
+  // victory formation: the QB drops to one knee (front knee up, back knee on the grass)
+  const kn = p.kneel > 0 ? ease(Math.min(1, p.kneel / 0.3)) : 0;
+  const W = big ? 30 : 24, TH = big ? 24 : 22, HIP = (big ? 17 : 18) - kn * 9.5;
+  const kneelLeg = kn ? (side, hx, hy, kx, ky, fx, fy) => side > 0
+    ? { kx: lerp(kx, hx + 10, kn), ky: lerp(ky, hy - 2, kn), fx: lerp(fx, hx + 11, kn), fy: lerp(fy, 0, kn) }      // front leg: thigh flat, shin straight down
+    : { kx: lerp(kx, hx - 1, kn), ky: lerp(ky, -1, kn), fx: lerp(fx, hx - 13, kn), fy: lerp(fy, -2, kn) } : null; // back leg: knee on the grass, shin flat behind
+  const legPose = kneelLeg || (pose && pose.leg) || null;
+  const lean = (p.down > 0 ? 0 : k * 0.18) + (p.engaged ? 0.25 : 0) + kn * 0.12;
 
   // legs (two segments) + cleats
   const leg = (side, ph) => {
     const s = Math.sin(p.anim + ph) * k, lift = Math.max(0, Math.cos(p.anim + ph)) * k * 5;
     const hx = side * (W * 0.18), hy = -HIP;
-    const kx = hx + s * 7 + 2, ky = -HIP * 0.48 - lift * 0.6;
-    const fxp = hx + s * 12, fyp = -lift;
+    let kx = hx + s * 7 + 2, ky = -HIP * 0.48 - lift * 0.6;
+    let fxp = hx + s * 12, fyp = -lift;
+    const lp = legPose && legPose(side, hx, hy, kx, ky, fxp, fyp); // kneeling / Heisman: the pose places this leg
+    if (lp) ({ kx, ky, fx: fxp, fy: fyp } = lp);
     g.strokeStyle = OUT; g.lineWidth = 10; g.lineCap = 'round';
     g.beginPath(); g.moveTo(hx, hy); g.lineTo(kx, ky); g.lineTo(fxp, fyp - 2); g.stroke();
     g.strokeStyle = look.pants; g.lineWidth = 7;
@@ -561,7 +569,7 @@ function drawPlayer(g, p, G, at) {
   }
   // front arm + ball
   const hand = arm(true);
-  if (carrying) drawFootball(g, hand.hx - 2, hand.hy - 1, 0.95, 0.4);
+  if (carrying && !(pose && pose.noBall)) drawFootball(g, hand.hx - 2, hand.hy - 1, 0.95, 0.4);
 
   // neck + bobble head
   const R = (big ? 19 : 21) * (p.headScale || 1);
@@ -868,6 +876,23 @@ function drawBanner(g, G) {
 
 function ordinal(n) { return ['1st', '2nd', '3rd', '4th'][n - 1] || n + 'th'; }
 
+// what's on the line late in a half: ['0:38 LEFT  ·  2 TO', 'NEED A TD', color] (or null when it doesn't matter yet)
+function crunchText(G) {
+  if (!G.teams || G.demo || !['playcall', 'presnap', 'dead'].includes(G.phase) || G.patSide != null) return null;
+  const q = G.quarter, c = Math.max(0, Math.ceil(G.clock));
+  const me = G.versus ? G.poss : G.human; if (me == null || me < 0) return null;
+  const m = G.score[me] - G.score[1 - me], hasBall = G.poss === me;
+  if (q > 4) return ['OVERTIME', 'NEXT SCORE WINS', '#ffd23f'];
+  const late = (q === 4 && c <= 120 && Math.abs(m) <= 24) || (q === 2 && c <= 40);
+  if (!late) return null;
+  const top = `${Math.floor(c / 60)}:${String(c % 60).padStart(2, '0')} LEFT  ·  ${G.timeouts ? G.timeouts[me] : 0} TO`;
+  const who = G.versus && !G.online ? `${pName(me)}: ` : '';
+  if (q === 2) return [top, who + (hasBall ? 'POINTS BEFORE HALF' : 'HOLD THEM'), '#fff'];
+  if (m < 0) { const d = -m; return [top, who + (d <= 2 ? 'FG WINS IT' : d === 3 ? 'FG TIES IT' : d <= 8 ? 'NEED A TD' : d <= 16 ? 'NEED 2 SCORES' : 'NEED 3 SCORES'), '#ff8a6a']; }
+  if (m === 0) return [top, who + (hasBall ? 'SCORE TO WIN' : 'STOP THEM'), '#ffd23f'];
+  if (hasBall) return [top, who + (canKneelOut() ? 'KNEEL TO WIN' : `UP ${m}  ·  RUN THE CLOCK`), '#4fe08a'];
+  return [top, who + `UP ${m}  ·  ` + (m <= 3 ? 'NO FIELD GOAL' : m <= 8 ? 'NO TOUCHDOWN' : 'KEEP IT IN FRONT'), '#4fe08a'];
+}
 function drawHUD(g, G) {
   const W = 640, x0 = (CW - W) / 2, y0 = 6, H = 46;
   g.fillStyle = '#0b0f16f0'; roundRect(g, x0, y0, W, H, 3); g.fill();
@@ -900,6 +925,19 @@ function drawHUD(g, G) {
   g.font = '800 15px "Barlow Condensed", Arial, sans-serif'; g.fillStyle = '#ffd23f';
   g.fillText(G.downText(), x0 + W - 112, y0 + 35);
 
+  // crunch time: a little tab on the right of the scorebug with the clock, timeouts and what you need
+  const sit = crunchText(G);
+  if (sit && !G.mini) {
+    const tx = x0 + W + 6, tw = 168;
+    if (tx + tw < CW - 110) {
+      g.fillStyle = '#0b0f16f0'; roundRect(g, tx, y0, tw, H, 3); g.fill();
+      g.fillStyle = '#ffd23f'; g.fillRect(tx, y0, 3, H);
+      g.textAlign = 'left'; g.font = '800 13px "Barlow Condensed", Arial, sans-serif'; g.fillStyle = '#9aa6b5';
+      g.fillText(sit[0], tx + 12, y0 + 15);
+      g.font = 'italic 900 18px "Barlow Condensed", "Arial Black", sans-serif'; g.fillStyle = sit[2] || '#fff';
+      g.fillText(sit[1], tx + 12, y0 + 34);
+    }
+  }
   // play clock
   if (G.playClock > 0 && (G.phase === 'playcall' || G.phase === 'presnap')) {
     const pc = Math.ceil(G.playClock), red = pc <= 5;

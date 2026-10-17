@@ -69,7 +69,8 @@ function initGame(home, away, opts) {
     storm: !stadiumOf(home).dome && opts.weather === 'storm', fog: !stadiumOf(home).dome && opts.weather === 'fog', ltn: null, night: !!opts.night, stadium: stadiumOf(home), uni: opts.uni || null, pbp: [], pbpShow: null, lastResult: null,
     versus: !!opts.versus, p1: opts.humanSide || 0, hd: [null, null], hp: [null, null], humanDef: null,
     career: opts.career || false, lock: !!opts.lock, callBall: 0, sitOut: false, dirt: {},
-    bigGame: opts.bigGame ? { year: opts.bigGame, name: bowlName(opts.bigGame) } : null
+    bigGame: opts.bigGame ? { year: opts.bigGame, name: bowlName(opts.bigGame) } : null,
+    coach: COACH_STYLES[opts.coach] ? opts.coach : savedCoach()
   });
   // big rivalries: the home team breaks out its rivalry set (unless someone picked uniforms on purpose)
   G.rivalryMatch = !opts.scenario && isRivalry(home, away);
@@ -137,6 +138,16 @@ function playCallCtx() {
     timeouts: G.timeouts ? G.timeouts[G.human] : 0, kneel: G.poss === G.human && canKneelOut(), canSpike: humanOff && G.down < 4 && !G.twoPt && G.pendingRunoff > 0, lastKey: humanOff ? G.lastOffKey : G.lastDefKey };
 }
 
+// CPU coaching styles (game setup: COACH). go = 4th-down guts, run = run/pass mix, blitz, two = 2-pt urge, deep = shot plays, fake = trick plays
+const COACH_STYLES = {
+  balanced: { go: 0, run: 1, blitz: 1, two: 0, deep: 0, fake: 0.03 },
+  aggressive: { go: 1, run: 0.85, blitz: 1.6, two: 0.25, deep: 0.25, fake: 0.08 },
+  conservative: { go: -1, run: 1.25, blitz: 0.6, two: -1, deep: -0.15, fake: 0 },
+  air: { go: 0, run: 0.5, blitz: 1, two: 0.1, deep: 0.35, fake: 0.03 },
+  ground: { go: 0.5, run: 1.7, blitz: 1.1, two: 0, deep: -0.1, fake: 0.03 }
+};
+function savedCoach() { try { const o = JSON.parse(localStorage.getItem('bobbleOpts') || 'null'); if (o && COACH_STYLES[o.optCoach]) return o.optCoach; } catch (e) {} return 'balanced'; }
+const coachStyle = () => COACH_STYLES[G.coach] || COACH_STYLES.balanced;
 // ---- CPU coach: reads the score, the clock, timeouts and field position ----
 // rough game-clock costs in this game: a hurry-up play ~11s, a normal play ~15s, a team milking the clock ~38s a snap
 function situation(side = G.poss) {
@@ -175,15 +186,17 @@ function cpuGoForIt(toGo, fgOk) {
     }
   }
   if (q === 2 && S.endHalf < 25) return fgOk ? false : own >= 55 && toGo <= 3; // end of half: points if we can get them
-  // the normal book (modern analytics: go for it more than old coaches did)
+  // the normal book (modern analytics: go for it more than old coaches did), tilted by the coach's style
+  const g = coachStyle().go;
+  if (g < 0) return toGo <= 1 && own >= 55 && !fgOk && chance(0.6);  // old school: punt it, kick it
   if (fgOk) {
-    if (toGo <= 1 && own >= 85) return chance(0.6);                 // goal line: try to punch it in
-    if (toGo <= 2 && own >= 70 && own < 85) return chance(0.35);
+    if (toGo <= 1 && own >= 85) return chance(0.6 + g * 0.2);        // goal line: try to punch it in
+    if (toGo <= 2 && own >= 70 && own < 85) return chance(0.35 + g * 0.25);
     return false;
   }
-  if (toGo <= 1 && own >= 35) return true;                           // 4th and inches
-  if (toGo <= 2 && own >= 50) return true;
-  if (toGo <= 4 && own >= 58) return chance(0.55);                   // no man's land: too far to kick, too close to punt
+  if (toGo <= 1 && own >= 35 - g * 10) return true;                  // 4th and inches
+  if (toGo <= 2 + g && own >= 50 - g * 10) return true;
+  if (toGo <= 4 + g && own >= 58 - g * 8) return chance(0.55 + g * 0.2); // no man's land: too far to kick, too close to punt
   if (toGo <= 1 && own >= 25 && margin < 0 && q >= 3) return chance(0.5);
   return false;
 }
@@ -207,7 +220,7 @@ function cpuOffCall() {
   if (G.down === 4 && !G.twoPt) {
     const fgOk = S.fgOk;
     if (!cpuGoForIt(toGo, fgOk)) {
-      if (toGo <= 5 && !hurry && !milk && S.q < 4 && chance(0.03)) return fgOk ? 'fakefg' : 'fakepunt';
+      if (toGo <= 5 && !hurry && !milk && S.q < 4 && chance(coachStyle().fake)) return fgOk ? 'fakefg' : 'fakepunt';
       return fgOk ? 'fg' : (S.own >= 62 && S.fgLong ? 'fg' : 'punt'); // a long FG beats punting it into the end zone
     }
     // going for it: pick a play that can actually get the yards
@@ -219,10 +232,12 @@ function cpuOffCall() {
   // end of half/game with the ball and time for one shot only
   if (S.endHalf < 8 && S.own > 45 && margin <= 0 && !S.fgLong) return 'hail';
   if (S.endHalf < 8 && S.q === 2 && S.own > 45 && !S.fgLong) return 'hail';
-  let runW = toGo <= 3 ? 0.55 : toGo >= 8 ? 0.15 : 0.35;
-  if (G.down === 3) runW *= toGo <= 2 ? 1 : 0.5;                     // 3rd and long: throw it
+  // run/pass mix by down and distance (1st down is a real coin flip, 3rd and long is a passing down)
+  let runW = G.down === 1 ? (toGo >= 15 ? 0.2 : 0.34) : G.down === 2 ? (toGo <= 3 ? 0.55 : toGo >= 8 ? 0.2 : 0.35) : (toGo <= 2 ? 0.55 : toGo <= 4 ? 0.3 : 0.1);
+  runW = clamp(runW * coachStyle().run, 0.05, 0.85);
   if (hurry) runW = toGo <= 1 ? 0.35 : 0.05;
   if (milk) runW = toGo >= 10 ? 0.4 : 0.85;
+  if (!hurry && !milk && toGo >= 4 && chance(coachStyle().deep)) return pick(['verts', 'pa', 'stopgo', 'drive', 'mseam']); // take a shot
   if (toGo <= 1 && chance(0.35) && !hurry) return 'sneak';
   if (chance(runW)) return milk ? pick(['zone', 'power', 'dive', 'counter', 'power']) : pick(['zone', 'zone', 'toss', 'qbdraw', 'dive', 'counter', 'jet', 'power', 'power']);
   if (hurry) return toGo >= 10 ? pick(['verts', 'flood', 'outs', 'drive', 'smash', 'outs']) : pick(['outs', 'smash', 'flood', 'curls', 'outs', 'slants']); // sideline routes stop the clock
@@ -232,7 +247,7 @@ function cpuOffCall() {
 // the CPU's PAT choice: the real two-point chart late in games
 function cpuGoForTwo(side) {
   const m = G.score[side] - G.score[1 - side], late = G.quarter >= 4 || (G.quarter === 3 && G.clock < (G.qtrLen || 180) * 0.3);
-  if (!late) return chance(0.06);
+  if (!late) return chance(Math.max(0, 0.06 + coachStyle().two));
   if ([-2, -5, -10, -9, 1, 5, 12, -16].includes(m)) return true;   // down 2 -> tie, up 1 -> up 3, down 5 -> down 3, ...
   if (m === -1) return G.clock < 30;                                // last-second try for the win
   return false;
@@ -250,6 +265,9 @@ function cpuDefCall() {
   if (toGo <= 2 && chance(0.5)) return 'run';
   if (toGo >= 15 && chance(0.4)) return 'prevent';
   const menu = ['man', 'c2', 'c3', 'blitz', 'man', 'c3', 'cb', 'run', 'c1', 'c4', 'tampa', 'fire', toGo > 6 ? 'c4' : 'c0'];
+  const bz = coachStyle().blitz; // aggressive coaches send pressure, old-school ones sit in zone
+  if (bz > 1 && chance((bz - 1) * 0.35)) return pick(['blitz', 'fire', 'c0', 'blitz']);
+  if (bz < 1 && chance((1 - bz) * 0.6)) return pick(['c3', 'c4', 'c2', 'tampa']);
   // the CPU learns your habits: keep going deep and it sits back, keep running and it loads the box
   const t = G.tend, n = t ? t.run + t.short + t.deep : 0;
   if (n >= 4) {
@@ -520,6 +538,8 @@ function snap() {
   burnHuddleClock();
   if (G.down === 3 && !G.twoPt && !G.special && G.tstats) { const t = G.tstats[G.poss]; t.a3 = (t.a3 || 0) + 1; }
   G.phase = 'live'; G.play.t = 0; Sound.hike(); G.throwT = null; G.playClock = 0;
+  G.play.fakeSpike = !!G.fakeSpike; G.fakeSpike = false;
+  if (G.play.fakeSpike) { G.O[0].throwAnim = 0.35; addText(G.O[0].x, G.O[0].y - 3, 'FAKE SPIKE!', '#7fd3ff', 18, 1.0); }
   G.credit = null; G.lastTackler = null; G.intBy = null; G.breakup = null; G.lastResult = null;
   if (typeof Replay !== 'undefined') Replay.begin();
   if (G.fake) { showBanner(G.fake === 'punt' ? 'FAKE PUNT!' : 'FAKE FIELD GOAL!', '', '#7fd3ff', 1.3); G.crowdHype = 1; }
@@ -645,6 +665,10 @@ function livePlay(dt) {
     if (p.down > 0 || p.stun > 0) { p.dvx = p.dvy = 0; continue; }
     if (p.dive > 0) continue; // dive keeps its velocity
     p.humanDriven = false; p.sprinting = false;
+    if (pl.fakeSpike && pl.t < 0.55 && !p.off && !p.isHuman) { p.dvx = p.dvy = 0; p.sdx = p.sdy = 0; continue; } // the defense bought it
+    if (pl.off.kneel && b.holder === G.O[0]) { // victory formation: QB backs up a step, everybody else stands down
+      p.dvx = p === G.O[0] && pl.t < 0.3 ? -dirOf(G.poss) * 3 : 0; p.dvy = 0; p.engaged = null; p.sdx = p.dvx; p.sdy = p.dvy; continue;
+    }
     if (p.isHuman && withSide(p.side, () => humanControl(p, dt) && (p.humanDriven = Input.axis().m > 0.1 || Input.stick.m > 0.15 || Input.pointer.down || p.dive > 0, true))) { if (p.tuck && b.holder === p) { p.dvx *= 0.92; p.dvy *= 0.92; } p.sdx = p.dvx; p.sdy = p.dvy; continue; }
     ai(p, dt);
     // smooth AI steering so players don't twitch
@@ -660,7 +684,7 @@ function livePlay(dt) {
   separate();
 
   // handoffs / pitches
-  if (G.bstate === 'snap' && b.holder === G.O[0] && pl.off.type === 'run' && !pl.off.qbRun && !G.handedOff) {
+  if (G.bstate === 'snap' && b.holder === G.O[0] && pl.off.type === 'run' && !pl.off.qbRun && !pl.off.kneel && !G.handedOff) {
     const rb = G.O[pl.off.carrier || 1];
     if (pl.off.toss && pl.t > 0.18) { G.handedOff = true; throwTo(G.O[0], rb, true); }
     else if (!pl.off.toss && pl.t > 0.25 && (dist(G.O[0], rb) < 1.6 || pl.t > (pl.off.carrier ? 1.5 : 0.9))) {
@@ -669,8 +693,9 @@ function livePlay(dt) {
   }
   // victory formation: QB takes a knee
   if (pl.off.kneel && b.holder === G.O[0]) {
-    if (pl.t > 0.45) { const qb = G.O[0]; qb.down = 1.5; qb.downDir = -dirOf(G.poss); G.credit = { p: qb, kind: 'rush' }; return endPlay({ type: 'tackle', carrier: qb, x: G.los - dirOf(G.poss) * 1, y: qb.y, kneel: true }); }
-    for (const p of G.players) if (!p.off) { p.dvx *= 0.2; p.dvy *= 0.2; }
+    const qb = G.O[0], d = dirOf(G.poss);
+    if (pl.t >= 0.3) { if (!qb.kneel) addText(qb.x, qb.y - 3, 'VICTORY FORMATION', '#ffd23f', 15, 1.1); qb.kneel = (qb.kneel || 0) + dt; qb.face.dir = d; } // down on one knee and hold it
+    if (pl.t > 1.35) { G.credit = { p: qb, kind: 'rush' }; return endPlay({ type: 'tackle', carrier: qb, x: G.los - d * 1, y: qb.y, kneel: true }); }
   }
   // QB crosses the line = runner
   if (G.bstate === 'snap' && b.holder === G.O[0] && dirOf(G.poss) * (b.holder.x - G.los) > 0.5) {
@@ -1845,6 +1870,7 @@ function endPlay(res) {
     car.tdRun = { x: gd * (car.x - gx) >= 3 ? car.x : gx + gd * 3.5, y: clamp(car.y, 9, FIELD_W - 9) };
     showBanner('TOUCHDOWN!', `${car.name} • ${G.teams[cs].city} ${G.teams[cs].name}`, isHumanSide(cs) ? '#ffd23f' : '#ff6040', 2.6);
     Sound.td(); G.crowdHype = 1.5; stat(car).td++; G.slowmo = 0.9;
+    if (typeof Unlocks !== 'undefined' && isHumanSide(cs) && !G.versus && !G.mini) Unlocks.td();
     for (const q of G.players) if (q.side === cs) q.celebrate = 2.6;
     for (let i = 0; i < 70; i++) G.fx.push({ kind: 'confetti', px: rand(0, CW), py: rand(-200, 0), vy: rand(120, 260), vx: rand(-40, 40), z: 0, vz: 0, color: pick([G.teams[cs].c1, G.teams[cs].c2, '#fff']), life: 2.6, max: 2.6 });
     if (G.credit && G.credit.passer && cs === off) stat(G.credit.passer).td++;
@@ -2123,7 +2149,7 @@ function updateCamera(dt) {
 function updateHint() {
   if (!G.teams) return;
   if (G.phase === 'kickmeter' || G.mini) { G.hint = ''; return; }
-  if (G.cellyGuy && G.phase === 'dead') { G.hint = G.versus && !G.online ? `${pName(G.cellyGuy.side)}: CELEBRATE!` : G.mode === 'mobile' ? '' : 'CELLY:  ↑ Leap  ↓ Griddy  ← Spike  → Dab   1 Flex  2 Bow  3 Shush  4 Moonwalk   E Nap   F Bowling' + (G.weather === 'snow' ? '   R Snow Angel' : G.weather === 'rain' ? '   C Mud Slide' : '') + (clubCelly(G.cellyGuy) ? `   G ${clubCelly(G.cellyGuy).name}` : ''); return; }
+  if (G.cellyGuy && G.phase === 'dead') { G.hint = G.versus && !G.online ? `${pName(G.cellyGuy.side)}: CELEBRATE!` : G.mode === 'mobile' ? '' : 'CELLY:  ↑ Leap  ↓ Griddy  ← Spike  → Dab   1 Flex  2 Bow  3 Shush  4 Moonwalk   E Nap   F Bowling' + (G.weather === 'snow' ? '   R Snow Angel' : G.weather === 'rain' ? '   C Mud Slide' : '') + (clubCelly(G.cellyGuy) ? `   G ${clubCelly(G.cellyGuy).name}` : '') + CELLYS.filter(c => c.lock && Unlocks.has(c.id)).map(c => `   ${CELLY_KEY_NAME[c.keys[0]]} ${c.name}`).join(''); return; }
   if (G.mode === 'mobile') return updateHintMobile();
   if (G.versus && !G.online) {
     const k = s => s === G.p1 ? 'SPACE' : 'ENTER';

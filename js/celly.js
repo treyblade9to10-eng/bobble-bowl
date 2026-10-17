@@ -25,8 +25,16 @@ CELLYS.push(
   { id: 'bark', name: 'DAWG POUND', keys: ['KeyG'], dur: 2.4, say: 'WOOF WOOF!', club: ['CLE'] },
   { id: 'roar', name: 'ROAR', keys: ['KeyG'], dur: 2.2, say: 'ROAR!', club: ['DET', 'CHI', 'JAX', 'CIN', 'CAR'] }
 );
+// unlockable cellys (keys 5-9): earned in the Trophy Case, see unlocks.js
+CELLYS.push(
+  { id: 'robot', name: 'THE ROBOT', keys: ['Digit5'], dur: 2.6, say: 'BEEP BOOP', lock: { tds: 10 } },
+  { id: 'superman', name: 'SUPERMAN', keys: ['Digit6'], dur: 2.4, say: 'UP, UP AND AWAY!', lock: { wins: 5 } },
+  { id: 'shimmy', name: 'SHIMMY', keys: ['Digit7'], dur: 2.4, say: 'SHIMMY!', lock: { wins: 15 } },
+  { id: 'worm', name: 'THE WORM', keys: ['Digit8'], dur: 3.0, say: 'THE WORM!', lock: { tds: 30 } },
+  { id: 'heisman', name: 'HEISMAN', keys: ['Digit9'], dur: 2.4, say: 'HEISMAN POSE!', lock: { titles: 1 } }
+);
 // weather cellys only work when the field has snow / is soaked; team cellys only for their team
-const cellyOk = (c, cg) => (!c.wx || c.wx === G.weather) && (!c.club || (cg && G.teams && c.club.includes(G.teams[cg.side].id)));
+const cellyOk = (c, cg) => (!c.wx || c.wx === G.weather) && (!c.club || (cg && G.teams && c.club.includes(G.teams[cg.side].id))) && (!c.lock || (typeof Unlocks !== 'undefined' && Unlocks.has(c.id)));
 const clubCelly = cg => cg && G.teams && CELLYS.find(c => c.club && c.club.includes(G.teams[cg.side].id));
 const ease = t => t < 0 ? 0 : t > 1 ? 1 : t * t * (3 - 2 * t);
 
@@ -49,7 +57,7 @@ const Celly = {
     if (c.team) this.setupBowl(cg);
   },
   // CPU scorers celebrate too
-  cpu(cg) { if (cg && chance(0.85)) setTimeout(() => { if (G.phase === 'dead' && G.players.includes(cg) && !cg.celly) this.start(cg, (clubCelly(cg) && chance(0.55) ? clubCelly(cg) : wet() && chance(0.5) ? CELLYS.find(c => c.wx === G.weather) : null || pick(CELLYS.filter(c => cellyOk(c, cg) && !c.club))).id); }, 900); }, // after he trots into the end zone
+  cpu(cg) { if (cg && chance(0.85)) setTimeout(() => { if (G.phase === 'dead' && G.players.includes(cg) && !cg.celly) this.start(cg, (clubCelly(cg) && chance(0.55) ? clubCelly(cg) : wet() && chance(0.5) ? CELLYS.find(c => c.wx === G.weather) : null || pick(CELLYS.filter(c => cellyOk(c, cg) && !c.club && !c.lock))).id); }, 900); }, // after he trots into the end zone
   setupBowl(cg) {
     const d = cg.face.dir || 1;
     const mates = G.players.filter(p => p.side === cg.side && p !== cg).sort((a, b) => dist(a, cg) - dist(b, cg)).slice(0, 3);
@@ -133,7 +141,7 @@ const Celly = {
   // ---- the poses (drawn in player space: +x = the way he faces, up = negative y) ----
   // returns { hop, rot, sy (squash), lie, legK, head, arm(front, shx, shy) -> {ex, ey, hx, hy} | null }
   pose(p, type, t) {
-    const P = { hop: 0, rot: 0, sy: 1, lie: 0, legK: null, head: 0, arm: null };
+    const P = { hop: 0, rot: 0, sy: 1, lie: 0, legK: null, head: 0, arm: null, leg: null };
     const up = (front, shx, shy, k = 1) => ({ ex: shx + (front ? 5 : -3), ey: shy - 11 * k, hx: shx + (front ? 7 : -5), hy: shy - 23 * k });
     if (type === 'leap') {
       const u = clamp(t / 1.0, 0, 1);
@@ -212,6 +220,30 @@ const Celly = {
     } else if (type === 'roar') {
       const a = ease(t / 0.35); P.head = -0.35 * a; P.sy = 1 + 0.06 * a; P.rot = -0.08 * a;
       P.arm = (front, shx, shy) => { const o = front ? 1 : -1; return { ex: shx + o * 10 * a, ey: shy - 6 * a, hx: shx + o * 16 * a, hy: shy - 16 * a }; };
+    } else if (type === 'robot') { // stiff arms that snap from pose to pose, head clicks side to side
+      const st = Math.floor(t / 0.3), a = st % 4;
+      P.head = [0.3, 0, -0.3, 0][a]; P.legK = 0; P.hop = [0, 4, 0, 4][a]; P.rot = [0.05, 0, -0.05, 0][a]; P.noBall = true;
+      P.arm = (front, shx, shy) => { const o = front ? 1 : -1, up = (a + (front ? 0 : 1)) % 2 === 0; // elbows locked at right angles, snapping up and down
+        return up ? { ex: shx + o * 11, ey: shy + 1, hx: shx + o * 11, hy: shy - 13 } : { ex: shx + o * 11, ey: shy + 1, hx: shx + o * 11, hy: shy + 14 }; };
+    } else if (type === 'superman') { // fly forward with both fists out, then pop up
+      if (t < 0.25) { P.sy = 1 - ease(t / 0.25) * 0.18; }
+      else if (t < 1.6) { const u = (t - 0.25) / 1.35; P.rot = 1.35 * ease(Math.min(1, u * 4)); P.hop = Math.sin(Math.min(1, u) * Math.PI) * 46 + 10; P.legK = 0; }
+      else { const u = ease((t - 1.6) / 0.35); P.rot = 1.35 * (1 - u); P.hop = 10 * (1 - u); }
+      P.arm = (front, shx, shy) => t < 0.25 ? null : t < 1.8 ? { ex: shx + 10, ey: shy - 6, hx: shx + 21, hy: shy - 10 } : up(front, shx, shy);
+    } else if (type === 'shimmy') { // shoulders shake, little bounce
+      const sh = Math.sin(t * 22); P.hop = Math.abs(Math.sin(t * 6)) * 8; P.rot = sh * 0.16; P.head = -sh * 0.14; P.legK = 0.5; P.sy = 1 - Math.abs(sh) * 0.04;
+      P.arm = (front, shx, shy) => { const o = front ? 1 : -1; return { ex: shx + o * 12, ey: shy + 4 + sh * 4 * o, hx: shx + o * 20, hy: shy - 2 + sh * 6 * o }; }; // arms out wide, shoulders rolling
+    } else if (type === 'worm') { // down on the turf, a wave rolls through him
+      const a = ease(t / 0.4), w = Math.sin(t * 9);
+      if (t < 2.6) { P.lie = -1.5 * a; P.hop = a * (4 + Math.max(0, w) * 10); P.sy = 1 + w * 0.08 * a; }
+      else { const u = ease((t - 2.6) / 0.35); P.lie = -1.5 * (1 - u); P.hop = u * 6; }
+      P.legK = 0;
+      P.arm = (front, shx, shy) => t > 2.6 ? up(front, shx, shy) : { ex: shx + 4, ey: shy + 6 + w * 3, hx: shx + 8, hy: shy + 12 + w * 4 };
+    } else if (type === 'heisman') { // the trophy pose: front knee up, stiff arm straight out, hold it
+      const a = ease(t / 0.3);
+      P.head = -0.05 * a; P.legK = 0; P.hop = a * 6; P.rot = -0.06 * a; P.noBall = a > 0.5; // ball tucked away behind him
+      P.leg = (side, hx, hy, kx, ky, fx, fy) => side < 0 ? null : { kx: lerp(kx, hx + 17, a), ky: lerp(ky, hy + 2, a), fx: lerp(fx, hx + 13, a), fy: lerp(fy, hy + 14, a) }; // knee out front at hip height
+      P.arm = (front, shx, shy) => front ? { ex: shx + 12 * a, ey: shy - 1 * a, hx: shx + 25 * a, hy: shy - 3 * a } : { ex: shx + 2, ey: shy + 8, hx: shx + 6, hy: shy + 6 };
     } else if (type === 'bowl') {
       const wind = t > 0.6 && t < 1.2 ? ease((t - 0.6) / 0.6) : 0, rel = t >= 1.2 ? Math.min(1, (t - 1.2) * 5) : 0;
       P.rot = wind * 0.35 + rel * 0.5 - (t > 1.6 && t < 2 ? 0 : 0); P.sy = 1 - wind * 0.1;

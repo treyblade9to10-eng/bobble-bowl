@@ -222,8 +222,8 @@ const fillSel = (id, list, val) => { $(id).innerHTML = list.map(([v, t]) => `<op
 fillSel('optUni0', UNIFORMS, 'home');
 $('optPlayers').onchange = () => renderSelect(); fillSel('optUni1', UNIFORMS, 'away'); fillSel('optWeather', WEATHER, 'clear');
 try { const o = JSON.parse(localStorage.getItem('bobbleOpts') || 'null'); if (o) for (const k in o) if ($(k)) $(k).value = o[k]; } catch (e) {}
-function saveOpts() { const o = {}; for (const k of ['optUni0', 'optUni1', 'optWeather', 'optNight', 'optGame', 'optLogos', 'optQtr', 'optDiff', 'optPlayers']) o[k] = $(k).value; try { localStorage.setItem('bobbleOpts', JSON.stringify(o)); } catch (e) {} }
-const cycPaint = [['optQtr', 'QUARTERS'], ['optDiff', 'CPU'], ['optWeather', 'WEATHER'], ['optNight', 'TIME'], ['optGame', 'GAME'], ['optLogos', 'LOGOS'], ['optPlayers', 'PLAYERS']].map(([id, l]) => cycleBtn(id, l));
+function saveOpts() { const o = {}; for (const k of ['optUni0', 'optUni1', 'optWeather', 'optNight', 'optGame', 'optLogos', 'optQtr', 'optDiff', 'optCoach', 'optPlayers']) o[k] = $(k).value; try { localStorage.setItem('bobbleOpts', JSON.stringify(o)); } catch (e) {} }
+const cycPaint = [['optQtr', 'QUARTERS'], ['optDiff', 'CPU'], ['optCoach', 'COACH'], ['optWeather', 'WEATHER'], ['optNight', 'TIME'], ['optGame', 'GAME'], ['optLogos', 'LOGOS'], ['optPlayers', 'PLAYERS']].map(([id, l]) => cycleBtn(id, l));
 $('optLogos').addEventListener('change', () => { Logo.setStyle($('optLogos').value); renderSelect(); });
 Logo.onReady(() => { if ($('select').classList.contains('show')) renderSelect(); });
 const repaintCycles = () => cycPaint.forEach(f => f());
@@ -234,7 +234,7 @@ function startGame() {
   if (G.mode === 'mobile') goFullscreen();
   saveOpts();
   G.demo = false; G.season = false; G.challenge = null; G.mini = null; show(null);
-  newGame(TEAMS[sel.idx[0]], TEAMS[sel.idx[1]], { qtr: +$('optQtr').value, diff: +$('optDiff').value, humanSide: sel.you,
+  newGame(TEAMS[sel.idx[0]], TEAMS[sel.idx[1]], { qtr: +$('optQtr').value, diff: +$('optDiff').value, coach: $('optCoach').value, humanSide: sel.you,
     weather: pickWeather($('optWeather').value), night: $('optNight').value === '1', uni: [$('optUni0').value, $('optUni1').value],
     versus: $('optPlayers').value === '2' && G.mode !== 'mobile', bigGame: $('optGame').value === 'bowl' ? quickBowlYear() : 0 });
   Broadcast.show();
@@ -329,12 +329,16 @@ function renderCards() {
   const tos = pcCtx.side != null ? pcCtx.side : G.human;
   const guest = G.online && Net.role === 'guest';
   if ((pcCtx.mode === 'off' || pcCtx.mode === 'def') && G.timeouts && G.timeouts[tos] > 0 && (G.pendingRunoff > 0 || guest)) tool(`TIMEOUT (${G.timeouts[tos]})`, () => { if (guest) { Net.send({ t: 'tool', k: 'timeout' }); Sound.click(); } else if (callTimeout(tos)) renderCards(); });
-  if (pcCtx.mode === 'off' && G.down < 4 && G.pendingRunoff > 0 && !G.online) tool('SPIKE', () => { show(null); spikeBall(); });
+  if (pcCtx.mode === 'off' && G.down < 4 && G.pendingRunoff > 0 && !G.online) {
+    tool('SPIKE', () => { show(null); spikeBall(); });
+    tool('FAKE SPIKE', () => { show(null); G.fakeSpike = true; choosePlay(pick(['slants', 'verts', 'smash'])); });
+  }
+  if (pcCtx.mode === 'off' && !G.online && G.score[G.poss] > G.score[1 - G.poss] && (G.quarter >= 4 || (G.quarter === 2 && G.clock < 60)) && !G.twoPt) tool('KNEEL', () => { show(null); choosePlay('kneel'); });
   const last = G.versus && !G.online ? (pcCtx.mode === 'off' ? (G.lastOffKeys || [])[pcCtx.side] : pcCtx.mode === 'def' ? (G.lastDefKeys || [])[pcCtx.side] : null) : pcCtx.mode === 'off' ? G.lastOffKey : pcCtx.mode === 'def' ? G.lastDefKey : null;
   const li = last ? pcList.findIndex(p => p.key === last) : -1;
   if (li >= 0) tool('LAST PLAY', () => choose(li));
   const tip = document.createElement('span'); tip.className = 'pgtip';
-  tip.textContent = G.mode === 'mobile' ? '' : `1-${Math.min(PER_PAGE, list.length) % 10 || 0} to pick     ← → pages`;
+  tip.textContent = G.mode === 'mobile' ? '' : `1-${Math.min(PER_PAGE, list.length) % 10 || 0} to pick     ← → pages` + [...hint.querySelectorAll('.tool')].map(b => b.textContent === 'KNEEL' ? '     K kneel' : b.textContent === 'SPIKE' ? '     X spike' : '').join('');
   hint.appendChild(tip);
 }
 G.hooks.onPlayCall = c => { if (G.demo) return; if (G.online && Net.role === 'host') return Net.onPlayCall(c); onPlayCall(c); };
@@ -633,7 +637,7 @@ function updateMobileButtons() {
   const key = st + side + canMotion + G.weather + (club ? club.id : '') + (b && b.flight ? 'air' : '') + (h && h.engaged ? 'eng' : '');
   if (key === mbState) return;
   mbState = key;
-  document.querySelectorAll('#mbtns button').forEach(x => x.classList.toggle('on', x.dataset.show === st && (!x.dataset.side || x.dataset.side === side) && (x.dataset.k !== 'KeyM' || canMotion) && (!x.dataset.wx || x.dataset.wx === G.weather)));
+  document.querySelectorAll('#mbtns button').forEach(x => x.classList.toggle('on', x.dataset.show === st && (!x.dataset.side || x.dataset.side === side) && (x.dataset.k !== 'KeyM' || canMotion) && (!x.dataset.wx || x.dataset.wx === G.weather) && (!x.dataset.lock || Unlocks.has(x.dataset.lock))));
   $('mbtns').classList.toggle('pre', st === 'presnap');
   $('mbtns').classList.toggle('cel', st === 'celly');
   $('mbClub').classList.toggle('on', !!club); if (club) $('mbClub').textContent = club.name; // team signature celly
@@ -819,3 +823,10 @@ $('onGo').onclick = () => {
   Net.join(code, st => { $('onStatus').textContent = st; });
 };
 $('onCodeIn').addEventListener('keydown', e => { if (e.code === 'Enter') $('onGo').onclick(); e.stopPropagation(); });
+
+// play-call shortcuts on a keyboard: K = kneel, X = spike (only when they'd show as buttons)
+addEventListener('keydown', e => {
+  if (!$('playcall').classList.contains('show') || pcCtx.mode !== 'off') return;
+  const btn = [...document.querySelectorAll('#pcHint .tool')].find(b => b.textContent === (e.code === 'KeyK' ? 'KNEEL' : e.code === 'KeyX' ? 'SPIKE' : '-'));
+  if (btn) { e.preventDefault(); btn.click(); }
+});

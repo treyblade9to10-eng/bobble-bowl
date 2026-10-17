@@ -43,6 +43,7 @@ const FILES = [
   'js/franchise.js',
   'js/trades.js',
   'js/ages.js',
+  'js/unlocks.js',
   'js/draftclasses.js',
   'js/aging.js',
   'js/tutorial.js',
