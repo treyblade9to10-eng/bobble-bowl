@@ -946,3 +946,92 @@ img.badge { object-fit: contain; }
 .clRow span { color: var(--dim); }
 .clBar { height: 6px; background: #ffffff14; display: block; } .clBar u { display: block; height: 100%; background: var(--gold); }
 .clRow em { font-style: normal; color: var(--dim); font-size: 12px; text-align: right; }
+/* ---- franchise 2: game recap, injuries, depth chart, scouting combine, draft-day trades ---- */
+#shTabs { overflow-x: auto; scrollbar-width: none; } #shTabs::-webkit-scrollbar { display: none; } #shTabs button { flex-shrink: 0; }
+#shLast { display: flex; align-items: center; gap: 8px; background: var(--panel); padding: 3px 4px 3px 10px; font-size: 13px; }
+#shLast .lbl { font-family: var(--hd); font-weight: 800; letter-spacing: .12em; color: var(--gold); font-size: 12px; }
+#shLast .W { color: #5cdd8a; font-weight: 700; } #shLast .L { color: #ff6a6a; font-weight: 700; } #shLast .T { font-weight: 700; }
+#shLast .lsTxt { flex: 1; min-width: 0; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#shLast button { margin: 0; padding: 4px 12px; font-size: 12px; }
+.rcOut { color: #ff6b6b; }
+
+#recap { justify-content: flex-start; overflow-y: auto; padding-top: 14px; }
+#rcBody { width: min(1100px, 96vw); }
+.rcHead { font-family: var(--hd); font-weight: 800; letter-spacing: .25em; color: var(--gold); text-align: center; font-size: 15px; }
+.rcScore { display: flex; align-items: center; justify-content: center; gap: 18px; padding: 8px 12px; margin: 6px 0; border-bottom: 5px solid #0006; }
+.rcScore b { font-family: var(--hd); font-style: italic; font-weight: 900; font-size: 52px; line-height: 1; text-shadow: 2px 2px 0 #0008; min-width: 60px; text-align: center; }
+.rcTeam { font-family: var(--hd); font-style: italic; font-weight: 900; font-size: 30px; text-shadow: 2px 2px 0 #0008; flex: 1; }
+.rcScore .rcTeam:first-child { text-align: right; }
+.rcRes { font-family: var(--hd); font-weight: 900; font-size: 18px; padding: 2px 10px; background: #0b0f16e0; color: #fff; }
+.rcRes.W { color: #5cdd8a; } .rcRes.L { color: #ff6a6a; }
+.rcLine { text-align: center; font-size: 15px; margin-bottom: 10px; }
+.rcGrid { display: flex; gap: 12px; align-items: flex-start; }
+.rcCol { flex: 1 1 0; min-width: 0; background: var(--panel); padding: 8px 10px; }
+.rcGap { margin-top: 10px; }
+.rcPlay { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; padding: 4px 0; border-bottom: 1px solid var(--line); line-height: 1.3; }
+.rcPlay i { display: block; font-style: normal; color: var(--dim); font-size: 11px; font-family: var(--hd); font-weight: 800; letter-spacing: .08em; }
+.rcTag { flex-shrink: 0; width: 74px; text-align: center; font-family: var(--hd); font-weight: 800; font-size: 11px; letter-spacing: .06em; padding: 1px 0; background: var(--panel2); color: var(--text); }
+.rcTag.gw { background: var(--gold); color: #111; }
+.rcPotg { font-size: 14px; } .rcPotg i { color: var(--dim); font-style: normal; font-size: 12px; } .rcPotg div { color: var(--gold); font-weight: 700; font-size: 13px; }
+.rcSt { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; margin-top: 5px; }
+.rcSt span { font-family: var(--hd); font-weight: 800; font-size: 11px; letter-spacing: .1em; color: var(--dim); }
+.rcSt b { min-width: 44px; } .rcSt b:last-child { text-align: right; }
+.rcBar { height: 5px; background: #ffffff30; margin-top: 2px; } .rcBar i { display: block; height: 100%; background: var(--gold); }
+.rcTop + .rcTop { margin-top: 8px; }
+.rcLgGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 4px; }
+.rcLg { background: var(--panel2); padding: 3px 6px; font-size: 12px; color: var(--dim); }
+.rcLg > span { display: block; white-space: nowrap; } .rcLg .w { color: #fff; font-weight: 700; }
+#recap #rcGo { margin-top: 10px; position: sticky; bottom: 6px; flex-shrink: 0; z-index: 2; }
+
+#depth { justify-content: flex-start; padding-top: 14px; }
+#dcBody { width: min(1100px, 96vw); }
+.dcWrap { display: flex; gap: 12px; max-height: calc(100vh - 230px); }
+.dcCol { flex: 1 1 0; min-width: 0; overflow-y: auto; background: var(--panel); padding: 6px; }
+.dcGrp { font-family: var(--hd); font-weight: 800; font-size: 11px; letter-spacing: .12em; color: var(--dim); padding: 6px 6px 2px; }
+.dcRow { display: flex; align-items: center; gap: 8px; padding: 4px 8px; font-size: 13px; cursor: pointer; border-bottom: 1px solid var(--line); }
+.dcRow:hover { background: var(--panel2); }
+.dcRow.bk { background: #0000001f; color: var(--dim); } .dcRow.bk b { color: var(--dim); }
+.dcRow .pos { width: 26px; color: var(--dim); font-family: var(--hd); font-weight: 800; }
+.dcRow b { width: 24px; font-family: var(--hd); font-size: 16px; color: var(--gold); }
+.dcRow .nm { flex: 1; min-width: 0; } .dcRow .nm i { display: block; font-style: normal; font-size: 10px; color: var(--dim); }
+.dcRow em { font-style: normal; font-family: var(--hd); font-weight: 800; font-size: 11px; letter-spacing: .05em; white-space: nowrap; }
+.dcRow em.st { color: var(--dim); } .dcRow em.out { color: #ff6b6b; }
+.dcRow.on { background: #f6c31c33; box-shadow: inset 3px 0 0 var(--gold); color: var(--text); }
+.dcRow.can { box-shadow: inset 3px 0 0 #5cdd8a; color: var(--text); }
+#dcMsg { text-align: center; color: var(--dim); font-size: 13px; margin-top: 8px; min-height: 18px; }
+
+#combine { justify-content: flex-start; padding-top: 14px; }
+#cbBody { width: min(1100px, 96vw); }
+.cbList { max-height: calc(100vh - 250px); overflow-y: auto; background: var(--panel); padding: 2px 6px; }
+.cbTab { width: 100%; border-collapse: collapse; font-size: 13px; }
+.cbTab th { position: sticky; top: 0; background: var(--panel); text-align: center; color: var(--dim); font-family: var(--hd); font-weight: 800; letter-spacing: .1em; font-size: 12px; padding: 5px 4px; cursor: pointer; }
+.cbTab th.on { color: var(--gold); } .cbTab th.cbNm { text-align: left; cursor: default; }
+.cbTab td { text-align: center; padding: 3px 4px; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+.cbTab td.pos { color: var(--dim); font-family: var(--hd); font-weight: 800; }
+.cbTab td.cbNm { text-align: left; } .cbTab td.cbNm i { font-style: normal; color: var(--dim); font-size: 11px; margin-left: 6px; }
+.cbTab td.cbG { font-family: var(--hd); font-weight: 800; color: var(--dim); } .cbTab td.cbG b { color: var(--gold); font-size: 16px; }
+.cbTab td.up, .cbTab td.up b { color: #5cdd8a; } .cbTab td.down, .cbTab td.down b { color: #ff6b6b; }
+.cbTab em { font-style: normal; font-family: var(--hd); font-weight: 800; font-size: 11px; letter-spacing: .06em; color: var(--dim); }
+.cbTab button { margin: 0; padding: 3px 10px; font-size: 12px; }
+.cbNote { text-align: center; margin: 6px 0; color: var(--dim); font-size: 12px; }
+
+.dRow.wait { cursor: default; } .dRow b small { font-size: 14px; color: var(--dim); } .dRow b { width: 44px; }
+.dDesk { margin-bottom: 10px; }
+.dkBtns { display: flex; gap: 4px; margin-bottom: 6px; } .dkBtns button { flex: 1; margin: 0; padding: 6px 8px; font-size: 13px; }
+.dkRow { display: flex; align-items: center; gap: 6px; padding: 4px 2px; border-bottom: 1px solid var(--line); font-size: 13px; }
+.dkRow > div { flex: 1; min-width: 0; } .dkRow i { display: block; font-style: normal; color: var(--dim); font-size: 11px; }
+.dkRow button { margin: 0; padding: 4px 10px; font-size: 12px; background: var(--gold); color: #111; }
+body.pad .dcRow:focus { outline: 4px solid var(--gold); outline-offset: -2px; }
+
+@media (max-height: 500px) {
+  #shTabs button { padding: 4px 9px; font-size: 12px; } #shLast { font-size: 11px; } #shLast button { padding: 3px 8px; font-size: 11px; }
+  #recap, #depth, #combine { padding-top: 6px; } #depth h2, #combine h2 { display: none; }
+  .rcScore { padding: 4px 10px; margin: 4px 0; } .rcScore b { font-size: 34px; min-width: 44px; } .rcTeam { font-size: 20px; } .rcLine { font-size: 13px; margin-bottom: 6px; }
+  .rcGrid { gap: 6px; } .rcCol { padding: 5px 7px; } .rcPlay { font-size: 11px; padding: 2px 0; } .rcTag { width: 62px; font-size: 10px; } .rcSt { margin-top: 2px; font-size: 11px; }
+  .dcWrap { max-height: calc(100vh - 118px); } .dcRow { padding: 2px 6px; font-size: 12px; } .dcRow .nm i { display: none; } #dcMsg { font-size: 11px; margin-top: 3px; }
+  #depth .row button { padding: 5px 14px; font-size: 13px; } #depth .row button.big { font-size: 19px; padding: 6px 24px; }
+  .cbList { max-height: calc(100vh - 128px); } .cbTab { font-size: 11px; } .cbTab td { padding: 1px 3px; } .cbTab td.cbNm i { display: none; } .cbNote { display: none; }
+  #cbGo, #rcGo { font-size: 19px; padding: 6px 26px; margin-top: 4px; } .dHead { font-size: 14px; margin-bottom: 4px; }
+  #draft h2 { display: none; } #draft .dWrap { max-height: calc(100vh - 100px); }
+  .dkBtns button { padding: 4px 6px; font-size: 11px; } .dkRow { font-size: 11px; }
+}

@@ -79,7 +79,7 @@ Object.assign(Season, {
       if (team === this.data.team) return true;
       // best value for what they need, with some randomness
       let bi = 0, bs = -1e9;
-      dr.pool.forEach((pr, k) => { const t = Object.assign(pr.t.slice(), { pot: pr.pot }), f = this.fit(team, t); const sc = (f ? f.gain : -20) + pr.t[3] * 0.25 + rand(-3, 3); if (sc > bs) { bs = sc; bi = k; } });
+      dr.pool.forEach((pr, k) => { const t = Object.assign(pr.t.slice(), { pot: pr.pot }); if (pr.cpu != null) t[3] = pr.cpu; /* CPU scouts aren't perfect either */ const f = this.fit(team, t); const sc = (f ? f.gain : -20) + t[3] * 0.25 + rand(-3, 3); if (sc > bs) { bs = sc; bi = k; } });
       this.draftPick(team, bi);
     }
     return false;
@@ -109,36 +109,42 @@ Season.finishWeek = function (s) {
 screens.push('draft'); menuScreens.push('draft');
 function openDraft() {
   if (!Season.data.draft) Season.startDraft();
-  const mine = Season.draftRun();
-  renderDraft(mine);
+  if (!Season.data.draft.combineDone) return openCombine(); // scouting combine first (franchise2.js)
+  renderDraft();
   show('draft');
 }
 let draftPos = 'ALL';
-function renderDraft(myTurn) {
+// the draft goes one pick at a time: watch, trade up, or sim to your pick (trades + scouting: franchise2.js)
+function renderDraft() {
   const d = Season.data, dr = d.draft, me = Season.team(d.team);
+  const over = dr.i >= dr.order.length, myTurn = !over && dr.order[dr.i] === d.team, more = dr.order.slice(dr.i).includes(d.team);
   const recent = dr.picks.slice(-6).reverse().map(p => `<div class="dpRow"><span>#${p.n} ${dotFor(p.team)}${p.team}${p.via ? ` <small>via ${p.via}</small>` : ''}</span><b>${p.pos} ${p.name}</b><i>${p.ovr} OVR</i></div>`).join('');
   let board = '';
-  if (myTurn) {
+  if (!over) {
     const tabs = `<div class="tlTabs dFilt">${['ALL', 'QB', 'RB', 'WR', 'TE', 'OL', 'DL', 'LB', 'CB', 'S'].map(f => `<button data-f="${f}" class="${draftPos === f ? 'on' : ''}">${f}</button>`).join('')}</div>`;
     const shown = dr.pool.map((pr, k) => [pr, k]).filter(([pr]) => draftPos === 'ALL' || pr.t[0] === draftPos).slice(0, draftPos === 'ALL' ? 30 : 48);
     board = tabs + (shown.length ? '' : `<div class="note">No ${draftPos}s left on the board.</div>`) + shown.map(([pr, k]) => {
-      const f = Season.fit(d.team, Object.assign(pr.t.slice(), { pot: pr.pot }));
-      const note = f ? (pr.t[3] > f.cur[3] ? `<span class="up">starts over ${lastName(f.cur[1])} (${f.cur[3]})</span>` : `<span>backup to ${lastName(f.cur[1])} (${f.cur[3]})</span>`) : '';
-      return `<div class="dRow" tabindex="0" data-k="${k}"><span class="pos">${pr.t[0]}</span><b>${pr.t[3]}</b><span class="nm">${pr.t[1]}<i>${pr.school}  •  AGE ${(pr.t[6] && pr.t[6].age) || 22}  •  SPD ${pr.t[4]}  •  POT ${pr.pot}</i></span>${note}</div>`;
+      const st = seenT(pr), f = Season.fit(d.team, st);
+      const note = f ? (st[3] > f.cur[3] ? `<span class="up">starts over ${lastName(f.cur[1])} (${f.cur[3]})</span>` : `<span>backup to ${lastName(f.cur[1])} (${f.cur[3]})</span>`) : '';
+      return `<div class="dRow${myTurn ? '' : ' wait'}" tabindex="0" data-k="${k}"><span class="pos">${pr.t[0]}</span><b>${scoutOvr(pr)}</b><span class="nm">${pr.t[1]}<i>${pr.school}  •  AGE ${(pr.t[6] && pr.t[6].age) || 22}  •  SPD ${pr.t[4]}  •  POT ${scoutPot(pr)}</i></span>${note}</div>`;
     }).join('');
   } else {
-    const mineP = dr.picks.find(p => p.team === d.team);
-    board = `<div class="dDone">DRAFT COMPLETE</div>${mineP ? `<div class="dMine">Your pick: <b>#${mineP.n} ${mineP.pos} ${mineP.name}</b> (${mineP.ovr} OVR, potential ${mineP.pot}, ${mineP.school})<br>${mineP.starts ? `He starts right away over ${mineP.replaced}.` : 'He sits behind your starters for now.'}</div>` : ''}
+    const mine = dr.picks.filter(p => p.team === d.team);
+    board = `<div class="dDone">DRAFT COMPLETE</div>${mine.map(p => `<div class="dMine">Your pick: <b>#${p.n} ${p.pos} ${p.name}</b> (${p.ovr} OVR, potential ${p.pot}, ${p.school})<br>${p.starts ? `He starts right away over ${p.replaced}.` : 'He sits behind your starters for now.'}</div>`).join('')}
       <div class="dTop">${dr.picks.slice(0, 8).map(p => `<div class="dpRow"><span>#${p.n} ${dotFor(p.team)}${p.team}</span><b>${p.pos} ${p.name}</b><i>${p.ovr}</i></div>`).join('')}</div>`;
   }
-  $('drBody').innerHTML = `<div class="dHead">${me.city.toUpperCase()} ${me.name.toUpperCase()}  ·  ${dr.year || Season.draftYear()} DRAFT${dr.real ? ' (REAL CLASS)' : ''}  ·  ${myTurn ? `YOU'RE ON THE CLOCK (PICK #${dr.i + 1})` : 'ALL 32 PICKS ARE IN'}</div>
-    <div class="dWrap"><div class="dBoard">${board}</div><div class="dSide"><div class="leadHead">LATEST PICKS</div>${recent || '<div class="note">Nobody has picked yet</div>'}</div></div>`;
-  $('drGo').textContent = myTurn ? 'AUTO PICK FOR ME' : `START YEAR ${d.year + 1}`;
-  document.querySelectorAll('.dFilt button').forEach(b => b.onclick = () => { Sound.click(); draftPos = b.dataset.f; renderDraft(myTurn); });
-  document.querySelectorAll('.dRow').forEach(r => r.onclick = () => { Sound.td(); Season.draftPick(d.team, +r.dataset.k); Season.draftRun(); renderDraft(false); });
+  $('drBody').innerHTML = `<div class="dHead">${me.city.toUpperCase()} ${me.name.toUpperCase()}  ·  ${dr.year || Season.draftYear()} DRAFT${dr.real ? ' (REAL CLASS)' : ''}  ·  ${myTurn ? `YOU'RE ON THE CLOCK (PICK #${dr.i + 1})` : over ? 'ALL 32 PICKS ARE IN' : `PICK #${dr.i + 1}: ${tName(dr.order[dr.i]).toUpperCase()} ON THE CLOCK`}</div>
+    <div class="dWrap"><div class="dBoard">${board}</div><div class="dSide">${draftDesk(myTurn, over)}<div class="leadHead">LATEST PICKS</div>${recent || '<div class="note">Nobody has picked yet</div>'}</div></div>`;
+  $('drGo').textContent = myTurn ? 'AUTO PICK FOR ME' : over ? `START YEAR ${d.year + 1}` : more ? 'SIM TO MY PICK' : 'FINISH THE DRAFT';
+  wireDraftDesk();
+  // after your pick: if you have no more picks the rest of the draft runs
+  const picked = k => { Season.draftPick(d.team, k); if (!dr.order.slice(dr.i).includes(d.team)) Season.draftRun(); renderDraft(); };
+  document.querySelectorAll('.dFilt button').forEach(b => b.onclick = () => { Sound.click(); draftPos = b.dataset.f; renderDraft(); });
+  if (myTurn) document.querySelectorAll('.dRow').forEach(r => r.onclick = () => { Sound.td(); picked(+r.dataset.k); });
   $('drGo').onclick = () => {
-    if (myTurn) { let bi = 0, bs = -1e9; dr.pool.forEach((pr, k) => { const f = Season.fit(d.team, Object.assign(pr.t.slice(), { pot: pr.pot })); const sc = (f ? f.gain : -20) + pr.t[3] * 0.25; if (sc > bs) { bs = sc; bi = k; } }); Season.draftPick(d.team, bi); Season.draftRun(); Sound.click(); return renderDraft(false); }
-    const draftNews = dr.picks.slice(0, 3).map(p => `DRAFT: ${p.team} takes ${p.pos} ${p.name} (${p.school}) at #${p.n}`);
+    if (myTurn) { let bi = 0, bs = -1e9; dr.pool.forEach((pr, k) => { const st = seenT(pr), f = Season.fit(d.team, st); const sc = (f ? f.gain : -20) + st[3] * 0.25; if (sc > bs) { bs = sc; bi = k; } }); Sound.click(); return picked(bi); }
+    if (!over) { Season.draftRun(); Sound.click(); return renderDraft(); }
+    const draftNews = dr.picks.slice(0, 3).map(p => `DRAFT: the ${tName(p.team)} take ${p.pos} ${p.name} (${p.school}) at #${p.n}`);
     delete d.draft;
     const ch = Season.nextYear(); Sound.whistle();
     draftNews.reverse().forEach(t => Season.news(t)); Season.save();

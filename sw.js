@@ -50,6 +50,7 @@ const FILES = [
   'js/aging.js',
   'js/tutorial.js',
   'js/teamlab.js',
+  'js/franchise2.js',
   'fonts/barlow-500.woff2',
   'fonts/barlow-700.woff2',
   'fonts/bc-600.woff2',
