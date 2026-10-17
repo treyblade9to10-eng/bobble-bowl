@@ -1097,3 +1097,42 @@ body.pad .dcRow:focus { outline: 4px solid var(--gold); outline-offset: -2px; }
   #pbSide { padding: 0 10px 10px; } #pbSide .tlSec { margin: 8px 0 4px; }
   #pbName { font-size: 16px; padding: 3px 8px; }
 }
+
+/* ---- contracts + free agency (js/contracts.js) ---- */
+#contracts { overflow: hidden; }
+#ctBody { width: min(1180px, 96vw); }
+.ctCap { display: grid; grid-template-columns: auto auto 1fr; gap: 16px; align-items: center; background: var(--panel); padding: 6px 12px; margin-bottom: 6px; font-family: var(--hd); font-weight: 800; font-size: 13px; letter-spacing: .06em; color: var(--dim); }
+.ctCap b { color: #fff; font-size: 16px; } .ctCap .neg b { color: #ff6b6b; }
+.ctCap i { height: 6px; background: #ffffff14; display: block; } .ctCap i u { display: block; height: 100%; background: var(--gold); }
+.ctList { max-height: calc(100vh - 260px); overflow-y: auto; background: var(--panel); }
+.ctRow { display: flex; align-items: center; gap: 10px; padding: 5px 8px; border-bottom: 1px solid #ffffff12; font-size: 14px; }
+.ctRow.pick { cursor: pointer; } .ctRow.pick:hover, .ctRow.sel { background: #ffd23f18; }
+.ctRow .pos { width: 30px; color: var(--dim); font-family: var(--hd); font-weight: 800; }
+.ctRow .ov { width: 28px; color: var(--gold); font-family: var(--hd); font-size: 18px; font-style: italic; }
+.ctRow .nm { flex: 1; min-width: 0; } .ctRow .nm i { display: block; font-style: normal; font-size: 11px; color: var(--dim); }
+.ctRow .ask { color: var(--dim); font-size: 12px; } .ctRow .up { color: #4fe08a; font-size: 12px; }
+.ctRow button { margin: 0; padding: 4px 12px; font-size: 13px; } .ctRow button.dim { background: var(--panel2); color: var(--dim); }
+.ctRow em { font-style: normal; font-family: var(--hd); font-weight: 800; font-size: 13px; letter-spacing: .06em; } .ctRow em.ok { color: #4fe08a; } .ctRow em.bad { color: #ff8a6a; }
+.ctWrap { display: flex; gap: 10px; }
+.ctBoard { flex: 2; max-height: calc(100vh - 230px); overflow-y: auto; background: var(--panel); padding: 6px; }
+.ctSide { flex: 1.1; max-height: calc(100vh - 230px); overflow-y: auto; background: var(--panel); padding: 8px 10px; }
+.ctDeal { border-left: 3px solid var(--gold); padding-left: 10px; }
+.ctDh { font-family: var(--hd); font-weight: 800; font-size: 15px; letter-spacing: .05em; margin-bottom: 6px; }
+.ctDeal label { display: flex; align-items: center; gap: 10px; margin: 6px 0; font-family: var(--hd); font-weight: 800; font-size: 12px; letter-spacing: .1em; color: var(--dim); }
+.ctDeal input[type=range] { flex: 1; accent-color: var(--gold); } .ctDeal label b { color: #fff; font-size: 16px; min-width: 52px; }
+.ctYrs button { margin: 0 2px; padding: 3px 10px; font-size: 14px; } .ctYrs button.on { background: var(--gold); color: #111; }
+.ctInt { display: flex; align-items: center; gap: 8px; margin: 8px 0; font-family: var(--hd); font-weight: 800; font-size: 12px; letter-spacing: .08em; color: var(--dim); }
+.ctInt i { flex: 1; height: 10px; background: #ffffff14; position: relative; } .ctInt i::after { content: ''; position: absolute; left: 80%; top: -3px; bottom: -3px; width: 2px; background: #fff8; }
+.ctInt u { display: block; height: 100%; background: #ff8a6a; } .ctInt u.yes { background: #4fe08a; } .ctInt b { color: #fff; font-size: 15px; min-width: 40px; text-align: right; }
+.ctDeal .big { width: 100%; margin: 4px 0; }
+.ctLog { font-size: 12px; padding: 3px 0; border-bottom: 1px solid #ffffff10; color: #cfd6df; }
+.ctMine { display: flex; align-items: center; gap: 6px; font-size: 12px; padding: 2px 0; border-bottom: 1px solid #ffffff0d; }
+.ctMine span { flex: 1; } .ctMine span i { font-style: normal; color: var(--gold); } .ctMine em { font-style: normal; color: var(--dim); }
+.ctMine button { margin: 0; padding: 1px 8px; font-size: 11px; background: var(--panel2); } .ctMine button.sure { background: #c0141c; color: #fff; }
+#ctToast { position: absolute; left: 50%; bottom: 80px; transform: translateX(-50%); background: #0b0f16f0; border-left: 3px solid var(--gold); padding: 8px 16px; font-size: 14px; opacity: 0; pointer-events: none; transition: opacity .2s; }
+#ctToast.on { opacity: 1; }
+@media (max-height: 500px) {
+  #contracts h2 { display: none; } .ctBoard, .ctSide { max-height: calc(100vh - 120px); } .ctList { max-height: calc(100vh - 150px); }
+  .ctRow { padding: 2px 6px; font-size: 12px; } .ctRow .nm i { display: none; } .ctCap { padding: 3px 10px; margin-bottom: 3px; }
+  #ctBtns .big { font-size: 18px; padding: 5px 22px; margin: 3px; }
+}

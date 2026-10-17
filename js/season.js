@@ -28,7 +28,7 @@ const Season = {
     });
     const rec = {}; for (const i of ids) rec[i] = { w: 0, l: 0, t: 0, pf: 0, pa: 0 };
     this.data = { team: teamId, games, qtr, diff, week: 0, weeks, rec, phase: 'regular', bracket: null, champ: null, log: [],
-      stats: {}, awards: null, year: carry ? carry.year : 1, history: carry ? carry.history : [], rosters: carry ? carry.rosters : null,
+      stats: {}, awards: null, fullPO: true, year: carry ? carry.year : 1, history: carry ? carry.history : [], rosters: carry ? carry.rosters : null,
       weather: weeks.map((_, w) => ({ w: pickWeather('random', w, games), night: chance(0.3) })) };
     this.save();
   },
@@ -121,10 +121,10 @@ const Season = {
   },
 
   // ---- playoffs. Full 17-game season = the real NFL setup: 7 teams per conference (4 division winners + 3 wild cards),
-  // the 1 seed gets a bye, then Wild Card, Divisional, Conference Championship, Bobble Bowl. Shorter seasons: top 4, three rounds ----
+  // the 1 seed gets a bye, then Wild Card, Divisional, Conference Championship, Bobble Bowl (every season now; old saves until their next year) ----
   startPlayoffs() {
     const d = this.data;
-    const myConf = this.team(d.team).conf, full = d.games >= 17;
+    const myConf = this.team(d.team).conf, full = d.games >= 17 || !!d.fullPO; // every season started from v7.4 on gets the full 14-team playoff
     const seedConf = c => {
       const st = this.standings(c);
       if (!full) return st.slice(0, 4);

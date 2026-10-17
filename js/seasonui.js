@@ -83,8 +83,8 @@ function renderHubTab() {
   if (hubTab === 'stand') {
     const st = Season.standings(conf);
     h = `<table><tr><th>#</th><th>${conf}</th><th>W-L</th><th>PF</th><th>PA</th></tr>` +
-      st.map((id, i) => { const r = d.rec[id]; return `<tr class="${id === d.team ? 'me' : ''} ${i === 3 ? 'cut' : ''}"><td>${i + 1}</td><td>${dotFor(id)}${Season.team(id).name}</td><td>${recStr(id)}</td><td>${r.pf}</td><td>${r.pa}</td></tr>`; }).join('') +
-      `</table><div class="note">Dashed line = playoff cut (top 4)</div>`;
+      st.map((id, i) => { const r = d.rec[id]; return `<tr class="${id === d.team ? 'me' : ''} ${i === (d.fullPO || d.games >= 17 ? 6 : 3) ? 'cut' : ''}"><td>${i + 1}</td><td>${dotFor(id)}${Season.team(id).name}</td><td>${recStr(id)}</td><td>${r.pf}</td><td>${r.pa}</td></tr>`; }).join('') +
+      `</table><div class="note">Dashed line = playoff cut (top ${d.fullPO || d.games >= 17 ? '7: 4 division winners + 3 wild cards' : 4})</div>`;
   } else if (hubTab === 'lead') {
     const cats = [['pass', 'PASSING YDS'], ['rush', 'RUSHING YDS'], ['rec', 'RECEIVING YDS'], ['td', 'TOUCHDOWNS'], ['sack', 'SACKS'], ['int', 'INTERCEPTIONS']];
     h = '<div class="leadGrid">' + cats.map(([k, lbl]) => `<div class="leadBox"><div class="leadHead">${lbl}</div>` +

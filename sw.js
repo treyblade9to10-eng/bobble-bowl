@@ -1,5 +1,5 @@
 // ---- Offline support: network first (so updates show up right away), saved copy when there's no signal ----
-const CACHE = 'bobble-v7.3';
+const CACHE = 'bobble-v7.4';
 const FILES = [
   './',
   'index.html',
@@ -51,6 +51,7 @@ const FILES = [
   'js/tutorial.js',
   'js/teamlab.js',
   'js/franchise2.js',
+  'js/contracts.js',
   'js/playbook.js',
   'fonts/barlow-500.woff2',
   'fonts/barlow-700.woff2',
