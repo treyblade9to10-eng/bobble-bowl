@@ -717,8 +717,18 @@ function frame(now) {
 // if the browser drops the canvas (GPU reset / low memory), redraw everything from scratch
 cv.addEventListener('contextlost', () => resetGfx());
 cv.addEventListener('contextrestored', () => resetGfx());
+// a slow frame on a phone used to turn into slow motion (dt was capped at 1/30s). Now the game catches up in
+// small 1/60s steps so it keeps real speed and the physics stay steady. Taps/keys only count in the first step.
+function stepUpdate(raw) {
+  const n = Math.min(6, Math.max(1, Math.ceil(raw / (1 / 60) - 0.05))), h = raw / n;
+  for (let i = 0; i < n; i++) {
+    if (i === 1) { Input.pressed = {}; Input.taps.length = 0; Input.release = null; }
+    update(h);
+  }
+}
 function step(now) {
-  const dt = clamp((now - last) / 1000, 0, 0.033); last = now;
+  const raw = clamp((now - last) / 1000, 0, 0.1); last = now;
+  const dt = Math.min(raw, 0.033);
   if (Input.pointer.down) Input.pointer.t += dt;
   Pad.poll(dt);
   Input.versus = !!G.versus && !G.demo; if (!Input.versus) Input.ctl = 0;
@@ -735,7 +745,7 @@ function step(now) {
   } else {
     if (G.demo) G.demo = false;
     if (G.online) Net.prepRemote();
-    update(dt);
+    if (G.online) update(dt); else stepUpdate(raw);
     if (G.sitOut && !G.paused && ['presnap', 'live', 'dead'].includes(G.phase)) update(dt); // Player Lock: plays without your guy go by at double speed
     if (G.online) Net.hostFrame(dt);
   }
