@@ -97,6 +97,7 @@
         <label>Quarter <select id="optQtr"><option value="120">2 min</option><option value="180" selected>3 min</option><option value="300">5 min</option></select></label>
         <label>CPU <select id="optDiff"><option value="0">Rookie</option><option value="1" selected>Pro</option><option value="2">All-Pro</option><option value="3">All-Madden</option></select></label>
         <label>Coach <select id="optCoach"><option value="balanced" selected>Balanced</option><option value="aggressive">Aggressive</option><option value="conservative">Old School</option><option value="air">Air Raid</option><option value="ground">Ground + Pound</option></select></label>
+        <label>Coach Mode <select id="optCoachMode"><option value="0" selected>Off</option><option value="1">On</option></select></label>
         <button class="big" id="btnKick">KICKOFF</button>
         <button id="btnBackSel">Back</button>
       </div>
@@ -139,6 +140,7 @@
         <label>Season <select id="snGames"><option value="6">6 games</option><option value="8" selected>8 games</option><option value="12">12 games</option><option value="17">17 games (full)</option></select></label>
         <label>Quarter <select id="snQtr"><option value="120" selected>2 min</option><option value="180">3 min</option><option value="300">5 min</option></select></label>
         <label>CPU <select id="snDiff"><option value="0">Rookie</option><option value="1" selected>Pro</option><option value="2">All-Pro</option><option value="3">All-Madden</option></select></label>
+        <label>Coach Mode <select id="snCoachMode"><option value="0" selected>Off</option><option value="1">On</option></select></label>
         <div class="snInfo">Top 4 in your conference make the playoffs.<br>Win 3 playoff games to take the Bobble Bowl.</div>
         <button class="big" id="snStart">START SEASON</button>
         <button id="snBack">Back</button>
@@ -303,7 +305,7 @@
   <div id="pause" class="screen">
     <h2>Paused</h2>
     <button class="big" id="btnResume">RESUME</button>
-    <div class="row"><button id="btnReplayOpt">INSTANT REPLAYS: ON</button><button id="btnQuit">QUIT GAME</button></div>
+    <div class="row"><button id="btnReplayOpt">INSTANT REPLAYS: ON</button><button id="btnCoachOpt">COACH MODE: OFF</button><button id="btnQuit">QUIT GAME</button></div>
     <div id="pausePbp"></div>
   </div>
 

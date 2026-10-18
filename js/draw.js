@@ -248,7 +248,7 @@ function drawRoutes(g, G) {
 // on defense: show what YOUR player is supposed to do
 function drawDefJob(g, G) {
   const h = G.humanDef;
-  if (!h || !h.assign || !(G.phase === 'presnap' || (G.phase === 'live' && G.bstate === 'snap'))) return;
+  if (!h || !h.assign || coachOn() || !(G.phase === 'presnap' || (G.phase === 'live' && G.bstate === 'snap'))) return;
   const a = h.assign, d = dirOf(G.poss);
   g.save(); g.strokeStyle = '#ffe14d'; g.lineWidth = 3; g.setLineDash([6, 6]); g.globalAlpha = 0.8;
   let label = '';
@@ -952,6 +952,11 @@ function drawHUD(g, G) {
     g.font = 'bold 14px Barlow, Arial, sans-serif'; const w = g.measureText(t).width + 22;
     g.fillStyle = '#0b0f16d0'; roundRect(g, 10, 10, w, 28, 2); g.fill();
     g.fillStyle = '#fff'; g.textAlign = 'left'; g.fillText(t, 21, 29);
+    if (coachOn()) { // small Coach Mode tag next to your call
+      g.font = 'italic 900 12px "Barlow Condensed", "Arial Black", sans-serif'; const cw = g.measureText('COACH MODE').width + 14;
+      g.fillStyle = '#0b0f16d0'; roundRect(g, 16 + w, 13, cw, 22, 2); g.fill();
+      g.fillStyle = '#d9a933'; g.fillRect(16 + w, 13, 3, 22); g.fillText('COACH MODE', 24 + w, 28.5);
+    }
   }
   // hint + stamina
   if (G.hint) {
