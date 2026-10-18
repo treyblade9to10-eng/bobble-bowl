@@ -14,6 +14,8 @@ screens.push('locker'); menuScreens.push('locker');
             <div class="lkSets"></div>
             <div class="lkMixT">MIX AND MATCH</div>
             <div class="lkMix"></div>
+            <div class="lkMixT">HELMET STRIPE</div>
+            <div class="lkStr"></div>
           </div>
         </div>
       </div>`).join('')}
@@ -62,6 +64,10 @@ const Locker = {
         return `<button class="lkChip${parts[k] === u ? ' on' : ''}" data-k="${k}" data-u="${u}" title="${n}"><i style="background:linear-gradient(135deg, ${c[0]} 55%, ${c[1]} 55%)"></i></button>`;
       }).join('')}</div>`).join('');
       col.querySelectorAll('.lkChip').forEach(b => b.onclick = () => { const p = uniParts(this.val(side)); p[b.dataset.k] = b.dataset.u; this.pick(side, uniValue(p)); });
+      // helmet stripe: the team's own look, or force none / one / two on every uniform
+      const hs = HStripe.get(t.id);
+      col.querySelector('.lkStr').innerHTML = [['', 'TEAM'], ['0', 'NONE'], ['1', 'ONE'], ['2', 'TWO']].map(([k, n]) => `<button class="lkStrB${(hs == null ? '' : String(hs)) === k ? ' on' : ''}" data-s="${k}">${n}</button>`).join('');
+      col.querySelectorAll('.lkStrB').forEach(b => b.onclick = () => { HStripe.set(t.id, b.dataset.s === '' ? null : +b.dataset.s); Sound.click(); this.render(); });
     }
     // can you tell the two teams apart?
     const ja = this.look(1).jersey, jh = this.look(0).jersey, clash = colorGap(ja, jh) < 90;

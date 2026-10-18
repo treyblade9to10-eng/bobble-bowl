@@ -1296,3 +1296,7 @@ body.pad .dcRow:focus { outline: 4px solid var(--gold); outline-offset: -2px; }
   #benchEd .row button { padding: 5px 14px; font-size: 13px; } #benchEd .row button.big { font-size: 19px; padding: 6px 24px; }
   .beOpen { padding: 2px 10px; font-size: 11px; }
 }
+.lkStr { display: flex; gap: 4px; }
+.lkStrB { margin: 0; padding: 4px 10px; font-size: 13px; clip-path: none; background: var(--panel); color: var(--dim); flex: 1 1 0; }
+.lkStrB.on { background: var(--gold); color: #111; }
+@media (max-height: 500px) { .lkStrB { padding: 2px 4px; font-size: 10px; } }

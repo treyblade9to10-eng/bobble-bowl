@@ -299,7 +299,18 @@ const lum = c => { let h = (c || '#000').replace('#', ''); if (h.length === 3) h
 const VISOR_COL = { clear: '#cfe6ff60', dark: '#1a1f2bdd', smoke: '#4a515cc8', gold: '#d9a933e0', blue: '#2a6cffb0' };
 const GEAR_COL = { white: '#f2f2f2', black: '#161616', gold: '#d9a933', neon: '#b6ff2e' };
 const lookCache = new Map();
+// helmet stripe override per team, picked in the Uniform Room: 0 = no stripe, 1 = one stripe, 2 = two thin stripes (none saved = the uniform's own)
+const HStripe = {
+  KEY: 'bobbleHStripe', d: null,
+  all() { if (!this.d) { try { this.d = JSON.parse(localStorage.getItem(this.KEY) || '{}') || {}; } catch (e) { this.d = {}; } } return this.d; },
+  get(id) { const v = this.all()[id]; return v === 0 || v === 1 || v === 2 ? v : null; },
+  set(id, v) { const d = this.all(); if (v == null) delete d[id]; else d[id] = v; try { localStorage.setItem(this.KEY, JSON.stringify(d)); } catch (e) {} }
+};
 function teamLook(team, home, style) {
+  const lk = teamLookBase(team, home, style), o = team && HStripe.get(team.id);
+  return o == null || lk.hstripe === o ? lk : { ...lk, hstripe: o };
+}
+function teamLookBase(team, home, style) {
   style = style || (home ? 'home' : 'away');
   if (style.startsWith('mix:')) { // mix and match: helmet from one set, jersey from another, pants from a third
     const key = team.id + team.c1 + team.c2 + team.helmet + team.mask + team.pants + home + style + (team.unis ? JSON.stringify(team.unis) : ''); let m = lookCache.get(key);
