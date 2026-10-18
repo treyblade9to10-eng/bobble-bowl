@@ -19,6 +19,9 @@ function withSide(s, fn) {
 function setHD(side, p) { if (G.versus) G.hd[side] = p; if (side === G.human) G.humanDef = p; }
 const pName = s => G.online ? (s === G.human ? 'YOU' : 'OPP') : G.versus ? (s === G.p1 ? 'P1' : 'P2') : (s === G.human ? 'YOU' : 'CPU');
 // mobile or computer controls for whoever is acting right now (online: each player's own device)
+// Coach Mode: you call the plays, the CPU runs every one of your players (no stick, auto snap, auto kicks). Not in 2-player / online / Player Lock / challenges
+const coachPref = () => { try { return JSON.parse(localStorage.getItem('bobbleOpts') || '{}').optCoachMode === '1'; } catch (e) { return false; } };
+const coachOn = () => !!G.coachMode && !G.versus && !G.online && !G.lock && !G.demo && !G.mini && !G.challenge && G.human >= 0;
 const ctlMobile = () => (G.online && G.netModes ? G.netModes[Input.ctl] : G.mode) === 'mobile';
 const goalX = s => (s === 0 ? 110 : 10);      // goal line this side is attacking
 const ownGoal = s => (s === 0 ? 10 : 110);    // goal line this side defends
@@ -70,7 +73,7 @@ function initGame(home, away, opts) {
     versus: !!opts.versus, p1: opts.humanSide || 0, hd: [null, null], hp: [null, null], humanDef: null,
     career: opts.career || false, lock: !!opts.lock, callBall: 0, sitOut: false, dirt: {},
     bigGame: opts.bigGame ? { year: opts.bigGame, name: bowlName(opts.bigGame) } : null,
-    coach: COACH_STYLES[opts.coach] ? opts.coach : savedCoach()
+    coach: COACH_STYLES[opts.coach] ? opts.coach : savedCoach(), coachMode: opts.coachMode != null ? !!opts.coachMode : coachPref()
   });
   // big rivalries: the home team breaks out its rivalry set (unless someone picked uniforms on purpose)
   G.rivalryMatch = !opts.scenario && isRivalry(home, away);
@@ -300,9 +303,9 @@ function choosePlay(key, defPick) {
   else setupPlay(OFF_PLAYS.find(p => p.key === offKey), DEF_PLAYS.find(p => p.key === defKey));
   G.phase = 'presnap'; G.presnapAt = G.time;
   Input.pressed = {}; Input.taps.length = 0; // the key/tap that picked the play doesn't count as a hot route or snap
-  G.snapTimer = humanOff && !G.sitOut ? Infinity : G.cpuMotion != null ? 2.4 : 1.6;
+  G.snapTimer = humanOff && !G.sitOut ? (coachOn() ? 2.2 : Infinity) : G.cpuMotion != null ? 2.4 : 1.6;
   if (G.play && G.play.off && G.play.off.motion) { G.cpuMotion = null; startMotion(); if (!humanOff) G.snapTimer = 2.2; } // motion plays: he takes off right away
-  if (!humanOff && !G.sitOut && (G.mode === 'mobile' || (G.online && G.netModes && G.netModes.includes('mobile')))) G.snapTimer += 1.2; // phones: a beat longer to tap SWITCH / a defender
+  if (!humanOff && !G.sitOut && !coachOn() && (G.mode === 'mobile' || (G.online && G.netModes && G.netModes.includes('mobile')))) G.snapTimer += 1.2; // phones: a beat longer to tap SWITCH / a defender
 }
 
 function choosePAT(kind) {
@@ -608,6 +611,15 @@ function update(dt) {
 // before the snap: offense snaps / hot routes, defense picks who to control
 function presnapInput(dt) {
   if (G.sitOut) { G.snapTimer -= dt; if (G.snapTimer <= 0) snap(); return; }
+  if (coachOn()) { // Coach Mode: timeout / audible still work, the ball snaps itself (or tap / SPACE to snap on offense)
+    if (Input.hit('KeyT')) callTimeout(G.human);
+    if (Input.hit('KeyZ')) { audible(); return 'audible'; }
+    G.snapTimer -= dt;
+    if (G.cpuMotion != null && G.snapTimer < G.cpuMotion) { G.cpuMotion = null; startMotion(); }
+    const settled = G.time - (G.presnapAt || 0) > 0.3;
+    if (G.snapTimer <= 0 || (G.poss === G.human && settled && (Input.hit('Space') || Input.taps.length))) snap();
+    return;
+  }
   if (Input.hit('KeyT')) callTimeout(G.human);
   if (Input.hit('KeyZ') && !G.versus) { audible(); return 'audible'; }
   if (G.poss === G.human) {
@@ -905,6 +917,7 @@ function updateHuman() {
     G.hp = hs; G.humanPlayer = hs[G.human];
     return;
   }
+  if (coachOn()) return; // Coach Mode: the CPU plays everybody
   const h = G.lock ? lockedGuy() || (G.sitOut || G.special ? null : humanFor()) : humanFor();
   if (h) h.isHuman = true;
   G.humanPlayer = h;
@@ -1873,7 +1886,7 @@ function endPlay(res) {
     next = { kickoff: off };
   } else if (res.type === 'td') {
     G.score[cs] += 6; G.deadT = isHumanSide(cs) ? 3.8 : 2.5;
-    if (isHumanSide(cs)) { G.cellyGuy = car; car.down = 0; car.dive = 0; } else { car.down = 0; car.dive = 0; Celly.cpu(car); }
+    if (isHumanSide(cs) && !coachOn()) { G.cellyGuy = car; car.down = 0; car.dive = 0; } else { car.down = 0; car.dive = 0; Celly.cpu(car); }
     // he trots a few yards into the end zone so the celly isn't buried in the pile
     const gx = goalX(cs), gd = dirOf(cs); G.tdScorer = car;
     car.tdRun = { x: gd * (car.x - gx) >= 3 ? car.x : gx + gd * 3.5, y: clamp(car.y, 9, FIELD_W - 9) };
@@ -2008,7 +2021,7 @@ function doKick(kind) {
            rateP: 0.7 + (90 - ovr) * 0.015, rateA: 0.6 + (90 - ovr) * 0.015,
            need: kind === 'punt' ? 0 : yds / fgRange(ovr), tol: kind === 'punt' ? 0.35 : Math.min(0.45, fgTol(yds, ovr) * (kind === 'xp' ? 1.6 : 1.35)) };
   G.playClock = 0;
-  if (isHumanSide(s) && !G.demo && !G.sitOut) { G.phase = 'kickmeter'; G.km.wait = 0.35; return; }
+  if (isHumanSide(s) && !G.demo && !G.sitOut && !coachOn()) { G.phase = 'kickmeter'; G.km.wait = 0.35; return; }
   // computer kicks: roll the dice using the kicker's rating
   const km = G.km;
   if (kind === 'punt') { km.power = rand(0.55, 0.95); km.aim = rand(-0.45, 0.45); }
@@ -2159,6 +2172,7 @@ function updateHint() {
   if (!G.teams) return;
   if (G.phase === 'kickmeter' || G.mini) { G.hint = ''; return; }
   if (G.cellyGuy && G.phase === 'dead') { G.hint = G.versus && !G.online ? `${pName(G.cellyGuy.side)}: CELEBRATE!` : G.mode === 'mobile' ? '' : 'CELLY:  ↑ Leap  ↓ Griddy  ← Spike  → Dab   1 Flex  2 Bow  3 Shush  4 Moonwalk   E Nap   F Bowling' + (G.weather === 'snow' ? '   R Snow Angel' : G.weather === 'rain' ? '   C Mud Slide' : '') + (clubCelly(G.cellyGuy) ? `   G ${clubCelly(G.cellyGuy).name}` : '') + CELLYS.filter(c => c.lock && Unlocks.has(c.id)).map(c => `   ${CELLY_KEY_NAME[c.keys[0]]} ${c.name}`).join(''); return; }
+  if (coachOn()) { G.hint = G.phase === 'presnap' && G.poss === G.human ? (G.mode === 'mobile' ? 'You call the plays, your team plays them  •  TAP to snap' : 'You call the plays, your team plays them  •  SPACE snap  •  Z audible  •  T timeout') : G.phase === 'presnap' || G.phase === 'live' ? 'You call the plays, your team plays them' + (G.phase === 'presnap' && G.mode !== 'mobile' ? '  •  Z audible  •  T timeout' : '') : ''; return; }
   if (G.mode === 'mobile') return updateHintMobile();
   if (G.versus && !G.online) {
     const k = s => s === G.p1 ? 'SPACE' : 'ENTER';

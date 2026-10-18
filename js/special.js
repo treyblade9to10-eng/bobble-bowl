@@ -67,9 +67,10 @@ function setupReturn(kind, k) {
 function startKickMeter(kind, k) {
   const kk = kickerOf(k, kind === 'punt' ? 'punt' : 'fg');
   G.km = { kind, yds: 0, kk, stage: 0, t: 0, power: 0, aim: 0, side: k, rateP: 0.7 + (90 - kk.ovr) * 0.015, rateA: 0.6 + (90 - kk.ovr) * 0.015, need: 0, tol: 0.35 };
-  if (isHumanSide(k) && !G.demo && !(G.sitOut && kind === 'punt')) { G.phase = 'kickmeter'; G.km.wait = 0.35; return; }
+  if (isHumanSide(k) && !G.demo && !(G.sitOut && kind === 'punt') && !coachOn()) { G.phase = 'kickmeter'; G.km.wait = 0.35; return; }
   // CPU kickoffs: mostly land in the field so you get to return them, sometimes a deep boot
   G.km.power = kind === 'onside' ? rand(0.3, 0.8) : kind === 'ko' ? (chance(0.7) ? rand(0.15, 0.68) : rand(0.7, 0.98)) : rand(0.6, 0.98); G.km.aim = rand(-0.4, 0.4);
+  if (isHumanSide(k) && coachOn() && kind !== 'onside') { const q = clamp((kk.ovr - 60) / 35, 0, 1); G.km.power = clamp(rand(0.55, 0.85) + q * 0.15, 0.4, 1); G.km.aim = rand(-0.4, 0.4) * (1.2 - q * 0.6); } // Coach Mode: your kicker's rating decides it
   G.phase = 'kickmeter'; G.km.cpuT = 0.8; G.km.stage = 3; // short pause so you can see the lineup
 }
 
@@ -115,7 +116,7 @@ function catchKick(f) {
   if (!rt || rd > 3) { b.loose = { vx: dirOf(k) * 2, vy: rand(-1, 1), t: 0 }; b.x = f.tx; b.y = f.ty; G.bstate = 'loose'; addText(f.tx, f.ty, 'LOOSE BALL!', '#ff9a3d', 20, 1); return; }
   // CPU returner calls a fair catch on punts when the coverage is right there
   const cover = Math.min(...G.D.map(p => dist(p, rt)));
-  if (f.kick === 'punt' && !isHumanSide(rt.side) && cover < 3.5) { addText(rt.x, rt.y, 'FAIR CATCH', '#fff', 18, 1); return endPlay({ type: 'kickdead', x: rt.x, why: 'FAIR CATCH' }); }
+  if (f.kick === 'punt' && (!isHumanSide(rt.side) || coachOn()) && cover < 3.5) { addText(rt.x, rt.y, 'FAIR CATCH', '#fff', 18, 1); return endPlay({ type: 'kickdead', x: rt.x, why: 'FAIR CATCH' }); }
   if (chance(0.02)) { b.loose = { vx: rand(-2, 2), vy: rand(-2, 2), t: 0 }; b.x = rt.x; b.y = rt.y; G.bstate = 'loose'; addText(rt.x, rt.y, 'MUFFED IT!', '#ff6040', 22, 1); return; }
   b.holder = rt; G.bstate = 'run'; G.credit = null; G.retStart = rt.x;
   Sound.catch(); addText(rt.x, rt.y, 'RETURN!', '#9cff9c', 18, 0.8);
@@ -148,7 +149,7 @@ function endReturn(res) {
   G.special = null;
   if (res.type === 'td') {
     G.score[cs] += 6; G.deadT = isHumanSide(cs) ? 3.8 : 2.5;
-    if (isHumanSide(cs)) { G.cellyGuy = car; car.down = 0; car.dive = 0; } else { car.down = 0; car.dive = 0; Celly.cpu(car); }
+    if (isHumanSide(cs) && !coachOn()) { G.cellyGuy = car; car.down = 0; car.dive = 0; } else { car.down = 0; car.dive = 0; Celly.cpu(car); }
     showBanner(cs === r ? (kind === 'punt' ? 'PUNT RETURN TD!' : 'KICK RETURN TD!') : 'TOUCHDOWN!', `${car.name} • ${G.teams[cs].name}`, cs === G.human ? '#ffd23f' : '#ff6040', 2.6);
     Sound.td(); G.crowdHype = 1.5; stat(car).td++; G.slowmo = 0.9;
     for (const q of G.players) if (q.side === cs) q.celebrate = 2.6;

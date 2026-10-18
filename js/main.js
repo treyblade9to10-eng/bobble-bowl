@@ -130,6 +130,7 @@ function renderSelect(bumpSide) {
     el.style.background = `linear-gradient(160deg, ${t.c1} 55%, ${t.c2})`; el.style.color = textOn(t.c1);
     const who = $(id).querySelector('.who');
     const two = $('optPlayers').value === '2' && G.mode !== 'mobile';
+    if ($('optCoachModeBtn')) $('optCoachModeBtn').style.display = two ? 'none' : '';
     who.textContent = sel.you === side ? (two ? 'P1' : 'YOU') : (two ? 'P2' : 'CPU'); who.className = 'who ' + (sel.you === side ? 'you' : two ? 'p2' : 'cpu');
     if (bumpSide === side) { el.classList.add('bump'); setTimeout(() => el.classList.remove('bump'), 120); }
   }
@@ -222,12 +223,23 @@ const fillSel = (id, list, val) => { $(id).innerHTML = list.map(([v, t]) => `<op
 fillSel('optUni0', UNIFORMS, 'home');
 $('optPlayers').onchange = () => renderSelect(); fillSel('optUni1', UNIFORMS, 'away'); fillSel('optWeather', WEATHER, 'clear');
 try { const o = JSON.parse(localStorage.getItem('bobbleOpts') || 'null'); if (o) for (const k in o) if ($(k)) $(k).value = o[k]; } catch (e) {}
-function saveOpts() { const o = {}; for (const k of ['optUni0', 'optUni1', 'optWeather', 'optNight', 'optGame', 'optLogos', 'optQtr', 'optDiff', 'optCoach', 'optPlayers']) o[k] = $(k).value; try { localStorage.setItem('bobbleOpts', JSON.stringify(o)); } catch (e) {} }
-const cycPaint = [['optQtr', 'QUARTERS'], ['optDiff', 'CPU'], ['optCoach', 'COACH'], ['optWeather', 'WEATHER'], ['optNight', 'TIME'], ['optGame', 'GAME'], ['optLogos', 'LOGOS'], ['optPlayers', 'PLAYERS']].map(([id, l]) => cycleBtn(id, l));
+function saveOpts() { const o = {}; for (const k of ['optUni0', 'optUni1', 'optWeather', 'optNight', 'optGame', 'optLogos', 'optQtr', 'optDiff', 'optCoach', 'optCoachMode', 'optPlayers']) o[k] = $(k).value; try { localStorage.setItem('bobbleOpts', JSON.stringify(o)); } catch (e) {} }
+const cycPaint = [['optQtr', 'QUARTERS'], ['optDiff', 'CPU'], ['optCoach', 'COACH'], ['optCoachMode', 'COACH MODE'], ['optWeather', 'WEATHER'], ['optNight', 'TIME'], ['optGame', 'GAME'], ['optLogos', 'LOGOS'], ['optPlayers', 'PLAYERS']].map(([id, l]) => cycleBtn(id, l));
 $('optLogos').addEventListener('change', () => { Logo.setStyle($('optLogos').value); renderSelect(); });
 Logo.onReady(() => { if ($('select').classList.contains('show')) renderSelect(); });
 const repaintCycles = () => cycPaint.forEach(f => f());
 $('optPlayersBtn').classList.add('optPl');
+// Coach Mode (you call the plays, the CPU plays them): one saved setting shared by Quick Game, Season and the pause menu
+function setCoachMode(on) {
+  $('optCoachMode').value = $('snCoachMode').value = on ? '1' : '0'; $('optCoachMode').dispatchEvent(new Event('change')); saveOpts();
+  if (G.teams) { G.coachMode = on; updateHuman(); }
+  coachLabel();
+}
+const coachLabel = () => { $('btnCoachOpt').textContent = 'COACH MODE: ' + ((G.teams ? G.coachMode : $('optCoachMode').value === '1') ? 'ON' : 'OFF'); };
+$('snCoachMode').value = $('optCoachMode').value;
+$('snCoachMode').onchange = () => setCoachMode($('snCoachMode').value === '1');
+$('optCoachMode').addEventListener('change', () => { $('snCoachMode').value = $('optCoachMode').value; });
+$('btnCoachOpt').onclick = () => { Sound.click(); setCoachMode(!G.coachMode); };
 
 function startGame() {
   Sound.init(); Sound.whistle(); Sound.crowd(false);
@@ -533,7 +545,7 @@ function togglePause() {
   if (!G.teams || G.phase === 'over' || G.demo) return;
   if (G.online) { const on = !$('pause').classList.contains('show'); if (on) { $('pausePbp').innerHTML = '<div class="pbpHead">ONLINE GAME KEEPS GOING WHILE THIS IS OPEN</div>' + pbpHtml(6); show('pause'); } else show(null); return; }
   G.paused = !G.paused;
-  if (G.paused) { G.pauseFrom = $('playcall').classList.contains('show') ? 'playcall' : null; $('pausePbp').innerHTML = pbpHtml(8); show('pause'); }
+  if (G.paused) { G.pauseFrom = $('playcall').classList.contains('show') ? 'playcall' : null; coachLabel(); $('btnCoachOpt').style.display = G.versus || G.lock || G.mini || G.challenge ? 'none' : ''; $('pausePbp').innerHTML = pbpHtml(8); show('pause'); }
   else show(G.pauseFrom);
 }
 $('btnPause').onclick = togglePause;
@@ -628,16 +640,18 @@ function updateMobileButtons() {
   }
   if (G.phase === 'dead' && G.cellyGuy && !G.cellyGuy.celly && !G.cellyGuy.cellyNext && !G.demo && (!G.online || G.cellyGuy.side === G.human)) st = 'celly'; // buttons hide once he's celebrating
   if (G.phase === 'presnap' && !G.demo) st = 'presnap';
+  const coach = coachOn(); // Coach Mode: no stick or move buttons, just AUDIBLE / TIMEOUT before the snap
+  if (coach && st !== 'presnap') st = '';
   const joyOn = G.phase === 'live' && !G.demo && !!h; // stays up the whole play so your thumb never loses it
   $('joy').classList.toggle('on', !!joyOn);
   if (!joyOn && Input.stick.m) { Input.stick.x = Input.stick.y = Input.stick.m = 0; $('joyKnob').style.left = $('joyKnob').style.top = ''; }
   const side = G.poss === G.human ? 'off' : 'def';
   const po = G.play && G.play.off, canMotion = !!po && (po.type === 'pass' || po.toss || po.carrier === 4);
   const club = st === 'celly' ? clubCelly(G.cellyGuy) : null;
-  const key = st + side + canMotion + G.weather + (club ? club.id : '') + (b && b.flight ? 'air' : '') + (h && h.engaged ? 'eng' : '');
+  const key = st + side + coach + canMotion + G.weather + (club ? club.id : '') + (b && b.flight ? 'air' : '') + (h && h.engaged ? 'eng' : '');
   if (key === mbState) return;
   mbState = key;
-  document.querySelectorAll('#mbtns button').forEach(x => x.classList.toggle('on', x.dataset.show === st && (!x.dataset.side || x.dataset.side === side) && (x.dataset.k !== 'KeyM' || canMotion) && (!x.dataset.wx || x.dataset.wx === G.weather) && (!x.dataset.lock || Unlocks.has(x.dataset.lock))));
+  document.querySelectorAll('#mbtns button').forEach(x => x.classList.toggle('on', x.dataset.show === st && (!x.dataset.side || x.dataset.side === side) && (x.dataset.k !== 'KeyM' || canMotion) && (!x.dataset.wx || x.dataset.wx === G.weather) && (!x.dataset.lock || Unlocks.has(x.dataset.lock)) && (!coach || x.dataset.k === 'KeyZ' || x.dataset.k === 'KeyT')));
   $('mbtns').classList.toggle('pre', st === 'presnap');
   $('mbtns').classList.toggle('cel', st === 'celly');
   $('mbClub').classList.toggle('on', !!club); if (club) $('mbClub').textContent = club.name; // team signature celly
