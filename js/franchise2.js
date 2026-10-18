@@ -78,7 +78,7 @@ Object.assign(Season, {
   const t = _team.call(this, id), r = this.data && this.data.rosters && this.data.rosters[id];
   if (!r || !r.bench) return t;
   const qb = r.bench.filter(p => p && p[0] === 'QB' && !this.hurt(p)).sort((a, b) => b[3] - a[3])[0];
-  return qb ? { ...t, qb2: qb.slice(0, 5) } : t;
+  return qb ? { ...t, qb2: qb.slice(0, 6) } : t; // keeps his skin tone
 }; }
 { const _fw = Season.finishWeek; Season.finishWeek = function (s) {
   const wk = this.data.week; _fw.call(this, s);

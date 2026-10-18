@@ -6,10 +6,20 @@ const posGroup = p => p === 'TE' ? 'WR' : p; // tight ends and receivers can cov
 const tName = id => (TEAMS.find(t => t.id === id) || { name: id }).name; // 'Saints', not 'NO'
 
 Object.assign(Season, {
-  // every team gets a bench of backups (one at each spot) the first time we need it
+  // every team gets a bench of backups (one at each spot) the first time we need it:
+  // the real ones off its depth chart (teams.js qb2 + rb2 + bench), made-up guys only for teams without them (custom teams).
+  // Saves that already have a bench keep it.
+  realBench(id) {
+    const t = TEAMS.find(x => x.id === id);
+    if (!t || !Array.isArray(t.bench)) return null;
+    const out = [t.qb2, t.rb2, ...t.bench].filter(p => Array.isArray(p) && p[0] && p[1]).map(p => { const q = p.slice(0, 6); if (q[5] == null) q[5] = 3; return q; });
+    for (const pos of BACKUP_POS) if (!out.some(p => p[0] === pos)) out.push(this.fakeBackup(pos)); // a spot with no real backup
+    return out;
+  },
+  fakeBackup(pos) { const [s0, s1] = ROOKIE_SPD[pos]; return [pos, `${pick(FIRST)} ${pick(LAST)}`, 1 + Math.floor(Math.random() * 98), Math.round(rand(60, 71)), Math.round(rand(s0, s1) - 3), Math.floor(Math.random() * 6)]; },
   bench(id) {
     const R = this.ensureRosters()[id];
-    if (!R.bench) R.bench = BACKUP_POS.map(pos => { const [s0, s1] = ROOKIE_SPD[pos]; return [pos, `${pick(FIRST)} ${pick(LAST)}`, 1 + Math.floor(Math.random() * 98), Math.round(rand(60, 71)), Math.round(rand(s0, s1) - 3), Math.floor(Math.random() * 6)]; });
+    if (!R.bench) R.bench = this.realBench(id) || BACKUP_POS.map(pos => this.fakeBackup(pos));
     return R.bench;
   },
   pickOwner(id) { const o = this.data.pickOwner; return (o && o[id]) || id; },
