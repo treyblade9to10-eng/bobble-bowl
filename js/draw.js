@@ -801,7 +801,7 @@ function drawBallFree(g, G) {
 // drag-back throw aim
 function drawAim(g, G) {
   const a = G.aim; if (!a || !G.O) return;
-  const qb = G.O[0];
+  const qb = curPasser();
   if (a.run) {
     const d = dirOf(G.poss), x0 = sx(qb.x), y0 = sy(qb.y) - 20, x1 = sx(qb.x + d * 7), y1 = y0;
     g.strokeStyle = '#7fd3ff'; g.fillStyle = '#7fd3ff'; g.lineWidth = 8; g.lineCap = 'round';

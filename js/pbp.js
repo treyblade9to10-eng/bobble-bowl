@@ -23,12 +23,12 @@ function pbpPlay(res) {
   if (res.kneel) {
     s = `${ln(car)} takes a knee.`;
   } else if (res.type === 'inc') {
-    const qb = G.O && G.O[0], tgt = G.intended;
+    const qb = G.lastPasser || (G.O && G.O[0]), tgt = G.intended;
     s = `${ln(qb)} pass incomplete${tgt ? `, intended for ${ln(tgt)}` : ''}.`;
     if (res.text === 'DROPPED!') s = `${ln(tgt)} drops it.`;
     else if (res.text === 'BROKEN UP!' || res.text === 'SWATTED!') s = `${ln(qb)} pass broken up${G.breakup ? ` by ${ln(G.breakup)}` : ''}.`;
   } else if (G.intBy && cs !== off) {
-    s = `${ln(G.O[0])} pass INTERCEPTED by ${ln(G.intBy)}` + (res.type === 'td' ? ', and he takes it to the house!' : '.');
+    s = `${ln(G.lastPasser || G.O[0])} pass INTERCEPTED by ${ln(G.intBy)}` + (res.type === 'td' ? ', and he takes it to the house!' : '.');
     hype = pick(['Huge turnover.', 'Read that one the whole way.', 'What a pick.']);
   } else if (res.type === 'sack') {
     s = `${ln(car)} sacked by ${ln(tk)} for a loss of ${yd(gain)}.`;
