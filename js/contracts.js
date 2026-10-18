@@ -63,22 +63,55 @@ const Contracts = {
     const d = Season.data;
     this.ensure();
     const R = Season.ensureRosters(), pool = [], mine = [];
-    for (const id in R) for (const p of this.all(id)) {
-      const c = this.con(p); if (!c) continue;
-      c.yrs--;
-      if (c.yrs > 0) continue;
-      if (id === d.team) { mine.push(p); continue; }
-      // CPU teams keep most of their good players (if they can pay them)
-      const keep = chance(p[3] >= 88 ? 0.92 : p[3] >= 80 ? 0.72 : p[3] >= 72 ? 0.45 : 0.2);
-      const ask = this.value(p), can = this.room(id) + c.sal;
-      if (keep && footballAge(p[0], p[6].age || 27) < 34 && can >= ask * 0.85) { c.sal = Math.min(ask, Math.round(can * 10) / 10); c.yrs = this.wantYears(p); } // stars usually stay (a little hometown discount)
-      else { this.remove(id, p); pool.push(this.listing(p, id)); }
+    for (const id in R) {
+      const qb = R[id].off[0], exp = [];
+      for (const p of this.all(id)) {
+        const c = this.con(p); if (!c) continue;
+        c.yrs--;
+        if (c.yrs > 0) continue;
+        if (id === d.team) { mine.push(p); continue; }
+        exp.push(p);
+      }
+      // the starting QB gets decided first: teams almost never let a good one walk
+      exp.sort((a, b) => (b === qb) - (a === qb));
+      for (const p of exp) {
+        if (!this.all(id).includes(p)) continue; // let go to make room for the QB
+        const c = this.con(p), ask = this.value(p), fa = footballAge(p[0], (p[6] && p[6].age) || 27);
+        if (p === qb && p[0] === 'QB' && this.keepQB(p, fa)) {
+          if (this.room(id) + c.sal < ask * 0.85) this.clearRoom(id, ask * 0.85 - c.sal, p, pool);
+          const can = this.room(id) + c.sal;
+          if (can >= ask * 0.7) { c.sal = Math.round(Math.min(ask, can) * 10) / 10; c.yrs = fa >= 33 ? 1 : fa >= 30 ? 2 : Math.max(3, this.wantYears(p)); continue; }
+        }
+        // CPU teams keep most of their good players (if they can pay them)
+        const keep = chance(p[3] >= 88 ? 0.92 : p[3] >= 80 ? 0.72 : p[3] >= 72 ? 0.45 : 0.2);
+        const can = this.room(id) + c.sal;
+        if (keep && fa < 34 && can >= ask * 0.85) { c.sal = Math.min(ask, Math.round(can * 10) / 10); c.yrs = this.wantYears(p); } // stars usually stay (a little hometown discount)
+        else { this.remove(id, p); pool.push(this.listing(p, id)); }
+      }
     }
     for (const id in R) if (id !== d.team) this.fillHoles(id);
     // a few veterans nobody signed last year are out there too
     for (let i = 0; i < 14; i++) { const pos = pick(BACKUP_POS), [s0, s1] = ROOKIE_SPD[pos]; const p = [pos, `${pick(FIRST)} ${pick(LAST)}`, 1 + Math.floor(Math.random() * 98), Math.round(rand(66, 79)), Math.round(rand(s0, s1) - 4), Math.floor(Math.random() * 6), { age: Math.round(rand(27, 32)) }]; pool.push(this.listing(p, null)); }
     d.fa = { year: d.year, stage: 'resign', day: 1, pool, mine: mine.map(p => ({ t: p, ask: { sal: this.value(p), yrs: this.wantYears(p) } })), log: [] };
     Season.save();
+  },
+  // does a CPU team bring its starting QB back? Good ones almost always (fa = football age: QBs count 4 years younger)
+  keepQB(p, fa) {
+    if (fa >= 37) return p[3] >= 88 && chance(0.6);
+    const old = fa >= 35;
+    return chance(p[3] >= 85 ? (old ? 0.85 : 0.97) : p[3] >= 78 ? (old ? 0.6 : 0.9) : p[3] >= 72 && fa < 34 ? 0.65 : 0);
+  },
+  // free up cap money by letting lesser, pricey players go (at most 6, and only if it's enough to keep the QB)
+  clearRoom(id, need, keepP, pool) {
+    const list = this.all(id).filter(p => p !== keepP && p[0] !== 'QB' && p[3] < keepP[3] - 3 && !(p[6] && p[6].cap) && ((this.con(p) || {}).sal || 0) >= 1)
+      .sort((a, b) => (this.con(b).sal - this.value(b) * 0.5) - (this.con(a).sal - this.value(a) * 0.5));
+    const go = []; let freed = 0;
+    for (const p of list) { if (freed >= need || go.length >= 6) break; freed += this.con(p).sal; go.push(p); }
+    if (freed < need) return;
+    for (const p of go) {
+      this.remove(id, p); pool.push(this.listing(p, id));
+      if (Season.news) Season.news(`${tName(id)} let ${p[0]} ${p[1]} (${p[3]}) go to make cap room for QB ${keepP[1]}`);
+    }
   },
   listing(p, from) { return { t: p, from, ask: { sal: this.value(p), yrs: this.wantYears(p) } }; },
   // re-sign one of your own guys at his asking price
@@ -134,7 +167,7 @@ const Contracts = {
         const f = Season.fit(id, Object.assign(L.t.slice(), { pot: 'C' })), gain = f ? f.gain : -10;
         const sc = gain + rand(-3, 3); if (sc > bs) { bs = sc; best = id; }
       }
-      if (best && bs > -2) this.sign(best, fa.pool.indexOf(L), L.ask.sal * rand(0.92, 1.12), L.ask.yrs);
+      if (best && bs > -2) this.sign(best, fa.pool.indexOf(L), Math.min(L.ask.sal * rand(0.92, 1.12), this.room(best)), L.ask.yrs); // never over the cap
     }
     for (const L of fa.pool) L.ask.sal = Math.max(MIN_SAL, Math.round(L.ask.sal * 0.9 * 10) / 10); // still unsigned: asks come down
   },
