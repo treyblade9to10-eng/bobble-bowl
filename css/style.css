@@ -1222,3 +1222,28 @@ body.pad .dcRow:focus { outline: 4px solid var(--gold); outline-offset: -2px; }
     .bkGames { flex-direction: row; flex-wrap: wrap; } .bkGames .bkG { flex: 1 1 140px; }
   .bkBowl .bkGames { flex-direction: column; align-items: stretch; } .bkBowl .bkGames .bkG { flex: 0 0 auto; } .bkWrap { gap: 8px; }
 }
+
+/* ---- season save slots (slots.js) ---- */
+#seasonSlots > .row { margin-top: 10px; }
+#ssCards { display: flex; gap: 14px; justify-content: center; align-items: stretch; flex-wrap: wrap; margin-top: 8px; }
+.ssCard { width: 250px; display: flex; flex-direction: column; align-items: center; text-align: center; padding: 10px 12px 12px; background: linear-gradient(165deg, color-mix(in srgb, var(--c1) 55%, #0c1016) 0%, var(--panel) 62%); border-top: 4px solid var(--c1, #333); position: relative; }
+.ssCard.last { box-shadow: 0 0 0 2px var(--gold); }
+.ssCard.empty { background: var(--panel); border-top-color: #ffffff30; justify-content: flex-start; }
+.ssSlot { font-family: var(--hd); font-weight: 800; font-size: 12px; letter-spacing: .16em; color: var(--gold); align-self: stretch; text-align: left; }
+.ssLogo { width: 84px; height: 84px; margin: 4px 0 2px; } .ssLogo .badge { width: 100%; height: 100%; display: block; filter: drop-shadow(2px 3px 0 #0008); }
+.ssTeam { font-family: var(--hd); font-style: italic; font-weight: 900; font-size: 30px; line-height: 1; text-transform: uppercase; color: #fff; text-shadow: 2px 2px 0 #0008; }
+.ssTeam i { display: block; font-size: 15px; font-weight: 800; letter-spacing: .06em; color: #ffffffc0; }
+.ssInfo { font-family: var(--hd); font-weight: 800; font-size: 18px; margin-top: 6px; letter-spacing: .04em; } .ssInfo b { color: var(--gold); }
+.ssWhere { font-family: var(--hd); font-weight: 800; font-size: 12px; letter-spacing: .14em; color: var(--dim); margin: 2px 0 8px; }
+.ssEmpty { font-family: var(--hd); font-style: italic; font-weight: 900; font-size: 34px; color: #ffffff38; margin: 46px 0 6px; }
+.ssCard button { margin: 3px 0 0; width: 100%; font-family: var(--hd); font-style: italic; font-weight: 800; font-size: 17px; letter-spacing: .06em; padding: 7px; }
+.ssCard.empty button { margin-top: auto; }
+.ssCard button.gold { background: var(--gold); color: #111; }
+.ssCard .ssDel { background: transparent; color: #ff8a7a; font-size: 13px; padding: 4px; }
+.ssCard .ssDel.sure { background: var(--red); color: #fff; }
+@media (max-height: 500px) {
+  #seasonSlots h2 { font-size: 28px; margin: 0 0 2px; } #seasonSlots { padding: 8px; } #ssCards { gap: 10px; margin-top: 2px; }
+  .ssCard { width: 220px; padding: 6px 10px 8px; } .ssLogo { width: 58px; height: 58px; } .ssTeam { font-size: 24px; } .ssTeam i { font-size: 12px; }
+  .ssInfo { font-size: 15px; margin-top: 3px; } .ssWhere { margin-bottom: 5px; } .ssEmpty { font-size: 28px; margin-top: 30px; } .ssCard button { font-size: 15px; padding: 5px; }
+}
+@media (max-width: 700px) { #ssCards { flex-direction: column; align-items: center; } .ssCard { width: min(320px, 92vw); } .ssEmpty { margin: 10px 0 4px; } }
