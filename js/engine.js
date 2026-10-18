@@ -204,8 +204,9 @@ function cpuGoForIt(toGo, fgOk) {
 function lastSecondKick(S) {
   if (!S.fgLong || G.twoPt || G.patSide != null) return false;
   const t = S.endHalf; if (t === Infinity) return false;
-  const left = S.clockRunning ? t - (S.tos > 0 ? 99 : 0) : t; // with a timeout left there's no rush
-  if (left > (S.clockRunning ? 16 : 7)) return false;
+  // only when there's no time for another real play: clock stopped (or a timeout to stop it) = under 12s, clock running with no timeouts = under 18s
+  const running = S.clockRunning && S.tos <= 0;
+  if (t > (running ? 18 : 12)) return false;
   if (G.quarter === 2) return true;
   return S.margin >= -3 && S.margin <= 0 || (S.margin > 0 && S.margin <= 5);
 }
@@ -1006,7 +1007,8 @@ function mobileControl(p, dt, isCarrier) {
     return false;
   }
   const onD = p.side !== G.poss || (b.holder && b.holder.side !== p.side);
-  if (!isCarrier && onD && b.flight && !b.flight.pitch && (Input.taps.length || Input.hit('Space'))) { doJump(p); Input.taps.length = 0; }
+  const inAir = !isCarrier && onD && b.flight && !b.flight.pitch;
+  if (inAir && (Input.taps.length || Input.hit('Space'))) { doJump(p); Input.taps.length = 0; }
   if (!isCarrier && p.engaged && Input.hit('KeyE')) doSwim(p);
   if (!isCarrier && onD && Input.hit('KeyC')) doHitStick(p);
   if (p.hit > 0) return true;
@@ -1028,7 +1030,7 @@ function mobileControl(p, dt, isCarrier) {
     if (Input.hit('KeyR') && p.stiffCd <= 0) doStiff(p);
     if (Input.hit('KeyE') && p.jukeCd <= 0 && !p.tuck) doJuke(p, null);
   } else if (G.lock && !onD && p !== G.O[0] && Input.hit('Space')) { if (G.bstate === 'snap' && !b.flight) callForBall(p); }
-  else if (Input.hit('Space') && p.dive <= 0) { const car = b.holder || b; doDive(p, { x: car.x - p.x, y: car.y - p.y, m: 1 }); return true; }
+  else if (!inAir && Input.hit('Space') && p.dive <= 0) { const car = b.holder || b; doDive(p, { x: car.x - p.x, y: car.y - p.y, m: 1 }); return true; }
   const sprint = p.stamina > 0.05;
   const st = Input.stick;
   if (st.m > 0.15 && isFinite(st.x) && isFinite(st.y)) { // joystick

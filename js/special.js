@@ -205,14 +205,16 @@ function cpuTimeoutCheck() {
   for (const cpu of [0, 1]) {
     if (isHumanSide(cpu) || !G.pendingRunoff || G.timeouts[cpu] <= 0 || G.clock <= 1) continue;
     const S = situation(cpu), q = G.quarter;
+    const late = Math.min(100, (G.qtrLen || 180) * 0.45); // the "two-minute drill" window, scaled to the quarter length
     if (G.poss === cpu) {
       if (G.down === 4 && !cpuGoForIt(S.toGo, S.fgOk)) continue; // kicking anyway: save it
       // our ball, clock running: save time when we need points (end of half, or behind/tied late)
       if (q === 2 && G.clock < 40 && S.own >= 35) callTimeout(cpu);
-      else if (q >= 4 && S.margin <= 0 && G.clock < Math.max(90, S.needScores * 70)) callTimeout(cpu);
+      else if (q >= 4 && S.margin <= 0 && G.clock < Math.min(late, Math.max(45, S.needScores * 40))) callTimeout(cpu);
     } else if (q >= 4 && S.margin < 0 && S.margin >= -16) {
-      // their ball, we're behind: stop the clock so we get it back with time left (not when a kneel ends it anyway)
-      if (G.clock < 3 * 38 + 20 && !canKneelOut()) callTimeout(cpu);
+      // their ball, we're behind: stop the clock so we get it back with time left (not when a kneel ends it anyway).
+      // only in the real end-game window, never with most of the 4th still to play
+      if (G.clock < late && !canKneelOut()) callTimeout(cpu);
     } else if (q === 2 && G.poss !== cpu && G.clock < 50 && G.down >= 3 && fromOwn(G.poss, G.los) < 40 && S.tos >= 2) callTimeout(cpu); // make them punt with time on the clock
   }
 }
