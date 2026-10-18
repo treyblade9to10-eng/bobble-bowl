@@ -291,19 +291,29 @@ function onPlayCall(c) {
 }
 let pcPage = 0, pcCoach = null, pcOff = true, pcCtx = {};
 const PER_PAGE = 10;
+// pages of card indexes: regular plays first, trick plays on their own TRICK page(s) at the end
+function pcPages() {
+  const reg = [], tr = [], out = [];
+  pcList.forEach((p, i) => (pcOff && p.trick ? tr : reg).push(i));
+  for (let i = 0; i < reg.length; i += PER_PAGE) out.push(reg.slice(i, i + PER_PAGE));
+  const trick0 = tr.length ? out.length : -1;
+  for (let i = 0; i < tr.length; i += PER_PAGE) out.push(tr.slice(i, i + PER_PAGE));
+  if (!out.length) out.push([]);
+  return { pages: out, trick0 };
+}
 function renderCards() {
-  const pages = Math.max(1, Math.ceil(pcList.length / PER_PAGE));
+  const { pages: pg, trick0 } = pcPages(), pages = pg.length;
   pcPage = clamp(pcPage, 0, pages - 1);
-  const list = pcList.slice(pcPage * PER_PAGE, pcPage * PER_PAGE + PER_PAGE);
+  const idx = pg[pcPage], list = idx.map(i => pcList[i]), onTrick = trick0 >= 0 && pcPage >= trick0;
   const box = $('pcCards'); box.innerHTML = '';
   const cols = Math.max(2, Math.ceil(list.length / 2));
   box.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
   box.style.width = `min(${cols * 200}px, calc(100vw - 20px))`;
   list.forEach((p, j) => {
-    const i = pcPage * PER_PAGE + j;
+    const i = idx[j];
     const el = document.createElement('div');
     el.className = 'pcard' + (p.special ? ' special' : '') + (p.key === pcCoach ? ' coach' : ''); el.tabIndex = 0;
-    const kind = p.type === 'run' ? 'run' : p.type === 'pass' ? 'pass' : p.special ? 'kick' : '';
+    const kind = (p.card || p.type) === 'run' ? 'run' : p.type === 'pass' ? 'pass' : p.special ? 'kick' : ''; // card: what the play looks like to you (Statue of Liberty is a run)
     const label = G.mode === 'mobile' ? (kind === 'run' ? 'RUN' : kind === 'pass' ? 'PASS' : kind === 'kick' ? 'KICK' : 'D') : (j + 1) % 10;
     el.innerHTML = `${p.key === pcCoach ? '<span class="cp">COACH PICK</span>' : ''}<div class="ph"><span class="k ${kind}">${label}</span><div class="t">${p.name}</div></div>`;
     const mini = document.createElement('canvas'); mini.width = 480; mini.height = 288; // 4x so the art stays sharp
@@ -321,8 +331,10 @@ function renderCards() {
   if (pages > 1) {
     const mk = (txt, d) => { const b = document.createElement('button'); b.className = 'pgbtn'; b.textContent = txt; b.onclick = () => { pcPage = (pcPage + d + pages) % pages; Sound.click(); renderCards(); }; return b; };
     hint.appendChild(mk('‹ PREV', -1));
-    const t = document.createElement('span'); t.className = 'pgtxt'; t.textContent = `PAGE ${pcPage + 1} / ${pages}`; hint.appendChild(t);
+    const nReg = trick0 >= 0 ? trick0 : pages;
+    const t = document.createElement('span'); t.className = 'pgtxt'; t.textContent = onTrick ? 'TRICK PLAYS' : `PAGE ${pcPage + 1} / ${nReg}`; hint.appendChild(t);
     hint.appendChild(mk('NEXT ›', 1));
+    if (trick0 >= 0) { const b = document.createElement('button'); b.className = 'pgbtn' + (onTrick ? '' : ' trick'); b.textContent = onTrick ? 'REGULAR PLAYS' : 'TRICK PLAYS'; b.onclick = () => { pcPage = onTrick ? 0 : trick0; Sound.click(); renderCards(); }; hint.appendChild(b); }
   }
   // clock tools
   const tool = (txt, fn) => { const b = document.createElement('button'); b.className = 'pgbtn tool'; b.textContent = txt; b.onclick = fn; hint.appendChild(b); };
@@ -388,11 +400,11 @@ window.addEventListener('keydown', e => {
   if ($('pcCover').classList.contains('on')) { if (e.code === 'Space' || e.code === 'Enter') $('pcReveal').onclick(); return; }
   if (e.code === 'KeyT' && G.timeouts && G.pendingRunoff > 0) { if (callTimeout(G.human)) renderCards(); return; }
   if (e.code === 'Enter') { const last = pcCtx.mode === 'off' ? G.lastOffKey : G.lastDefKey; const li = pcList.findIndex(p => p.key === last); if (li >= 0) choose(li); return; }
-  if (e.code === 'ArrowRight' || e.code === 'ArrowLeft') { const pages = Math.ceil(pcList.length / PER_PAGE); pcPage = (pcPage + (e.code === 'ArrowRight' ? 1 : -1) + pages) % pages; renderCards(); return; }
+  if (e.code === 'ArrowRight' || e.code === 'ArrowLeft') { const pages = pcPages().pages.length; pcPage = (pcPage + (e.code === 'ArrowRight' ? 1 : -1) + pages) % pages; renderCards(); return; }
   const n = parseInt(e.key, 10);
   if (isNaN(n)) return;
-  const i = pcPage * PER_PAGE + (n === 0 ? 9 : n - 1);
-  if (i < Math.min(pcList.length, (pcPage + 1) * PER_PAGE)) choose(i);
+  const i = (pcPages().pages[pcPage] || [])[n === 0 ? 9 : n - 1];
+  if (i != null) choose(i);
 });
 
 // ---------- team stat sheet (halftime + final) ----------
@@ -632,7 +644,7 @@ function updateMobileButtons() {
   $('joy').classList.toggle('on', !!joyOn);
   if (!joyOn && Input.stick.m) { Input.stick.x = Input.stick.y = Input.stick.m = 0; $('joyKnob').style.left = $('joyKnob').style.top = ''; }
   const side = G.poss === G.human ? 'off' : 'def';
-  const po = G.play && G.play.off, canMotion = !!po && (po.type === 'pass' || po.toss || po.carrier === 4);
+  const po = G.play && G.play.off, canMotion = !!po && !po.chain && (po.type === 'pass' || po.toss || po.carrier === 4);
   const club = st === 'celly' ? clubCelly(G.cellyGuy) : null;
   const key = st + side + canMotion + G.weather + (club ? club.id : '') + (b && b.flight ? 'air' : '') + (h && h.engaged ? 'eng' : '');
   if (key === mbState) return;

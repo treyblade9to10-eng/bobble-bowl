@@ -257,7 +257,7 @@ const HOT = [
 const HOT_RB = [['FLAT', [[1, 5], [3, 10]], 'sit'], ['WHEEL', [[1, 5], [25, 8]], 'go'], ['CHECK', [[2, -2], [4, -3]], 'sit'], ['BLOCK', null, 'block']];
 function hotRoute(slot) {
   if (G.phase !== 'presnap' || G.poss !== G.human || G.play.off.type !== 'pass') return;
-  const p = G.O[slot]; if (!p) return;
+  const p = G.O[slot]; if (!p || (G.play.off.paths && G.play.off.paths[slot]) || G.play.off.lateral) return; // trick plays keep their design
   const list = slot === 1 ? HOT_RB : HOT;
   const i = ((p.hotI == null ? -1 : p.hotI) + 1) % list.length;
   p.hotI = i; const [name, steps, end] = list[i];

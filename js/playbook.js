@@ -173,11 +173,11 @@ Playbook.load();
       const hid = b.hidden.includes(p.key), fav = b.fav.includes(p.key);
       const t = document.createElement('div');
       t.className = 'pbTile' + (hid ? ' hid' : '') + (fav ? ' fav' : '') + (S.sel === p.key ? ' sel' : '');
-      const kind = off ? (p.type === 'run' ? 'run' : 'pass') : 'd';
+      const kind = off ? ((p.card || p.type) === 'run' ? 'run' : 'pass') : 'd';
       t.innerHTML = `${fav ? '<span class="pbFavT">FAVORITE</span>' : ''}<div class="pbTh"><span class="pbNo">${hid ? '-' : ++no}</span><span class="k ${kind}">${off ? kind.toUpperCase() : 'D'}</span><b>${html(p.name)}</b>
         <button class="pbOn${hid ? '' : ' on'}">${hid ? 'OFF' : 'ON'}</button></div>`;
       const c = document.createElement('canvas'); c.width = 360; c.height = 216; drawPlayDiagram(c, p, off); t.appendChild(c);
-      const f = document.createElement('div'); f.className = 'pbTf'; f.textContent = p.custom ? 'MY PLAY' : off ? (FORMATIONS[p.form || 'gun'] || FORMATIONS.gun).name : 'DEFENSE'; t.appendChild(f);
+      const f = document.createElement('div'); f.className = 'pbTf'; f.textContent = p.custom ? 'MY PLAY' : p.trick ? 'TRICK PLAY' : off ? (FORMATIONS[p.form || 'gun'] || FORMATIONS.gun).name : 'DEFENSE'; t.appendChild(f);
       t.onclick = () => { S.sel = S.sel === p.key ? null : p.key; S.sure = null; Sound.click(); renderList(); };
       t.querySelector('.pbOn').onclick = e => { e.stopPropagation(); toggleHide(p.key); };
       grid.appendChild(t);

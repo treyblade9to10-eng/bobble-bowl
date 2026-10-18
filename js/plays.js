@@ -78,8 +78,54 @@ const OFF_PLAYS = [
   { key: 'mseam', form: 'gun', name: 'Motion Seam', type: 'pass', desc: 'Motion man turns straight up the seam. Outside guys pull the corners away.', motion: true,
     mroute: [[3, 1], [28, 2]], mend: 'go',
     routes: { 2: { r: [[8, 0], [8, 7]], end: 'sit' }, 3: { r: [[8, 0], [8, 7]], end: 'sit' }, 4: { r: [[3, 1], [28, 2]], end: 'go' }, 1: { r: [[1, 4], [2, 9]], end: 'sit' } } },
+  // ---- more regular plays ----
+  { key: 'stretch', form: 'iform', name: 'Stretch', type: 'run', desc: 'Run wide behind the line, find a crease, cut it up.', wide: true,
+    rb: { path: [[-3.4, 1.2], [-1.8, 6], [1, 9.5], [10, 10.5]], end: 'go' }, wr: 'block' },
+  { key: 'boot', form: 'iform', name: 'PA Bootleg', type: 'pass', desc: 'Fake the run one way, QB rolls out the other.', fake: true, boot: true,
+    rb: { path: [[-3.6, -0.6], [0, -0.8]], end: 'block' },
+    routes: { 2: { r: [[10, 0], [18, -28]], end: 'go' }, 3: { r: [[10, 0], [20, 8]], end: 'go' }, 4: { r: [[3, 1], [4, 9]], end: 'sit' } } },
+  { key: 'wrscreen', form: 'gun', name: 'WR Screen', type: 'pass', desc: 'WR steps back behind a wall of blockers.', screen: true, screenTo: 3,
+    routes: { 2: { r: [[40, 0]], end: 'go' }, 3: { r: [[-0.5, -2.5], [-0.8, -4.5]], end: 'sit' }, 4: { r: [[3, 0]], end: 'block' } } },
+  { key: 'rpo', form: 'gun', name: 'RPO Bubble', type: 'run', desc: 'QB reads the linebacker: hand it off or throw it.', rpo: true,
+    rb: { path: [[-4.2, 1.0], [0.5, -0.5], [10, -1.5]], end: 'go' },
+    routes: { 2: { r: [[2, 0], [9, -7]], end: 'go' }, 3: { r: [[2, 0], [9, -7]], end: 'go' }, 4: { r: [[-1, 3], [0, 6]], end: 'sit' } } },
+  { key: 'shovel', form: 'gun', name: 'Shovel Pass', type: 'run', desc: 'QB flips it forward to the slot crossing underneath.',
+    paths: { 1: { path: [[-4.5, 7], [-2, 12]], end: 'go' }, 4: { path: [[-1.2, 6], [-1.0, 4.4], [1.5, 4.2], [12, 4.5]], end: 'go' } },
+    chain: [{ to: 4, at: 0.42, kind: 'shovel', run: true, decoy: 1 }] },
+  // ---- trick plays (their own TRICK page on the play-call screen) ----
+  // chain: who gets the ball after the snap, in order. kind 'hand' = handoff if they're close (else a quick pitch), 'pitch' = lateral.
+  //   pass: true = he's the passer now (throws like a QB), run: true = he runs it. paths: designed paths (field spots, like rb.path)
+  { key: 'flea', form: 'iform', name: 'Flea Flicker', type: 'pass', trick: true, desc: 'Handoff, RB pitches it back, QB bombs it deep.',
+    paths: { 1: { path: [[-3.4, 0.4], [-2.4, 0.6]], end: 'sit' } },
+    chain: [{ to: 1, at: 0.25, kind: 'hand' }, { to: 0, at: 0.85, kind: 'pitch', pass: true, minT: 1.55 }],
+    routes: { 2: { r: [[12, 0], [34, -8]], end: 'go' }, 3: { r: [[40, 0]], end: 'go' }, 4: { r: [[6, 0], [14, -12]], end: 'go' } } },
+  { key: 'hbpass', form: 'gun', name: 'HB Pass', type: 'pass', trick: true, desc: 'Toss to the RB. He pulls up and throws it.',
+    paths: { 1: { path: [[-4.5, 6], [-3, 10], [-2.5, 12]], end: 'sit' } },
+    chain: [{ to: 1, at: 0.18, kind: 'pitch', pass: true, minT: 1.1 }],
+    routes: { 2: { r: [[12, 0], [30, -12]], end: 'go' }, 3: { r: [[2, 0], [1.5, 0], [30, -3]], end: 'go' }, 4: { r: [[3, 0]], end: 'block' } } },
+  { key: 'reverse', form: 'gun', name: 'WR Reverse', type: 'run', trick: true, desc: 'RB runs one way, hands it to the WR going back.',
+    spots: { 4: [1.5, -8] },
+    paths: { 1: { path: [[-4, -1], [-3.2, -4.5], [-2.6, -7.5]], end: 'sit' }, 4: { path: [[-0.5, -9], [-3.4, -6.5], [-3.4, -4], [-2.4, 3.5], [0, 8.5], [3, 11], [12, 12.5]], end: 'go' } },
+    chain: [{ to: 1, at: 0.25, kind: 'hand' }, { to: 4, at: 0.7, kind: 'hand', run: true }], wr: 'block', fast: 4 },
+  { key: 'endaround', form: 'gun', name: 'End Around', type: 'run', trick: true, desc: 'Fake the dive, the far WR comes around and takes it.',
+    spots: { 2: [0.8, -10] }, fast: 2,
+    paths: { 1: { path: [[-3.6, -0.5], [0.5, -0.5], [6, -0.5]], end: 'go' }, 2: { path: [[-2.3, -6], [-4.6, -1.5], [-4.2, 1.5], [-2.4, 5.5], [0, 9], [3, 11.5], [12, 13]], end: 'go' } },
+    chain: [{ to: 2, at: 0.75, kind: 'hand', run: true, decoy: 1 }], wr: 'block' },
+  { key: 'statue', form: 'gun', name: 'Statue of Liberty', type: 'pass', card: 'run', trick: true, noThrow: true, desc: 'QB fakes the throw, RB grabs it and sweeps.',
+    drop: 4.6, paths: { 1: { path: [[-5.6, 1.0], [-5.7, -2], [-3.5, -6.5], [-0.5, -10.5], [3, -13], [12, -14]], end: 'go', wait: [1, 0.62] } },
+    chain: [{ to: 1, at: 0.68, kind: 'hand', run: true, pump: 0.5 }],
+    routes: { 2: { r: [[30, 0]], end: 'go' }, 3: { r: [[14, 0], [24, -8]], end: 'go' }, 4: { r: [[10, 0], [20, -6]], end: 'go' } } },
+  { key: 'philly', form: 'gun', name: 'Philly Special', type: 'pass', trick: true, desc: 'Snap to the RB, pitch to the WR, WR throws to the QB!',
+    spots: { 0: [1.0, 6.5], 1: [4.5, 0], 4: [1.5, -7] }, directSnap: 1,
+    paths: { 1: { path: [[-4.3, -1.5], [-3.8, -3.5]], end: 'sit' }, 4: { path: [[-2.5, -5.5], [-4.4, -2.5], [-5.2, 2], [-5, 5]], end: 'sit' } },
+    chain: [{ to: 4, at: 0.5, kind: 'pitch', pass: true, minT: 1.25 }],
+    routes: { 0: { r: [[1, 0.5], [3, 2.5], [9, 6]], end: 'go', wait: [0, 0.5] }, 2: { r: [[12, 0], [30, -10]], end: 'go' }, 3: { r: [[10, 0], [20, 8]], end: 'go' } } },
+  { key: 'hooklat', form: 'gun', name: 'Hook & Lateral', type: 'pass', trick: true, desc: 'Hit the WR on a hook, he pitches to the slot flying by.',
+    lateral: { from: 3, to: 4 }, focus: 3,
+    routes: { 2: { r: [[40, 0]], end: 'go' }, 3: { r: [[10, 0], [9.5, -0.5]], end: 'sit' }, 4: { r: [[3, 0], [6, 4], [7.5, 6.5]], end: 'sit' }, 1: { r: [[1, -3], [3, -6]], end: 'sit' } } },
   { key: 'kneel', form: 'goal', name: 'Kneel', type: 'run', desc: 'Victory formation. QB takes a knee, clock keeps running.', kneel: true }
 ];
+const TRICK_KEYS = OFF_PLAYS.filter(p => p.trick).map(p => p.key);
 
 // Formations: where each skill guy lines up. [yards behind the line, sideways offset] — positive offset = the wide side of the field.
 const FORMATIONS = {
@@ -91,7 +137,7 @@ const FORMATIONS = {
 };
 // near the goal line, runs come out in a heavy Goal Line set
 function formationFor(play) {
-  if (typeof G !== 'undefined' && G.goalToGo && G.los != null && play.type === 'run' && !play.toss && !play.jet && Math.abs(goalX(G.poss) - G.los) <= 4) return 'goal';
+  if (typeof G !== 'undefined' && G.goalToGo && G.los != null && play.type === 'run' && !play.toss && !play.jet && !play.chain && !play.rpo && Math.abs(goalX(G.poss) - G.los) <= 4) return 'goal';
   return play.form || 'gun';
 }
 
@@ -127,7 +173,15 @@ const DEF_PLAYS = [
   { key: 'fire', name: 'Fire Zone', desc: 'A DL drops, LBs blitz. Confuse him!',
     a: ['rush', 'zone:5:-6', 'rush', 'rush', 'rush', 'zone:14:thirdT', 'zone:14:thirdB', 'zone:16:mid'] },
   { key: 'c0', name: 'Cover 0', desc: 'Everybody blitzes, pure man. All or nothing.',
-    a: ['rush', 'rush', 'rush', 'rush', 'man:1', 'man:2', 'man:3', 'man:4'] }
+    a: ['rush', 'rush', 'rush', 'rush', 'man:1', 'man:2', 'man:3', 'man:4'] },
+  { key: 'robber', name: 'Robber', desc: 'Man outside, a LB lurks in the middle to jump throws.',
+    a: ['rush', 'rush', 'rush', 'man:4', 'zone:9:mid', 'man:2', 'man:3', 'zone:18:mid'] },
+  { key: 'c6', name: 'Cover 6', desc: 'Quarters on one side, Cover 2 on the other.',
+    a: ['rush', 'rush', 'rush', 'zone:6:-8', 'zone:6:8', 'zone:15:thirdT', 'zone:4:edgeB', 'zone:16:6'] },
+  { key: 'sblitz', name: 'Safety Blitz', desc: 'Safety sneaks down and blitzes. LB drops deep.',
+    a: ['rush', 'rush', 'rush', 'man:1', 'zone:12:mid', 'man:2', 'man:3', 'rush'] },
+  { key: 'contain', name: 'Contain', desc: 'Ends stay home, nobody bites. Stops trick plays.', disc: true,
+    a: ['zone:2:-11', 'rush', 'zone:2:11', 'spy', 'zone:7:mid', 'zone:15:thirdT', 'zone:15:thirdB', 'zone:20:mid'] }
 ];
 
 const SPECIAL_PLAYS = [
@@ -174,15 +228,16 @@ function drawPlayDiagram(cv, play, isOff) {
   const dot = (x, y, fill, sq) => { g.fillStyle = fill; g.strokeStyle = '#0b0f16'; g.lineWidth = 0.9; g.beginPath(); if (sq) g.rect(x - 2.6, y - 2.6, 5.2, 5.2); else g.arc(x, y, 2.9, 0, 7); g.fill(); g.stroke(); };
   if (isOff) {
     const F = FORMATIONS[play.form || 'gun'], spots = { 5: [-0.7, -4.8], 6: [-0.7, 0], 7: [-0.7, 4.8] };
-    for (const k in F.spots) spots[k] = [-F.spots[k][0], F.spots[k][1] * 1.5];
+    for (const k in F.spots) { const sp = (play.spots && play.spots[k]) || F.spots[k]; spots[k] = [-sp[0], sp[1] * 1.5]; }
     // blockers: short T in front of them
     const blockT = (x, y) => { g.strokeStyle = '#ffffff99'; g.lineWidth = 1; g.lineCap = 'round'; g.beginPath(); g.moveTo(x + 3, y); g.lineTo(x + 5.8, y); g.moveTo(x + 5.8, y - 1.8); g.lineTo(x + 5.8, y + 1.8); g.stroke(); };
     for (const s in spots) {
       const [d, y] = spots[s], [px, py] = P(d, y);
       const route = play.routes && play.routes[s];
       if (+s >= 5) blockT(px, py);
-      else if (+s >= 1 && route && route.end !== 'block') {
-        const out = y === 0 ? 1 : Math.sign(y), key = +s === 1 ? 4 : +s - 1;
+      else if (play.paths && play.paths[s]) continue;
+      else if (route && route.end !== 'block') {
+        const out = y === 0 ? 1 : Math.sign(y), key = +s <= 1 ? 4 : +s - 1;
         const pts = [[px, py]];
         for (const [dd, oo] of route.r) pts.push(P(d + Math.min(dd, 30), y + oo * out));
         pdPath(g, pts, ROUTE_COL[key - 1], 1.5, route.end);
@@ -194,6 +249,30 @@ function drawPlayDiagram(cv, play, isOff) {
       for (const [d, w] of runner) pts.push(P(Math.min(d, 26), w * 1.5));
       if (play.fake) { g.setLineDash([2.5, 2]); pdPath(g, pts, '#ffffff90', 1.3, 'go'); g.setLineDash([]); }
       else pdPath(g, pts, '#ff8a3d', 2.1, 'go');
+    }
+    if (play.paths) { // trick plays: the final runner / passer is solid orange, the decoys are dashed; yellow dashes = pitches
+      const last = play.chain[play.chain.length - 1], ends = {};
+      for (const s in play.paths) {
+        const pts = [P(...spots[s])];
+        for (const [d, w] of play.paths[s].path) pts.push(P(Math.min(d, 26), w * 1.5));
+        ends[s] = pts;
+        if (+s === last.to && last.run) pdPath(g, pts, '#ff8a3d', 2.1, 'go');
+        else { g.setLineDash([2.5, 2]); pdPath(g, pts, '#ffffff90', 1.3, play.paths[s].end === 'sit' ? 'sit' : 'go'); g.setLineDash([]); }
+      }
+      let from = 0;
+      for (const st of play.chain) {
+        if (st.kind === 'pitch' || st.kind === 'shovel') {
+          const a = ends[from] ? ends[from][ends[from].length - 1] : P(...spots[from]), tp = ends[st.to], b = tp ? tp[Math.min(tp.length - 1, 2)] : P(spots[st.to][0] - 2.5, spots[st.to][1]);
+          g.setLineDash([1.5, 1.8]); g.strokeStyle = '#ffd23f'; g.lineWidth = 1.1; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke(); g.setLineDash([]);
+        }
+        from = st.to;
+      }
+    }
+    if (play.lateral) { // hook and lateral: the pitch after the catch
+      const r = play.routes[play.lateral.from], sp = spots[play.lateral.from], out = Math.sign(sp[1]) || 1;
+      let d = sp[0], y = sp[1]; for (const [dd, oo] of r.r) { d = sp[0] + dd; y = sp[1] + oo * out; }
+      const [ax, ay] = P(d, y), [bx, by] = P(d - 2, y - out * 6);
+      g.setLineDash([1.5, 1.8]); g.strokeStyle = '#ffd23f'; g.lineWidth = 1.1; g.beginPath(); g.moveTo(ax, ay); g.lineTo(bx, by); g.stroke(); g.setLineDash([]);
     }
     if (play.qbRun) pdPath(g, [P(spots[0][0], 0), P(16, 0)], '#ff8a3d', 2.1, 'go');
     for (const s in spots) { const [px, py] = P(...spots[s]); dot(px, py, +s === 0 ? '#f6c31c' : '#ffffff', +s >= 5); }
