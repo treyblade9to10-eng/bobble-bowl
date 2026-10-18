@@ -268,18 +268,33 @@ const TeamLab = {
       <div class="tlBig">${[['all', 'TEAM'], ['off', 'OFFENSE'], ['def', 'DEFENSE']].map(([k, n]) => `<label><span>${n}</span><input type="range" min="50" max="99" data-g="${k}" value="${k === 'all' ? CT.ovr(t) : avg(t[k])}"><b>${k === 'all' ? CT.ovr(t) : avg(t[k])}</b></label>`).join('')}</div>
       <div class="tlSec">OFFENSE</div>${t.off.map((p, i) => row(p, 'off', i)).join('')}
       <div class="tlSec">DEFENSE</div>${t.def.map((p, i) => row(p, 'def', i)).join('')}
-      <div class="tlSec">SPECIAL TEAMS</div>${kRow(t.k, 'k')}${kRow(t.p, 'p')}`;
+      <div class="tlSec">SPECIAL TEAMS</div>${kRow(t.k, 'k')}${kRow(t.p, 'p')}
+      <div class="tlSec">BACKUPS <span class="tlBkN">${(t.backups || []).length} / ${CT.BK_MAX}</span>
+        <button class="tlMini" id="tlBkAdd"${(t.backups || []).length >= CT.BK_MAX ? ' disabled' : ''}>ADD BACKUP</button><button class="tlMini" id="tlBkFill">FILL BENCH</button></div>
+      <div class="tlHint">They come in when a starter gets hurt or tired. The first QB is your backup QB, the first RB splits carries. Tap a position to change it.</div>
+      ${(t.backups || []).map((p, i) => `<div class="tlP tlBk" data-s="bk" data-i="${i}">
+        <button class="tlPos tlBkPos">${p[0]}</button>
+        <input class="tlPn" maxlength="18" value="${esc(p[1])}">
+        <input class="tlNo" type="number" min="0" max="99" value="${p[2]}">
+        <input class="tlRg" type="range" min="40" max="99" value="${p[3]}"><b class="tlOv">${p[3]}</b>
+        <button class="tlSk" style="background:${SKIN[p[5]]}" title="Skin tone"></button>
+        <button class="tlBkX">CUT</button></div>`).join('') || '<div class="tlHint">No backups yet. Tap ADD BACKUP or FILL BENCH.</div>'}`;
   },
   wire_ros() {
     const t = this.t;
-    const get = el => { const r = el.closest('.tlP'), s = r.dataset.s, i = +r.dataset.i; return s === 'k' || s === 'p' ? { arr: t[s], n: 0, no: 1, ov: 2, sk: 3 } : { arr: t[s][i], n: 1, no: 2, ov: 3, sk: 5 }; };
+    const get = el => { const r = el.closest('.tlP'), s = r.dataset.s, i = +r.dataset.i; return s === 'k' || s === 'p' ? { arr: t[s], n: 0, no: 1, ov: 2, sk: 3 } : { arr: (s === 'bk' ? t.backups : t[s])[i], n: 1, no: 2, ov: 3, sk: 5 }; };
+    t.backups = t.backups || [];
+    $('tlBkAdd').onclick = () => { if (t.backups.length >= CT.BK_MAX) return; const need = CT.BK_POS.find(pos => !t.backups.some(p => p[0] === pos)) || 'WR'; t.backups.push(CT.mkBackup(need)); Sound.click(); this.renderEd(); };
+    $('tlBkFill').onclick = () => { for (const pos of CT.BK_POS) if (t.backups.length < CT.BK_MAX && !t.backups.some(p => p[0] === pos)) t.backups.push(CT.mkBackup(pos)); Sound.click(); this.renderEd(); };
+    document.querySelectorAll('.tlBkPos').forEach(b => b.onclick = () => { const p = t.backups[+b.closest('.tlP').dataset.i]; p[0] = CT.BK_POS[(CT.BK_POS.indexOf(p[0]) + 1) % CT.BK_POS.length]; p[4] = POS_SPD[p[0]] || 80; Sound.click(); this.renderEd(); });
+    document.querySelectorAll('.tlBkX').forEach(b => b.onclick = () => { if (b.dataset.sure !== '1') { b.dataset.sure = '1'; b.textContent = 'SURE?'; return; } t.backups.splice(+b.closest('.tlP').dataset.i, 1); Sound.click(); this.renderEd(); });
     document.querySelectorAll('.tlP .tlPn').forEach(i => { i.addEventListener('input', () => { const g = get(i); g.arr[g.n] = i.value; }); i.addEventListener('keydown', e => e.stopPropagation()); });
     document.querySelectorAll('.tlP .tlNo').forEach(i => { i.addEventListener('input', () => { const g = get(i); g.arr[g.no] = clamp(parseInt(i.value, 10) || 0, 0, 99); }); i.addEventListener('keydown', e => e.stopPropagation()); });
     document.querySelectorAll('.tlP .tlRg').forEach(i => i.addEventListener('input', () => { const g = get(i); g.arr[g.ov] = +i.value; i.nextElementSibling.textContent = i.value; this.renderName(); }));
     document.querySelectorAll('.tlP .tlSk').forEach(b => b.onclick = () => { const g = get(b); g.arr[g.sk] = (g.arr[g.sk] + 1) % 6; b.style.background = SKIN[g.arr[g.sk]]; });
     document.querySelectorAll('.tlBig input').forEach(i => {
       i.addEventListener('input', () => { CT.setOvr(t, i.dataset.g, +i.value); i.nextElementSibling.textContent = i.value; this.renderName();
-        document.querySelectorAll('.tlP').forEach(r => { const s = r.dataset.s; if (s === 'k' || s === 'p') return; const p = t[s][+r.dataset.i]; r.querySelector('.tlRg').value = p[3]; r.querySelector('.tlOv').textContent = p[3]; }); });
+        document.querySelectorAll('.tlP').forEach(r => { const s = r.dataset.s; if (s === 'k' || s === 'p' || s === 'bk') return; const p = t[s][+r.dataset.i]; r.querySelector('.tlRg').value = p[3]; r.querySelector('.tlOv').textContent = p[3]; }); });
       i.addEventListener('change', () => this.renderEd());
     });
     $('tlRandN').onclick = () => { for (const p of t.off.concat(t.def)) p[1] = CT.randName(); t.k[0] = CT.randName(); t.p[0] = CT.randName(); Sound.click(); this.renderEd(); };

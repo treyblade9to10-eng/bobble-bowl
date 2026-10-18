@@ -21,7 +21,17 @@ const CT = {
   str(s, n) { return String(s == null ? '' : s).replace(/[<>&"'`\\]/g, '').replace(/\s+/g, ' ').trim().slice(0, n); },
   col(c, d) { return /^#[0-9a-fA-F]{6}$/.test(c || '') ? c.toUpperCase() : d; },
   num(v, a, b, d) { v = Math.round(+v); return isFinite(v) ? clamp(v, a, b) : d; },
-  clean(t) {
+  // backups: one list on the team (any positions, up to 10). The game reads qb2 (first QB), rb2 (first RB) and bench (the rest)
+  BK_POS: ['QB', 'RB', 'WR', 'TE', 'OL', 'DL', 'LB', 'CB', 'S'], BK_MAX: 10,
+  derive(t) {
+    const b = t.backups || [], qi = b.findIndex(p => p[0] === 'QB'), ri = b.findIndex(p => p[0] === 'RB');
+    t.qb2 = qi >= 0 ? b[qi] : null; t.rb2 = ri >= 0 ? b[ri] : null; t.bench = b.filter((p, i) => i !== qi && i !== ri);
+    if (!b.length) { delete t.qb2; delete t.rb2; delete t.bench; }
+    return t;
+  },
+  mkBackup(pos) { return [pos, this.randName(), this.randNum(pos), 64 + Math.round(rand(-4, 5)), clamp((POS_SPD[pos] || 80) + Math.round(rand(-5, 2)), 50, 95), Math.floor(Math.random() * 6)]; },
+  clean(t) { const c = this.clean0(t); return c && this.derive(c); },
+  clean0(t) {
     if (!t || typeof t !== 'object') return null;
     const id = this.str(t.id, 4).toUpperCase().replace(/[^A-Z0-9]/g, '');
     if (id.length < 2) return null;
@@ -34,6 +44,7 @@ const CT = {
       shape: this.SHAPES.includes(t.shape) ? t.shape : 'shield', stadium: this.str(t.stadium, 24) || 'Home Field', dome: !!t.dome,
       off: this.OFF.map((pos, i) => pl(t.off && t.off[i], pos)), def: this.DEF.map((pos, i) => pl(t.def && t.def[i], pos)),
       k: ks(t.k, 'Kicker'), p: ks(t.p, 'Punter'),
+      backups: (Array.isArray(t.backups) ? t.backups : []).slice(0, this.BK_MAX).map(p => pl(p, this.BK_POS.includes(p && p[0]) ? p[0] : 'WR')),
       ...(this.logo(t.logo) ? { logo: t.logo } : {}), ...(this.unis(t.unis) ? { unis: this.unis(t.unis) } : {})
     };
   },
@@ -86,6 +97,7 @@ const CT = {
     const mk = (pos, i) => [pos, this.randName(), this.randNum(pos, i), 75 + Math.round(rand(-7, 7)), clamp((POS_SPD[pos] || 80) + Math.round(rand(-4, 4)), 50, 97), Math.floor(Math.random() * 6)];
     t.off = this.OFF.map(mk); t.def = this.DEF.map(mk);
     t.k = [this.randName(), 3, 75, Math.floor(Math.random() * 6)]; t.p = [this.randName(), 9, 74, Math.floor(Math.random() * 6)];
+    t.backups = this.BK_POS.map(pos => this.mkBackup(pos)); // a backup at every spot to start
     return this.clean(t);
   },
   randName() { return `${pick(TL_FIRST)} ${pick(TL_LAST)}`; },
@@ -103,10 +115,10 @@ const CT = {
 
   // ---- online database (public teams) ----
   BAD: /(fuck|shit|bitch|cunt|nigg|fagg|whore|porn|nazi|hitler|retard|penis|vagina|pussy|slut|\b(dick|cock|sex|sexy|rape|anal|cum|boob|boobs|kys|fag|ass|hoe|tits)\b)/,
-  isClean(t) { return ![t.city, t.name, t.id, t.stadium, t.by, ...t.off.map(p => p[1]), ...t.def.map(p => p[1]), t.k[0], t.p[0]].some(s => this.BAD.test(String(s).toLowerCase().replace(/[^a-z]+/g, ' '))); },
+  isClean(t) { return ![t.city, t.name, t.id, t.stadium, t.by, ...t.off.map(p => p[1]), ...t.def.map(p => p[1]), ...(t.backups || []).map(p => p[1]), t.k[0], t.p[0]].some(s => this.BAD.test(String(s).toLowerCase().replace(/[^a-z]+/g, ' '))); },
   async publish(t) {
     if (!this.isClean(t)) throw new Error('Some words in this team are not allowed. Change them and try again.');
-    const body = { ...t, pub: true, at: Date.now() }; delete body.custom; delete body.conf; delete body.div; delete body.logo; // uploaded pictures stay on this device
+    const body = { ...t, pub: true, at: Date.now() }; delete body.custom; delete body.conf; delete body.div; delete body.logo; delete body.qb2; delete body.rb2; delete body.bench; // uploaded pictures stay on this device (backups go up as one list)
     const r = await fetch(`${this.DB}/${t.uid}.json`, { method: 'PUT', body: JSON.stringify(body) });
     if (!r.ok) throw new Error('Could not reach the team database (' + r.status + ').');
   },

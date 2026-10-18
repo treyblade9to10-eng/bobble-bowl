@@ -27,7 +27,7 @@ const BenchEd = {
       clamp(n(p && p[3]) || 65, 40, 99), clamp(n(p && p[4]) || 80, 40, 99), clamp(isFinite(n(p && p[5])) ? n(p[5]) : 3, 0, 5)];
   },
   // a team's default backups as one list: QB2, RB2, then the rest
-  listOf(t) { return [t.qb2, t.rb2, ...(t.bench || [])].filter(p => Array.isArray(p) && p[0] && p[1]).map(p => this.clean(p)); },
+  listOf(t) { if (t.custom) return (t.backups || []).map(p => this.clean(p)); return [t.qb2, t.rb2, ...(t.bench || [])].filter(p => Array.isArray(p) && p[0] && p[1]).map(p => this.clean(p)); },
   // and back: first QB = qb2 (backup QB in games), first RB = rb2 (RB rotation), everybody else = bench
   setList(t, list) {
     const qi = list.findIndex(p => p[0] === 'QB'), ri = list.findIndex(p => p[0] === 'RB');
@@ -38,7 +38,15 @@ const BenchEd = {
   // put saved edits onto the teams (runs at start and whenever the team list is rebuilt)
   applyAll() {
     const s = this.store();
-    for (const t of TEAMS) { this.remember(t); if (Array.isArray(s[t.id])) this.setList(t, s[t.id].map(p => this.clean(p))); }
+    for (const t of TEAMS) {
+      if (t.custom) continue; // created teams keep their backups on the team itself (Create a Team > ROSTER)
+      this.remember(t); if (Array.isArray(s[t.id])) this.setList(t, s[t.id].map(p => this.clean(p)));
+    }
+  },
+  // created team: write the list onto the team and save My Teams
+  saveCustom(t, list) {
+    for (const x of [t, CT.mine.find(m => m.uid === t.uid)]) if (x) { x.backups = list.map(p => p.slice(0, 6)); CT.derive(x); }
+    CT.save();
   },
 
   // ---- open ----
@@ -52,7 +60,8 @@ const BenchEd = {
   rows() { return this.ctx.kind === 'season' ? Season.bench(this.ctx.id) : (this.ctx.list = this.ctx.list && this.ctx.listId === this.ctx.cur ? this.ctx.list : (this.ctx.listId = this.ctx.cur, this.listOf(this.team()))); },
   commit() {
     if (this.ctx.kind === 'season') { Season.save(); return; }
-    const t = this.team(), s = this.store(); s[t.id] = this.ctx.list; this.saveStore(s); this.setList(t, this.ctx.list.map(p => p.slice()));
+    const t = this.team(); if (t.custom) { this.saveCustom(t, this.ctx.list); return; }
+    const s = this.store(); s[t.id] = this.ctx.list; this.saveStore(s); this.setList(t, this.ctx.list.map(p => p.slice()));
   },
 
   render() {
