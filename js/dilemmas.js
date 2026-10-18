@@ -126,6 +126,7 @@ const Dilemma = {
   // between weeks: about 1 in 3, never two weeks in a row
   maybe() {
     const d = Season.data;
+    if (d && d.dilemma && d.dilemma.week !== d.week) delete d.dilemma; // skipped (only possible from tests / old flows)
     if (!d || d.phase !== 'regular' || d.dilemma || d.week < 1 || d.week >= d.games || (Season.isCareer && Season.isCareer())) return;
     const last = (d.dilemmas || []).slice(-1)[0];
     if (last && last.year === d.year && d.week - last.week < 2) return;
@@ -176,6 +177,7 @@ Season.injuryWeekHeal = function (p) {
   _hub();
   const d = Season.data; let box = $('dlmBox');
   if (!box) { box = document.createElement('div'); box.id = 'dlmBox'; $('seasonHub').appendChild(box); }
+  if (d && d.dilemma && (d.phase !== 'regular' || d.dilemma.week !== d.week || d.dilemma.year !== d.year)) { delete d.dilemma; Season.save(); } // the week moved on without an answer
   const D = d && d.dilemma;
   if (!D) { box.style.display = 'none'; return; }
   $('shPlay').style.display = $('shSim').style.display = 'none';
