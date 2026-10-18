@@ -53,6 +53,7 @@ const FILES = [
   'js/franchise2.js',
   'js/contracts.js',
   'js/cputrades.js',
+  'js/playoffpic.js',
   'js/playbook.js',
   'fonts/barlow-500.woff2',
   'fonts/barlow-700.woff2',
