@@ -55,6 +55,7 @@ const FILES = [
   'js/cputrades.js',
   'js/playoffpic.js',
   'js/slots.js',
+  'js/dilemmas.js',
   'js/playbook.js',
   'fonts/barlow-500.woff2',
   'fonts/barlow-700.woff2',

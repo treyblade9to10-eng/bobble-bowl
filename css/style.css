@@ -1247,3 +1247,23 @@ body.pad .dcRow:focus { outline: 4px solid var(--gold); outline-offset: -2px; }
   .ssInfo { font-size: 15px; margin-top: 3px; } .ssWhere { margin-bottom: 5px; } .ssEmpty { font-size: 28px; margin-top: 30px; } .ssCard button { font-size: 15px; padding: 5px; }
 }
 @media (max-width: 700px) { #ssCards { flex-direction: column; align-items: center; } .ssCard { width: min(320px, 92vw); } .ssEmpty { margin: 10px 0 4px; } }
+
+/* ---- coach's call dilemmas (dilemmas.js) ---- */
+#dlmBox { position: fixed; inset: 0; z-index: 30; display: none; align-items: center; justify-content: center; background: #05080cc8; padding: 12px; }
+.dlmCard { width: min(620px, 94vw); max-height: 94vh; overflow-y: auto; background: var(--panel); border-top: 4px solid var(--gold); box-shadow: 0 12px 40px #000a; padding: 14px 18px 16px; text-align: center; }
+.dlmTag { font-family: var(--hd); font-weight: 800; font-size: 12px; letter-spacing: .2em; color: var(--gold); }
+.dlmT { font-family: var(--hd); font-style: italic; font-weight: 900; font-size: 38px; line-height: 1.05; text-transform: uppercase; color: #fff; margin: 2px 0 6px; text-shadow: 2px 2px 0 #0008; }
+.dlmTx { font-size: 16px; line-height: 1.35; margin-bottom: 12px; }
+.dlmRes { font-weight: 700; color: #fff; background: var(--panel2); border-left: 4px solid var(--gold); padding: 10px 12px; text-align: left; }
+.dlmOpts { display: flex; gap: 10px; justify-content: center; }
+.dlmOpts button { flex: 1 1 0; margin: 0; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 10px 8px; background: var(--panel2); border-bottom: 3px solid #ffffff30; }
+.dlmOpts button b { font-family: var(--hd); font-style: italic; font-weight: 900; font-size: 21px; letter-spacing: .04em; color: #fff; }
+.dlmOpts button i { font-style: normal; font-family: var(--bd); font-size: 12px; color: var(--dim); }
+.dlmOpts button:hover:not(:disabled) { background: #f6c31c26; border-bottom-color: var(--gold); }
+.dlmOpts button:disabled { opacity: .4; cursor: default; }
+.dlmOpts button.gold { background: var(--gold); flex: 0 1 auto; padding: 10px 30px; } .dlmOpts button.gold b { color: #111; }
+@media (max-height: 500px) {
+  .dlmCard { padding: 8px 14px 10px; } .dlmT { font-size: 28px; margin-bottom: 4px; } .dlmTx { font-size: 14px; margin-bottom: 8px; }
+  .dlmOpts button { padding: 6px; } .dlmOpts button b { font-size: 18px; }
+}
+@media (max-width: 600px) { .dlmOpts { flex-direction: column; } }
