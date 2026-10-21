@@ -72,7 +72,7 @@ Object.assign(Season, {
       // fill any hole a retirement left: best backup steps in, or a young free agent gets signed
       for (const side of ['off', 'def']) R[id][side].forEach((p, i) => {
         if (p) return;
-        const pos = TEAMS.find(t => t.id === id)[side][i][0], bench = R[id].bench;
+        const pos = TEAMS.find(t => t.id === id)[side][i][0], bench = R[id].bench || (R[id].bench = []); // some saves (career seasons) have no bench yet
         let bi = -1; bench.forEach((b, j) => { if (posGroup(b[0]) === posGroup(pos) && (bi < 0 || b[3] > bench[bi][3])) bi = j; });
         if (bi >= 0) R[id][side][i] = bench.splice(bi, 1)[0];
         else { const [s0, s1] = ROOKIE_SPD[pos] || [75, 88]; R[id][side][i] = [pos, `${pick(FIRST)} ${pick(LAST)}`, 1 + Math.floor(Math.random() * 98), Math.round(rand(64, 71)), Math.round(rand(s0, s1)), Math.floor(Math.random() * 6), { age: Math.round(rand(23, 26)) }]; }
