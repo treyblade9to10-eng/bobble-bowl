@@ -1,13 +1,21 @@
 // ---- Career screens: create, college, combine, draft day, NFL hub, upgrades, gear, free agency, Hall of Fame + Trophy Case ----
-screens.push('cap', 'trophies'); menuScreens.push('cap', 'trophies');
+screens.push('cap', 'trophies', 'capSlots'); menuScreens.push('cap', 'trophies', 'capSlots');
 let capForm = null, capAnim = null, capTab = 'season', draftTimer = null;
 
 // the season engine has two save slots: your franchise and your career
 Season.slot = 'franchise';
 Season.use = function (slot) {
-  if (this.slot === slot) return;
-  this.slot = slot; this.KEY = slot === 'career' ? 'bobbleCareerSeason' : 'bobbleSeason'; this.load();
+  const key = slot === 'career' ? CareerSlots.seasonKey(CareerSlots.active) : 'bobbleSeason';
+  if (this.slot === slot && (slot !== 'career' || this.KEY === key)) return;
+  this.slot = slot; this.KEY = key; this.load();
 };
+// a saved mid-game remembers which career it belongs to (old saves = slot 1) and whether the coach was calling the plays
+SaveGame.FIELDS.push('careerSlot', 'coachCalls');
+{ const _r = SaveGame.resume.bind(SaveGame); SaveGame.resume = function () {
+  const d = this.get();
+  if (d && d.career && (d.careerSlot || 1) !== CareerSlots.active) CareerSlots.select(d.careerSlot || 1);
+  return _r();
+}; }
 const _seasonTeam = Season.team;
 Season.team = function (id) { const t = _seasonTeam.call(this, id); return this.slot === 'career' ? Career.withCAP(t) : t; };
 const _openSeason = openSeason;
@@ -21,7 +29,7 @@ G.hooks.onMiniOver = r => {
   _miniOver(r);
 };
 
-$('btnCap').onclick = () => { Sound.init(); Sound.click(); CareerUI.open(); };
+$('btnCap').onclick = () => { Sound.init(); Sound.click(); openCareerSlots(); };
 $('btnTrophies').onclick = () => { Sound.init(); Sound.click(); renderTrophies(); show('trophies'); };
 $('troBack').onclick = () => show('title');
 
@@ -113,7 +121,7 @@ const CareerUI = {
     document.querySelectorAll('.cpOffer').forEach(b => b.onclick = () => { f.college = b.dataset.c; re(); });
     $('capName').oninput = () => { f.name = $('capName').value; $('capName').classList.remove('bad'); document.querySelector('.cpNm').textContent = f.name.trim() || 'Your Name'; };
     $('capNum').onchange = () => { f.num = clamp(parseInt($('capNum').value, 10) || 0, 0, 99); this.form(); };
-    $('capBack').onclick = () => { cancelAnimationFrame(capAnim); show('title'); };
+    $('capBack').onclick = () => { cancelAnimationFrame(capAnim); openCareerSlots(); };
     $('capCreate').onclick = () => {
       f.name = $('capName').value.trim();
       if (f.name.length < 2) { $('capName').focus(); $('capName').classList.add('bad'); $('capName').scrollIntoView({ block: 'center' }); return; }
@@ -143,7 +151,14 @@ const CareerUI = {
     $('ccGear').onclick = () => { Sound.click(); this.gear(); };
     capPreview(Career.tuple(), team);
   },
-  goalsHtml() { return `<div class="ccGoals"><div class="lbl">GAME GOALS (+60 XP EACH)</div>${Career.goals().map(g => `<span>${g.text}</span>`).join('')}</div>`; },
+  goalsHtml() { return `<div class="ccGoals"><div class="lbl">GAME GOALS (+20 XP EACH)</div>${Career.goals().map(g => `<span>${g.text}</span>`).join('')}</div>`; },
+  // coach trust meter: who calls the plays in your games
+  trustHtml() {
+    const c = Career.cap, t = c.trust || 0, vet = Career.vet(), on = Career.canCall(), nfl = c.phase === 'nfl';
+    const txt = on ? (vet && t < TRUST_CALL ? 'Veteran: you call your own plays now.' : 'You call the plays. Bad games and turnovers can cost you his trust.')
+      : `Coach calls the plays. Earn his trust (${TRUST_CALL}) ${nfl ? `or become a veteran (${ordinal(VET_YEAR)} NFL season)` : 'with big games and wins'} to call your own.`;
+    return `<div class="ccTrust${on ? ' on' : ''}"><div class="trTop"><span>COACH TRUST</span><b>${t}</b><div class="trBar"><i style="width:${t}%"></i><u style="left:${TRUST_CALL}%"></u></div><em>${on ? 'YOU CALL THE PLAYS' : "COACH'S CALLS"}</em></div><div class="trTxt">${txt}</div></div>`;
+  },
   lockBtn() { const c = Career.cap; return `<button id="ccLock" class="${c.lock ? 'on' : ''}">PLAYER LOCK: ${c.lock ? 'ON' : 'OFF'}</button>`; },
   wireLock(re) { $('ccLock').onclick = () => { Career.cap.lock = !Career.cap.lock; Career.save(); Sound.click(); re(); }; },
   logHtml() {
@@ -159,7 +174,8 @@ const CareerUI = {
     if (G.mode === 'mobile') goFullscreen();
     cancelAnimationFrame(capAnim);
     G.demo = false; G.challenge = null; G.mini = null; show(null);
-    newGame(home, away, { qtr: Career.cap.qtr, diff: Career.cap.diff, lock: Career.cap.lock, ...opts });
+    // career games: the coach calls the plays until you earn it, and kicks are automatic (no kick meter). Coach Mode is off: you play your guy
+    newGame(home, away, { qtr: Career.cap.qtr, diff: Career.cap.diff, lock: Career.cap.lock, coachMode: false, coachCalls: !Career.canCall(), careerSlot: CareerSlots.active, ...opts });
     const mineIsHome = opts.humanSide === 0, opp = mineIsHome ? away : home;
     if (Career.isRival(opp.id)) {
       G.rivalry = opp.id; G.crowdHype = 1;
@@ -180,7 +196,7 @@ const CareerUI = {
         <div class="ccHead">SENIOR SEASON · ${me.city.toUpperCase()} ${me.name.toUpperCase()} · ${cl.w}-${cl.l}</div>
         ${this.newBadges()}
         ${g ? `<div class="ccNext" style="background:linear-gradient(110deg, ${me.c1} 45%, ${opp.c1} 55%)"><div class="lbl">${g.bowl ? 'BOWL GAME' : Career.isRival(g.opp) ? 'RIVALRY WEEK · 1.5x XP' : 'NEXT GAME'}</div><div class="mu">${g.home ? 'vs' : '@'} ${opp.city} ${opp.name}</div><div class="sub">${opp.id} ${ovr(opp)} OVR · you are ${g.home ? 'HOME' : 'AWAY'}</div></div>
-        ${this.goalsHtml()}
+        ${this.goalsHtml()}${this.trustHtml()}
         <div class="row"><button class="big" id="ccPlay">PLAY</button><button id="ccSim">SIM</button>${this.lockBtn()}</div>` : ''}
         <div class="ccStock">DRAFT STOCK: <b>${Career.projText()}</b></div>
         <div class="ccLine">This season: ${s.g} games · ${Career.line(s)}</div>
@@ -285,13 +301,13 @@ const CareerUI = {
     const c = Career.cap, d = Season.data, me = Season.team(c.team), g = Season.myGame();
     const over = !g;
     if (over && !d.capEnded) { Career.endNFLSeason(d); d.capEnded = true; Season.save(); }
-    const yr = c.seasons.filter(x => x.lvl === 'NFL').length;
+    const yr = Career.yearNum() - (over ? 1 : 0); // season over: still this year until the offseason
     const rec = d.rec[c.team], recS = `${rec.w}-${rec.l}${rec.t ? '-' + rec.t : ''}`;
     let next = '';
     if (g) {
       const home = g.home === c.team, opp = Season.team(home ? g.away : g.home);
       next = `<div class="ccNext" style="background:linear-gradient(110deg, ${me.c1} 45%, ${opp.c1} 55%)"><div class="lbl">${d.phase === 'playoffs' ? Season.roundName(d.bracket.round).toUpperCase() : `WEEK ${d.week + 1} OF ${d.games}`}${Career.isRival(opp.id) ? ` · <b class="rivTag">RIVALRY · 1.5x XP · ${Career.series(opp.id)}</b>` : ''}</div><div class="mu">${home ? 'vs' : '@'} ${opp.city} ${opp.name}</div><div class="sub">${opp.id} is ${recStr(opp.id)} · ${teamOvr(opp)} OVR</div></div>
-        ${this.goalsHtml()}
+        ${this.goalsHtml()}${this.trustHtml()}
         <div class="row"><button class="big" id="ccPlay">PLAY</button><button id="ccSim">SIM</button>${this.lockBtn()}</div>`;
     } else {
       const aw = (d.awards || []).map(a => `<div class="awLine"><b>${a.award}</b> ${a.name} <span>${a.pos}, ${a.team}</span></div>`).join('');
@@ -302,7 +318,7 @@ const CareerUI = {
     const tabs = [['season', 'SEASON'], ['career', 'CAREER'], ['badges', 'BADGES'], ['league', 'LEAGUE']];
     this.set(`<div class="ccWrap">${this.card(me)}
       <div class="ccMain">
-        <div class="ccHead">YEAR ${Math.max(1, yr + (over ? 0 : 1))} · ${me.city.toUpperCase()} ${me.name.toUpperCase()} · ${recS} · ${c.contract ? `${c.contract.years} YR${c.contract.years === 1 ? '' : 'S'} LEFT ON CONTRACT` : ''}</div>
+        <div class="ccHead">YEAR ${Math.max(1, yr)} · ${me.city.toUpperCase()} ${me.name.toUpperCase()} · ${recS} · ${c.contract ? `${c.contract.years} YR${c.contract.years === 1 ? '' : 'S'} LEFT ON CONTRACT` : ''}</div>
         ${this.newBadges()}${next}
         <div class="ccTabs">${tabs.map(([k, t]) => `<button data-t="${k}" class="${capTab === k ? 'on' : ''}">${t}</button>`).join('')}</div>
         <div class="ccTab" id="ccTab"></div>
@@ -353,7 +369,7 @@ const CareerUI = {
     for (const s of ['pass', 'rush', 'rec', 'td', 'tkl', 'sack', 'int']) st[s] = (after[s] || 0) - (before[s] || 0);
     const home = g.home === c.team, won = home ? sc[0] > sc[1] : sc[1] > sc[0];
     Career.addStats(st); Career.gameBadges(st);
-    const xp = Career.simXP(st, won); Career.gainXP(xp); Career.checkBadges();
+    const xp = Career.simXP(st, won); Career.gainXP(xp); Career.checkBadges(); Career.simTrust(won);
     c.log.unshift({ vs: home ? g.away : g.home, score: home ? `${sc[0]}-${sc[1]}` : `${sc[1]}-${sc[0]}`, xp, grade: 'SIM', line: Career.line(st) }); c.log.length = Math.min(c.log.length, 12);
     Career.save();
     seasonGameDone(sc);
@@ -376,7 +392,7 @@ const CareerUI = {
     if (expired) document.querySelectorAll('.ofr').forEach(b => b.onclick = () => {
       const o = offers[+b.dataset.i]; Sound.td();
       c.contract = { years: o.years, total: o.total };
-      if (o.team !== c.team) { Season.news && Season.news(`SIGNING: ${c.name} signs with ${o.team}`); c.team = o.team; Season.data.team = o.team; }
+      if (o.team !== c.team) { Season.news && Season.news(`SIGNING: ${c.name} signs with ${o.team}`); Career.changeTeam(o.team); Season.data.team = o.team; } // new coach: trust starts over (part of it carries)
       Career.save(); go();
     });
     else $('ccGo').onclick = () => { Sound.whistle(); go(); };
@@ -412,7 +428,7 @@ const CareerUI = {
     this.set(`<div class="ccWrap">${this.card(team)}
       <div class="ccMain">
         <div class="ccHead">SKILL POINTS: <b class="gold">${c.sp}</b></div>
-        <div class="ccText">You get 3 points every level. Overall is the average of your two skills. Speed costs 2 points but makes you faster on every play.</div>
+        <div class="ccText">You get 2 points every level. Overall is the average of your two skills. Speed costs 2 points but makes you faster on every play.</div>
         ${bar(0, sk[0], c.a[0], 1)}${bar(1, sk[1], c.a[1], 1)}${bar('spd', 'Speed', c.spd, 2)}
         <div class="row"><button class="big" id="upDone">DONE</button></div>
       </div></div>`, 'Upgrade');
@@ -458,11 +474,60 @@ function renderTrophies() {
   ];
   const aw = T.awards.length ? T.awards.slice().reverse().map(a => `<div class="awRow"><b>${a.award}</b> ${a.name} <span>${a.team}${a.year ? `, Year ${a.year}` : ''}</span></div>`).join('') : '<div class="troEmpty">Season awards you win show up here.</div>';
   const leg = (T.legends || []).length ? T.legends.map(l => `<div class="rRow"><span>${l.hof ? 'HOF  ' : ''}${l.name}, ${l.pos} (${l.years} yrs)</span><b>${l.peak} OVR</b></div>`).join('') : '<div class="troEmpty">Finish a career and your player goes here. Great ones make the Hall of Fame.</div>';
-  const c = Career.cap;
+  const act = [1, 2, 3].map(n => CareerSlots.peek(n)).filter(c => c && c.a && c.phase !== 'retired').map(c => `<div class="rRow"><span>${c.name}, ${c.pos} (active)</span><b>${Career.ovr(c)} OVR</b></div>`).join('');
   $('troBody').innerHTML = `<div class="shelf">${titles}</div>${riv ? `<div class="troHead" style="margin:8px 0 2px">RIVALRY TROPHIES</div><div class="shelf">${riv}</div>` : ''}
     <div class="troCols">
       <div class="troBox"><div class="troHead">RECORDS</div>${rec.map(([k, v]) => `<div class="rRow"><span>${k}</span><b>${v}</b></div>`).join('')}</div>
       <div class="troBox"><div class="troHead">AWARDS</div>${aw}
-        <div class="troHead" style="margin-top:10px">CAREERS</div>${c && c.phase !== 'retired' ? `<div class="rRow"><span>${c.name}, ${c.pos} (active)</span><b>${Career.ovr()} OVR</b></div>` : ''}${leg}</div>
+        <div class="troHead" style="margin-top:10px">CAREERS</div>${act}${leg}</div>
     </div>`;
 }
+
+// ---- career save slots: pick one of 3 careers ----
+(() => {
+  const el = document.createElement('div'); el.id = 'capSlots'; el.className = 'screen';
+  el.innerHTML = `<h2>Career Saves</h2><div id="csCards"></div><div class="row"><button id="csBack">BACK</button></div>`;
+  $('stage').appendChild(el);
+})();
+function careerSlotInfo(n) {
+  const c = CareerSlots.peek(n); if (!c || !c.pos || !c.name) return null;
+  const a = c.a || [c.ovr || 60, c.ovr || 60], ovr = Math.round((a[0] + a[1]) / 2);
+  const col = c.college && COLLEGES.find(t => t.id === c.college.id), pro = TEAMS.find(t => t.id === c.team);
+  const inCollege = c.phase === 'college' || c.phase === 'combine' || c.phase === 'draft';
+  const team = inCollege ? col : pro || col;
+  const nflDone = (c.seasons || []).filter(s => s.lvl === 'NFL' && !s.open).length;
+  let lvl = 'COLLEGE', where = '';
+  if (c.phase === 'college') where = c.college ? `SENIOR SEASON  ·  ${c.college.w}-${c.college.l}` : 'SENIOR SEASON';
+  else if (c.phase === 'combine') where = 'NFL COMBINE';
+  else if (c.phase === 'draft') where = c.draft && !c.draft.done ? 'DRAFT DAY' : 'DRAFT DAY NEXT';
+  else if (c.phase === 'nfl') {
+    lvl = 'NFL'; const d = CareerSlots.peekSeason(n), r = d && d.rec && d.rec[c.team];
+    const over = d && d.capEnded, yr = over ? Math.max(1, nflDone) : nflDone + 1;
+    where = `YEAR ${yr}` + (!d ? '' : over ? '  ·  OFFSEASON' : d.phase === 'playoffs' ? '  ·  PLAYOFFS' : d.phase === 'regular' ? `  ·  WEEK ${d.week + 1}` : '') + (r ? `  ·  ${r.w}-${r.l}${r.t ? '-' + r.t : ''}` : '');
+  } else { lvl = 'RETIRED'; where = (c.badges || []).some(b => b.k === 'hof') ? 'HALL OF FAME' : `${nflDone} NFL SEASON${nflDone === 1 ? '' : 'S'}`; }
+  return { c, ovr, team, lvl, where };
+}
+function openCareerSlots() {
+  cancelAnimationFrame(capAnim); clearInterval(draftTimer);
+  const h = [];
+  for (let n = 1; n <= CareerSlots.N; n++) {
+    const s = careerSlotInfo(n), t = s && s.team, last = n === CareerSlots.active;
+    h.push(s ? `<div class="ssCard csCard${last ? ' last' : ''}" style="--c1:${t ? t.c1 : '#333'};--c2:${t ? t.c2 : '#888'}">
+        <div class="ssSlot">SLOT ${n}${last ? '  ·  LAST PLAYED' : ''}</div>
+        <div class="csTop">${t ? `<div class="csLogo">${teamBadge(t)}</div>` : ''}<div class="csOvr"><b>${s.ovr}</b><span>OVR</span></div></div>
+        <div class="csName">${s.c.name.replace(/[<>&"]/g, '')}</div>
+        <div class="csPos">${s.c.pos}  ·  #${s.c.num}  ·  ${String(s.c.arch || '').toUpperCase()}</div>
+        <div class="csTeam">${t ? `${t.city} ${t.name}` : ''}</div>
+        <div class="ssWhere"><b class="csLvl">${s.lvl}</b>  ·  ${s.where}</div>
+        <button class="gold ssGo" data-n="${n}">CONTINUE</button><button class="ssDel" data-n="${n}">DELETE</button></div>`
+      : `<div class="ssCard csCard empty"><div class="ssSlot">SLOT ${n}</div><div class="ssEmpty">EMPTY</div><div class="ssWhere">Start a new career here</div><button class="ssGo" data-n="${n}">CREATE PLAYER</button></div>`);
+  }
+  $('csCards').innerHTML = h.join('');
+  document.querySelectorAll('#csCards .ssGo').forEach(b => b.onclick = () => { Sound.click(); CareerSlots.select(+b.dataset.n); Season.use('career'); capTab = 'season'; capForm = null; CareerUI.open(); });
+  document.querySelectorAll('#csCards .ssDel').forEach(b => b.onclick = () => {
+    if (!b.classList.contains('sure')) { b.classList.add('sure'); b.textContent = 'TAP AGAIN TO DELETE'; Sound.click(); return; }
+    CareerSlots.remove(+b.dataset.n); Sound.click(); openCareerSlots();
+  });
+  show('capSlots');
+}
+$('csBack').onclick = () => { Sound.click(); show('title'); };

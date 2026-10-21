@@ -10,8 +10,11 @@ function startKickoff(k, from = 35) {
   G.phase = 'playcall'; G.flags = []; G.playClock = 0; G.pendingRunoff = 0; G.koPending = true;
   setupReturn('ko', k);
   if (typeof SaveGame !== 'undefined') SaveGame.save();
-  if (isHumanSide(k) && !G.demo) G.hooks.onPlayCall({ mode: 'kickoff', side: k });
-  else setTimeout(() => { if (G.phase === 'playcall' && G.kickoffSide === k) chooseKickoff(cpuKickoffCall(k)); }, 900);
+  if (isHumanSide(k) && !G.demo && !coachCalls()) G.hooks.onPlayCall({ mode: 'kickoff', side: k });
+  else {
+    if (isHumanSide(k) && !G.demo) coachSays(cpuKickoffCall(k) === 'onside' ? 'Onside Kick' : 'Kickoff'); // career: the coach's call
+    setTimeout(() => { if (G.phase === 'playcall' && G.kickoffSide === k) chooseKickoff(cpuKickoffCall(k)); }, 900);
+  }
 }
 function cpuKickoffCall(k) {
   const behind = G.score[1 - k] - G.score[k];
@@ -67,10 +70,10 @@ function setupReturn(kind, k) {
 function startKickMeter(kind, k) {
   const kk = kickerOf(k, kind === 'punt' ? 'punt' : 'fg');
   G.km = { kind, yds: 0, kk, stage: 0, t: 0, power: 0, aim: 0, side: k, rateP: 0.7 + (90 - kk.ovr) * 0.015, rateA: 0.6 + (90 - kk.ovr) * 0.015, need: 0, tol: 0.35 };
-  if (isHumanSide(k) && !G.demo && !(G.sitOut && kind === 'punt') && !coachOn()) { G.phase = 'kickmeter'; G.km.wait = 0.35; return; }
+  if (isHumanSide(k) && !G.demo && !(G.sitOut && kind === 'punt') && !autoKick()) { G.phase = 'kickmeter'; G.km.wait = 0.35; return; }
   // CPU kickoffs: mostly land in the field so you get to return them, sometimes a deep boot
   G.km.power = kind === 'onside' ? rand(0.3, 0.8) : kind === 'ko' ? (chance(0.7) ? rand(0.15, 0.68) : rand(0.7, 0.98)) : rand(0.6, 0.98); G.km.aim = rand(-0.4, 0.4);
-  if (isHumanSide(k) && coachOn() && kind !== 'onside') { const q = clamp((kk.ovr - 60) / 35, 0, 1); G.km.power = clamp(rand(0.55, 0.85) + q * 0.15, 0.4, 1); G.km.aim = rand(-0.4, 0.4) * (1.2 - q * 0.6); } // Coach Mode: your kicker's rating decides it
+  if (isHumanSide(k) && autoKick() && kind !== 'onside') { const q = clamp((kk.ovr - 60) / 35, 0, 1); G.km.power = clamp(rand(0.55, 0.85) + q * 0.15, 0.4, 1); G.km.aim = rand(-0.4, 0.4) * (1.2 - q * 0.6); } // Coach Mode: your kicker's rating decides it
   G.phase = 'kickmeter'; G.km.cpuT = 0.8; G.km.stage = 3; // short pause so you can see the lineup
 }
 
@@ -204,7 +207,7 @@ function callTimeout(side) {
 function cpuTimeoutCheck() {
   if (G.versus) return;
   for (const cpu of [0, 1]) {
-    if (isHumanSide(cpu) || !G.pendingRunoff || G.timeouts[cpu] <= 0 || G.clock <= 1) continue;
+    if ((isHumanSide(cpu) && !coachCalls()) || !G.pendingRunoff || G.timeouts[cpu] <= 0 || G.clock <= 1) continue;
     const S = situation(cpu), q = G.quarter;
     const late = Math.min(100, (G.qtrLen || 180) * 0.45); // the "two-minute drill" window, scaled to the quarter length
     if (G.poss === cpu) {
@@ -222,7 +225,7 @@ function cpuTimeoutCheck() {
 // CPU spikes it when the clock is running, it's out of timeouts and the seconds matter
 function cpuSpikeCheck() {
   const s = G.poss;
-  if (isHumanSide(s) || G.versus || !G.pendingRunoff || G.down >= 4 || G.patSide != null || G.twoPt) return false;
+  if ((isHumanSide(s) && !coachCalls()) || G.versus || !G.pendingRunoff || G.down >= 4 || G.patSide != null || G.twoPt) return false;
   if (G.timeouts[s] > 0 || !(G.quarter === 2 || G.quarter >= 4) || G.clock > 22 || G.clock < 3) return false;
   const S = situation(s);
   if (G.quarter >= 4 && S.margin > 0) return false;
@@ -245,7 +248,7 @@ function spikeBall(cpu) {
   if (G.ball) { G.ball.holder = null; G.ball.x = G.los - dirOf(G.poss) * 1; G.ball.dead = { vx: 0, vy: 0 }; G.ball.bounce = 0.7; }
 }
 function audible() {
-  if (G.phase !== 'presnap') return;
+  if (G.phase !== 'presnap' || coachCalls()) return;
   Sound.click();
   G.phase = 'playcall';
   G.hooks.onPlayCall(playCallCtx());
