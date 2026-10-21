@@ -118,9 +118,23 @@ const CT = {
   isClean(t) { return ![t.city, t.name, t.id, t.stadium, t.by, ...t.off.map(p => p[1]), ...t.def.map(p => p[1]), ...(t.backups || []).map(p => p[1]), t.k[0], t.p[0]].some(s => this.BAD.test(String(s).toLowerCase().replace(/[^a-z]+/g, ' '))); },
   async publish(t) {
     if (!this.isClean(t)) throw new Error('Some words in this team are not allowed. Change them and try again.');
-    const body = { ...t, pub: true, at: Date.now() }; delete body.custom; delete body.conf; delete body.div; delete body.logo; delete body.qb2; delete body.rb2; delete body.bench; // uploaded pictures stay on this device (backups go up as one list)
+    const body = { ...t, pub: true, at: Date.now() }; delete body.custom; delete body.conf; delete body.div; delete body.qb2; delete body.rb2; delete body.bench; // backups go up as one list
+    if (body.logo) { const small = await this.smallLogo(body.logo); if (small) body.logo = small; else delete body.logo; } // logo goes up as a small 128px copy
     const r = await fetch(`${this.DB}/${t.uid}.json`, { method: 'PUT', body: JSON.stringify(body) });
     if (!r.ok) throw new Error('Could not reach the team database (' + r.status + ').');
+  },
+  // shrink an uploaded logo so the Team Database stays quick to load
+  smallLogo(url, S = 128) {
+    return new Promise(res => {
+      if (typeof Image === 'undefined' || !this.logo(url)) return res(null);
+      const img = new Image();
+      img.onload = () => {
+        const o = document.createElement('canvas'); o.width = o.height = S; const g = o.getContext('2d');
+        g.imageSmoothingQuality = 'high'; g.drawImage(img, 0, 0, S, S);
+        const u = o.toDataURL('image/png'); res(this.logo(u) && u.length < 120000 ? u : null);
+      };
+      img.onerror = () => res(null); img.src = url;
+    });
   },
   async unpublish(t) { try { await fetch(`${this.DB}/${t.uid}.json`, { method: 'DELETE' }); } catch (e) {} },
   async browse() {

@@ -175,9 +175,9 @@ const TeamLab = {
       <div class="tlLogo"><div class="tlLogoBox">${t.logo ? `<img src="${t.logo}" alt="">` : '<span>NO LOGO</span>'}</div>
         <div class="tlLogoR"><div class="tlLogoBtns"><button class="tlMini" id="tlLogoUp">${t.logo ? 'CHANGE PICTURE' : 'UPLOAD PICTURE'}</button>${t.logo ? '<button class="tlMini" id="tlLogoBg">CLEAR BACKGROUND</button><button class="tlMini tlDel" id="tlLogoRm">REMOVE</button>' : ''}</div>
         <div class="tlHint" id="tlLogoHint">${t.logo ? 'Shows at midfield, in the end zones and on the scoreboard.' : 'PNG with a see-through background works best. No logo = the badge below.'}</div>
-        <div class="tlHint">Your picture stays on this device. Public teams show the badge in the Team Database.</div></div>
+        <div class="tlHint">If the team is PUBLIC, your logo goes up with it so everyone sees it. Logos only, no photos of people.</div></div>
         <input type="file" id="tlLogoFile" accept="image/*" hidden></div>
-      <div class="tlSec">BADGE${t.logo ? ' <span class="tlSecSub">USED IN THE TEAM DATABASE</span>' : ''}</div>
+      <div class="tlSec">BADGE${t.logo ? ' <span class="tlSecSub">USED WHEN THERE IS NO LOGO</span>' : ''}</div>
       <div class="tlShapes">${CT.SHAPES.map(s => `<button class="tlShape${t.shape === s ? ' on' : ''}" data-s="${s}">${teamBadge({ ...t, shape: s, logo: undefined })}<span>${s.toUpperCase()}</span></button>`).join('')}</div>
       <div class="tlSec">STADIUM</div>
       ${this.field('Stadium', 'tlStadIn', t.stadium, 24)}
@@ -322,6 +322,7 @@ const TeamLab = {
     if (raw.id.length < 2 || CT.idTaken(raw.id, raw.uid)) { this.edTab = 'id'; this.renderEd(); msg.textContent = 'Pick a different abbreviation first.'; return; }
     const t = CT.clean(raw);
     if (t.pub && !CT.isClean(t)) { msg.textContent = 'Some words in this team are not allowed in the database. Change them or make it PRIVATE.'; return; }
+    if (t.pub && t.logo && !confirm('Your logo goes public with this team, so anyone can see it. Logos only, no photos of people. Post it?')) { msg.textContent = 'Not posted. Remove the picture or make the team PRIVATE.'; return; }
     const i = CT.mine.findIndex(x => x.uid === t.uid), was = i >= 0 ? CT.mine[i] : null;
     if (i >= 0) CT.mine[i] = t; else CT.mine.push(t);
     CT.save(); CT.useAll(); Sound.td();
