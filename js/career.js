@@ -54,9 +54,35 @@ const BADGES = {
   champ: 'Bobble Bowl Champion', big_season: 'Monster Season', vet: '10-Year Veteran', hof: 'Hall of Fame'
 };
 const SEASON_RT = ['QB', 'RB', 'WR', 'TE'];
+// Coach trust: in career games the coach calls the plays until he trusts you (75+) or you're a veteran (4th NFL season)
+const TRUST_CALL = 75, VET_YEAR = 4;
+
+// ---- Career save slots: up to 3 careers. Slot 1 is the old single career ('bobbleCAP' + 'bobbleCareerSeason'), so nothing has to move.
+// Everything a career has (player, college, combine, draft, contract, badges, log, trust) lives in the player save; his NFL seasons live in the season save.
+// The Trophy Case ('bobbleTrophies') is shared by every mode and every career (Hall of Fame legends from all of them).
+const CareerSlots = {
+  N: 3, AKEY: 'bobbleCareerSlot',
+  capKey(n) { return n === 1 ? 'bobbleCAP' : 'bobbleCAP' + n; },
+  seasonKey(n) { return n === 1 ? 'bobbleCareerSeason' : 'bobbleCareerSeason' + n; },
+  active: (() => { let n = 1; try { n = +localStorage.getItem('bobbleCareerSlot') || 1; } catch (e) {} return n >= 1 && n <= 3 ? n : 1; })(),
+  peek(n) { try { return JSON.parse(localStorage.getItem(this.capKey(n)) || 'null'); } catch (e) { return null; } },
+  peekSeason(n) { try { return JSON.parse(localStorage.getItem(this.seasonKey(n)) || 'null'); } catch (e) { return null; } },
+  // switch to career slot n (player + his season)
+  select(n) {
+    this.active = n; try { localStorage.setItem(this.AKEY, String(n)); } catch (e) {}
+    Career.KEY = this.capKey(n); Career.fresh = []; Career.load();
+    if (typeof Season !== 'undefined' && Season.slot === 'career') { Season.KEY = this.seasonKey(n); Season.load(); }
+  },
+  remove(n) {
+    try { localStorage.removeItem(this.capKey(n)); localStorage.removeItem(this.seasonKey(n)); } catch (e) {}
+    // a saved mid-game from this career goes too
+    if (typeof SaveGame !== 'undefined') { const d = SaveGame.get(); if (d && d.career && (d.careerSlot || 1) === n) SaveGame.clear(); }
+    if (n === this.active) { Career.cap = null; if (typeof Season !== 'undefined' && Season.slot === 'career') Season.data = null; }
+  }
+};
 
 const Career = {
-  KEY: 'bobbleCAP', TKEY: 'bobbleTrophies',
+  KEY: CareerSlots.capKey(CareerSlots.active), TKEY: 'bobbleTrophies',
   cap: null, tro: null,
   load() {
     try { this.cap = JSON.parse(localStorage.getItem(this.KEY) || 'null'); } catch (e) { this.cap = null; }
@@ -64,6 +90,8 @@ const Career = {
     if (!this.tro) this.tro = { games: 0, w: 0, l: 0, t: 0, titles: [], awards: [], bestWin: null, seasons: 0 };
     if (!this.tro.legends) this.tro.legends = [];
     if (this.cap && !this.cap.v) this.migrate();
+    if (this.cap && this.cap.trust == null) this.cap.trust = this.cap.phase === 'college' || this.cap.phase === 'combine' || this.cap.phase === 'draft' ? 18 + (this.cap.stars || 3) * 3
+      : clamp(30 + 10 * this.cap.seasons.filter(s => s.lvl === 'NFL' && !s.open).length, 20, 70); // careers from before coach trust
     return this;
   },
   save() { try { localStorage.setItem(this.KEY, JSON.stringify(this.cap)); localStorage.setItem(this.TKEY, JSON.stringify(this.tro)); } catch (e) {} },
@@ -80,7 +108,7 @@ const Career = {
   blank(o) {
     const arch = CAP_ARCH[o.pos].find(a => a[0] === o.arch) || CAP_ARCH[o.pos][0], rc = RECRUIT[o.stars || 3];
     return { v: 2, name: o.name, pos: o.pos, arch: arch[0], num: o.num, skin: o.skin, stars: o.stars || 3, a: arch[1].a.map(v => v + rc.ovr), spd: Math.min(99, arch[1].spd + rc.spd), sp: 0, xp: 0, lvl: 1,
-      games: o.games || 10, diff: o.diff != null ? o.diff : 1, qtr: o.qtr || 180, lock: true, gear: { visor: false, gloves: 'white' },
+      games: o.games || 10, diff: o.diff != null ? o.diff : 1, qtr: o.qtr || 180, lock: true, gear: { visor: false, gloves: 'white' }, trust: 18 + (o.stars || 3) * 3,
       phase: 'college', age: 21, college: null, team: null, combine: null, draft: null, contract: null,
       stats: { pass: 0, rush: 0, rec: 0, td: 0, tkl: 0, sack: 0, int: 0, g: 0 }, seasons: [], badges: [], log: [] };
   },
@@ -93,7 +121,8 @@ const Career = {
 
   // ---- ratings ----
   ovr(c = this.cap) { return Math.round((c.a[0] + c.a[1]) / 2); },
-  need(lvl) { return 120 + lvl * 10; }, // XP for the next level (each level = 3 skill points)
+  SP_PER_LVL: 2, XP_CAP: 240,
+  need(lvl) { return 200 + lvl * 5; }, // XP for the next level (each level = 2 skill points)
   tuple() {
     const c = this.cap; if (!c) return null;
     const gl = c.gear.gloves === 'team' ? null : c.gear.gloves === 'black' ? '#151515' : c.gear.gloves === 'gold' ? '#f6c31c' : '#f2f2f2';
@@ -119,7 +148,7 @@ const Career = {
   gainXP(xp) {
     const c = this.cap, before = this.ovr(); let lv = 0;
     c.xp += xp;
-    while (c.xp >= this.need(c.lvl)) { c.xp -= this.need(c.lvl); c.lvl++; c.sp += 3; lv++; }
+    while (c.xp >= this.need(c.lvl)) { c.xp -= this.need(c.lvl); c.lvl++; c.sp += this.SP_PER_LVL; lv++; }
     return { lv, before };
   },
   // spend skill points: +1 to a skill costs 1, +1 speed costs 2
@@ -131,11 +160,23 @@ const Career = {
   },
   gearOk(k) { return this.ovr() >= CAP_GEAR[k]; },
   badge(k) { const c = this.cap; if (!c || c.badges.some(b => b.k === k)) return false; c.badges.push({ k, lvl: c.phase === 'college' ? 'College' : `Year ${this.yearNum()}` }); this.fresh = (this.fresh || []).concat(k); return true; },
-  yearNum() { return Math.max(1, (this.cap.seasons.filter(s => s.lvl === 'NFL').length) + (this.cap.phase === 'nfl' ? 1 : 0)); },
+  // NFL year you're in: finished NFL seasons + this one (the open season line doesn't count twice)
+  yearNum() { return Math.max(1, this.cap.seasons.filter(s => s.lvl === 'NFL' && !s.open).length + (this.cap.phase === 'nfl' ? 1 : 0)); },
   checkBadges() {
     const o = this.ovr();
     if (o >= 85) this.badge('xfactor'); if (o >= 90) this.badge('elite'); if (o >= 99) this.badge('club99');
   },
+
+  // ---- coach trust: who calls the plays ----
+  nflYear() { const c = this.cap; return c && c.phase === 'nfl' ? this.yearNum() : 0; },
+  vet() { return this.nflYear() >= VET_YEAR; },
+  canCall() { const c = this.cap; return !!c && ((c.trust || 0) >= TRUST_CALL || this.vet()); },
+  addTrust(d) { const c = this.cap, was = this.canCall(); c.trust = clamp(Math.round((c.trust || 0) + d), 0, 100); return { v: c.trust, d: Math.round(d), unlocked: !was && this.canCall() }; },
+  // after a game you played: good grades, wins and goals earn it; bad games and turnovers lose it
+  trustDelta(grade, won, hit, tov) { return { 'A+': 5, A: 4, 'B+': 3, B: 2, 'C+': 1, C: 0, D: -2, F: -4 }[grade] + (won ? 1 : -1) + (hit === 3 ? 1 : 0) - 3 * (tov || 0); },
+  // new team: the new coach doesn't know you yet (draft round / stars set the first number)
+  draftTrust(d) { return ({ 1: 32, 2: 26, 3: 21 }[d.round] || 26) + (d.pick && d.pick <= 10 ? 4 : 0); },
+  changeTeam(id) { const c = this.cap; c.team = id; c.trust = clamp(Math.round(c.trust * 0.5 + 15), 20, 60); },
 
   // ---- game goals + grade ----
   goals() {
@@ -189,25 +230,27 @@ const Career = {
   series(oppId) { const r = (this.cap.rivals || {})[oppId]; return r ? `${r.w}-${r.l}` : '0-0'; },
   // after a game you PLAYED: stats, goals, grade, XP
   afterGame(s) {
-    const c = this.cap; if (!c || !G.career) return null;
+    const c = this.cap; if (!c || !G.career || (G.careerSlot && G.careerSlot !== CareerSlots.active)) return null;
     const side = G.teams.findIndex(t => t.id === c.team); if (side < 0) return null;
     const st = Object.values(G.pstats || {}).find(p => p.side === side && p.name === c.name) || {};
     const won = s.score[side] > s.score[1 - side];
     const goals = this.goals().map(g => ({ ...g, done: this.goalVal(g.key, st, won) >= g.v }));
     const hit = goals.filter(g => g.done).length;
     const grade = this.grade(st, won, hit);
-    const gb = { 'A+': 80, A: 60, 'B+': 45, B: 30, 'C+': 20, C: 10, D: 0, F: 0 }[grade];
+    const gb = { 'A+': 50, A: 40, 'B+': 30, B: 20, 'C+': 12, C: 6, D: 0, F: 0 }[grade];
     const rival = G.rivalry && this.isRival(G.rivalry) ? G.rivalry : null;
-    const xp = Math.round((50 + (won ? 30 : 0) + hit * 60 + gb + this.score(st, c.pos) * 2.5) * (rival ? 1.5 : 1)); // rivalry games are worth 1.5x
+    // ~1 level (2 skill points) for a great game, under half a level for an average one; rivalry games are worth 1.5x (up to the cap)
+    const xp = Math.min(this.XP_CAP, Math.round((10 + (won ? 15 : 0) + hit * 20 + gb + Math.min(50, this.score(st, c.pos))) * (rival ? 1.5 : 1)));
     if (rival) { c.rivals = c.rivals || {}; const R = c.rivals[rival] || (c.rivals[rival] = { w: 0, l: 0 }); if (won) R.w++; else if (s.score[side] < s.score[1 - side]) R.l++; }
     this.addStats(st); this.gameBadges(st);
     if (hit === 3) this.badge('perfect');
-    const r = this.gainXP(xp); this.checkBadges();
+    const sp0 = c.sp, r = this.gainXP(xp); this.checkBadges();
+    const trust = this.addTrust(this.trustDelta(grade, won, hit, st.tov));
     const opp = G.teams[1 - side].id;
     c.log.unshift({ vs: opp, score: `${s.score[side]}-${s.score[1 - side]}`, xp, grade, line: this.line(st) }); c.log.length = Math.min(c.log.length, 12);
     if (G.career === 'college') this.collegeResult(side === 0 ? s.score : [s.score[1], s.score[0]], side === 0);
     this.save();
-    return { xp, grade, goals, lv: r.lv, line: this.line(st), won, rival: rival ? { id: rival, series: this.series(rival) } : null };
+    return { xp, grade, goals, lv: r.lv, sp: c.sp - sp0, trust, line: this.line(st), won, rival: rival ? { id: rival, series: this.series(rival) } : null };
   },
   line(st) {
     const L = [st.pass && `${st.pass} pass yds`, st.rush && `${st.rush} rush yds`, st.rec && `${st.rec} rec yds`, st.td && `${st.td} TD`, st.tkl && `${st.tkl} tkl`, st.sack && `${st.sack} sack${st.sack > 1 ? 's' : ''}`, st.int && `${st.int} INT`].filter(Boolean);
@@ -225,7 +268,8 @@ const Career = {
     return st;
   },
   // simmed games give less XP than playing (playing is where you really get better)
-  simXP(st, won) { return Math.round(30 + (won ? 15 : 0) + this.score(st, this.cap.pos) * 1.2); },
+  simXP(st, won) { return Math.round(8 + (won ? 8 : 0) + Math.min(20, this.score(st, this.cap.pos) * 0.5)); },
+  simTrust(won) { return this.addTrust(won ? 1 : -1); },
 
   // ---------------- college ----------------
   collegeTeam(id) {
@@ -275,7 +319,7 @@ const Career = {
     const w = pick([17, 20, 21, 24, 27, 28, 31, 34, 35, 38, 42]), l = Math.max(0, w - pick([1, 3, 4, 6, 7, 10, 14, 17]));
     const sc = won ? [w, l] : [l, w];
     const st = this.simLine(sc[0], won); this.addStats(st); this.gameBadges(st);
-    const xp = this.simXP(st, won); this.gainXP(xp); this.checkBadges();
+    const xp = this.simXP(st, won); this.gainXP(xp); this.checkBadges(); this.simTrust(won);
     c.log.unshift({ vs: g.opp, score: `${sc[0]}-${sc[1]}`, xp, grade: 'SIM', line: this.line(st) }); c.log.length = Math.min(c.log.length, 12);
     this.collegeResult(sc); this.save();
     return { sc, st, xp };
@@ -321,7 +365,7 @@ const Career = {
   joinNFL() {
     const c = this.cap, d = c.draft;
     if (d.round === 1) this.badge('first_round'); if (d.pick <= 10) this.badge('top10');
-    d.done = true; c.team = d.team; c.phase = 'nfl'; c.age = 22;
+    d.done = true; c.team = d.team; c.phase = 'nfl'; c.age = 22; c.trust = this.draftTrust(d);
     this.save();
   },
 

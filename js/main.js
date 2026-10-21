@@ -279,7 +279,7 @@ function onPlayCall(c) {
       if (c.fgDist <= c.fgMax + 8) {
         const rng = c.fgDist > c.fgMax ? 'out' : c.fgDist > c.fgMax - 8 ? 'long' : 'in', kk = kickerOf(G.poss, 'fg');
         sp.push({ ...SPECIAL_PLAYS[1], name: `${c.fgDist} yd FG`, range: rng,
-          desc: `${kk.name} max: ${c.fgMax} yd. ` + (rng === 'out' ? 'Out of his range. Long shot.' : rng === 'long' ? 'Long one. Nail the meter!' : 'In his range.') });
+          desc: `${kk.name} max: ${c.fgMax} yd. ` + (rng === 'out' ? 'Out of his range. Long shot.' : rng === 'long' ? (G.career ? 'Long one for him.' : 'Long one. Nail the meter!') : 'In his range.') });
       }
       pcList = sp.concat(pcList);
     }
@@ -476,7 +476,7 @@ G.hooks.onGameOver = s => {
   const wk = Weekly.afterGame(s);
   $('overWeek').innerHTML = wk ? (wk.champ ? `<div class="wkChamp">WEEKLY CHAMPION: all 3 done. Trophy added${Career.cap ? ', +250 XP' : ''}.</div>` : '') +
     wk.out.map(g => `<div class="wkG${g.done ? ' done' : ''}"><span class="wkT">WEEKLY: ${g.text}</span><span class="wkBar"><i style="width:${Math.round(100 * g.have / g.need)}%"></i></span><span class="wkN">${g.done ? 'DONE' : `${g.have}/${g.need}`}</span></div>`).join('') : '';
-  $('overCap').innerHTML = cr ? `<div class="ocTop"><span class="ocGrade g${cr.grade.replace('+', 'p')}">${cr.grade}</span><div><b>${Career.cap.name}</b>: ${cr.line}<br><b class="ocXp">+${cr.xp} XP</b>${cr.rival ? `<span class="rivTag"> RIVALRY 1.5x · series ${cr.rival.series}</span>` : ''}${cr.lv ? `<span class="lvl">LEVEL UP! +${cr.lv * 3} SKILL POINTS</span>` : ''}</div></div>
+  $('overCap').innerHTML = cr ? `<div class="ocTop"><span class="ocGrade g${cr.grade.replace('+', 'p')}">${cr.grade}</span><div><b>${Career.cap.name}</b>: ${cr.line}<br><b class="ocXp">+${cr.xp} XP</b>${cr.rival ? `<span class="rivTag"> RIVALRY 1.5x · series ${cr.rival.series}</span>` : ''}${cr.lv ? `<span class="lvl">LEVEL UP! +${cr.sp} SKILL POINT${cr.sp === 1 ? '' : 'S'}</span>` : ''}<br><span class="ocTrust">COACH TRUST ${cr.trust.v} (${cr.trust.d >= 0 ? '+' : ''}${cr.trust.d})${cr.trust.unlocked ? '  ·  PLAY CALLING UNLOCKED' : ''}</span></div></div>
     <div class="ocGoals">${cr.goals.map(g => `<span class="${g.done ? 'ok' : ''}">${g.done ? 'DONE' : 'MISSED'}: ${g.text}</span>`).join('')}</div>` : '';
   // MVP: best performer on the winning team (or yours if tied)
   const mvpSide = won || tie ? me : them;
@@ -660,16 +660,17 @@ function updateMobileButtons() {
   const side = G.poss === G.human ? 'off' : 'def';
   const po = G.play && G.play.off, canMotion = !!po && !po.chain && (po.type === 'pass' || po.toss || po.carrier === 4);
   const club = st === 'celly' ? clubCelly(G.cellyGuy) : null;
-  const key = st + side + coach + canMotion + G.weather + (club ? club.id : '') + (b && b.flight ? 'air' : '') + (h && h.engaged ? 'eng' : '');
+  const cc = coachCalls(); // career: the coach has the audible / timeout
+  const key = st + side + coach + cc + canMotion + G.weather + (club ? club.id : '') + (b && b.flight ? 'air' : '') + (h && h.engaged ? 'eng' : '');
   if (key === mbState) return;
   mbState = key;
-  document.querySelectorAll('#mbtns button').forEach(x => x.classList.toggle('on', x.dataset.show === st && (!x.dataset.side || x.dataset.side === side) && (x.dataset.k !== 'KeyM' || canMotion) && (!x.dataset.wx || x.dataset.wx === G.weather) && (!x.dataset.lock || Unlocks.has(x.dataset.lock)) && (!coach || x.dataset.k === 'KeyZ' || x.dataset.k === 'KeyT')));
+  document.querySelectorAll('#mbtns button').forEach(x => x.classList.toggle('on', x.dataset.show === st && (!x.dataset.side || x.dataset.side === side) && (x.dataset.k !== 'KeyM' || canMotion) && (!x.dataset.wx || x.dataset.wx === G.weather) && (!x.dataset.lock || Unlocks.has(x.dataset.lock)) && (!coach || x.dataset.k === 'KeyZ' || x.dataset.k === 'KeyT') && !(cc && (x.dataset.k === 'KeyZ' || x.dataset.k === 'KeyT'))));
   $('mbtns').classList.toggle('pre', st === 'presnap');
   $('mbtns').classList.toggle('cel', st === 'celly');
   $('mbClub').classList.toggle('on', !!club); if (club) $('mbClub').textContent = club.name; // team signature celly
   $('mbDive').textContent = b && b.flight ? 'JUMP' : 'DIVE';
   $('mbSwim').style.display = st === 'def' && h && h.engaged ? 'block' : 'none';
-  $('mbTO').style.display = st === 'presnap' && G.timeouts && G.timeouts[G.human] > 0 && G.pendingRunoff > 0 ? 'block' : 'none';
+  $('mbTO').style.display = st === 'presnap' && !cc && G.timeouts && G.timeouts[G.human] > 0 && G.pendingRunoff > 0 ? 'block' : 'none';
 }
 
 // (season mode screens live in seasonui.js)

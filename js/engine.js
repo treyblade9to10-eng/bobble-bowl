@@ -22,6 +22,10 @@ const pName = s => G.online ? (s === G.human ? 'YOU' : 'OPP') : G.versus ? (s ==
 // Coach Mode: you call the plays, the CPU runs every one of your players (no stick, auto snap, auto kicks). Not in 2-player / online / Player Lock / challenges
 const coachPref = () => { try { return JSON.parse(localStorage.getItem('bobbleOpts') || '{}').optCoachMode === '1'; } catch (e) { return false; } };
 const coachOn = () => !!G.coachMode && !G.versus && !G.online && !G.lock && !G.demo && !G.mini && !G.challenge && G.human >= 0;
+// Career: until the coach trusts you (or you're a veteran) he calls your team's plays (you still play your guy). No timeouts / audibles for you then
+const coachCalls = () => !!G.coachCalls && !!G.career && !G.versus && !G.online && !G.demo && !G.mini && !G.challenge && G.human >= 0;
+// kicks the human never aims: Coach Mode and every career game (rating-based, like the CPU)
+const autoKick = () => coachOn() || (!!G.career && !G.versus && !G.online && !G.mini && G.human >= 0);
 const ctlMobile = () => (G.online && G.netModes ? G.netModes[Input.ctl] : G.mode) === 'mobile';
 const goalX = s => (s === 0 ? 110 : 10);      // goal line this side is attacking
 const ownGoal = s => (s === 0 ? 10 : 110);    // goal line this side defends
@@ -71,7 +75,7 @@ function initGame(home, away, opts) {
     weather: stadiumOf(home).dome ? 'clear' : opts.weather === 'storm' ? 'rain' : opts.weather === 'fog' ? 'clear' : (opts.weather || 'clear'),
     storm: !stadiumOf(home).dome && opts.weather === 'storm', fog: !stadiumOf(home).dome && opts.weather === 'fog', ltn: null, night: !!opts.night, stadium: stadiumOf(home), uni: opts.uni || null, pbp: [], pbpShow: null, lastResult: null,
     versus: !!opts.versus, p1: opts.humanSide || 0, hd: [null, null], hp: [null, null], humanDef: null,
-    career: opts.career || false, lock: !!opts.lock, callBall: 0, sitOut: false, dirt: {},
+    career: opts.career || false, lock: !!opts.lock, callBall: 0, sitOut: false, dirt: {}, coachCalls: !!opts.coachCalls, careerSlot: opts.careerSlot || 0, coachTok: null, coachCallName: null,
     bigGame: opts.bigGame ? { year: opts.bigGame, name: bowlName(opts.bigGame) } : null,
     coach: COACH_STYLES[opts.coach] ? opts.coach : savedCoach(), coachMode: opts.coachMode != null ? !!opts.coachMode : coachPref()
   });
@@ -103,7 +107,7 @@ function stat(p) {
 
 // ---------------- play calling ----------------
 function toPlayCall() {
-  G.phase = 'playcall'; G.sitOut = false;
+  G.phase = 'playcall'; G.sitOut = false; G.coachCallName = null; G.coachTok = null;
   G.ball = null;
   G.flags = [];
   G.fx = G.fx.filter(f => f.kind !== 'flag');
@@ -111,8 +115,12 @@ function toPlayCall() {
   G.playClock = (isHumanSide(G.poss) && !(G.patSide != null && !G.twoPt)) ? (G.online ? 30 : G.versus ? 40 : G.mode === 'mobile' ? 25 : 20) : 0;
   G.koPending = false; G.special = null; G.kickoffSide = null; G.callStart = G.time; G.timeoutCalled = false;
   if (G.patSide != null && !G.twoPt) {
-    if (isHumanSide(G.patSide)) G.hooks.onPlayCall({ mode: 'pat', side: G.patSide });
-    else { const two = cpuGoForTwo(G.patSide); setTimeout(() => choosePAT(two ? 'two' : 'xp'), 700); }
+    if (isHumanSide(G.patSide) && !coachCalls()) G.hooks.onPlayCall({ mode: 'pat', side: G.patSide });
+    else {
+      const two = cpuGoForTwo(G.patSide), tok = G.coachTok = {};
+      if (isHumanSide(G.patSide)) coachSays(two ? 'Go For 2' : 'Extra Point');
+      setTimeout(() => { if (G.coachTok === tok && G.phase === 'playcall') choosePAT(two ? 'two' : 'xp'); }, 700);
+    }
     return;
   }
   cpuTimeoutCheck();
@@ -126,7 +134,28 @@ function toPlayCall() {
     return;
   }
   if (G.versus) return G.hooks.onPlayCall({ ...withSide(G.poss, playCallCtx), side: G.poss });
+  if (coachCalls()) return coachCallPlay();
   G.hooks.onPlayCall(playCallCtx());
+}
+// career: the coach calls it with the CPU play-call brain (4th downs, two-point tries and kneels included), you see what's coming, then play it
+function coachCallPlay() {
+  const off = G.poss === G.human, key = off ? cpuOffCall() : cpuDefCall(), tok = G.coachTok = {};
+  coachSays(playLabel(key, off));
+  setTimeout(() => { if (G.coachTok === tok && G.phase === 'playcall' && !G.koPending) choosePlay(key); }, 900);
+}
+function playLabel(key, off) {
+  const p = (off ? OFF_PLAYS.concat(typeof FAKE_PLAYS !== 'undefined' ? FAKE_PLAYS : [], typeof SPECIAL_PLAYS !== 'undefined' ? SPECIAL_PLAYS : []) : DEF_PLAYS).find(x => x.key === key);
+  return key === 'fg' ? 'Field Goal' : key === 'punt' ? 'Punt' : p ? p.name : key;
+}
+function coachSays(name) {
+  G.coachCallName = name;
+  if (!G.banner || G.banner.t > 0.8 || G.banner.text === "COACH'S CALL") showBanner("COACH'S CALL", name, '#ffd23f', 1.5);
+}
+// the presnap hint says what the coach called (and drops audible / timeout, those are his)
+function coachHint() {
+  if (!coachCalls() || G.phase !== 'presnap' || !G.coachCallName) return;
+  const rest = (G.hint || '').replace(/\s*•\s*(Z audible|T timeout)/g, '').trim();
+  G.hint = `COACH'S CALL: ${G.coachCallName}` + (rest ? '  •  ' + rest : '');
 }
 // leading late and the defense can't stop the clock enough: take a knee and end it
 function canKneelOut() {
@@ -639,7 +668,7 @@ function update(dt) {
   if (Replay.rec && (G.phase === 'live' || G.phase === 'dead')) Replay.record();
   updateRefs(dt);
   updateFx(dt);
-  updateHint();
+  updateHint(); coachHint();
   updateCamera(dt);
 }
 // before the snap: offense snaps / hot routes, defense picks who to control
@@ -654,8 +683,8 @@ function presnapInput(dt) {
     if (G.snapTimer <= 0 || (G.poss === G.human && settled && (Input.hit('Space') || Input.taps.length))) snap();
     return;
   }
-  if (Input.hit('KeyT')) callTimeout(G.human);
-  if (Input.hit('KeyZ') && !G.versus) { audible(); return 'audible'; }
+  if (Input.hit('KeyT') && !coachCalls()) callTimeout(G.human);
+  if (Input.hit('KeyZ') && !G.versus && !coachCalls()) { audible(); return 'audible'; }
   if (G.poss === G.human) {
     if (Input.hit('KeyM')) startMotion();
     const settled = G.time - (G.presnapAt || 0) > 0.3;
@@ -1837,7 +1866,7 @@ function resolveCatch() {
     else G.credit = { p: f.intended, kind: 'rush' };
     return;
   }
-  const offSide = f.passer.side;
+  const offSide = f.passer.side; G.lastThrower = f.passer;
   if (G.thrownAway) { G.thrownAway = false; return incomplete(null, 'THROWN AWAY'); }
   let rcv = null, rd = 99, def = null, dd = 99;
   for (const p of G.players) {
@@ -1891,6 +1920,7 @@ function intercept(def) {
   const b = G.ball;
   b.holder = def; G.bstate = 'run'; Sound.bad();
   stat(def).int++; G.tstats[G.poss].to++; G.intBy = def;
+  if (G.lastThrower) { const t = stat(G.lastThrower); t.tov = (t.tov || 0) + 1; }
   showBanner('INTERCEPTED!', def.name, '#ff5050', 1.6);
   def.mouth = 'O'; def.mouthT = 0.6;
   G.credit = null; G.crowdHype = 1;
@@ -1958,7 +1988,7 @@ function tackle(car, df, hitters) {
   if ((G.bstate === 'run' || stick) && chance((0.022 + (hitters > 1 ? 0.02 : 0) + (stick ? 0.3 : 0) + Weather.fumbleBonus()) * tuckFumbleMul(car))) {
     b.holder = null; b.x = car.x; b.y = car.y;
     b.loose = { vx: rand(-4, 4), vy: rand(-3, 3), t: 0 };
-    G.bstate = 'loose'; showBanner('FUMBLE!', '', '#ff9a3d', 1.0); car.down = 0.9;
+    G.bstate = 'loose'; showBanner('FUMBLE!', '', '#ff9a3d', 1.0); car.down = 0.9; b.fumbler = car;
     return;
   }
   st.tkl++;
@@ -1978,8 +2008,9 @@ function updateLoose(dt) {
   if (l.t < 0.3) return;
   for (const p of G.players) if (p.down <= 0 && dist(p, b) < 0.9) {
     b.loose = null; b.holder = p; Sound.catch();
-    if (p.side !== G.poss) { G.tstats[G.poss].to++; showBanner('RECOVERED!', p.name, '#ff5050', 1.3); }
+    if (p.side !== G.poss) { G.tstats[G.poss].to++; showBanner('RECOVERED!', p.name, '#ff5050', 1.3); if (b.fumbler && b.fumbler.side === G.poss) { const t = stat(b.fumbler); t.tov = (t.tov || 0) + 1; } }
     else showBanner('RECOVERED!', p.name, '#9cff9c', 1.1);
+    b.fumbler = null;
     endPlay({ type: 'fumble', carrier: p, x: p.x, y: p.y });
     return;
   }
@@ -2165,7 +2196,7 @@ function doKick(kind) {
            rateP: 0.7 + (90 - ovr) * 0.015, rateA: 0.6 + (90 - ovr) * 0.015,
            need: kind === 'punt' ? 0 : yds / fgRange(ovr), tol: kind === 'punt' ? 0.35 : Math.min(0.45, fgTol(yds, ovr) * (kind === 'xp' ? 1.6 : 1.35)) };
   G.playClock = 0;
-  if (isHumanSide(s) && !G.demo && !G.sitOut && !coachOn()) { G.phase = 'kickmeter'; G.km.wait = 0.35; return; }
+  if (isHumanSide(s) && !G.demo && !G.sitOut && !autoKick()) { G.phase = 'kickmeter'; G.km.wait = 0.35; return; }
   // computer kicks: roll the dice using the kicker's rating
   const km = G.km;
   if (kind === 'punt') { km.power = rand(0.55, 0.95); km.aim = rand(-0.45, 0.45); }
