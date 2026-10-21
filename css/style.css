@@ -1306,3 +1306,14 @@ body.pad .dcRow:focus { outline: 4px solid var(--gold); outline-offset: -2px; }
 .tlBkPos { margin: 0; padding: 2px 0; background: var(--ink); border: 1px solid var(--line); clip-path: none; }
 .tlBkX { margin: 0; padding: 3px 6px; font-size: 11px; background: #3a1418; color: #ff9b9b; clip-path: none; }
 @media (max-height: 500px) { .tlP.tlBk { grid-template-columns: 30px 1fr 40px 1fr 26px 22px 46px; gap: 5px; } .tlBkX { font-size: 10px; padding: 2px 3px; } }
+
+/* ---- first-time pop-ups (tutorial offer) ---- */
+#wcBox { position: fixed; inset: 0; z-index: 60; display: none; align-items: center; justify-content: center; background: #05080cd0; padding: 12px; }
+#wcBox.show { display: flex; }
+.wcCard { width: min(560px, 94vw); background: var(--panel); border-top: 4px solid var(--gold); box-shadow: 0 12px 40px #000a; padding: 16px 22px 18px; text-align: center; }
+.wcTag { font-family: var(--hd); font-weight: 800; font-size: 12px; letter-spacing: .2em; color: var(--gold); }
+#wcTitle { font-family: var(--hd); font-style: italic; font-weight: 900; font-size: 38px; line-height: 1.05; text-transform: uppercase; color: #fff; margin: 2px 0 8px; text-shadow: 2px 2px 0 #0008; }
+#wcBody { font-size: 16px; line-height: 1.4; margin-bottom: 14px; }
+.wcBtns { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+.wcBtns button { margin: 0; }
+@media (max-height: 500px) { .wcCard { padding: 10px 16px 12px; } #wcTitle { font-size: 28px; margin-bottom: 4px; } #wcBody { font-size: 14px; margin-bottom: 10px; } }
