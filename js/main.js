@@ -496,8 +496,8 @@ G.hooks.onGameOver = s => {
   const ch = challengeResult(s);
   $('overChal').textContent = ch ? ch.text : '';
   $('overChal').style.color = ch ? (ch.ok ? '#9cff9c' : '#ff8a8a') : '';
-  if (ch && ch.ok) $('overTitle').textContent = G.challenge.type === '2min' ? 'DRIVE COMPLETE!' : 'CHALLENGE COMPLETE!';
-  $('btnAgain').textContent = G.challenge ? 'TRY AGAIN' : 'REMATCH';
+  if (ch && ch.ok && !ch.next) $('overTitle').textContent = G.challenge.type === '2min' ? 'DRIVE COMPLETE!' : G.challenge.type === 'draft' ? 'DRAFT CHAMPION!' : 'CHALLENGE COMPLETE!';
+  $('btnAgain').textContent = ch && ch.next ? 'NEXT GAME' : G.challenge && G.challenge.type === 'draft' ? 'NEW DRAFT' : G.challenge ? 'TRY AGAIN' : 'REMATCH';
   $('btnNewTeams').textContent = G.challenge ? 'CHALLENGES' : G.online ? 'MAIN MENU' : 'NEW TEAMS';
   if (G.online && Net.role === 'host') Net.over(s);
   if (won && (G.rivalryMatch || G.rivalry) && !G.versus && !G.challenge && !G.mini && !G.online) { Career.addRivalTrophy(s.teams[me].id, s.teams[them].id, inSeason && Season.data ? Season.data.year : 1); $('overChal').textContent = `RIVALRY TROPHY: you beat the ${s.teams[them].name}. It's in your Trophy Case.`; $('overChal').style.color = '#ffd23f'; }
@@ -691,7 +691,8 @@ function openModes() {
     ['daily', '02', 'DAILY CHALLENGE', `${TEAMS[d.mine].name} vs ${TEAMS[d.opp].name}: ${d.goal.text}`, done ? 'Done today' + (R.daily.streak ? `, ${R.daily.streak} day streak` : '') : (R.daily && R.daily.streak ? `${R.daily.streak} day streak` : 'New one every day')],
     ['qb', '03', 'QB TARGETS', '45 seconds to hit targets downfield. Bullseyes are worth 300.', R.qb ? `High score: ${R.qb}` : ''],
     ['kick', '04', 'KICKING CONTEST', 'Start at 25 yards, back up 5 every make. 2 misses = out.', R.kick ? `Longest: ${R.kick} yds` : ''],
-    ['dash', '05', '40-YARD DASH', 'Mash ← → (or tap) to race your fastest player.', R.dash && R.dash < 99 ? `Best: ${R.dash}s` : '']
+    ['dash', '05', '40-YARD DASH', 'Mash ← → (or tap) to race your fastest player.', R.dash && R.dash < 99 ? `Best: ${R.dash}s` : ''],
+    ['draft', '06', 'DRAFT CHAMPIONS', 'Pick 1 of 3 real players at every spot, then win 3 straight.', DC.recordText()]
   ];
   $('mdWeekly').innerHTML = weeklyHtml(true);
   $('mdCards').innerHTML = cards.map(([k, i, tt, dd, rr]) => `<div class="mdcard" tabindex="0" data-k="${k}"><div class="mi">${i}</div><div class="mt">${tt}</div><div class="md">${dd}</div><div class="mr">${rr}</div></div>`).join('');
@@ -700,6 +701,7 @@ function openModes() {
 }
 function runChallenge(k) {
   Sound.init(); Sound.whistle();
+  if (k === 'draft') { G.lastMini = k; G.demo = false; G.challenge = null; G.mini = null; return DC.start(); }
   if (G.mode === 'mobile') goFullscreen();
   G.demo = false; G.season = false; G.challenge = null; G.mini = null; show(null);
   if (k === '2min') startTwoMinute(myIdx());

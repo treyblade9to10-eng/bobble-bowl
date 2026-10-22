@@ -50,6 +50,7 @@ function startDaily() {
 function challengeResult(s) {
   const c = G.challenge; if (!c) return null;
   const me = s.score[s.human], op = s.score[1 - s.human];
+  if (c.type === 'draft') return DC.result(me > op);
   const R = Records.get();
   if (c.type === '2min') {
     const ok = me > op;

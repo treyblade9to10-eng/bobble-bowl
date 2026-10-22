@@ -276,7 +276,7 @@ body.mobile .pgbtn { padding: 8px 16px; font-size: 16px; }
 /* ---- challenges ---- */
 #mdTeam { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; font-family: var(--hd); font-size: 20px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; }
 #mdTeam .pgbtn { clip-path: none; padding: 2px 12px; font-size: 22px; }
-#mdCards { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; width: min(1150px, 96vw); margin-bottom: 14px; }
+#mdCards { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; width: min(1150px, 96vw); margin-bottom: 14px; }
 .mdcard { background: var(--panel); border: 1px solid var(--line); border-top: 4px solid var(--red); padding: 12px 12px 14px; text-align: left; cursor: pointer; transition: transform .1s, border-color .1s; }
 .mdcard:hover { transform: translateY(-4px); border-color: var(--gold); }
 .mdcard .mi { font-family: var(--hd); font-style: italic; font-weight: 900; font-size: 40px; line-height: 1; color: #ffffff30; }
@@ -288,7 +288,7 @@ body.mobile .pgbtn { padding: 8px 16px; font-size: 16px; }
 #moBest { font-family: var(--hd); font-size: 22px; font-weight: 800; letter-spacing: .1em; margin-bottom: 14px; }
 #overChal { font-size: 17px; font-weight: 700; margin: 4px 0 8px; padding: 6px 14px; background: var(--panel); }
 #overChal:empty { display: none; }
-@media (max-width: 900px) { #mdCards { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; } .mdcard { padding: 6px; } .mdcard .mi { font-size: 24px; } .mdcard .mt { font-size: 15px; } .mdcard .md { font-size: 10px; min-height: 0; } #moBig { font-size: 44px; } }
+@media (max-width: 900px) { #mdCards { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; } .mdcard { padding: 6px; } .mdcard .mi { font-size: 24px; } .mdcard .mt { font-size: 15px; } .mdcard .md { font-size: 10px; min-height: 0; } #moBig { font-size: 44px; } }
 .chev { width: 22px; height: 22px; display: block; margin: auto; fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
 .arr:hover { color: var(--gold); }
 
@@ -1348,3 +1348,37 @@ body.pad .dcRow:focus { outline: 4px solid var(--gold); outline-offset: -2px; }
 .wcBtns { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
 .wcBtns button { margin: 0; }
 @media (max-height: 500px) { .wcCard { padding: 10px 16px 12px; } #wcTitle { font-size: 28px; margin-bottom: 4px; } #wcBody { font-size: 14px; margin-bottom: 10px; } }
+
+/* Draft Champions */
+#dchamp { justify-content: flex-start; padding: 14px 18px; gap: 14px; }
+#dcHead { display: flex; align-items: center; gap: 18px; width: 100%; max-width: 1100px; }
+#dcKick { font-family: var(--hd); font-weight: 800; font-size: 14px; letter-spacing: .14em; color: var(--gold); }
+#dcHead h2 { margin: 0; font-size: 34px; }
+#dcHead h2::after { left: 0; margin-left: 0; }
+#dcOvr { margin-left: auto; text-align: right; font-family: var(--hd); }
+#dcOvr span { display: block; font-size: 12px; letter-spacing: .14em; color: var(--dim); font-weight: 700; }
+#dcOvr b { font-size: 40px; font-style: italic; font-weight: 900; line-height: 1; color: var(--gold); }
+#dcQuit { margin-right: 52px; }
+#dcCards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; width: 100%; max-width: 900px; flex: 1; min-height: 0; max-height: 320px; }
+.dcCard { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 14px 10px; transform: none; clip-path: none;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--tc) 45%, #0c1016) 0%, var(--panel) 62%); border: 2px solid var(--line2); border-top: 5px solid var(--edge, #b07a45); text-align: center; cursor: pointer; transition: transform .1s, border-color .1s; }
+.dcCard.dcGold { --edge: var(--gold); } .dcCard.dcSil { --edge: #c9d1db; } .dcCard.dcBrz { --edge: #b07a45; }
+.dcCard:hover, .dcCard:focus-visible { transform: translateY(-4px); border-color: var(--edge); }
+.dcTop { display: flex; align-items: center; justify-content: space-between; width: 100%; }
+.dcTop .badge { width: 40px; height: 44px; object-fit: contain; }
+.dcPos { font-family: var(--hd); font-style: italic; font-weight: 900; font-size: 22px; color: var(--dim); }
+.dcO { font-family: var(--hd); font-style: italic; font-weight: 900; font-size: 74px; line-height: .9; color: var(--edge); }
+.dcN { font-family: var(--hd); font-weight: 800; font-size: 22px; text-transform: uppercase; line-height: 1.05; }
+.dcM { font-size: 12px; color: var(--dim); letter-spacing: .06em; }
+#dcFoot { width: 100%; max-width: 1100px; }
+#dcLine { display: grid; grid-template-columns: repeat(16, minmax(0, 1fr)); gap: 4px; }
+.dcSlot { background: var(--panel); border: 1px solid var(--line); padding: 4px 2px; text-align: center; font-family: var(--hd); min-width: 0; }
+.dcSlot span { display: block; font-size: 11px; font-weight: 800; color: var(--dim); letter-spacing: .08em; }
+.dcSlot b { display: block; font-size: 18px; font-style: italic; font-weight: 900; height: 20px; line-height: 20px; }
+.dcSlot i { display: block; font-style: normal; font-size: 10px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; height: 13px; }
+.dcSlot.got { border-color: var(--line2); } .dcSlot.cur { border-color: var(--gold); background: #f6c31c1a; }
+@media (max-height: 500px) {
+  #dchamp { padding: 8px 12px; gap: 8px; } #dcHead h2 { font-size: 22px; } #dcKick { font-size: 11px; } #dcOvr b { font-size: 28px; }
+  #dcCards { gap: 10px; max-height: 210px; } .dcO { font-size: 48px; } .dcN { font-size: 17px; } .dcTop .badge { width: 30px; height: 32px; } .dcCard { padding: 8px; }
+  .dcSlot b { font-size: 14px; height: 16px; line-height: 16px; } .dcSlot i { display: none; }
+}

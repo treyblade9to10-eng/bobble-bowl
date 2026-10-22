@@ -1,5 +1,5 @@
 // ---- Offline support: network first (so updates show up right away), saved copy when there's no signal ----
-const CACHE = 'bobble-v8.6';
+const CACHE = 'bobble-v8.7';
 const FILES = [
   './',
   'index.html',
@@ -29,6 +29,7 @@ const FILES = [
   'js/special.js',
   'js/season.js',
   'js/modes.js',
+  'js/draftchamps.js',
   'js/savegame.js',
   'js/gamepad.js',
   'js/lib/peerjs.min.js',
