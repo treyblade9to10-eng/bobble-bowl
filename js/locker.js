@@ -198,7 +198,9 @@ function drawTurnHelmet(g, lk, pl, a) {
       g.save(); g.translate(side * R * 0.55 * c, -R * 0.05); g.scale(depth, 1);
       g.font = `900 ${Math.round(R * 0.62)}px "Barlow Condensed", "Arial Black", sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
       g.lineWidth = 3; g.strokeStyle = shade(lk.helmet, -0.6); g.fillStyle = lk.stripe === lk.helmet ? '#fff' : lk.stripe;
-      g.strokeText(String(pl.num), 0, 0); g.fillText(String(pl.num), 0, 0); g.restore();
+      if (lk.decal === 'logo' && lk.logoTeam && typeof Logo !== 'undefined') Logo.draw(g, lk.logoTeam, 0, 0, R * 0.8);
+      else if (lk.decal !== 'none') { g.strokeText(String(pl.num), 0, 0); g.fillText(String(pl.num), 0, 0); }
+      g.restore();
       g.fillStyle = shade(lk.helmet, -0.55); g.beginPath(); g.ellipse(-side * s * R * 0.05 + dx * R * 0.2, R * 0.3, R * 0.11 * depth + 1, R * 0.11, 0, 0, 7); g.fill();
     }
   }
@@ -217,8 +219,10 @@ function drawTurnHelmet(g, lk, pl, a) {
     const mc = lk.mask || '#c8c8c8';
     for (const [col, w] of [[OUT, 5], [mc, 3]]) {
       g.strokeStyle = col; g.lineWidth = w; g.lineCap = 'round'; g.beginPath();
-      for (const yy of [0.12, 0.36, 0.58]) { g.moveTo(fx - R * 0.6 * k, fy + R * yy); g.lineTo(fx + R * 0.6 * k, fy + R * yy); }
-      g.moveTo(fx, fy + R * 0.1); g.lineTo(fx, fy + R * 0.6);
+      const ms = lk.maskStyle || 'classic'; // same four facemasks as the Gear Locker
+      for (const yy of ms === 'open' ? [0.12, 0.5] : ms === 'robot' ? [-0.08, 0.12, 0.36, 0.58, 0.74] : ms === 'cage' ? [-0.08, 0.12, 0.36, 0.58] : [0.12, 0.36, 0.58]) { g.moveTo(fx - R * 0.6 * k, fy + R * yy); g.lineTo(fx + R * 0.6 * k, fy + R * yy); }
+      if (ms !== 'open') { g.moveTo(fx, fy + R * 0.1); g.lineTo(fx, fy + R * 0.6); }
+      if (ms === 'cage' || ms === 'robot') for (const xx of [-0.3, 0.3]) { g.moveTo(fx + R * xx * k, fy - R * 0.08); g.lineTo(fx + R * xx * k, fy + R * 0.6); }
       g.stroke();
     }
   }

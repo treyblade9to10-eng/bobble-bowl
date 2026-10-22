@@ -12,5 +12,12 @@ const STADIUMS = {
 };
 // end zone paint for a few places (everyone else is solid)
 const EZ_STYLE = { DEN: 'stripes', KC: 'stripes', GB: 'checker', CHI: 'stripes', DAL: 'checker', TB: 'stripes', SEA: 'checker', NO: 'checker', PIT: 'stripes', BUF: 'checker', LV: 'stripes', JAX: 'checker' };
-const stadiumOf = team => { const st = stadiumBase(team); st.ez = team && !team.custom && EZ_STYLE[team.id] || 'solid'; return st; };
-const stadiumBase = team => { if (team && team.custom) return { name: team.stadium || 'Home Field', dome: !!team.dome, turf: false }; const s = team && STADIUMS[team.id]; return s ? { name: s[0], dome: s[1] === 'dome', turf: s[2] === 'turf' } : { name: 'Bobble Bowl Stadium', dome: false, turf: false }; };
+const stadiumOf = team => { const st = stadiumBase(team); if (typeof FieldStyle !== 'undefined') { st.f = FieldStyle.of(team); st.turf = st.f.surf === 'turf'; } return st; };
+const stadiumBase = team => {
+  if (team && team.custom) return { name: team.stadium || 'Home Field', dome: !!team.dome, turf: false };
+  const s = team && STADIUMS[team.id], st = s ? { name: s[0], dome: s[1] === 'dome', turf: s[2] === 'turf' } : { name: 'Bobble Bowl Stadium', dome: false, turf: false };
+  // Stadium Editor changes on this device (the roof stays real online so both players get the same weather)
+  const o = s && typeof FieldStyle !== 'undefined' && FieldStyle.get(team.id);
+  if (o) { if (o.name) st.name = o.name; if (o.dome != null && !(typeof G !== 'undefined' && G.online)) st.dome = o.dome; }
+  return st;
+};

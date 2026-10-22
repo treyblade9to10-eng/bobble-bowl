@@ -45,7 +45,8 @@ const CT = {
       off: this.OFF.map((pos, i) => pl(t.off && t.off[i], pos)), def: this.DEF.map((pos, i) => pl(t.def && t.def[i], pos)),
       k: ks(t.k, 'Kicker'), p: ks(t.p, 'Punter'),
       backups: (Array.isArray(t.backups) ? t.backups : []).slice(0, this.BK_MAX).map(p => pl(p, this.BK_POS.includes(p && p[0]) ? p[0] : 'WR')),
-      ...(this.logo(t.logo) ? { logo: t.logo } : {}), ...(this.unis(t.unis) ? { unis: this.unis(t.unis) } : {})
+      ...(this.logo(t.logo) ? { logo: t.logo } : {}), ...(this.unis(t.unis) ? { unis: this.unis(t.unis) } : {}),
+      ...this.extras(t, id)
     };
   },
   // uploaded logo: a small square PNG made by the editor (nothing else gets through)
@@ -58,9 +59,24 @@ const CT = {
     for (const st of this.UNIS) {
       const k = u[st]; if (!k || typeof k !== 'object') continue;
       const o = {}; for (const part of UNI_PARTS) { const c = this.col(k[part], null); if (c) o[part] = c; }
+      for (const [part, max] of this.CUTS) if (k[part] != null) o[part] = this.num(k[part], 0, max, 0); // stripe counts
+      for (const part of ['yoke', 'matte']) if (typeof k[part] === 'boolean') o[part] = k[part];
+      if (this.col(k.numOut, null)) o.numOut = this.col(k.numOut, null);
       if (Object.keys(o).length) out[st] = o;
     }
     return Object.keys(out).length ? out : null;
+  },
+  CUTS: [['sleeve', 3], ['pstripe', 2], ['hstripe', 2], ['sockBand', 3]],
+  // the deeper stuff: field paint job, helmet side + team gear, how the CPU coaches it, its rival
+  KIT: { decal: ['num', 'logo', 'none'], mask: ['classic', 'cage', 'robot', 'open'], gloves: ['auto', 'white', 'black', 'team', 'gold'], cleats: ['auto', 'white', 'black', 'team', 'gold', 'neon'] },
+  COACHES: ['balanced', 'aggressive', 'conservative', 'air', 'ground'],
+  extras(t, id) {
+    const o = {}, f = typeof FieldStyle !== 'undefined' && FieldStyle.clean(t.field);
+    if (f) o.field = f;
+    if (t.kit && typeof t.kit === 'object') { const k = {}; for (const n in this.KIT) if (this.KIT[n].includes(t.kit[n]) && t.kit[n] !== this.KIT[n][0]) k[n] = t.kit[n]; if (Object.keys(k).length) o.kit = k; }
+    if (this.COACHES.includes(t.coach) && t.coach !== 'balanced') o.coach = t.coach;
+    const r = this.str(t.rival, 4).toUpperCase().replace(/[^A-Z0-9]/g, ''); if (r.length >= 2 && r !== id) o.rival = r;
+    return o;
   },
   newUid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); },
   // abbreviations must be unique (they're the team's id everywhere)
@@ -79,7 +95,7 @@ const CT = {
     TEAMS.length = 0; TEAMS.push(...this.NFL);
     if (swap && swap.team) {
       const i = TEAMS.findIndex(t => t.id === swap.out), t = this.clean(swap.team), cur = t && this.mine.find(m => m.uid === t.uid);
-      if (cur) { for (const k of ['c1', 'c2', 'helmet', 'mask', 'pants', 'shape', 'logo', 'unis']) { if (cur[k] !== undefined) t[k] = cur[k]; else delete t[k]; } } // latest look from the editor
+      if (cur) { for (const k of ['c1', 'c2', 'helmet', 'mask', 'pants', 'shape', 'logo', 'unis', 'field', 'kit', 'coach', 'rival', 'stadium', 'dome']) { if (cur[k] !== undefined) t[k] = cur[k]; else delete t[k]; } } // latest look from the editor
       if (i >= 0 && t) TEAMS[i] = { ...t, conf: this.NFL[i].conf, div: this.NFL[i].div, replaces: swap.out };
     }
     this.fixSel();
@@ -115,7 +131,7 @@ const CT = {
 
   // ---- online database (public teams) ----
   BAD: /(fuck|shit|bitch|cunt|nigg|fagg|whore|porn|nazi|hitler|retard|penis|vagina|pussy|slut|\b(dick|cock|sex|sexy|rape|anal|cum|boob|boobs|kys|fag|ass|hoe|tits)\b)/,
-  isClean(t) { return ![t.city, t.name, t.id, t.stadium, t.by, ...t.off.map(p => p[1]), ...t.def.map(p => p[1]), ...(t.backups || []).map(p => p[1]), t.k[0], t.p[0]].some(s => this.BAD.test(String(s).toLowerCase().replace(/[^a-z]+/g, ' '))); },
+  isClean(t) { return ![t.city, t.name, t.id, t.stadium, t.by, ...t.off.map(p => p[1]), ...t.def.map(p => p[1]), ...(t.backups || []).map(p => p[1]), t.k[0], t.p[0], t.field && t.field.tx].some(s => this.BAD.test(String(s).toLowerCase().replace(/[^a-z]+/g, ' '))); },
   async publish(t) {
     if (!this.isClean(t)) throw new Error('Some words in this team are not allowed. Change them and try again.');
     const body = { ...t, pub: true, at: Date.now() }; delete body.custom; delete body.conf; delete body.div; delete body.qb2; delete body.rb2; delete body.bench; // backups go up as one list

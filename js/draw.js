@@ -25,7 +25,7 @@ function wy(py) { return (py - CH / 2 - VY) / PY + cam.y; }
 const FIELD_PAD_X = 6, FIELD_PAD_TOP = 8, FIELD_PAD_BOT = 5;
 let fieldCv = null, fieldKey = '';
 function buildField(G) {
-  const key = G.teams[0].id + G.teams[1].id + (G.demo ? 'd' : '') + (G.bigGame ? 'B' + G.bigGame.year : '') + (typeof Logo !== 'undefined' ? Logo.style() : '') + (G.teams[0].logo ? G.teams[0].logo.length + G.teams[0].logo.slice(-24) : '') + (G.teams[1].logo ? G.teams[1].logo.length : '');
+  const key = G.teams[0].id + G.teams[1].id + (G.demo ? 'd' : '') + (G.bigGame ? 'B' + G.bigGame.year : '') + (typeof Logo !== 'undefined' ? Logo.style() : '') + (G.teams[0].logo ? G.teams[0].logo.length + G.teams[0].logo.slice(-24) : '') + (G.teams[1].logo ? G.teams[1].logo.length : '') + FieldStyle.key(G);
   if (fieldKey === key && fieldCv) return;
   fieldKey = key;
   const W = Math.ceil((120 + FIELD_PAD_X * 2) * PX), H = Math.ceil((FIELD_W + FIELD_PAD_TOP + FIELD_PAD_BOT) * PY);
@@ -34,6 +34,8 @@ function buildField(G) {
   const fx = x => (x + FIELD_PAD_X) * PX, fy = y => (y + FIELD_PAD_TOP) * PY;
   // stands
   const stad = stadiumOf(G.teams[0]);
+  // the home team's paint job (the Bobble Bowl keeps its own neutral split look)
+  const fs = G.bigGame ? { ...FieldStyle.DEF, surf: stad.turf ? 'turf' : 'grass' } : FieldStyle.of(G.teams[0]), fc = FieldStyle.colors(fs, G.teams[0]), tf = FieldStyle.turf(fs);
   const st = g.createLinearGradient(0, 0, 0, fy(-1.2));
   st.addColorStop(0, stad.dome ? '#07090d' : '#0e1420'); st.addColorStop(1, stad.dome ? '#1b2230' : '#253147');
   g.fillStyle = st; g.fillRect(0, 0, W, fy(-1.2));
@@ -46,7 +48,7 @@ function buildField(G) {
     g.fillStyle = SKIN[(h >> 4) % 6]; g.beginPath(); g.arc(i * 13 + (row % 2) * 6 + 4, 4 + row * 12, 3, 0, 7); g.fill();
   }
   // ad wall
-  g.fillStyle = '#10151d'; g.fillRect(0, fy(-1.9), W, 0.9 * PY);
+  g.fillStyle = shade(fc.wall, -0.75); g.fillRect(0, fy(-1.9), W, 0.9 * PY);
   if (stad.dome) { // roof: dark steel with trusses and a ring of lights
     const rf = g.createLinearGradient(0, 0, 0, 22); rf.addColorStop(0, '#05070a'); rf.addColorStop(1, '#05070a00');
     g.fillStyle = rf; g.fillRect(0, 0, W, 22);
@@ -57,35 +59,20 @@ function buildField(G) {
   const wall = `${stad.name.toUpperCase()}  •  ${G.teams[0].city.toUpperCase()}  •  BOBBLE BOWL`;
   for (let x = 0; x < W; x += 300) g.fillText(wall, x + 10, fy(-1.35));
   // apron + grass
-  g.fillStyle = '#2b6b2e'; g.fillRect(0, fy(-1.2), W, H - fy(-1.2));
+  g.fillStyle = tf.apron; g.fillRect(0, fy(-1.2), W, H - fy(-1.2));
   for (let yd = -FIELD_PAD_X; yd < 120 + FIELD_PAD_X; yd += 5) {
     const inField = yd >= 0 && yd < 120;
-    g.fillStyle = !inField ? (stad.turf ? '#23743a' : '#2b6b2e') : stad.turf ? ((Math.floor(yd / 5) % 2 === 0) ? '#34a04f' : '#2f9749') : (Math.floor(yd / 5) % 2 === 0) ? '#3d9a43' : '#378f3c';
+    g.fillStyle = !inField ? tf.apron : (Math.floor(yd / 5) % 2 === 0) ? tf.a : tf.b;
     g.fillRect(fx(yd), fy(0), 5 * PX + 1, FIELD_W * PY);
   }
   // mowing texture
-  g.globalAlpha = stad.turf ? 0.02 : 0.05; g.fillStyle = '#000';
+  g.globalAlpha = tf.mow; g.fillStyle = '#000';
   for (let y = 0; y < FIELD_W; y += 2) g.fillRect(fx(0), fy(y), 120 * PX, PY * 0.5);
   g.globalAlpha = 1;
   // end zones
   for (let s = 0; s < 2; s++) {
     const t = G.teams[G.bigGame ? s : 0], x0 = fx(s === 0 ? 0 : 110); // home team's stadium = both end zones are theirs (the Bobble Bowl splits them)
-    const ez = g.createLinearGradient(x0, 0, x0 + 10 * PX, 0);
-    ez.addColorStop(0, shade(t.c1, -0.15)); ez.addColorStop(0.5, t.c1); ez.addColorStop(1, shade(t.c1, -0.15));
-    g.fillStyle = ez; g.fillRect(x0, fy(0), 10 * PX, FIELD_W * PY);
-    // some stadiums paint their end zones with stripes or a checkerboard
-    const ezs = stad.ez || 'solid';
-    if (ezs !== 'solid') {
-      g.save(); g.beginPath(); g.rect(x0, fy(0), 10 * PX, FIELD_W * PY); g.clip(); g.fillStyle = shade(t.c1, -0.22);
-      if (ezs === 'stripes') for (let k = -FIELD_W * PY; k < 10 * PX + FIELD_W * PY; k += 44) { g.beginPath(); g.moveTo(x0 + k, fy(0)); g.lineTo(x0 + k + 20, fy(0)); g.lineTo(x0 + k + 20 - FIELD_W * PY, fy(FIELD_W)); g.lineTo(x0 + k - FIELD_W * PY, fy(FIELD_W)); g.fill(); }
-      else for (let cx = 0; cx < 10; cx += 2.5) for (let cy = 0; cy < FIELD_W; cy += 2.5 * PX / PY / 1.7) if ((Math.round(cx / 2.5) + Math.round(cy / (2.5 * PX / PY / 1.7))) % 2) g.fillRect(x0 + cx * PX, fy(cy), 2.5 * PX, 2.5 * PX / 1.7);
-      g.restore();
-    }
-    if (typeof Logo !== 'undefined' && g.save) for (const ly of [FIELD_W * 0.12, FIELD_W * 0.88]) Logo.draw(g, t, x0 + 5 * PX, fy(ly), 5.6 * PX); // logos keep their real shape
-    g.save(); g.translate(x0 + 5 * PX, fy(FIELD_W / 2)); g.rotate(s === 0 ? -Math.PI / 2 : Math.PI / 2);
-    g.font = '900 86px "Barlow Condensed", "Arial Black", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-    g.lineWidth = 8; g.strokeStyle = shade(t.c1, -0.5); g.strokeText(t.name.toUpperCase(), 0, 0);
-    g.fillStyle = t.c2; g.fillText(t.name.toUpperCase(), 0, 0); g.restore();
+    FieldStyle.paintEZ(g, t, fs, x0, fy(0), 10 * PX, FIELD_W * PY, s);
   }
   // yard lines
   g.strokeStyle = '#ffffffdd';
@@ -96,7 +83,7 @@ function buildField(G) {
   g.font = '900 34px "Barlow Condensed", "Arial Black", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
   for (let yd = 20; yd <= 100; yd += 10) {
     const n = yd <= 60 ? yd - 10 : 110 - yd;
-    for (const ny of [8.5, 44.8]) { g.fillStyle = '#ffffffd8'; g.fillText(String(n), fx(yd), fy(ny)); }
+    for (const ny of [8.5, 44.8]) { g.fillStyle = fc.yard + 'd8'; g.fillText(String(n), fx(yd), fy(ny)); }
   }
   // home team logo painted at midfield
   const ht = G.teams[0];
@@ -107,8 +94,8 @@ function buildField(G) {
     g.font = 'italic 900 70px "Barlow Condensed", "Arial Black", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#d9a933';
     g.fillText(roman(bowlNo(G.bigGame.year)), 2.6 * PX, 0.6 * PX); g.font = '800 22px "Barlow Condensed", Arial, sans-serif'; g.fillStyle = '#fff'; g.fillText('BOBBLE BOWL', 2.6 * PX, -2.4 * PX);
     g.restore();
-  } else if (typeof Logo !== 'undefined' && g.save) {
-    Logo.draw(g, ht, fx(60), fy(FIELD_W / 2), 9 * PX); // real shape, not squished
+  } else if (typeof Logo !== 'undefined' && g.save && fs.mid !== 'none') {
+    Logo.draw(g, ht, fx(60), fy(FIELD_W / 2), (fs.mid === 'big' ? 13 : 9) * PX); // real shape, not squished
   }
   // sidelines
   g.strokeStyle = '#fff'; g.lineWidth = 7; g.strokeRect(fx(0), fy(0), 120 * PX, FIELD_W * PY);
@@ -131,10 +118,10 @@ function buildField(G) {
   for (const side of [-1, 1]) {
     const xa = side < 0 ? 0 : fx(122.6), w = side < 0 ? fx(-2.6) : W - fx(122.6), top = fy(-1.2); // stands start right behind the wall (Lambeau Leap territory)
     g.fillStyle = '#10151d'; g.fillRect(xa, top, w, H - top);
-    g.fillStyle = shade(G.teams[0].c1, -0.2); g.fillRect(side < 0 ? xa + w - 7 : xa, top, 7, H - top); // padded wall
+    g.fillStyle = shade(fc.wall, -0.2); g.fillRect(side < 0 ? xa + w - 7 : xa, top, 7, H - top); // padded wall
     for (let yy = top + 6; yy < H; yy += 11) for (let xx = xa + 5; xx < xa + w - 3; xx += 11) { const hh = hashStr(side + ':' + xx + ':' + yy); g.fillStyle = cols[hh % cols.length]; g.beginPath(); g.arc(xx, yy, 4, 0, 7); g.fill(); }
     const bx = side < 0 ? fx(-FIELD_PAD_X + 0.3) : fx(120 + FIELD_PAD_X - 1.9), by = fy(FIELD_W / 2) - 70, bw = 1.6 * PX, bh = 140;
-    g.fillStyle = '#05070a'; g.fillRect(bx - 4, by - 4, bw + 8, bh + 8); g.fillStyle = shade(G.teams[0].c1, -0.4); g.fillRect(bx, by, bw, bh);
+    g.fillStyle = '#05070a'; g.fillRect(bx - 4, by - 4, bw + 8, bh + 8); g.fillStyle = shade(fc.wall, -0.4); g.fillRect(bx, by, bw, bh);
     if (typeof Logo !== 'undefined' && g.save) Logo.draw(g, G.teams[0], bx + bw / 2, by + bh / 2, Math.min(bw, bh) - 6);
   }
   // team benches area
@@ -316,7 +303,7 @@ function teamLookBase(team, home, style) {
     const key = team.id + team.c1 + team.c2 + team.helmet + team.mask + team.pants + home + style + (team.unis ? JSON.stringify(team.unis) : ''); let m = lookCache.get(key);
     if (!m) {
       const [h, j, p] = style.slice(4).split(',').map(k => teamLook(team, home, k));
-      m = { helmet: h.helmet, stripe: h.stripe, mask: h.mask, hstripe: h.hstripe, matte: h.matte,
+      m = { helmet: h.helmet, stripe: h.stripe, mask: h.mask, hstripe: h.hstripe, matte: h.matte, decal: h.decal, maskStyle: h.maskStyle, logoTeam: h.logoTeam,
         jersey: j.jersey, trim: j.trim, num: j.num, numOut: j.numOut, sleeve: j.sleeve, yoke: j.yoke, sock: j.sock, sockBand: j.sockBand, pants: p.pants, pstripe: p.pstripe };
       lookCache.set(key, m);
     }
@@ -328,10 +315,12 @@ function teamLookBase(team, home, style) {
 // created teams can set every color of each uniform by hand (helmet, jersey, numbers, pants...)
 const UNI_PARTS = ['helmet', 'stripe', 'mask', 'jersey', 'num', 'trim', 'pants', 'sock'];
 function baseLook(team, style) {
-  const lk = autoLook(team, style), cu = team.custom && team.unis && team.unis[style];
-  if (!cu) return lk;
-  const out = { ...lk }; for (const k of UNI_PARTS) if (cu[k]) out[k] = cu[k];
-  if (cu.num || cu.jersey || cu.trim) delete out.numOut; // let the number outline match the new colors
+  const lk = autoLook(team, style), cu = team.custom && team.unis && team.unis[style], kit = team.custom && team.kit;
+  if (!cu && !kit) return lk;
+  const out = { ...lk }; if (cu) { for (const k of UNI_PARTS) if (cu[k]) out[k] = cu[k];
+    if (cu.num || cu.jersey || cu.trim) delete out.numOut; // let the number outline match the new colors
+    for (const k of ['sleeve', 'pstripe', 'hstripe', 'sockBand', 'yoke', 'matte', 'numOut']) if (cu[k] != null) out[k] = cu[k]; } // stripe counts, yoke, matte, outline picked in Create a Team
+  if (kit) { if (kit.decal) { out.decal = kit.decal; out.logoTeam = team; } if (kit.mask) out.maskStyle = kit.mask; } // helmet side + facemask for the editor's turntable
   return out;
 }
 function autoLook(team, style) {
@@ -645,7 +634,7 @@ function drawHead(g, R, team, p, look) {
   const face = p.face, gear = p.gear || {};
   const mood = p.mouth === 'O' ? 'shock' : p.celebrate > 0 ? 'happy' : (p.engaged || !p.off) ? 'mad' : 'focus';
   const snow = G.weather === 'snow' && p.dirt > 0.1 ? Math.round(Math.min(1, p.dirt + 0.3) * 6) : 0;
-  const key = [R.toFixed(1), mood, face.dir, face.skin, face.visor ? 1 : 0, face.beard ? 1 : 0, look.helmet, look.stripe, look.hstripe, look.matte ? 1 : 0, look.mask, p.num, gear.visor, gear.mask, G.weather === 'rain' ? 'r' : '', snow].join('|');
+  const key = [R.toFixed(1), mood, face.dir, face.skin, face.visor ? 1 : 0, face.beard ? 1 : 0, look.helmet, look.stripe, look.hstripe, look.matte ? 1 : 0, look.mask, p.num, gear.visor, gear.mask, look.decal ? look.decal + team.id : '', G.weather === 'rain' ? 'r' : '', snow].join('|');
   let c = headCache.get(key);
   if (!c) {
     const S = 2, B = Math.ceil(R * 1.3 + 4); // drawn at 2x so the zoomed celly cam stays sharp
@@ -686,7 +675,8 @@ function drawHeadRaw(g, R, team, p, look) {
   g.font = `900 ${Math.round(R * 0.62)}px "Barlow Condensed", "Arial Black", sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
   g.lineWidth = 3; g.strokeStyle = shade(look.helmet, -0.6); g.fillStyle = look.stripe === look.helmet ? '#fff' : look.stripe;
   const dx = -R * 0.38 * face.dir;
-  g.strokeText(p.num, dx, -R * 0.08); g.fillText(p.num, dx, -R * 0.08);
+  if (look.decal === 'logo' && typeof Logo !== 'undefined') Logo.draw(g, team, dx, -R * 0.06, R * 0.78); // created teams can put their logo on the helmet
+  else if (look.decal !== 'none') { g.strokeText(p.num, dx, -R * 0.08); g.fillText(p.num, dx, -R * 0.08); }
   g.restore();
   // gloss
   g.save(); g.translate(-R * 0.42, -R * 0.52); g.rotate(-0.6);

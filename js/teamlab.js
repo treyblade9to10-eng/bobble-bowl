@@ -178,15 +178,12 @@ const TeamLab = {
         <div class="tlHint">If the team is PUBLIC, your logo goes up with it so everyone sees it. Logos only, no photos of people.</div></div>
         <input type="file" id="tlLogoFile" accept="image/*" hidden></div>
       <div class="tlSec">BADGE${t.logo ? ' <span class="tlSecSub">USED WHEN THERE IS NO LOGO</span>' : ''}</div>
-      <div class="tlShapes">${CT.SHAPES.map(s => `<button class="tlShape${t.shape === s ? ' on' : ''}" data-s="${s}">${teamBadge({ ...t, shape: s, logo: undefined })}<span>${s.toUpperCase()}</span></button>`).join('')}</div>
-      <div class="tlSec">STADIUM</div>
-      ${this.field('Stadium', 'tlStadIn', t.stadium, 24)}
-      <div class="tlF"><span>Roof</span><div class="tlTabs" id="tlRoof"><button data-d="0" class="${t.dome ? '' : 'on'}">OPEN AIR</button><button data-d="1" class="${t.dome ? 'on' : ''}">DOME</button></div></div>`;
+      <div class="tlShapes">${CT.SHAPES.map(s => `<button class="tlShape${t.shape === s ? ' on' : ''}" data-s="${s}">${teamBadge({ ...t, shape: s, logo: undefined })}<span>${s.toUpperCase()}</span></button>`).join('')}</div>`; // stadium name + roof live on the STADIUM tab (stadiumedit.js)
   },
   wire_id() {
     const t = this.t;
     const on = (id, k, f) => $(id).addEventListener('input', () => { t[k] = f ? f($(id).value) : $(id).value; this.renderName(); });
-    on('tlCityIn', 'city'); on('tlNameIn', 'name'); on('tlStadIn', 'stadium');
+    on('tlCityIn', 'city'); on('tlNameIn', 'name');
     $('tlIdIn').addEventListener('input', () => {
       const v = $('tlIdIn').value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4); $('tlIdIn').value = v; t.id = v;
       const bad = v.length < 2 ? 'Needs at least 2 letters.' : CT.idTaken(v, t.uid) ? `${v} is already taken. Try another.` : '';
@@ -194,8 +191,7 @@ const TeamLab = {
       this.renderName(); document.querySelectorAll('.tlShape').forEach(b => { b.querySelector('svg').outerHTML = teamBadge({ ...t, shape: b.dataset.s, logo: undefined }); });
     });
     document.querySelectorAll('.tlShape').forEach(b => b.onclick = () => { t.shape = b.dataset.s; Sound.click(); this.renderEd(); });
-    document.querySelectorAll('#tlRoof button').forEach(b => b.onclick = () => { t.dome = b.dataset.d === '1'; Sound.click(); this.renderEd(); });
-    for (const id of ['tlCityIn', 'tlNameIn', 'tlIdIn', 'tlStadIn']) $(id).addEventListener('keydown', e => e.stopPropagation());
+    for (const id of ['tlCityIn', 'tlNameIn', 'tlIdIn']) $(id).addEventListener('keydown', e => e.stopPropagation());
     $('tlLogoUp').onclick = () => { Sound.click(); $('tlLogoFile').click(); };
     $('tlLogoFile').onchange = async () => {
       const f = $('tlLogoFile').files[0]; if (!f) return;
@@ -241,8 +237,8 @@ const TeamLab = {
       if (!t.unis[kit]) { const lk = teamLook(t, kit !== 'away', kit); t.unis[kit] = {}; for (const [p] of this.PARTS) t.unis[kit][p] = hex6(lk[p]); } // lock in the whole set the first time
       t.unis[kit][k] = c; this.renderEd();
     };
-    document.querySelectorAll('.tlC').forEach(b => b.onclick = () => { Sound.click(); b.dataset.k ? setTeam(b.dataset.k, b.dataset.c) : setUni(b.dataset.u, b.dataset.c); });
-    document.querySelectorAll('.tlPick input').forEach(i => i.addEventListener('change', () => { const c = i.value.toUpperCase(); i.dataset.k ? setTeam(i.dataset.k, c) : setUni(i.dataset.u, c); }));
+    document.querySelectorAll('.tlC[data-k], .tlC[data-u]').forEach(b => b.onclick = () => { Sound.click(); b.dataset.k ? setTeam(b.dataset.k, b.dataset.c) : setUni(b.dataset.u, b.dataset.c); });
+    document.querySelectorAll('.tlPick input[data-k], .tlPick input[data-u]').forEach(i => i.addEventListener('change', () => { const c = i.value.toUpperCase(); i.dataset.k ? setTeam(i.dataset.k, c) : setUni(i.dataset.u, c); }));
     if ($('tlUniReset')) $('tlUniReset').onclick = () => { Sound.click(); delete t.unis[kit]; if (!Object.keys(t.unis).length) delete t.unis; this.renderEd(); };
     $('tlShuffle').onclick = () => {
       const a = pick(TL_PALETTE.filter(c => c !== '#FFFFFF')); let b; do { b = pick(TL_PALETTE); } while (b === a || colorGap(a, b) < 120);
