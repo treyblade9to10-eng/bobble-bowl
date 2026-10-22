@@ -12,7 +12,7 @@ Object.assign(Season, {
   realBench(id) {
     const t = TEAMS.find(x => x.id === id);
     if (!t || !Array.isArray(t.bench)) return null;
-    const out = [t.qb2, t.rb2, ...t.bench].filter(p => Array.isArray(p) && p[0] && p[1]).map(p => { const q = p.slice(0, 6); if (q[5] == null) q[5] = 3; return q; });
+    const out = [t.qb2, t.rb2, ...t.bench].filter(p => Array.isArray(p) && p[0] && p[1]).map(p => { const q = p.slice(0, 6); if (q[5] == null) q[5] = 3; if (p[6]) q[6] = JSON.parse(JSON.stringify(p[6])); return q; }); // edited age / ratings come along
     for (const pos of BACKUP_POS) if (!out.some(p => p[0] === pos)) out.push(this.fakeBackup(pos)); // a spot with no real backup
     return out;
   },

@@ -216,7 +216,7 @@ const Season = {
   // ---- franchise: rosters you can change (trades) and that develop each year ----
   ensureRosters() {
     const d = this.data;
-    if (!d.rosters) { d.rosters = {}; for (const t of TEAMS) d.rosters[t.id] = { off: t.off.map(p => p.slice()), def: t.def.map(p => p.slice()) }; }
+    if (!d.rosters) { const cp = p => p[6] ? p.slice(0, 6).concat([JSON.parse(JSON.stringify(p[6]))]) : p.slice(); d.rosters = {}; for (const t of TEAMS) d.rosters[t.id] = { off: t.off.map(cp), def: t.def.map(cp) }; } // own copy of the info slot (injuries etc. live there)
     return d.rosters;
   },
   // ratings move a little every offseason: young-ish low guys grow, top stars level off, award winners get a bump

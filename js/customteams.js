@@ -35,8 +35,8 @@ const CT = {
     if (!t || typeof t !== 'object') return null;
     const id = this.str(t.id, 4).toUpperCase().replace(/[^A-Z0-9]/g, '');
     if (id.length < 2) return null;
-    const pl = (p, pos) => ['' + pos, this.str(p && p[1], 18) || 'Player', this.num(p && p[2], 0, 99, 0), this.num(p && p[3], 40, 99, 70), this.num(p && p[4], 40, 99, POS_SPD[pos] || 80), this.num(p && p[5], 0, 5, 2)];
-    const ks = (k, d) => [this.str(k && k[0], 18) || d, this.num(k && k[1], 0, 99, 3), this.num(k && k[2], 40, 99, 72), this.num(k && k[3], 0, 5, 2)];
+    const pl = (p, pos) => this.ex(['' + pos, this.str(p && p[1], 18) || 'Player', this.num(p && p[2], 0, 99, 0), this.num(p && p[3], 40, 99, 70), this.num(p && p[4], 40, 99, POS_SPD[pos] || 80), this.num(p && p[5], 0, 5, 2)], p && p[6]);
+    const ks = (k, d) => this.ex([this.str(k && k[0], 18) || d, this.num(k && k[1], 0, 99, 3), this.num(k && k[2], 40, 99, 72), this.num(k && k[3], 0, 5, 2)], k && k[4], true);
     return {
       id, city: this.str(t.city, 16) || 'My', name: this.str(t.name, 16) || 'Team', conf: 'CUSTOM', div: '', custom: true,
       uid: this.str(t.uid, 24) || this.newUid(), by: this.str(t.by, 16), pub: !!t.pub, at: this.num(t.at, 0, 9e15, Date.now()), dl: this.num(t.dl, 0, 1e9, 0),
@@ -47,6 +47,14 @@ const CT = {
       backups: (Array.isArray(t.backups) ? t.backups : []).slice(0, this.BK_MAX).map(p => pl(p, this.BK_POS.includes(p && p[0]) ? p[0] : 'WR')),
       ...(this.logo(t.logo) ? { logo: t.logo } : {}), ...(this.unis(t.unis) ? { unis: this.unis(t.unis) } : {})
     };
+  },
+  // a player's info slot: only his age and specific ratings (ratings.js) get through. Kickers keep it at k[4]
+  ex(t, x, kick) {
+    if (!x || typeof x !== 'object' || Array.isArray(x)) return t;
+    const o = {}, age = this.num(x.age, 18, 45, 0), r = Ratings.clean(x.r, kick ? t[2] : t[3], kick ? 0 : t[4], kick);
+    if (age) o.age = age; if (r) o.r = r;
+    if (o.age || o.r) t.push(o);
+    return t;
   },
   // uploaded logo: a small square PNG made by the editor (nothing else gets through)
   logo(v) { return typeof v === 'string' && v.length < 400000 && /^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(v); },
