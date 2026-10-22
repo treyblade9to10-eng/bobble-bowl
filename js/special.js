@@ -36,7 +36,7 @@ function setupReturn(kind, k) {
   const at = (p, x, y) => { p.x = x; p.y = clamp(y, 2, FIELD_W - 2); p.hx = p.x; p.hy = p.y; p.role = 'ret'; p.face.dir = dirOf(p.side); };
   // the kicker / punter joins the coverage team
   const kk = kickerOf(k, kind === 'punt' ? 'punt' : 'fg');
-  Object.assign(D[1], { name: kk.name, num: kk.num, ovr: kk.ovr, pos: kind === 'punt' ? 'P' : 'K', cap: false, xf: null });
+  Object.assign(D[1], { name: kk.name, num: kk.num, ovr: kk.ovr, pos: kind === 'punt' ? 'P' : 'K', cap: false, xf: null, rt: null });
   if (kk.skin != null) D[1].face.skin = kk.skin;
   if (kind === 'punt') {
     D.forEach((p, i) => at(p, spot - dk * 0.8, MID + (i - 3.5) * 3.2));
@@ -69,11 +69,11 @@ function setupReturn(kind, k) {
 
 function startKickMeter(kind, k) {
   const kk = kickerOf(k, kind === 'punt' ? 'punt' : 'fg');
-  G.km = { kind, yds: 0, kk, stage: 0, t: 0, power: 0, aim: 0, side: k, rateP: 0.7 + (90 - kk.ovr) * 0.015, rateA: 0.6 + (90 - kk.ovr) * 0.015, need: 0, tol: 0.35 };
+  G.km = { kind, yds: 0, kk, stage: 0, t: 0, power: 0, aim: 0, side: k, rateP: 0.7 + (90 - kk.ka) * 0.015, rateA: 0.6 + (90 - kk.ka) * 0.015, need: 0, tol: 0.35 };
   if (isHumanSide(k) && !G.demo && !(G.sitOut && kind === 'punt') && !autoKick()) { G.phase = 'kickmeter'; G.km.wait = 0.35; return; }
   // CPU kickoffs: mostly land in the field so you get to return them, sometimes a deep boot
   G.km.power = kind === 'onside' ? rand(0.3, 0.8) : kind === 'ko' ? (chance(0.7) ? rand(0.15, 0.68) : rand(0.7, 0.98)) : rand(0.6, 0.98); G.km.aim = rand(-0.4, 0.4);
-  if (isHumanSide(k) && autoKick() && kind !== 'onside') { const q = clamp((kk.ovr - 60) / 35, 0, 1); G.km.power = clamp(rand(0.55, 0.85) + q * 0.15, 0.4, 1); G.km.aim = rand(-0.4, 0.4) * (1.2 - q * 0.6); } // Coach Mode: your kicker's rating decides it
+  if (isHumanSide(k) && autoKick() && kind !== 'onside') { const q = clamp((kk.ka - 60) / 35, 0, 1); G.km.power = clamp(rand(0.55, 0.85) + q * 0.15, 0.4, 1); G.km.aim = rand(-0.4, 0.4) * (1.2 - q * 0.6); } // Coach Mode: your kicker's rating decides it
   G.phase = 'kickmeter'; G.km.cpuT = 0.8; G.km.stage = 3; // short pause so you can see the lineup
 }
 
@@ -82,14 +82,14 @@ function launchReturnKick() {
   const km = G.km, k = km.side, dk = dirOf(k), r = 1 - k, kicker = G.D[1];
   const b = G.ball, f = { sx: b.x, sy: b.y, t: 0, kick: km.kind, intended: G.O[1], passer: kicker };
   if (km.kind === 'ko') {
-    const dist = 46 + km.power * (22 + (km.kk.ovr - 60) * 0.25);
+    const dist = 46 + km.power * (22 + (km.kk.kp - 60) * 0.25);
     f.tx = b.x + dk * dist; f.ty = clamp(MID + km.aim * 20, 3, FIELD_W - 3); f.T = 2.5; f.peak = 13;
     f.touchback = dirOf(r) * (ownGoal(r) - f.tx) > 4; // deep in the end zone
   } else if (km.kind === 'onside') {
     const dist = 9 + km.power * 7;
     f.tx = b.x + dk * dist; f.ty = clamp(MID + km.aim * 18, 2, FIELD_W - 2); f.T = 0.85; f.peak = 1.2; f.onside = true;
   } else { // punt
-    let dist = 30 + km.power * (18 + (km.kk.ovr - 60) * 0.35);
+    let dist = 30 + km.power * (18 + (km.kk.kp - 60) * 0.35);
     f.shank = Math.abs(km.aim) > 0.75; if (f.shank) dist *= 0.55;
     f.tx = G.los + dk * dist; f.ty = G.ballY + km.aim * 24;
     f.oob = f.ty < 0 || f.ty > FIELD_W;
@@ -188,7 +188,7 @@ function setupFake(play) {
   setupPlay(play, KICK_RUSH);
   const qb = G.O[0], d = dirOf(G.poss);
   const kk = kickerOf(G.poss, play.fakeKind === 'punt' ? 'punt' : 'fg');
-  if (play.fakeKind === 'punt') { Object.assign(qb, { name: kk.name, num: kk.num, ovr: Math.min(qb.ovr, kk.ovr - 5), pos: 'P', cap: false, xf: null, thp: null, tha: null }); if (kk.skin != null) qb.face.skin = kk.skin; qb.x = G.los - d * 9; qb.hx = qb.x; }
+  if (play.fakeKind === 'punt') { Object.assign(qb, { name: kk.name, num: kk.num, ovr: Math.min(qb.ovr, kk.ovr - 5), pos: 'P', cap: false, xf: null, thp: null, tha: null, rt: null }); if (kk.skin != null) qb.face.skin = kk.skin; qb.x = G.los - d * 9; qb.hx = qb.x; }
   else { qb.x = G.los - d * 7; qb.hx = qb.x; qb.ovr = Math.min(qb.ovr, 72); }
   G.fake = play.fakeKind;
 }

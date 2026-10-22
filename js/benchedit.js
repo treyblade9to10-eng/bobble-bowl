@@ -1,11 +1,12 @@
-// ---- Backups editor: change who's on a team's bench (name, number, position, OVR, speed, skin), add or cut backups ----
-// Quick Game: edits a team's default backups (saved on this device in 'bobbleBenches', also used when you start a new Season).
-// Season: edits YOUR franchise's bench (from the Depth Chart).
+// ---- Roster editor: a team's starters + backups. Tap anyone for his player card (playeredit.js); add or cut backups ----
+// Quick Game: edits a team's default roster (backups saved on this device in 'bobbleBenches', changed starters in 'bobbleStarters';
+// both are also used when you start a new Season).
+// Season: edits YOUR franchise's players (from the Depth Chart).
 screens.push('benchEd'); menuScreens.push('benchEd');
 (() => {
   const el = document.createElement('div'); el.id = 'benchEd'; el.className = 'screen';
   el.innerHTML = `
-    <div class="beTop"><h2>Backups</h2><div class="tlTabs" id="beTeams"></div></div>
+    <div class="beTop"><h2>Roster</h2><div class="tlTabs" id="beTeams"></div></div>
     <div id="beHead"></div>
     <div id="beList"></div>
     <div id="beMsg"></div>
@@ -23,8 +24,8 @@ const BenchEd = {
   saveStore(s) { try { localStorage.setItem(this.KEY, JSON.stringify(s)); } catch (e) {} },
   clean(p) {
     const pos = BACKUP_POS.includes(p && p[0]) ? p[0] : 'WR', n = v => Math.round(+v);
-    return [pos, String((p && p[1]) || 'Backup').replace(/[<>&"'`\\]/g, '').trim().slice(0, 18) || 'Backup', clamp(n(p && p[2]) || 0, 0, 99),
-      clamp(n(p && p[3]) || 65, 40, 99), clamp(n(p && p[4]) || 80, 40, 99), clamp(isFinite(n(p && p[5])) ? n(p[5]) : 3, 0, 5)];
+    return CT.ex([pos, String((p && p[1]) || 'Backup').replace(/[<>&"'`\\]/g, '').trim().slice(0, 18) || 'Backup', clamp(n(p && p[2]) || 0, 0, 99),
+      clamp(n(p && p[3]) || 65, 40, 99), clamp(n(p && p[4]) || 80, 40, 99), clamp(isFinite(n(p && p[5])) ? n(p[5]) : 3, 0, 5)], p && p[6]); // keeps age + ratings
   },
   // a team's default backups as one list: QB2, RB2, then the rest
   listOf(t) { if (t.custom) return (t.backups || []).map(p => this.clean(p)); return [t.qb2, t.rb2, ...(t.bench || [])].filter(p => Array.isArray(p) && p[0] && p[1]).map(p => this.clean(p)); },
@@ -45,7 +46,7 @@ const BenchEd = {
   },
   // created team: write the list onto the team and save My Teams
   saveCustom(t, list) {
-    for (const x of [t, CT.mine.find(m => m.uid === t.uid)]) if (x) { x.backups = list.map(p => p.slice(0, 6)); CT.derive(x); }
+    for (const x of [t, CT.mine.find(m => m.uid === t.uid)]) if (x) { x.backups = list.map(p => p.slice(0, 7)); CT.derive(x); }
     CT.save();
   },
 
@@ -60,44 +61,55 @@ const BenchEd = {
   rows() { return this.ctx.kind === 'season' ? Season.bench(this.ctx.id) : (this.ctx.list = this.ctx.list && this.ctx.listId === this.ctx.cur ? this.ctx.list : (this.ctx.listId = this.ctx.cur, this.listOf(this.team()))); },
   commit() {
     if (this.ctx.kind === 'season') { Season.save(); return; }
-    const t = this.team(); if (t.custom) { this.saveCustom(t, this.ctx.list); return; }
+    const t = this.team();
+    if (t.custom) { // starters live on the team too: copy them to My Teams
+      const m = CT.mine.find(x => x.uid === t.uid); if (m && m !== t) { m.off = t.off; m.def = t.def; m.k = t.k; m.p = t.p; }
+      this.saveCustom(t, this.ctx.list); return;
+    }
     const s = this.store(); s[t.id] = this.ctx.list; this.saveStore(s); this.setList(t, this.ctx.list.map(p => p.slice()));
+    StarterEd.save(t);
+  },
+  // everybody on the card editor's list: starters (spot locked), kicker + punter (Quick Game), then the backups in the order shown
+  starters() {
+    const c = this.ctx, t = this.team(), R = c.kind === 'season' ? Season.ensureRosters()[c.id] : t, id = t.id, L = [];
+    for (const side of ['off', 'def']) R[side].forEach(p => { if (p && !(p[6] && p[6].cap)) L.push({ p, teamId: id, tag: 'STARTER', real: c.kind !== 'season' && !t.custom }); }); // never your Career guy
+    if (c.kind !== 'season') { if (t.k) L.push({ p: t.k, kick: 'K', teamId: id, real: !t.custom }); if (t.p) L.push({ p: t.p, kick: 'P', teamId: id, real: !t.custom }); }
+    if (c.kind !== 'season' && !t.custom) { const o = StarterEd.orig[id]; if (o) L.forEach((e, i) => { const r = i < 16 ? (i < 8 ? o.off[i] : o.def[i - 8]) : e.kick === 'K' ? o.k : o.p; if (r) e.orig = JSON.parse(JSON.stringify(r)); }); }
+    return L;
+  },
+  benchOrder(rows) { const order = p => BACKUP_POS.indexOf(p[0]); return rows.map((p, i) => [p, i]).sort((a, b) => order(a[0]) - order(b[0]) || b[0][3] - a[0][3]); },
+  peList() {
+    const season = this.ctx.kind === 'season', id = this.team().id;
+    return this.starters().concat(this.benchOrder(this.rows()).map(([p, i]) => ({ p, bi: i, teamId: id, posList: BACKUP_POS, tag: season && Season.hurt(p) ? 'HURT' : 'BACKUP' })));
+  },
+  edit(k) {
+    const t = this.team(), season = this.ctx.kind === 'season', team = season ? Season.team(t.id) : t;
+    PlayerEd.open({ title: `${team.city} ${team.name}`.toUpperCase(), team, list: this.peList(), i: k, onChange: () => this.commit(), onClose: () => { this.commit(); this.render(); } });
   },
 
   render() {
-    const c = this.ctx, t = this.team(), rows = this.rows(), season = c.kind === 'season';
+    const c = this.ctx, t = this.team(), rows = this.rows(), season = c.kind === 'season', L = this.peList(), nSt = this.starters().length;
     $('beTeams').innerHTML = season ? '' : c.ids.map((id, i) => `<button data-id="${id}" class="${id === c.cur ? 'on' : ''}">${i ? 'HOME' : 'AWAY'}  ${tName(id).toUpperCase()}</button>`).join('');
-    $('beHead').innerHTML = `${t.city.toUpperCase()} ${t.name.toUpperCase()}  ·  ${rows.length} BACKUP${rows.length === 1 ? '' : 'S'}<span>${season ? 'Your franchise bench. Tap a position to change it.' : 'Used in Quick Games and new Seasons. The first QB and RB come in when a starter is hurt or tired.'}</span>`;
-    const order = p => BACKUP_POS.indexOf(p[0]);
-    $('beList').innerHTML = rows.map((p, i) => [p, i]).sort((a, b) => order(a[0]) - order(b[0]) || b[0][3] - a[0][3]).map(([p, i]) => {
-      const hurt = season && Season.hurt(p);
-      return `<div class="beP" data-i="${i}">
-        <button class="bePos" title="Change position">${p[0]}</button>
-        <input class="bePn" maxlength="18" value="${esc(p[1])}">
-        <input class="beNo" type="number" min="0" max="99" value="${p[2]}">
-        <label class="beR"><span>OVR</span><input type="range" min="40" max="99" data-k="3" value="${p[3]}"><b>${p[3]}</b></label>
-        <label class="beR"><span>SPD</span><input type="range" min="40" max="99" data-k="4" value="${p[4]}"><b>${p[4]}</b></label>
-        <button class="tlSk" style="background:${SKIN[p[5] == null ? 3 : p[5]]}" title="Skin tone"></button>
-        <button class="beX">${hurt ? 'CUT (HURT)' : 'CUT'}</button></div>`;
-    }).join('') || '<div class="beEmpty">No backups. Tap ADD BACKUP.</div>';
+    $('beHead').innerHTML = `${t.city.toUpperCase()} ${t.name.toUpperCase()}  ·  ${rows.length} BACKUP${rows.length === 1 ? '' : 'S'}<span>${season ? 'Your franchise. Tap a player to edit him. Change who starts in the Depth Chart.' : 'Tap a player to edit him. Used in Quick Games and new Seasons. The first QB and RB come in when a starter is hurt or tired.'}</span>`;
+    const row = k => { const e = L[k], hurt = season && Season.hurt(e.p); return PlayerEd.row(e, k, k >= nSt ? `<button class="beX" data-k="${k}">${hurt ? 'CUT (HURT)' : 'CUT'}</button>` : ''); };
+    const ks = (a, b) => Array.from({ length: Math.max(0, b - a) }, (_, j) => row(a + j)).join('');
+    $('beList').innerHTML = `<div class="tlSec">STARTERS${StarterEd.edited(t) && !season ? '<span class="tlBkN">CHANGED</span>' : ''}</div><div class="peRows">${ks(0, nSt)}</div>
+      <div class="tlSec">BACKUPS <span class="tlBkN">${rows.length} / ${this.MAX}</span></div>
+      <div class="peRows">${ks(nSt, L.length) || '<div class="beEmpty">No backups. Tap ADD BACKUP.</div>'}</div>`;
     $('beMsg').textContent = this.msg;
     $('beAdd').disabled = rows.length >= this.MAX;
     $('beReset').style.display = !season && this.orig[t.id] ? '' : 'none';
-    this.wire();
+    this.wire(L);
   },
-  wire() {
-    const rows = this.rows(), get = e => rows[+e.closest('.beP').dataset.i], stop = e => e.stopPropagation();
-    document.querySelectorAll('#beTeams button').forEach(b => b.onclick = () => { Sound.click(); this.ctx.cur = b.dataset.id; this.ctx.list = null; this.msg = ''; this.render(); });
-    document.querySelectorAll('.beP .bePn').forEach(i => { i.addEventListener('input', () => { get(i)[1] = i.value.replace(/[<>&"'`\\]/g, '').slice(0, 18); }); i.addEventListener('change', () => { const p = get(i); if (!p[1].trim()) p[1] = 'Backup'; this.commit(); }); i.addEventListener('keydown', stop); });
-    document.querySelectorAll('.beP .beNo').forEach(i => { i.addEventListener('change', () => { get(i)[2] = clamp(parseInt(i.value, 10) || 0, 0, 99); i.value = get(i)[2]; this.commit(); }); i.addEventListener('keydown', stop); });
-    document.querySelectorAll('.beP input[type=range]').forEach(i => { i.addEventListener('input', () => { get(i)[+i.dataset.k] = +i.value; i.nextElementSibling.textContent = i.value; }); i.addEventListener('change', () => this.commit()); });
-    document.querySelectorAll('.beP .tlSk').forEach(b => b.onclick = () => { const p = get(b); p[5] = ((p[5] == null ? 3 : p[5]) + 1) % 6; b.style.background = SKIN[p[5]]; this.commit(); });
-    document.querySelectorAll('.beP .bePos').forEach(b => b.onclick = () => { const p = get(b); p[0] = BACKUP_POS[(BACKUP_POS.indexOf(p[0]) + 1) % BACKUP_POS.length]; Sound.click(); this.commit(); this.render(); });
-    document.querySelectorAll('.beP .beX').forEach(b => b.onclick = () => {
-      const p = get(b);
+  wire(L) {
+    const rows = this.rows();
+    document.querySelectorAll('#beTeams button').forEach(b => b.onclick = () => { this.ctx.cur = b.dataset.id; this.ctx.list = null; this.msg = ''; this.render(); });
+    PlayerEd.wireRows($('beList'), k => this.edit(k));
+    document.querySelectorAll('#beList .beX').forEach(b => b.onclick = () => {
+      const p = L[+b.dataset.k].p;
       if (b.dataset.sure !== '1') { b.dataset.sure = '1'; b.textContent = 'SURE?'; return; }
       if (this.ctx.kind === 'season') Contracts.remove(this.ctx.id, p); else rows.splice(rows.indexOf(p), 1);
-      this.msg = `${p[1]} is off the team.`; Sound.click(); this.commit(); this.render();
+      this.msg = `${p[1]} is off the team.`; this.commit(); this.render();
     });
   },
   add() {
@@ -105,15 +117,15 @@ const BenchEd = {
     const need = BACKUP_POS.find(pos => !rows.some(p => p[0] === pos)) || 'WR';
     const p = this.clean([need, `${pick(FIRST)} ${pick(LAST)}`, 1 + Math.floor(Math.random() * 98), 65, POS_SPD[need] || 80, Math.floor(Math.random() * 6)]);
     if (this.ctx.kind === 'season') { p[6] = { age: 24 }; if (typeof Contracts !== 'undefined') Contracts.give(p, { sal: MIN_SAL, yrs: 1 }); }
-    rows.push(p); this.msg = `Added a ${p[0]}. Change his name, spot and ratings below.`; Sound.click(); this.commit(); this.render();
-    const last = document.querySelector(`.beP[data-i="${rows.length - 1}"]`); if (last) last.scrollIntoView({ block: 'nearest' });
+    rows.push(p); this.msg = `Added a ${p[0]}.`; this.commit(); this.render();
+    this.edit(this.peList().findIndex(e => e.p === p)); // straight to his card
   },
   reset() {
     const t = this.team(), o = this.orig[t.id]; if (!o) return;
-    const s = this.store(); delete s[t.id]; this.saveStore(s);
-    Object.assign(t, JSON.parse(JSON.stringify(o))); this.ctx.list = null; this.msg = 'Back to the real depth chart.'; Sound.click(); this.render();
+    const s = this.store(); delete s[t.id]; this.saveStore(s); StarterEd.reset(t);
+    Object.assign(t, JSON.parse(JSON.stringify(o))); this.ctx.list = null; this.msg = 'Back to the real roster.'; this.render();
   },
-  done() { Sound.click(); this.commit(); if (this.ctx.kind === 'season') { openDepth(); } else { show('select'); renderSelect(); } }
+  done() { this.commit(); if (this.ctx.kind === 'season') { openDepth(); } else { show('select'); renderSelect(); } }
 };
 $('beAdd').onclick = () => BenchEd.add();
 $('beReset').onclick = () => BenchEd.reset();
@@ -126,11 +138,11 @@ for (const k of ['useAll', 'useLeague']) { const f = CT[k]; CT[k] = function (..
 // entry points: Matchup screen (one button per team) and the Season depth chart
 (() => {
   for (const [id, side] of [['pAway', 1], ['pHome', 0]]) {
-    const b = document.createElement('button'); b.className = 'beOpen'; b.textContent = 'BACKUPS';
-    b.onclick = e => { e.stopPropagation(); Sound.click(); BenchEd.openQuick(side); };
+    const b = document.createElement('button'); b.className = 'beOpen'; b.textContent = 'ROSTER';
+    b.onclick = e => { e.stopPropagation(); BenchEd.openQuick(side); };
     $(id).appendChild(b);
   }
-  const d = document.createElement('button'); d.id = 'dcBench'; d.textContent = 'EDIT BACKUPS';
-  d.onclick = () => { Sound.click(); BenchEd.openSeason(); };
+  const d = document.createElement('button'); d.id = 'dcBench'; d.textContent = 'EDIT PLAYERS';
+  d.onclick = () => BenchEd.openSeason();
   $('dcAuto').after(d);
 })();
