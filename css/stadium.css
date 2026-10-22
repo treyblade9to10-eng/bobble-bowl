@@ -1,0 +1,61 @@
+/* ---------- Stadium Editor (Create a Team STADIUM tab + the Uniform Room's STADIUM screen) + deeper team options ---------- */
+.sdCv { width: 100%; height: auto; aspect-ratio: 740 / 400; background: #0c1016; border-bottom: 4px solid var(--gold); }
+.sdUnder { display: flex; align-items: center; gap: 8px; }
+.sdUnder .tlMini { margin-left: auto; }
+.sdView button { font-size: 12px; padding: 5px 10px; }
+/* Create a Team: the field preview takes the turntable's spot on the STADIUM tab */
+#sdTlBox { display: none; flex-direction: column; gap: 8px; }
+#tlEdBody.sdWide #tlPrev { width: 44%; }
+#tlEdBody.sdWide #sdTlBox { display: flex; }
+#tlEdBody.sdWide #tlCv, #tlEdBody.sdWide #tlKit { display: none; }
+/* rows of choices */
+.sdF { max-width: none; align-items: flex-start; }
+.sdF > span { padding-top: 5px; }
+.sdSeg { flex-wrap: wrap; }
+.sdSeg button { font-size: 13px; padding: 5px 11px; }
+.sdShades { display: flex; flex-wrap: wrap; gap: 4px; }
+.sdShade { margin: 0; clip-path: none; display: flex; align-items: center; gap: 6px; font-size: 12px; padding: 4px 9px 4px 4px; background: var(--panel); color: var(--dim); }
+.sdShade i { width: 18px; height: 18px; border: 2px solid #0006; }
+.sdShade.on { background: var(--gold); color: #111; }
+/* stacked color rows: name + team-color shortcuts on top, the palette under */
+.sdCol { padding: 6px 0 8px; border-bottom: 1px solid #ffffff0d; }
+.sdColL { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; }
+.sdColL i { width: 24px; height: 24px; border: 2px solid #fff6; flex: none; }
+.sdColL i.auto { background: repeating-linear-gradient(45deg, #2a3544 0 4px, #1c2430 4px 8px); }
+.sdColL b { font-family: var(--hd); font-weight: 800; font-size: 15px; letter-spacing: .04em; min-width: 110px; }
+.sdSp, .tsAuto { margin: 0; clip-path: none; display: inline-flex; align-items: center; gap: 5px; font-size: 11px; padding: 3px 8px; background: var(--panel2); color: var(--dim); }
+.sdSp u { width: 12px; height: 12px; border: 1px solid #0008; }
+.sdSp.on, .tsAuto.on { background: var(--gold); color: #111; }
+.tsAuto { height: 24px; }
+/* Stadium Editor screen */
+#sdRoom { justify-content: flex-start; padding: 14px 22px; }
+#sdRoom #sdSides button { min-width: 90px; }
+#sdBody { display: flex; gap: 16px; width: 100%; max-width: 1220px; margin-top: 12px; min-height: 0; flex: 1; }
+#sdLeft { flex: none; width: 46%; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+#sdTeam { display: flex; gap: 10px; align-items: center; background: var(--panel); padding: 6px 8px; border-left: 4px solid var(--tc, var(--gold)); }
+#sdTeam .badge { width: 40px; height: 44px; }
+.sdTN { flex: 1; min-width: 0; }
+#sdPane { flex: 1; overflow-y: auto; background: var(--panel); padding: 6px 16px 16px; min-width: 0; }
+#sdNote { margin: 0; }
+#lkStad { margin: 0 0 0 auto; font-size: 15px; padding: 7px 18px; background: var(--panel2); }
+#lkStad + #lkGear { margin-left: 0; }
+/* deeper team options */
+.tsRiv { display: flex; align-items: center; gap: 6px; }
+.tsRivN { display: flex; align-items: center; gap: 8px; min-width: 210px; background: var(--panel2); padding: 3px 10px; min-height: 34px; }
+.tsRivN .badge { width: 26px; height: 30px; }
+.tsRivN b { font-family: var(--hd); font-style: italic; font-weight: 900; font-size: 16px; text-transform: uppercase; color: var(--text); }
+.tsRivN b.dim { color: var(--dim); font-style: normal; font-weight: 800; letter-spacing: .1em; font-size: 13px; }
+@media (max-height: 500px) {
+  #tlEdBody.sdWide #tlPrev { width: 44%; }
+  .sdSeg button { font-size: 11px; padding: 4px 7px; }
+  .sdShade { font-size: 10px; padding: 3px 6px 3px 3px; } .sdShade i { width: 14px; height: 14px; }
+  .sdColL { margin-bottom: 4px; } .sdColL b { font-size: 13px; min-width: 90px; } .sdColL i { width: 20px; height: 20px; }
+  .sdSp, .tsAuto { font-size: 10px; padding: 2px 6px; } .tsAuto { height: 20px; }
+  .sdView button { font-size: 10px; padding: 4px 7px; }
+  #sdRoom { padding: 8px 12px; }
+  #sdBody { margin-top: 6px; gap: 10px; }
+  #sdTeam { padding: 3px 6px; } #sdTeam .badge { width: 30px; height: 34px; } #sdTeam .tlNm { font-size: 16px; }
+  #sdPane { padding: 2px 10px 10px; }
+  #lkStad { font-size: 12px; padding: 4px 10px; }
+  .tsRivN { min-width: 170px; min-height: 28px; } .tsRivN b { font-size: 14px; }
+}
