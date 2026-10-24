@@ -49,7 +49,7 @@ function collegeOffers(stars, seed) {
 }
 const CAP_GEAR = { visor: 68, gloves: 74, goldGloves: 88 }; // overall needed to unlock
 const BADGES = {
-  first_td: 'First Touchdown', big_game: 'Big Game', perfect: 'Perfect Game', bowl: 'Bowl Champion', first_round: 'First-Round Pick', top10: 'Top 10 Pick',
+  first_td: 'First Touchdown', big_game: 'Big Game', perfect: 'Perfect Game', bowl: 'Bowl Champion', cfp: 'College Football Playoff', natty: 'National Champion', first_round: 'First-Round Pick', top10: 'Top 10 Pick',
   xfactor: 'X-Factor Unlocked', elite: 'Elite: 90 OVR', club99: '99 Club', mvp: 'MVP', opoy: 'Offensive Player of the Year', dpoy: 'Defensive Player of the Year',
   champ: 'Bobble Bowl Champion', big_season: 'Monster Season', vet: '10-Year Veteran', hof: 'Hall of Fame'
 };
@@ -113,8 +113,8 @@ const Career = {
       stats: { pass: 0, rush: 0, rec: 0, td: 0, tkl: 0, sack: 0, int: 0, g: 0 }, seasons: [], badges: [], log: [] };
   },
   create(o) {
-    this.cap = this.blank(o);
-    this.startCollege(o.college);
+    this.cap = this.blank(o); this.fresh = [];
+    this.startCollege(o.college, { bowls: o.bowls !== 0, cfp: o.cfp !== 0 });
     this.save();
   },
   retireNow() { this.cap = null; this.save(); },
@@ -220,7 +220,7 @@ const Career = {
   },
 
   // rivalries: NFL = your division, college = the last regular-season game (rivalry week)
-  collegeRival() { const cl = this.cap && this.cap.college; if (!cl) return null; const reg = cl.sched.filter(g => !g.bowl); return reg.length ? reg[reg.length - 1].opp : null; },
+  collegeRival() { const cl = this.cap && this.cap.college; if (!cl) return null; const reg = cl.sched.filter(g => !g.bowl && !g.cfp); return reg.length ? reg[reg.length - 1].opp : null; },
   isRival(oppId) {
     const c = this.cap; if (!c) return false;
     if (c.phase === 'college') return oppId === this.collegeRival();
@@ -289,26 +289,45 @@ const Career = {
     const mk = pos => { const [s0, s1] = ROOKIE_SPD[pos]; const star = chance(0.15); return [pos, `${pick(FIRST)} ${pick(LAST)}`, 1 + Math.floor(Math.random() * 98), Math.round(rand(58, 70) + pr * 2 + (star ? 7 : 0)), Math.round(rand(s0, s1) - 2), Math.floor(Math.random() * 6)]; };
     return { off: ['QB', 'RB', 'WR', 'WR', 'TE', 'OL', 'OL', 'OL'].map(mk), def: ['DL', 'DL', 'DL', 'LB', 'LB', 'CB', 'CB', 'S'].map(mk) };
   },
-  startCollege(id) {
+  startCollege(id, post) {
     const c = this.cap, rosters = {};
     for (const t of COLLEGES) rosters[t.id] = this.realCollegeRoster(t.id) || this.makeCollegeRoster(t.pr);
     const opps = shuffle(COLLEGES.filter(t => t.id !== id).map(t => t.id)).slice(0, 6);
-    c.college = { id, rosters, sched: opps.map((o, i) => ({ opp: o, home: i % 2 === 0, score: null })), week: 0, w: 0, l: 0, bowl: null, done: false };
+    c.college = { id, rosters, sched: opps.map((o, i) => ({ opp: o, home: i % 2 === 0, score: null })), week: 0, w: 0, l: 0, bowl: null, done: false, post: post || { bowls: true, cfp: false } };
     c.team = id; c.phase = 'college';
   },
   collegeGame() { const cl = this.cap.college; return cl.week < cl.sched.length ? cl.sched[cl.week] : null; },
   // score = [mine, theirs]
   collegeResult(sc) {
     const cl = this.cap.college, g = this.collegeGame(); if (!g) return;
+    const won = sc[0] > sc[1];
     g.score = sc; cl.week++;
-    if (sc[0] > sc[1]) cl.w++; else cl.l++;
-    if (g.bowl && sc[0] > sc[1]) this.badge('bowl');
-    if (cl.week >= cl.sched.length) {
-      if (!cl.bowl && cl.w >= 4) { // earned a bowl game
-        const used = new Set(cl.sched.map(s => s.opp)), opp = COLLEGES.find(t => t.id !== cl.id && !used.has(t.id)) || COLLEGES.find(t => t.id !== cl.id);
-        cl.bowl = opp.id; cl.sched.push({ opp: opp.id, home: false, score: null, bowl: true });
-      } else { cl.done = true; this.cur().open = false; this.cap.phase = 'combine'; }
+    if (won) cl.w++; else cl.l++;
+    if (g.bowl && won) this.badge('bowl');
+    if (g.cfp && won) { if (g.cfp === 4) { cl.champ = true; this.badge('natty'); } else this.addPost({ cfp: g.cfp + 1 }); }
+    if (cl.week >= cl.sched.length && !cl.bowl && !cl.inCfp && !cl.postDone) { // regular season over: playoff, bowl, or done
+      const o = cl.post || { bowls: true, cfp: false }; cl.postDone = true;
+      if (o.cfp && cl.w >= 5) { cl.inCfp = true; this.badge('cfp'); this.addPost({ cfp: cl.w >= 6 ? 2 : 1 }); } // 6-0 = top-4 seed, skips the first round
+      else if (o.bowls && cl.w >= 4) this.addPost({ bowl: true });
     }
+    if (cl.week >= cl.sched.length) { cl.done = true; this.cur().open = false; this.cap.phase = 'combine'; }
+  },
+  // CFP rounds: 1 first round, 2 quarterfinal, 3 semifinal, 4 national championship
+  CFP_NAMES: ['', 'CFP First Round', 'CFP Quarterfinal', 'CFP Semifinal', 'National Championship'],
+  BOWLS: ['Citrus Bowl', 'Gator Bowl', 'Alamo Bowl', 'Holiday Bowl', 'Music City Bowl', 'Las Vegas Bowl', 'Sun Bowl', 'Liberty Bowl', 'Duke\'s Mayo Bowl', 'Pinstripe Bowl'],
+  CFP_BOWLS: { 2: ['Rose Bowl', 'Sugar Bowl', 'Orange Bowl', 'Fiesta Bowl', 'Peach Bowl', 'Cotton Bowl'], 3: ['Orange Bowl', 'Cotton Bowl', 'Peach Bowl', 'Fiesta Bowl'] },
+  postName(g) { return g.cfp ? this.CFP_NAMES[g.cfp] + (g.name && g.name !== this.CFP_NAMES[g.cfp] ? ' · ' + g.name : '') : g.bowl ? (g.name || 'Bowl Game') : ''; },
+  addPost(o) {
+    const cl = this.cap.college, used = new Set(cl.sched.map(s => s.opp));
+    // playoff teams get tougher every round; bowl opponents are similar programs
+    let pool = COLLEGES.filter(t => t.id !== cl.id && !used.has(t.id)); if (!pool.length) pool = COLLEGES.filter(t => t.id !== cl.id);
+    const want = o.cfp ? Math.min(3, o.cfp) : COLLEGES.find(t => t.id === cl.id).pr;
+    pool.sort((a, b) => Math.abs(a.pr - want) - Math.abs(b.pr - want) || Math.random() - 0.5);
+    const opp = pick(pool.slice(0, 3));
+    const g = { opp: opp.id, home: o.cfp === 1 ? cl.w >= 6 || chance(0.5) : false, score: null };
+    if (o.cfp) { g.cfp = o.cfp; const b = this.CFP_BOWLS[o.cfp]; g.name = b ? pick(b) : this.CFP_NAMES[o.cfp]; }
+    else { g.bowl = true; g.name = pick(this.BOWLS); cl.bowl = opp.id; }
+    cl.sched.push(g);
   },
   simCollege() {
     const c = this.cap, g = this.collegeGame(); if (!g) return null;
@@ -339,7 +358,7 @@ const Career = {
     const cl = c.college, pr = COLLEGES.find(x => x.id === cl.id).pr;
     const forty = c.combine ? c.combine.forty : this.fortyFromSpd();
     const fortyAvg = { QB: 4.85, RB: 4.5, WR: 4.48, TE: 4.7, DL: 4.85, LB: 4.65, CB: 4.45, S: 4.55 }[c.pos];
-    return (this.ovr() - 58) * 2.2 + Math.min(36, pg * 1.4) + cl.w * 2 + (cl.bowl && cl.sched[cl.sched.length - 1].score && cl.sched[cl.sched.length - 1].score[0] > cl.sched[cl.sched.length - 1].score[1] ? 5 : 0) + (fortyAvg - forty) * 45 + pr * 3;
+    return (this.ovr() - 58) * 2.2 + Math.min(36, pg * 1.4) + cl.w * 2 + cl.sched.reduce((a, g) => a + (g.score && g.score[0] > g.score[1] ? (g.bowl ? 5 : g.cfp ? 4 : 0) : 0), 0) + (cl.inCfp ? 3 : 0) + (cl.champ ? 6 : 0) + (fortyAvg - forty) * 45 + pr * 3;
   },
   projPick(stock = this.stock()) { return clamp(Math.round(97 - stock * 0.95), 1, 96); },
   projText(p = this.projPick()) { const r = Math.ceil(p / 32); const lo = clamp(p - 6, 1, 96), hi = clamp(p + 6, 1, 96); return `Round ${r} (picks ${lo}-${hi})`; },

@@ -71,7 +71,7 @@ const CareerUI = {
 
   // ---------------- create ----------------
   form() {
-    const f = capForm = capForm || { name: '', pos: 'WR', arch: CAP_ARCH.WR[0][0], num: 7, skin: 2, stars: 3, college: 'MICH', games: 10, diff: 1, qtr: 180 };
+    const f = capForm = capForm || { name: '', pos: 'WR', arch: CAP_ARCH.WR[0][0], num: 7, skin: 2, stars: 3, college: 'MICH', games: 10, diff: 1, qtr: 180, bowls: 1, cfp: 1 };
     const offers = collegeOffers(f.stars, f.pos + f.arch);
     if (!offers.some(t => t.id === f.college)) f.college = offers[0].id;
     const rc = RECRUIT[f.stars], arch = CAP_ARCH[f.pos].find(x => x[0] === f.arch)[1];
@@ -106,6 +106,8 @@ const CareerUI = {
         <div class="tlSec">SCHOLARSHIP OFFERS <span class="cpSecR">${offers.length}</span></div>
         <div class="cpOffers">${offers.map(t => `<button class="cpOffer${t.id === f.college ? ' on' : ''}" data-c="${t.id}" style="--c1:${t.c1}">${teamBadge(t)}<div><b>${t.city}</b><span>${TIER[t.pr]}</span></div></button>`).join('')}</div>
         <div class="tlSec">CAREER SETTINGS</div>
+        <div class="cpSet"><span>Bowl games</span>${chips('bowls', [[1, 'ON'], [0, 'OFF']], f.bowls)}</div>
+        <div class="cpSet"><span>CFB Playoff</span>${chips('cfp', [[1, 'ON'], [0, 'OFF']], f.cfp)}</div>
         <div class="cpSet"><span>NFL season</span>${chips('games', [[6, '6 GAMES'], [10, '10 GAMES'], [14, '14 GAMES']], f.games)}</div>
         <div class="cpSet"><span>Quarters</span>${chips('qtr', [[120, '2 MIN'], [180, '3 MIN'], [300, '5 MIN']], f.qtr)}</div>
         <div class="cpSet"><span>Difficulty</span>${chips('diff', [[0, 'ROOKIE'], [1, 'PRO'], [2, 'ALL-PRO'], [3, 'ALL-MADDEN']], f.diff)}</div>
@@ -182,7 +184,8 @@ const CareerUI = {
       if (!opts.uni) G.uni = ['rivalry', 'away']; // rivalry week: home team breaks out the rivalry set
       showBanner('RIVALRY GAME', `vs ${opp.city} ${opp.name} · 1.5x XP · series ${Career.series(opp.id)}`, '#ff6040', 3);
     }
-    Broadcast.show(Career.cap.phase === 'college' ? 'College Football' : 'My Career');
+    if (opts.post) { G.crowdHype = 1.3; showBanner(opts.post.toUpperCase(), `vs ${opp.city} ${opp.name}`, '#ffd23f', 3); }
+    Broadcast.show(opts.post || (Career.cap.phase === 'college' ? 'College Football' : 'My Career'));
   },
 
   // ---------------- college ----------------
@@ -190,15 +193,17 @@ const CareerUI = {
     const c = Career.cap, cl = c.college, me = Career.collegeTeam(cl.id), g = Career.collegeGame();
     const opp = g && Career.collegeTeam(g.opp), s = Career.cur(false);
     const ovr = t => Math.round(t.off.concat(t.def).reduce((a, p) => a + p[3], 0) / 16);
-    const sched = cl.sched.map((x, i) => { const t = COLLEGES.find(k => k.id === x.opp); const r = x.score ? (x.score[0] > x.score[1] ? `<b class="w">W ${x.score[0]}-${x.score[1]}</b>` : `<b class="l">L ${x.score[0]}-${x.score[1]}</b>`) : ''; return `<div class="${i === cl.week ? 'cur' : ''}">${x.bowl ? 'BOWL' : 'Wk ' + (i + 1)} ${x.home ? 'vs' : '@'} ${t.city} ${r}</div>`; }).join('');
+    const sched = cl.sched.map((x, i) => { const t = COLLEGES.find(k => k.id === x.opp); const r = x.score ? (x.score[0] > x.score[1] ? `<b class="w">W ${x.score[0]}-${x.score[1]}</b>` : `<b class="l">L ${x.score[0]}-${x.score[1]}</b>`) : ''; return `<div class="${i === cl.week ? 'cur' : ''}${x.bowl || x.cfp ? ' post' : ''}">${x.cfp ? ['', 'CFP R1', 'CFP QF', 'CFP SF', 'TITLE'][x.cfp] : x.bowl ? 'BOWL' : 'Wk ' + (i + 1)} ${x.home ? 'vs' : '@'} ${t.city} ${r}</div>`; }).join('');
+    const post = cl.post || { bowls: true, cfp: false };
     this.set(`<div class="ccWrap">${this.card(me)}
       <div class="ccMain">
         <div class="ccHead">SENIOR SEASON · ${me.city.toUpperCase()} ${me.name.toUpperCase()} · ${cl.w}-${cl.l}</div>
         ${this.newBadges()}
-        ${g ? `<div class="ccNext" style="background:linear-gradient(110deg, ${me.c1} 45%, ${opp.c1} 55%)"><div class="lbl">${g.bowl ? 'BOWL GAME' : Career.isRival(g.opp) ? 'RIVALRY WEEK · 1.5x XP' : 'NEXT GAME'}</div><div class="mu">${g.home ? 'vs' : '@'} ${opp.city} ${opp.name}</div><div class="sub">${opp.id} ${ovr(opp)} OVR · you are ${g.home ? 'HOME' : 'AWAY'}</div></div>
+        ${g ? `<div class="ccNext" style="background:linear-gradient(110deg, ${me.c1} 45%, ${opp.c1} 55%)"><div class="lbl">${g.cfp || g.bowl ? Career.postName(g).toUpperCase() + (g.cfp === 4 ? ' · WIN IT ALL' : '') : Career.isRival(g.opp) ? 'RIVALRY WEEK · 1.5x XP' : 'NEXT GAME'}</div><div class="mu">${g.home ? 'vs' : '@'} ${opp.city} ${opp.name}</div><div class="sub">${opp.id} ${ovr(opp)} OVR · you are ${g.home ? 'HOME' : 'AWAY'}</div></div>
         ${this.goalsHtml()}${this.trustHtml()}
         <div class="row"><button class="big" id="ccPlay">PLAY</button><button id="ccSim">SIM</button>${this.lockBtn()}</div>` : ''}
         <div class="ccStock">DRAFT STOCK: <b>${Career.projText()}</b></div>
+        ${cl.postDone ? '' : `<div class="ccLine">Postseason: ${[post.cfp ? 'go 5-1 or better for the College Football Playoff' : '', post.bowls ? 'go 4-2 or better for a bowl game' : ''].filter(Boolean).join(', ') || 'off (season ends after week 6)'}</div>`}
         <div class="ccLine">This season: ${s.g} games · ${Career.line(s)}</div>
         <div class="ccSched">${sched}</div>
         ${this.logHtml()}
@@ -211,7 +216,7 @@ const CareerUI = {
     this.wireLock(() => this.college());
     $('ccPlay').onclick = () => {
       const mine = Career.collegeTeam(cl.id), o = Career.collegeTeam(g.opp);
-      this.play(g.home ? mine : o, g.home ? o : mine, { humanSide: g.home ? 0 : 1, career: 'college', weather: 'clear', night: !!g.bowl || chance(0.3) });
+      this.play(g.home ? mine : o, g.home ? o : mine, { humanSide: g.home ? 0 : 1, career: 'college', weather: 'clear', night: !!(g.bowl || g.cfp) || chance(0.3), post: Career.postName(g) });
     };
     $('ccSim').onclick = () => { Sound.click(); Career.simCollege(); this.open(); };
   },
@@ -223,7 +228,7 @@ const CareerUI = {
       <div class="ccMain">
         <div class="ccHead">NFL COMBINE · INDIANAPOLIS</div>
         ${this.newBadges()}
-        <div class="ccText">College is done: <b>${cl.w}-${cl.l}</b>${cl.bowl ? ', played in a bowl game' : ''}. ${Career.line(c.seasons.find(s => s.lvl === 'NCAA') || {})}.<br><br>
+        <div class="ccText">College is done: <b>${cl.w}-${cl.l}</b>${cl.champ ? ', <b>national champions</b>' : cl.inCfp ? ', made the College Football Playoff' : cl.bowl ? ', played in a bowl game' : ''}. ${Career.line(c.seasons.find(s => s.lvl === 'NCAA') || {})}.<br><br>
           Every scout in the NFL is watching your <b>40-yard dash</b>. Mash to run. A fast time moves you up draft boards.</div>
         <div class="ccStock">DRAFT STOCK RIGHT NOW: <b>${Career.projText()}</b></div>
         <div class="row"><button class="big gold" id="ccRun">RUN THE 40</button><button id="ccSkip">SKIP (USE MY SPEED)</button></div>

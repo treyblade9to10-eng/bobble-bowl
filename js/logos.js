@@ -240,16 +240,21 @@ const Logo = (() => {
   // the Rams get their yellow LA (the blue one disappears on their blue end zone and scorebug): ESPN's white version, tinted yellow
   const TINT = { LAR: '#FFD100' };
   const espn = id => `https://a.espncdn.com/i/teamlogos/nfl/${TINT[id] ? '500-dark' : '500'}/${id === 'WAS' ? 'wsh' : id.toLowerCase()}.png`;
+  // real college logos (ESPN team numbers, checked against ESPN's team list 2026-10-24)
+  const NCAA = { ALA: 333, OSU: 194, UGA: 61, LSU: 99, MICH: 130, TEX: 251, ORE: 2483, USC: 30, CLEM: 228, PSU: 213, ND: 87, TENN: 2633, WIS: 275, BSU: 68, ISU: 66, APP: 2026, TOL: 2649, NIU: 2459 };
+  const colId = t => t && !t.custom && NCAA[t.id] ? t.id : null; // no NFL or created team can use these abbreviations
+  const logoUrl = t => colId(t) ? `https://a.espncdn.com/i/teamlogos/ncaa/500/${NCAA[t.id]}.png` : espn(t.id);
   let bump = null;
   function realImg(t) {
-    if (style !== 'real' || !t || t.custom || !SPEC[t.id] || typeof Image === 'undefined') return null;
-    let im = REAL[t.id];
+    if (style !== 'real' || !t || t.custom || typeof Image === 'undefined') return null;
+    const key = colId(t) ? 'ncaa:' + t.id : SPEC[t.id] ? t.id : null; if (!key) return null;
+    let im = REAL[key];
     if (!im) {
-      im = REAL[t.id] = new Image(); im.crossOrigin = 'anonymous';
-      im.onload = () => { if (TINT[t.id]) tint(t.id, im); cache.clear(); clearTimeout(bump); bump = setTimeout(() => ready.forEach(f => f()), 120); };
-      im.src = espn(t.id);
+      im = REAL[key] = new Image(); im.crossOrigin = 'anonymous';
+      im.onload = () => { if (key === t.id && TINT[t.id]) tint(t.id, im); cache.clear(); clearTimeout(bump); bump = setTimeout(() => ready.forEach(f => f()), 120); };
+      im.src = logoUrl(t);
     }
-    if (TINT[t.id]) return im.tinted || null;
+    if (key === t.id && TINT[t.id]) return im.tinted || null;
     return im.complete && im.naturalWidth ? im : null;
   }
   function tint(id, im) {
@@ -281,7 +286,7 @@ const Logo = (() => {
   }
   const cache = new Map();
   function canvas(t, px) {
-    const key = t.id + t.c1 + t.c2 + (t.custom ? 'c' : '') + (t.logo ? t.logo.length + t.logo.slice(-24) : '') + px;
+    const key = (colId(t) ? 'ncaa' : '') + t.id + t.c1 + t.c2 + (t.custom ? 'c' : '') + (t.logo ? t.logo.length + t.logo.slice(-24) : '') + px;
     let cv = cache.get(key); if (cv) return cv;
     cv = document.createElement('canvas'); cv.width = cv.height = px;
     const g = cv.getContext('2d'); if (!g || !g.save) return cv;
@@ -290,10 +295,10 @@ const Logo = (() => {
   }
   function url(t, px = 96) { try { return canvas(t, px).toDataURL(); } catch (e) { return ''; } }
   ready.push(() => { fieldKey = ''; }); // repaint the field once real logos arrive
-  const preload = () => { if (typeof TEAMS !== 'undefined') for (const t of TEAMS) realImg(t); };
+  const preload = () => { if (typeof TEAMS !== 'undefined') for (const t of TEAMS) realImg(t); if (typeof COLLEGES !== 'undefined') for (const t of COLLEGES) realImg(t); };
   preload();
-  return { draw, canvas, url, has: t => !!(t && ((SPEC[t.id] && !t.custom) || (t.custom && t.logo))), own: ownImg,
+  return { draw, canvas, url, has: t => !!(t && ((SPEC[t.id] && !t.custom) || colId(t) || (t.custom && t.logo))), own: ownImg,
     onReady(f) { ready.push(f); },
-    reset() { cache.clear(); for (const id in REAL) if (REAL[id].tinted) { delete REAL[id].tinted; if (REAL[id].complete) tint(id, REAL[id]); } },
+    reset() { cache.clear(); for (const id in REAL) if (TINT[id] && REAL[id].tinted) { delete REAL[id].tinted; if (REAL[id].complete) tint(id, REAL[id]); } },
     setStyle(s) { style = s; cache.clear(); preload(); ready.forEach(f => f()); }, style: () => style };
 })();
