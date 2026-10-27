@@ -515,7 +515,7 @@ function setupPlay(offPlay, defPlay, preview) {
   else G.ball.holder = O[6]; // center holds it while we pick
   G.motion = null; G.press = !!G.cpuPress; G.cpuPress = false; G.showBlitz = false;
   G.cpuMotion = (!preview && !isHumanSide(o) && G.human >= 0 && offPlay.type === 'pass' && !offPlay.chain && chance(0.3)) ? 1.0 : null;
-  G.bstate = 'snap'; G.qbScramble = false; G.humanScramble = false; G.aim = null; G.fake = null; G.special = null; G.qbThink = 0; G.handedOff = false; G.intended = null;
+  G.bstate = 'snap'; G.meter = null; G.meterV = null; G.qbScramble = false; G.humanScramble = false; G.aim = null; G.fake = null; G.special = null; G.qbThink = 0; G.handedOff = false; G.intended = null;
   G.trickI = 0; G.decoy = null; G.trickPasser = null; G.trickT = 0; G.trickMinT = 0; G.bite = false; G.pumped = false; G.pumpAt = null; G.rpoKeep = false; G.lastPasser = null; G.latDone = false; G.catchT = null;
   G.runoff = 0; G.passPlay = offPlay.type === 'pass'; G.thrownAway = false;
   // human control
@@ -820,14 +820,21 @@ function humanQBInput() {
     if (eligible(r) && !(s === 0 && G.O[1].throwKey)) { r.throwKey = s <= 1 ? 4 : s - 1; r.openness = openness(r); }
   }
   G.aim = null;
+  if (!canThrow) { G.meter = null; G.meterV = null; }
   if (canThrow) {
     const qb = curPasser();
     const keys = { Digit1: 1, Digit2: 2, Digit3: 3, Digit4: 4, Numpad1: 1, Numpad2: 2, Numpad3: 3, Numpad4: 4 };
     const style = Input.held('ShiftLeft') ? 'bullet' : Input.held('ControlLeft', 'ControlRight') ? 'lob' : 'normal';
-    for (const k in keys) if (Input.hit(k)) { const r = G.O.find(o => o.throwKey === keys[k]); if (eligible(r)) { throwTo(qb, r, false, null, style, Input.axis()); break; } }
+    const useMeter = meterOn() && Input.cur !== 1; // online guest keys arrive as single presses: no meter for those
+    if (G.meter && G.meter.key) { // holding a receiver key: let go to throw
+      const r = G.O.find(o => o.throwKey === keys[G.meter.key]);
+      if (G.ball.holder !== qb || !eligible(r)) G.meter = null;
+      else if (!Input.held(G.meter.key)) { throwTo(qb, r, false, null, style, Input.axis(), meterRead()); }
+    } else for (const k in keys) if (Input.hit(k)) { const r = G.O.find(o => o.throwKey === keys[k]); if (eligible(r)) { if (useMeter && Input.held(k)) meterStart(qb, k); else throwTo(qb, r, false, null, style, Input.axis()); break; } }
     const P = Input.pointer;
     if (G.ball.holder === qb && P.down && P.moved) {
       P.aiming = true;
+      if (meterOn() && !G.meter) meterStart(qb, null);
       const t = aimTarget(qb, P.x0 - P.x, P.y0 - P.y);
       const back = dirOf(G.poss) * (t.x - qb.x) < -1.5;
       G.aim = { style: ctlMobile() ? '' : style, tx: t.x, ty: t.y, run: back, target: back ? null : receiverFor(qb, t.x, t.y), from: { x: P.x0, y: P.y0 }, to: { x: P.x, y: P.y } };
@@ -837,9 +844,12 @@ function humanQBInput() {
       if (Math.hypot(v.x, v.y) > 28) {
         const t = aimTarget(qb, v.x, v.y);
         if (dirOf(G.poss) * (t.x - qb.x) < -1.5) qbTakeOff(qb); // aimed backwards = QB runs it
-        else throwAt(qb, t.x, t.y, ctlMobile() ? (Input.flick ? 'bullet' : 'normal') : style);
+        else throwAt(qb, t.x, t.y, ctlMobile() ? (Input.flick ? 'bullet' : 'normal') : style, G.meter && !G.meter.key ? meterRead() : null);
       }
+      if (G.meter && !G.meter.key) G.meter = null;
     }
+    if (G.meter && !G.meter.key && !P.down && !Input.release) G.meter = null; // finger lifted without a throw
+    G.meterV = G.meter ? [meterVal(), G.meter.green[0], G.meter.green[1]] : null;
     if (G.ball.holder === qb) for (const c of Input.taps) {
       let best = null, bd = 60;
       for (const r of G.O) if (r.throwKey) { const dd = Math.min(Math.hypot(sx(r.x) - c.x, sy(r.y) - 40 - c.y), Math.hypot(sx(r.x) - c.x, sy(r.y) - 120 - c.y)); if (dd < bd) { bd = dd; best = r; } }
@@ -1759,10 +1769,18 @@ function receiverFor(qb, tx, ty) {
   }
   return best;
 }
-function throwAt(qb, tx, ty, style) {
+// ---- throw meter: hold to aim, the bar fills up and back down. Let go in the green = PERFECT (on target, easier catch)
+const meterOn = () => { try { return (JSON.parse(localStorage.getItem('bobbleOpts') || '{}').optMeter || '1') === '1'; } catch (e) { return true; } };
+const METER_CYCLE = 0.8; // seconds from empty to full
+function meterStart(qb, key) { G.meter = { t0: G.time, key, green: meterGreen(qb) }; }
+function meterGreen(qb) { const w = clamp(0.1 + (qbArm(qb).acc - 70) * 0.004, 0.08, 0.2); return [0.92 - w, 0.92]; } // better accuracy = bigger green
+function meterVal() { const m = G.meter; if (!m) return 0; const ph = (G.time - m.t0) / METER_CYCLE % 2; return ph < 1 ? ph : 2 - ph; }
+// what the release did: power 0..1 and whether it was perfect
+function meterRead() { const m = G.meter; if (!m) return null; const v = meterVal(); G.meter = null; return { v, perfect: v >= m.green[0] && v <= m.green[1], over: v > m.green[1], g0: m.green[0] }; }
+function throwAt(qb, tx, ty, style, mt) {
   const r = receiverFor(qb, tx, ty) || nearestTo(G.O.filter(eligible), { x: tx, y: ty });
   if (!r) return;
-  throwTo(qb, r, false, { x: tx, y: clamp(ty, -0.5, FIELD_W + 0.5) }, style);
+  throwTo(qb, r, false, { x: tx, y: clamp(ty, -0.5, FIELD_W + 0.5) }, style, null, mt);
 }
 // QB arm: throw power sets how far and how fast, accuracy sets how close it lands to where you wanted
 function qbArm(qb) {
@@ -1771,14 +1789,22 @@ function qbArm(qb) {
   if (G.O && qb !== G.O[0] && qb.pos !== 'QB') { thp = Math.min(thp, 70); acc = Math.min(acc, 55); } // trick play: a RB / WR throwing it
   return { thp, acc, range: 18 + thp * 0.52, accF: Math.pow(clamp((100 - acc) / 30, 0, 4), 1.3) };
 }
-function throwTo(qb, r, pitch = false, aimed = null, style = 'normal', lead = null) {
+function throwTo(qb, r, pitch = false, aimed = null, style = 'normal', lead = null, mt = null) {
   const b = G.ball;
   const arm = qbArm(qb);
   const sMul = style === 'bullet' ? 1.3 : style === 'lob' ? 0.72 : 1;
-  const spd = (pitch ? 20 : Math.max(11, 19 + (arm.thp - 70) * 0.16)) * GAME_SPEED * (pitch ? 1 : sMul); // pitches are short and quick
+  // meter power: weak = a slower ball (defenders close), too hard = faster but wilder
+  const mMul = !mt || pitch ? 1 : mt.perfect ? 1.05 : mt.over ? 1.15 : lerp(0.78, 1, clamp(mt.v / mt.g0, 0, 1));
+  const spd = (pitch ? 20 : Math.max(11, 19 + (arm.thp - 70) * 0.16)) * GAME_SPEED * (pitch ? 1 : sMul * mMul); // pitches are short and quick
   let tx = r.x, ty = r.y, T = 0.3;
   const sitting = r.route && r.route.end === 'sit' && r.route.i >= r.route.pts.length;
-  if (aimed) { tx = aimed.x; ty = aimed.y; T = Math.max(0.3, Math.hypot(tx - qb.x, ty - qb.y) / spd); }
+  if (aimed) {
+    tx = aimed.x; ty = aimed.y; T = Math.max(0.3, Math.hypot(tx - qb.x, ty - qb.y) / spd);
+    // aimed right at a running receiver: lead him a bit so it isn't thrown behind him
+    if (!pitch && r && dist(r, aimed) < 4.5 && Math.hypot(r.vx || 0, r.vy || 0) > 2) for (let k = 0; k < 3; k++) {
+      T = Math.max(0.3, Math.hypot(tx - qb.x, ty - qb.y) / spd); tx = aimed.x + r.vx * T * 0.8; ty = aimed.y + r.vy * T * 0.8;
+    }
+  }
   else for (let k = 0; k < 4; k++) {
     T = Math.max(pitch ? 0.25 : 0.35, Math.hypot(tx - qb.x, ty - qb.y) / spd);
     if (pitch) T = Math.min(T, 0.4);
@@ -1807,12 +1833,15 @@ function throwTo(qb, r, pitch = false, aimed = null, style = 'normal', lead = nu
     if (style === 'bullet') err *= 1.15; else if (style === 'lob') err *= 0.9;
     if (qb.xf && qb.xf.on && qb.xf.kind === 'dimes') err *= 0.35;
     if (G.weather === 'rain' || G.weather === 'snow') err *= 1.15;
+    if (mt) { if (mt.perfect) err *= 0.25; else if (mt.over) err *= 1.35; else err *= 1 + (1 - clamp(mt.v / mt.g0, 0, 1)) * 0.6; }
     if (arm.thp < 62 || err > 3.5) duck = true;
+    if (mt && mt.perfect) duck = false;
+    if (mt) addText(qb.x, qb.y - 2.4, mt.perfect ? 'PERFECT' : mt.over ? 'TOO HARD' : mt.v / mt.g0 < 0.6 ? 'WEAK' : 'GOOD', mt.perfect ? '#5dff7a' : mt.over ? '#ff8a8a' : '#fff', 15, 0.8);
     if (style !== 'normal') addText(qb.x, qb.y, style === 'bullet' ? 'BULLET!' : 'LOB!', '#7fd3ff', 15, 0.6);
     const a = rand(0, Math.PI * 2), m = Math.abs(rand(-1, 1) + rand(-1, 1)) / 2 * err * 2;
     let ex = Math.cos(a) * m, ey = Math.sin(a) * m;
     // good QBs miss long or to the safe side, not short behind the receiver
-    if (len > 1 && !duck) { const ux = (tx - qb.x) / len, uy = (ty - qb.y) / len, along = ex * ux + ey * uy; if (along < 0) { const cut = along * clamp((arm.acc - 72) / 18, 0, 1); ex -= ux * cut; ey -= uy * cut; } }
+    if (len > 1 && !duck) { const ux = (tx - qb.x) / len, uy = (ty - qb.y) / len, along = ex * ux + ey * uy; if (along < 0) { const cut = along * clamp(0.6 + (arm.acc - 72) / 45, 0.6, 1); ex -= ux * cut; ey -= uy * cut; } }
     tx += ex; ty += ey;
     stat(qb).att++;
     Sound.throw();
@@ -1821,7 +1850,7 @@ function throwTo(qb, r, pitch = false, aimed = null, style = 'normal', lead = nu
   ty = clamp(ty, -0.5, FIELD_W + 0.5);
   b.holder = null;
   const pk = pitch ? 0.4 : (0.6 + len * 0.1) * (style === 'bullet' ? 0.45 : style === 'lob' ? 1.9 : 1) + (style === 'lob' ? 1.5 : 0);
-  b.flight = { sx: qb.x, sy: qb.y, tx, ty, t: 0, T: Math.max(T, len / spd), peak: pk, intended: r, pitch, passer: qb, style, duck };
+  b.flight = { sx: qb.x, sy: qb.y, tx, ty, t: 0, T: Math.max(T, len / spd), peak: pk, intended: r, pitch, passer: qb, style, duck, perfect: !!(mt && mt.perfect) };
   G.bstate = 'air'; G.intended = r;
   for (const p of G.players) { p.laneChecked = false; p.jumpTried = false; }
   G.passPlay = !pitch;
@@ -1901,6 +1930,7 @@ function resolveCatch() {
   if (rcv && rd < R) {
     let pc = 0.9 + (rat(rcv, 'CTH') - 78) / 160 - Math.max(0, Math.hypot(land.x - f.sx, land.y - f.sy) - 15) * 0.006 - (rd > 0.9 ? 0.08 : 0) - Weather.catchPenalty();
     if (hands) pc += 0.15;
+    if (f.perfect) pc += 0.12; // a PERFECT meter throw is right in his hands
     if (def && dd < 1.8) { pc -= (hands ? 0.08 : 0.24) - (rat(rcv, 'CTH') - rat(def, 'COV')) / 150; if (chance(0.03 + humanDefBonus * 0.5)) return intercept(def); }
     if (chance(clamp(pc, 0.25, 0.97))) {
       const backLine = rcv.x < -0.25 || rcv.x > 120.25, sideLine = rcv.y < -0.25 || rcv.y > FIELD_W + 0.25;
@@ -2033,7 +2063,7 @@ function endPlay(res) {
   if (G.phase !== 'live') return;
   if (res.x != null && !isFinite(res.x)) res.x = G.los; // never let a broken spot become the new line of scrimmage
   if (res.y != null && !isFinite(res.y)) res.y = G.ballY;
-  G.phase = 'dead'; G.deadT = 1.15; G.showTarget = false; G.aim = null;
+  G.phase = 'dead'; G.deadT = 1.15; G.showTarget = false; G.aim = null; G.meter = null; G.meterV = null;
   Sound.whistle();
   for (const p of G.players) { p.throwKey = 0; p.engaged = null; }
   G.flagNote = null; G.pendingRunoff = 0;

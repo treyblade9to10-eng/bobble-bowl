@@ -16,7 +16,8 @@ const PSTAT = ['x', 'y', 'vx', 'vy', 'anim', 'speedNow', 'down', 'downDir', 'div
 // Every lane is a list the other side reads and deletes, and each side's stuff is deleted by the server
 // when that device drops off, so old rooms clean themselves up.
 const RELAY_CFG = { apiKey: 'AIzaSyDkw-xjR0eAkCPR3BRQyKk0Rnusu3pbEmw', authDomain: 'cardio-game-3713.firebaseapp.com', databaseURL: 'https://cardio-game-3713-default-rtdb.firebaseio.com', projectId: 'cardio-game-3713' };
-const RELAY_HZ = 15, RELAY_WAIT = 3500, RELAY_GRACE = 15000;
+const NET_HZ = 50; // direct connection: updates per second both ways (was 30)
+const RELAY_HZ = 20, RELAY_WAIT = 3500, RELAY_GRACE = 15000;
 const Relay = {
   dbp: null,
   load() {
@@ -320,7 +321,7 @@ const Net = {
     const R = Input.store[1];
     if (R) { R.pressed = {}; R.taps = []; R.release = null; if (Input.cur === 1) Input.use(0); }
     this.snapT -= dt;
-    if (this.snapT <= 0) { this.snapT = this.onRelay ? 1 / RELAY_HZ : 1 / 30; this.sendSnap(); }
+    if (this.snapT <= 0) { this.snapT = Math.max(0, this.snapT + (this.onRelay ? 1 / RELAY_HZ : 1 / NET_HZ)); this.sendSnap(); } // carry the leftover so 60fps really gives 50 a second
   },
   // convert the guest's finger (sent in field coords) into this screen's coords right before the engine runs
   prepRemote() {
@@ -345,7 +346,7 @@ const Net = {
       rf: (G.refs || []).map(r => [r2(r.x), r2(r.y), r.face, r2(r.anim || 0), r.moving, r2(r.throwT || 0)]),
       hp: [idx(G.hp && G.hp[0]), idx(G.hp && G.hp[1])], hd: [idx(G.hd && G.hd[0]), idx(G.hd && G.hd[1])],
       km: G.km && (G.phase === 'kickmeter' || G.phase === 'kick') ? { kind: G.km.kind, stage: G.km.stage, power: G.km.power, aim: G.km.aim, side: G.km.side, need: G.km.need, tol: G.km.tol, yds: G.km.yds, kk: G.km.kk, cpuT: G.km.cpuT != null ? 1 : null, wait: G.km.wait, needle: G.km.needle, wind: G.wind } : null,
-      aim: G.aim, cg: idx(G.cellyGuy), hy: Math.round(G.crowdHype * 100) / 100, sh: Math.round(cam.shake), sm: G.slowmo > 0 ? 1 : 0, flg: (G.flags || []).length
+      aim: G.aim, mv: G.meterV ? G.meterV.map(r2) : null, cg: idx(G.cellyGuy), hy: Math.round(G.crowdHype * 100) / 100, sh: Math.round(cam.shake), sm: G.slowmo > 0 ? 1 : 0, flg: (G.flags || []).length
     };
     // one-time stuff goes on the safe lane
     const e = { t: 'e', fx: [], snd: this.sounds.splice(0) };
@@ -424,7 +425,7 @@ const Net = {
     const P = G.players;
     Object.assign(G, { phase: s.ph === 'replay' ? 'dead' : s.ph, score: s.sc, quarter: s.q, clock: s.cl, down: s.dn, los: s.los, firstDownX: s.fdx, goalToGo: s.gtg, ballY: s.by, poss: s.poss,
       timeouts: s.to, pendingRunoff: s.pr, playClock: s.pc, special: s.sp, patSide: s.pat, twoPt: s.two, bstate: s.bs, koPending: s.kp, kickoffSide: s.ks, showTarget: s.st, aim: s.aim,
-      crowdHype: s.hy, km: s.km, flags: new Array(s.flg).fill({}) });
+      crowdHype: s.hy, km: s.km, meterV: s.mv || null, flags: new Array(s.flg).fill({}) });
     if (s.sh > cam.shake) cam.shake = s.sh;
     if (s.sm) G.slowmo = 0.05;
     const off = OFF_PLAYS.concat(FAKE_PLAYS, typeof SPECIAL_PLAYS !== 'undefined' ? SPECIAL_PLAYS : []).find(p => p.key === s.ok) || (s.ok ? { key: s.ok, name: s.ok, type: s.ok === 'ret' ? 'ret' : 'pass' } : null);
@@ -474,17 +475,24 @@ const Net = {
   // draw the game a little in the past and slide between the two updates around that moment
   playback() {
     const B = this.buf; if (!B.length || this.off == null) return;
-    const delay = clamp(0.05 + this.jit * 1.6, 0.06, 0.3);
+    const delay = clamp((this.onRelay ? 0.06 : 0.03) + this.jit * 1.4, this.onRelay ? 0.07 : 0.035, 0.3);
     const rt = performance.now() / 1000 + this.off - delay;
     let a = B[0], c = null;
     for (let i = 0; i < B.length - 1; i++) if (B[i].tm <= rt && B[i + 1].tm >= rt) { a = B[i]; c = B[i + 1]; break; }
     if (!c) { a = B[B.length - 1]; if (rt < B[0].tm) a = B[0]; }
     const u = c ? (rt - a.tm) / Math.max(1e-4, c.tm - a.tm) : 0;
     const ex = c ? 0 : clamp(rt - a.tm, 0, 0.1); // ran out of updates: keep them moving a tiny bit
-    const P = G.players;
+    const P = G.players, now = performance.now() / 1000 + this.off;
+    const me = G.phase === 'live' && G.humanPlayer && !G.humanPlayer.celly ? G.humanPlayer : null; // the guy you're steering
     for (let i = 0; i < P.length; i++) {
       const p = P[i], pa = a.p[i]; if (!pa) continue;
       const pc = c && c.p[i];
+      if (p === me) { // newest spot + his speed * how old it is, eased so it never snaps
+        const L = B[B.length - 1].p[i]; if (!L) continue;
+        const ahead = clamp(now - B[B.length - 1].tm, 0, 0.12), tx = L[0] + L[2] * ahead, ty = L[1] + L[3] * ahead;
+        if (Math.hypot(tx - p.x, ty - p.y) > 5) { p.x = tx; p.y = ty; } else { p.x = lerp(p.x, tx, 0.45); p.y = lerp(p.y, ty, 0.45); }
+        continue;
+      }
       if (pc) { const far = Math.hypot(pc[0] - pa[0], pc[1] - pa[1]) > 5; p.x = far ? pc[0] : lerp(pa[0], pc[0], u); p.y = far ? pc[1] : lerp(pa[1], pc[1], u); }
       else { p.x = pa[0] + pa[2] * ex; p.y = pa[1] + pa[3] * ex; }
     }
@@ -510,7 +518,7 @@ const Net = {
     }
     this.sendT -= dt;
     if (this.sendT > 0) return;
-    this.sendT = this.onRelay ? 1 / RELAY_HZ : 1 / 30;
+    this.sendT = this.onRelay ? 1 / RELAY_HZ : 0; // direct: your controls go out every frame
     this.send({ t: 'in', n: ++this.inSeq, held: NET_KEYS.filter(c => Input.down[c]),
       st: [r2(Input.stick.x), r2(Input.stick.y), r2(Input.stick.m)], ax: Input.pads[0] ? [r2(ax.x), r2(ax.y), r2(ax.m)] : null, p: ptr }, true);
   },

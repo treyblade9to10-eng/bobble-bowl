@@ -799,6 +799,21 @@ function drawBallFree(g, G) {
   }
 }
 
+// throw meter: a bar beside the QB. Green = PERFECT, past it = too hard
+function drawMeter(g, G) {
+  const m = G.meterV; if (!m || !G.O) return;
+  const qb = curPasser ? curPasser() : G.O[0]; if (!qb) return;
+  const [v, g0, g1] = m, w = 22, h = 130, x = sx(qb.x) + 48, y = sy(qb.y) - 165;
+  g.fillStyle = '#0c1016e8'; g.fillRect(x - 4, y - 4, w + 8, h + 8); g.strokeStyle = '#ffffff55'; g.lineWidth = 2; g.strokeRect(x - 4, y - 4, w + 8, h + 8);
+  g.fillStyle = '#ffffff22'; g.fillRect(x, y, w, h);
+  g.fillStyle = '#ff6a5a66'; g.fillRect(x, y, w, h * (1 - g1)); // too hard
+  g.fillStyle = '#2fd15a'; g.fillRect(x, y + h * (1 - g1), w, h * (g1 - g0)); // the green
+  const inG = v >= g0 && v <= g1;
+  g.fillStyle = inG ? '#7dff98' : v > g1 ? '#ff6a5a' : '#f6c31c'; g.fillRect(x + 3, y + h * (1 - v), w - 6, h * v);
+  g.fillStyle = '#fff'; g.fillRect(x - 6, y + h * (1 - v) - 2, w + 12, 4); // the needle
+  g.font = 'italic 900 16px "Barlow Condensed", "Arial Black", sans-serif'; g.textAlign = 'center'; g.lineWidth = 4; g.strokeStyle = '#000';
+  g.strokeText('POWER', x + w / 2, y + h + 20); g.fillStyle = '#fff'; g.fillText('POWER', x + w / 2, y + h + 20);
+}
 // drag-back throw aim
 function drawAim(g, G) {
   const a = G.aim; if (!a || !G.O) return;
