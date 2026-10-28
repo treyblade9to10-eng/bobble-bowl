@@ -223,8 +223,8 @@ const fillSel = (id, list, val) => { $(id).innerHTML = list.map(([v, t]) => `<op
 fillSel('optUni0', UNIFORMS, 'home');
 $('optPlayers').onchange = () => renderSelect(); fillSel('optUni1', UNIFORMS, 'away'); fillSel('optWeather', WEATHER, 'clear');
 try { const o = JSON.parse(localStorage.getItem('bobbleOpts') || 'null'); if (o) for (const k in o) if ($(k)) $(k).value = o[k]; } catch (e) {}
-function saveOpts() { const o = {}; for (const k of ['optUni0', 'optUni1', 'optWeather', 'optNight', 'optGame', 'optLogos', 'optQtr', 'optDiff', 'optCoach', 'optCoachMode', 'optPlayers', 'optMeter']) o[k] = $(k).value; try { localStorage.setItem('bobbleOpts', JSON.stringify(o)); } catch (e) {} }
-const cycPaint = [['optQtr', 'QUARTERS'], ['optDiff', 'CPU'], ['optCoach', 'COACH'], ['optCoachMode', 'COACH MODE'], ['optWeather', 'WEATHER'], ['optNight', 'TIME'], ['optGame', 'GAME'], ['optLogos', 'LOGOS'], ['optMeter', 'THROW METER'], ['optPlayers', 'PLAYERS']].map(([id, l]) => cycleBtn(id, l));
+function saveOpts() { const o = {}; for (const k of ['optUni0', 'optUni1', 'optWeather', 'optNight', 'optGame', 'optLogos', 'optQtr', 'optDiff', 'optCoach', 'optCoachMode', 'optPlayers', 'optMeter', 'optCatchM', 'optDefM']) o[k] = $(k).value; try { localStorage.setItem('bobbleOpts', JSON.stringify(o)); } catch (e) {} }
+const cycPaint = [['optQtr', 'QUARTERS'], ['optDiff', 'CPU'], ['optCoach', 'COACH'], ['optCoachMode', 'COACH MODE'], ['optWeather', 'WEATHER'], ['optNight', 'TIME'], ['optGame', 'GAME'], ['optLogos', 'LOGOS'], ['optMeter', 'PASS METER'], ['optCatchM', 'CATCH METER'], ['optDefM', 'DEFENSE METER'], ['optPlayers', 'PLAYERS']].map(([id, l]) => cycleBtn(id, l));
 $('optLogos').addEventListener('change', () => { Logo.setStyle($('optLogos').value); renderSelect(); });
 Logo.onReady(() => { if ($('select').classList.contains('show')) renderSelect(); });
 const repaintCycles = () => cycPaint.forEach(f => f());
@@ -798,7 +798,7 @@ function render() {
     const ps = G.players.concat(G.refs || []).sort((a, b) => a.y - b.y);
     for (const p of ps) safeDraw('player', () => p.slot === undefined ? drawRef(ctx, p, G) : drawPlayer(ctx, p, G));
     if (G.mini) safeDraw('mini', () => drawMini(ctx, G));
-    safeDraw('ball', () => { if (G.ball) drawBallFree(ctx, G); drawAim(ctx, G); drawMeter(ctx, G); });
+    safeDraw('ball', () => { if (G.ball) drawBallFree(ctx, G); drawAim(ctx, G); drawMeter(ctx, G); drawFlightMeter(ctx, G); });
     safeDraw('fx', () => { drawFx(ctx, G); drawWeather(ctx, G); });
   }
   ctx.restore();

@@ -814,6 +814,22 @@ function drawMeter(g, G) {
   g.font = 'italic 900 16px "Barlow Condensed", "Arial Black", sans-serif'; g.textAlign = 'center'; g.lineWidth = 4; g.strokeStyle = '#000';
   g.strokeText('POWER', x + w / 2, y + h + 20); g.fillStyle = '#fff'; g.fillText('POWER', x + w / 2, y + h + 20);
 }
+// catch / defense meter: a bar over where the ball lands. Press when the needle hits the green
+function drawFlightMeter(g, G) {
+  const f = G.ball && G.ball.flight, me = G.humanPlayer; if (!f || f.pitch || f.kick || !me || G.human < 0 || !(f.T > 0)) return;
+  const off = G.poss === G.human, on = off ? catchMeterOn() && f.intended === me : defMeterOn() && me.side !== G.poss;
+  if (!on) return;
+  const u = clamp(f.t / f.T, 0, 1), w = 120, h = 12, x = sx(f.tx) - w / 2, y = sy(f.ty) - 78;
+  const done = off ? f.cp : f.dp && f.dp.res;
+  g.fillStyle = '#0c1016e0'; g.fillRect(x - 4, y - 4, w + 8, h + 8);
+  g.fillStyle = '#ffffff22'; g.fillRect(x, y, w, h);
+  g.fillStyle = '#2fd15a'; g.fillRect(x + w * CATCH_WIN[0], y, w * (CATCH_WIN[1] - CATCH_WIN[0]), h);
+  g.fillStyle = off ? '#f6c31c' : '#7fd3ff'; g.fillRect(x, y, w * u, h * 0.35);
+  g.fillStyle = '#fff'; g.fillRect(x + w * u - 2, y - 5, 4, h + 10);
+  g.font = 'italic 900 15px "Barlow Condensed", "Arial Black", sans-serif'; g.textAlign = 'center'; g.lineWidth = 4; g.strokeStyle = '#000';
+  const t = done ? (done === 'perfect' ? 'PERFECT' : done === 'good' ? 'GOOD' : 'EARLY') : off ? (ctlMobile() ? 'TAP TO CATCH' : 'SPACE TO CATCH') : (ctlMobile() ? 'TAP TO DEFEND' : 'SPACE TO DEFEND');
+  g.strokeText(t, x + w / 2, y - 9); g.fillStyle = done === 'perfect' ? '#5dff7a' : '#fff'; g.fillText(t, x + w / 2, y - 9);
+}
 // drag-back throw aim
 function drawAim(g, G) {
   const a = G.aim; if (!a || !G.O) return;

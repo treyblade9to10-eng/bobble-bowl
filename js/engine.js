@@ -829,12 +829,21 @@ function humanQBInput() {
     if (G.meter && G.meter.key) { // holding a receiver key: let go to throw
       const r = G.O.find(o => o.throwKey === keys[G.meter.key]);
       if (G.ball.holder !== qb || !eligible(r)) G.meter = null;
-      else if (!Input.held(G.meter.key)) { throwTo(qb, r, false, null, style, Input.axis(), meterRead()); }
-    } else for (const k in keys) if (Input.hit(k)) { const r = G.O.find(o => o.throwKey === keys[k]); if (eligible(r)) { if (useMeter && Input.held(k)) meterStart(qb, k); else throwTo(qb, r, false, null, style, Input.axis()); break; } }
+      else if (!Input.held(G.meter.key)) meterThrow(qb, r, style, Input.axis());
+    } else for (const k in keys) if (Input.hit(k)) { const r = G.O.find(o => o.throwKey === keys[k]); if (eligible(r)) { if (useMeter && Input.held(k)) meterStart(qb, k, r); else throwTo(qb, r, false, null, useMeter && style === 'normal' ? 'lob' : style, Input.axis()); break; } }
     const P = Input.pointer;
+    // finger on a receiver's icon: hold for the power bar, a quick tap lobs it
+    if (meterOn() && G.ball.holder === qb && !G.meter && P.down && !P.moved) {
+      const best = iconAt(P.x0, P.y0);
+      if (best) meterStart(qb, null, best);
+    }
+    if (G.meter && G.meter.r && !G.meter.key) {
+      if (P.moved || G.ball.holder !== qb || !eligible(G.meter.r)) G.meter = null; // slid off: it's a drag-back aim now
+      else if (!P.down) { meterThrow(qb, G.meter.r, style); Input.taps.length = 0; }
+      else Input.taps.length = 0;
+    }
     if (G.ball.holder === qb && P.down && P.moved) {
       P.aiming = true;
-      if (meterOn() && !G.meter) meterStart(qb, null);
       const t = aimTarget(qb, P.x0 - P.x, P.y0 - P.y);
       const back = dirOf(G.poss) * (t.x - qb.x) < -1.5;
       G.aim = { style: ctlMobile() ? '' : style, tx: t.x, ty: t.y, run: back, target: back ? null : receiverFor(qb, t.x, t.y), from: { x: P.x0, y: P.y0 }, to: { x: P.x, y: P.y } };
@@ -844,16 +853,13 @@ function humanQBInput() {
       if (Math.hypot(v.x, v.y) > 28) {
         const t = aimTarget(qb, v.x, v.y);
         if (dirOf(G.poss) * (t.x - qb.x) < -1.5) qbTakeOff(qb); // aimed backwards = QB runs it
-        else throwAt(qb, t.x, t.y, ctlMobile() ? (Input.flick ? 'bullet' : 'normal') : style, G.meter && !G.meter.key ? meterRead() : null);
+        else throwAt(qb, t.x, t.y, ctlMobile() ? (Input.flick ? 'bullet' : 'normal') : style);
       }
-      if (G.meter && !G.meter.key) G.meter = null;
     }
-    if (G.meter && !G.meter.key && !P.down && !Input.release) G.meter = null; // finger lifted without a throw
-    G.meterV = G.meter ? [meterVal(), G.meter.green[0], G.meter.green[1]] : null;
+    G.meterV = G.meter && G.time - G.meter.t0 >= TAP_LOB * 0.6 ? [meterVal(), G.meter.green[0], G.meter.green[1]] : null;
     if (G.ball.holder === qb) for (const c of Input.taps) {
-      let best = null, bd = 60;
-      for (const r of G.O) if (r.throwKey) { const dd = Math.min(Math.hypot(sx(r.x) - c.x, sy(r.y) - 40 - c.y), Math.hypot(sx(r.x) - c.x, sy(r.y) - 120 - c.y)); if (dd < bd) { bd = dd; best = r; } }
-      if (best) { throwTo(qb, best, false, null, style); break; }
+      const best = iconAt(c.x, c.y);
+      if (best) { throwTo(qb, best, false, null, meterOn() && style === 'normal' ? 'lob' : style); break; }
     }
   }
 }
@@ -982,6 +988,12 @@ function openness(r) {
   let m = 99;
   for (const d of G.D) if (!d.engaged && d.down <= 0) m = Math.min(m, dist(r, d));
   return m;
+}
+// which receiver's throw icon is under this screen point
+function iconAt(x, y) {
+  let best = null, bd = 60;
+  for (const r of G.O) if (r.throwKey) { const dd = Math.min(Math.hypot(sx(r.x) - x, sy(r.y) - 40 - y), Math.hypot(sx(r.x) - x, sy(r.y) - 120 - y)); if (dd < bd) { bd = dd; best = r; } }
+  return best;
 }
 function humanCanThrow() {
   const b = G.ball, qb = curPasser(), off = G.play && G.play.off;
@@ -1135,7 +1147,8 @@ function humanControl(p, dt) {
   }
   const chasing = b.holder ? b.holder.side !== p.side : p.side !== G.poss;
   if (G.lock && !isCarrier && !chasing && p !== G.O[0] && G.bstate === 'snap' && !b.flight && Input.hit('Space')) callForBall(p);
-  if (!isCarrier && chasing && b.flight && !b.flight.pitch && Input.hit('Space')) { doJump(p); }
+  if (!isCarrier && !chasing && b.flight && !b.flight.pitch && Input.hit('Space')) flightPress(p, 'catch');
+  if (!isCarrier && chasing && b.flight && !b.flight.pitch && Input.hit('Space')) { flightPress(p, 'def'); doJump(p); }
   else if (!isCarrier && chasing && Input.hit('Space') && p.dive <= 0) { doDive(p, ax); return true; }
   if (!isCarrier && p.engaged && Input.hit('KeyE')) doSwim(p);
   if (!isCarrier && chasing && Input.hit('KeyC')) doHitStick(p);
@@ -1167,7 +1180,8 @@ function mobileControl(p, dt, isCarrier) {
   }
   const onD = p.side !== G.poss || (b.holder && b.holder.side !== p.side);
   const inAir = !isCarrier && onD && b.flight && !b.flight.pitch;
-  if (inAir && (Input.taps.length || Input.hit('Space'))) { doJump(p); Input.taps.length = 0; }
+  if (inAir && (Input.taps.length || Input.hit('Space'))) { flightPress(p, 'def'); doJump(p); Input.taps.length = 0; }
+  if (!isCarrier && !onD && b.flight && !b.flight.pitch && b.flight.intended === p && (Input.taps.length || Input.hit('Space'))) { flightPress(p, 'catch'); Input.taps.length = 0; }
   if (!isCarrier && p.engaged && Input.hit('KeyE')) doSwim(p);
   if (!isCarrier && onD && Input.hit('KeyC')) doHitStick(p);
   if (p.hit > 0) return true;
@@ -1770,13 +1784,33 @@ function receiverFor(qb, tx, ty) {
   return best;
 }
 // ---- throw meter: hold to aim, the bar fills up and back down. Let go in the green = PERFECT (on target, easier catch)
-const meterOn = () => { try { return (JSON.parse(localStorage.getItem('bobbleOpts') || '{}').optMeter || '1') === '1'; } catch (e) { return true; } };
-const METER_CYCLE = 0.8; // seconds from empty to full
-function meterStart(qb, key) { G.meter = { t0: G.time, key, green: meterGreen(qb) }; }
-function meterGreen(qb) { const w = clamp(0.1 + (qbArm(qb).acc - 70) * 0.004, 0.08, 0.2); return [0.92 - w, 0.92]; } // better accuracy = bigger green
-function meterVal() { const m = G.meter; if (!m) return 0; const ph = (G.time - m.t0) / METER_CYCLE % 2; return ph < 1 ? ph : 2 - ph; }
+// tap a receiver = touch LOB, hold = the POWER bar fills: green = PERFECT bullet, past it = TOO HARD. Catch + defense meters time the ball's arrival
+const optOn = k => { try { return (JSON.parse(localStorage.getItem('bobbleOpts') || '{}')[k] || '1') === '1'; } catch (e) { return true; } };
+const meterOn = () => optOn('optMeter'), catchMeterOn = () => optOn('optCatchM'), defMeterOn = () => optOn('optDefM');
+const TAP_LOB = 0.18; // let go faster than this = it was a tap
+const METER_CYCLE = 1.0; // seconds from empty to full
+function meterStart(qb, key, r) { G.meter = { t0: G.time, key, r: r || null, green: meterGreen(qb) }; }
+function meterGreen(qb) { const w = clamp(0.13 + (qbArm(qb).acc - 70) * 0.005, 0.11, 0.24); return [0.92 - w, 0.92]; } // better accuracy = bigger green
+function meterVal() { const m = G.meter; if (!m) return 0; return Math.min(1, Math.max(0, G.time - m.t0 - 0.08) / METER_CYCLE); }
 // what the release did: power 0..1 and whether it was perfect
 function meterRead() { const m = G.meter; if (!m) return null; const v = meterVal(); G.meter = null; return { v, perfect: v >= m.green[0] && v <= m.green[1], over: v > m.green[1], g0: m.green[0] }; }
+// let go of a held receiver: a quick tap is a lob, a hold throws with the meter's power (strong enough = a bullet)
+function meterThrow(qb, r, style, lead) {
+  const tap = G.time - G.meter.t0 < TAP_LOB;
+  if (tap) { G.meter = null; return throwTo(qb, r, false, null, style === 'normal' ? 'lob' : style, lead); }
+  const mt = meterRead();
+  throwTo(qb, r, false, null, style !== 'normal' ? style : mt.v >= mt.g0 ? 'bullet' : 'normal', lead, mt);
+}
+// catch / defense meter: press when the ball gets there. Window = last part of the flight
+const CATCH_WIN = [0.78, 0.96];
+function flightPress(p, kind) {
+  const f = G.ball && G.ball.flight; if (!f || f.pitch || f.kick) return;
+  if (kind === 'catch' ? (!catchMeterOn() || f.intended !== p || f.cp) : (!defMeterOn() || f.dp)) return;
+  const u = f.t / f.T, res = u >= CATCH_WIN[0] && u <= CATCH_WIN[1] ? 'perfect' : u >= 0.62 && u <= 1 ? 'good' : 'early';
+  if (kind === 'catch') f.cp = res; else f.dp = { p, res };
+  if (res !== 'early') addText(p.x, p.y - 1.5, res === 'perfect' ? (kind === 'catch' ? 'PERFECT CATCH' : 'PERFECT READ') : 'GOOD TIMING', res === 'perfect' ? '#5dff7a' : '#fff', 15, 0.8);
+  else addText(p.x, p.y - 1.5, 'TOO EARLY', '#ff8a8a', 14, 0.7);
+}
 function throwAt(qb, tx, ty, style, mt) {
   const r = receiverFor(qb, tx, ty) || nearestTo(G.O.filter(eligible), { x: tx, y: ty });
   if (!r) return;
@@ -1910,13 +1944,15 @@ function resolveCatch() {
   const jumper = G.players.find(p => p.side !== offSide && p.jump > 0 && p.down <= 0 && dist(p, land) < 2.0);
   if (jumper) {
     const jd = dist(jumper, land);
-    const pInt = clamp((jumper.isHuman ? 0.62 : 0.4) + (rat(jumper, 'CTH') - 75) / 90 - (rd < jd ? 0.25 : 0) - jd * 0.12, 0.1, 0.85);
+    const dpj = f.dp && f.dp.p === jumper ? f.dp.res : null; // a well-timed jump wins more often
+    const pInt = clamp((jumper.isHuman ? 0.62 : 0.4) + (rat(jumper, 'CTH') - 75) / 90 - (rd < jd ? 0.25 : 0) - jd * 0.12 + (dpj === 'perfect' ? 0.2 : dpj === 'good' ? 0.08 : 0), 0.1, 0.9);
     if (chance(pInt)) return intercept(jumper);
     if (chance(0.6)) return incomplete(jumper, 'SWATTED!');
   }
-  const humanDefBonus = (def && def.isHuman ? 0.15 : 0) + (xfOn(def, 'lurker') ? 0.2 : 0);
+  const dpr = f.dp && f.dp.p === def ? f.dp.res : null;
+  const humanDefBonus = (def && def.isHuman ? 0.15 : 0) + (xfOn(def, 'lurker') ? 0.2 : 0) + (dpr === 'perfect' ? 0.15 : dpr === 'good' ? 0.06 : 0);
   const R = 1.45;
-  const hands = xfOn(rcv, 'hands') && rd < 1.6; // a "Double Me" guy usually wins the 50-50 ball
+  const hands = (xfOn(rcv, 'hands') || f.cp === 'perfect') && rd < 1.6; // a "Double Me" guy (or a PERFECT catch) usually wins the 50-50 ball
   if (def && dd < 0.5 && dd < rd - 0.3 && !(hands && chance(0.7))) { // ball hits the defender right in the body: 7 out of 10 get picked
     if (chance(def.isHuman ? 0.55 : 0.2)) return intercept(def);
     return incomplete(def, 'BROKEN UP!');
@@ -1931,6 +1967,7 @@ function resolveCatch() {
     let pc = 0.9 + (rat(rcv, 'CTH') - 78) / 160 - Math.max(0, Math.hypot(land.x - f.sx, land.y - f.sy) - 15) * 0.006 - (rd > 0.9 ? 0.08 : 0) - Weather.catchPenalty();
     if (hands) pc += 0.15;
     if (f.perfect) pc += 0.12; // a PERFECT meter throw is right in his hands
+    if (f.cp === 'perfect') pc += 0.1; else if (f.cp === 'good') pc += 0.08; // timed catch
     if (def && dd < 1.8) { pc -= (hands ? 0.08 : 0.24) - (rat(rcv, 'CTH') - rat(def, 'COV')) / 150; if (chance(0.03 + humanDefBonus * 0.5)) return intercept(def); }
     if (chance(clamp(pc, 0.25, 0.97))) {
       const backLine = rcv.x < -0.25 || rcv.x > 120.25, sideLine = rcv.y < -0.25 || rcv.y > FIELD_W + 0.25;
@@ -2394,7 +2431,7 @@ function updateHint() {
   if (G.phase === 'presnap') G.hint = humanOff ? (G.play.off.type === 'run' ? 'SPACE snap  •  Z audible  •  T timeout' : `SPACE snap  •  1-4 hot route  •  M motion${G.versus ? '' : '  •  Z audible'}  •  T timeout`) : `Q / TAB pick defender  •  V press  •  B show blitz${G.versus ? '' : '  •  Z audible'}  •  T timeout`;
   else if (G.phase === 'live') {
     const h = G.humanPlayer;
-    if (h && b.holder === h && h.side === G.human) G.hint = humanCanThrow() ? '1-4 throw (SHIFT = bullet, CTRL = lob, hold WASD to lead)  •  or drag back with mouse' : 'WASD move  •  SHIFT sprint  •  E juke  •  F spin  •  R stiff arm';
+    if (h && b.holder === h && h.side === G.human) G.hint = humanCanThrow() ? (meterOn() ? 'TAP 1-4 = lob  •  HOLD 1-4 = power, let go in the green  •  hold WASD to lead' : '1-4 throw (SHIFT = bullet, CTRL = lob, hold WASD to lead)  •  or drag back with mouse') : 'WASD move  •  SHIFT sprint  •  E juke  •  F spin  •  R stiff arm';
     else if (h && (h.side !== G.poss || (b.holder && b.holder.side !== G.human))) G.hint = b.flight ? 'SPACE = JUMP for the pick!  •  WASD move' : h.engaged ? 'E = SWIM MOVE past the blocker!' : 'WASD move  •  SHIFT sprint  •  SPACE dive  •  C HIT STICK  •  Q switch';
     else G.hint = 'Steer to the ball marker to catch it!';
   } else G.hint = '';
