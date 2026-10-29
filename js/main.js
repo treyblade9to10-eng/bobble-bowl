@@ -654,7 +654,7 @@ function updateMobileButtons() {
   if (G.phase === 'presnap' && !G.demo) st = 'presnap';
   const coach = coachOn(); // Coach Mode: no stick or move buttons, just AUDIBLE / TIMEOUT before the snap
   if (coach && st !== 'presnap') st = '';
-  const joyOn = G.phase === 'live' && !G.demo && !!h; // stays up the whole play so your thumb never loses it
+  const joyOn = (G.phase === 'live' || fgRushing()) && !G.demo && !!h; // stays up the whole play so your thumb never loses it (+ rushing a field goal)
   $('joy').classList.toggle('on', !!joyOn);
   if (!joyOn && Input.stick.m) { Input.stick.x = Input.stick.y = Input.stick.m = 0; $('joyKnob').style.left = $('joyKnob').style.top = ''; }
   const side = G.poss === G.human ? 'off' : 'def';

@@ -146,6 +146,7 @@ function aiKickFlight(p) {
 
 // end of a kick / return play
 function endReturn(res) {
+  if (G.special === 'fgblock') return endBlocked(res);
   const r = G.poss, k = 1 - r, kind = G.special, rd = dirOf(r);
   const car = res.carrier, cs = car ? car.side : r;
   let x = res.x != null ? res.x : G.ball.x;
@@ -174,6 +175,230 @@ function endReturn(res) {
   if (car && cs === r) addPbp(`${lastName(car.name)} ${ret > 0 ? `returns the ${kind === 'punt' ? 'punt' : 'kick'} ${ret} yards` : `fields the ${kind === 'punt' ? 'punt' : 'kick'} and gets stopped right there`}${G.lastTackler ? `, tackled by ${lastName(G.lastTackler.name)}` : ''}.`);
   if (kind === 'onside' && res.type !== 'tackle') showBanner('RECOVERED!', `${G.teams[r].name} ball`, '#fff', 1.3);
   G.next = { drive: r, x: clamp(x, 11, 109) };
+}
+
+// ======== live field goals / extra points ========
+// The FG unit runs a real play: center snaps it, the holder (the punter) spots it, the kicker steps into it,
+// the line holds up the rush. Blocks come from where the rushers actually are when the ball leaves the foot.
+const FG_SNAP = 0.36;  // snap flight
+const FG_SET = 0.62;   // holder has it down, kicker starts his steps
+// defense [off the ball, across]: six rush (3 a side), a contain man for fakes, a safety deep
+const FG_DL = [[1, -1], [1, 1], [1, -2.6], [1, 2.6], [3, 7.5], [1.2, -4.6], [1.2, 4.6], [10, 0]];
+function fgSetup(kind) {
+  const s = G.poss, d = dirOf(s), L = G.los, by = G.ballY, O = G.O, D = G.D;
+  const kx = L - d * 7, ky = by;
+  const at = (p, x, y) => { p.x = x; p.y = clamp(y, 1, FIELD_W - 1); p.hx = p.x; p.hy = p.y; p.vx = p.vy = 0; p.engaged = null; p.fgT = null; };
+  at(O[6], L - d * 0.45, by); at(O[5], L - d * 0.5, by - 1.4); at(O[7], L - d * 0.5, by + 1.4);
+  at(O[2], L - d * 0.6, by - 2.9); at(O[3], L - d * 0.6, by + 2.9); at(O[4], L - d * 1, by - 4.3); // wing on the kicker's side
+  const pk = kickerOf(s, 'punt'), h = O[1]; // the punter holds, like the real thing
+  Object.assign(h, { name: pk.name, num: pk.num, ovr: pk.ovr, pos: 'P', cap: false, xf: null, rt: null }); if (pk.skin != null) h.face.skin = pk.skin;
+  at(h, kx, ky + 0.85); h.kneel = 1;
+  at(O[0], kx - d * 2.6, ky - 1.7);
+  for (const p of O) { p.role = p.slot >= 2 ? 'fgblock' : 'route'; p.route = null; p.blockTarget = null; } // 'route' keeps the kicker/holder out of the block fights
+  D.forEach((p, i) => { at(p, L + d * FG_DL[i][0], by + FG_DL[i][1]); p.assign = i === 4 || i === 7 ? { type: 'zone', d: 10, y: 'mid' } : { type: 'rush' }; });
+  const b = G.ball; b.holder = null; b.flight = null; b.loose = null; b.x = L; b.y = by; b.z = 0.2;
+  G.play = { off: { key: 'fg', name: kind === 'xp' ? 'Extra Point' : 'Field Goal', type: 'kick', special: true }, def: KICK_RUSH, t: 0, form: null };
+  const rush = !G.mini && !(typeof Tutorial !== 'undefined' && Tutorial.active);
+  const kk = kickerOf(s, kind);
+  // a human on defense gets an edge rusher (career Player Lock keeps his own guy)
+  if (rush && isHumanSide(1 - s) && !coachOn() && !(G.lock && lockedGuy())) setHD(1 - s, D[6]);
+  updateHuman();
+  return { t: 0, snapT: null, kx, ky, rush, kicked: null,
+    kickAt: clamp(1.36 - (kk.ka - 70) * 0.004, 1.22, 1.42) + rand(-0.04, 0.04), // snap to kick: better kickers are quicker
+    pre: isHumanSide(1 - s) && rush && !coachOn() ? 1.2 : 0.7 };
+}
+// this device's player is rushing a live kick (hint, phone joystick)
+function fgRushing() { const km = G.km, h = G.humanPlayer; return G.phase === 'kickmeter' && !!km && (km.kind === 'fg' || km.kind === 'xp') && !G.mini && !!h && !h.off && h.side !== km.side; }
+function fgSnap() {
+  const L = G.km.live; if (!L || L.snapT != null) return;
+  L.snapT = L.t; Sound.hike(); addDust(G.los, G.ballY, 3);
+  G.play.t = 0; G.bstate = 'snap'; G.lastResult = null; G.credit = null; G.lastTackler = null;
+  if (typeof Replay !== 'undefined') Replay.begin();
+}
+// every frame of a live kick (kick meter phase, and the ball in the air after it)
+function fgLive(dt) {
+  const km = G.km, L = km.live, b = G.ball, d = dirOf(km.side), O = G.O;
+  L.t += dt;
+  const st = L.snapT == null ? -1 : L.t - L.snapT; // time since the snap
+  if (st < 0 && km.locked && L.t >= L.pre) fgSnap(); // CPU / auto kicks snap on their own
+  if (st >= 0) G.play.t = st;
+  for (const p of G.players) {
+    p.shedCd = Math.max(0, p.shedCd - dt); p.stun = Math.max(0, p.stun - dt); p.swimCd = Math.max(0, (p.swimCd || 0) - dt);
+    p.jump = Math.max(0, (p.jump || 0) - dt); p.jumpCd = Math.max(0, (p.jumpCd || 0) - dt);
+  }
+  // the ball: snap, catch, spot
+  const kick = O[0], hold = O[1];
+  if (st < 0) { b.x = G.los; b.y = G.ballY; b.z = 0.2; }
+  else if (st < FG_SNAP) { const u = st / FG_SNAP; b.x = lerp(G.los, L.kx, u); b.y = lerp(G.ballY, L.ky + 0.4, u); b.z = 0.5 + Math.sin(u * Math.PI) * 0.5; b.spin = (b.spin || 0) + dt * 20; }
+  else if (!L.kicked) { const u = clamp((st - FG_SNAP) / (FG_SET - FG_SNAP), 0, 1); b.x = L.kx; b.y = lerp(L.ky + 0.4, L.ky, u); b.z = lerp(0.9, 0.3, u); }
+  // who goes where
+  for (const p of G.players) {
+    if (p.down > 0 || p.stun > 0 || p.dive > 0) { if (p.down > 0 || p.stun > 0) p.dvx = p.dvy = 0; continue; }
+    if (st < 0 || L.kicked != null && L.t - L.kicked > 0.35) { p.dvx = p.dvy = 0; continue; } // in the stance / play's over
+    if (L.kicked != null) { p.dvx *= 0.9; p.dvy *= 0.9; continue; } // pull up after the kick
+    if (p === kick) {
+      const tx = L.kx - d * 0.55, ty = L.ky - 0.45, left = Math.max(0.05, L.kickAt - st);
+      if (st < FG_SET) { p.dvx = p.dvy = 0; continue; }
+      const dx = tx - p.x, dy = ty - p.y, m = Math.hypot(dx, dy);
+      const sp = Math.min(6, m / left); p.dvx = m > 0.05 ? dx / m * sp : 0; p.dvy = m > 0.05 ? dy / m * sp : 0;
+    } else if (p === hold) { p.dvx = p.dvy = 0; }
+    else if (p.off) fgBlockAI(p, L);
+    else if (!L.rush) { p.dvx = p.dvy = 0; }
+    else {
+      if (!(p.isHuman && withSide(p.side, () => fgHumanRush(p, dt, L)))) fgRushAI(p, L, st);
+      if (p.engaged) { p.dvx *= 0.5; p.dvy *= 0.5; } // the kick unit sits down and anchors: no driving the pile into the kicker
+    }
+  }
+  const hp = st < 0 && L.rush && G.D.find(p => p.isHuman);
+  if (hp) withSide(hp.side, () => fgHumanRush(hp, dt, L)); // pick your rusher before the snap
+  if (st >= 0 && L.kicked == null) resolveBlocks(dt * (st < 1.2 ? 0.7 : 0.2)); // FG protection holds longer than a pass set, then anchors (a slow kicker isn't a sure block)
+  for (const p of G.players) applyMove(p, dt);
+  separate();
+  hold.face.dir = -d;
+  if (L.kicked == null && st >= 0 && typeof Replay !== 'undefined' && Replay.rec) Replay.record();
+  // foot meets ball
+  if (G.phase === 'kickmeter' && km.locked && st >= L.kickAt && L.kicked == null) {
+    L.kicked = L.t;
+    const by = L.rush ? fgBlockRoll(L) : null;
+    if (by) return fgBlocked(by);
+    for (const p of G.D) if (!p.isHuman && L.rush && p.jump <= 0 && dist(p, { x: L.kx, y: L.ky }) < 4.5) p.jump = 0.45; // hands up
+    launchKick();
+  }
+}
+// line: hold your ground, take the nearest guy coming through your gap
+function fgBlockAI(p, L) {
+  if (p.engaged) return;
+  const d = dirOf(G.poss);
+  let t = null, td = 4.2;
+  for (const df of G.D) {
+    if (df.down > 0 || df.engaged || df.shedCd > 0 || df.assign.type !== 'rush') continue;
+    const dd = Math.hypot(df.x - p.hx, (df.y - p.hy) * 1.25);
+    if (dd < td && !G.O.some(o => o !== p && o.fgT === df && !o.engaged)) { td = dd; t = df; }
+  }
+  p.fgT = t;
+  if (t) steer(p, t.x - d * 0.9, lerp(t.y, L.ky, 0.2), 0.95, 0.25);
+  else steer(p, p.hx - d * 0.7, p.hy, 0.5, 0.5);
+}
+// rush: inside guys go straight at the kick point, edges bend around the end of the line
+function fgRushAI(p, L, st) {
+  const d = dirOf(G.poss), bx = L.kx + d * 1.2, by = L.ky;
+  if (p.assign.type !== 'rush') return steer(p, p.hx, p.hy, 0.4);
+  const mul = (st < 0.3 ? 0.6 : 0.95) * (G.poss === G.human && !G.versus ? [0.9, 0.95, 1, 1.04][G.diff] : 1);
+  const side = Math.sign(p.hy - by) || 1;
+  if (Math.abs(p.hy - by) > 5 && d * (p.x - (G.los - d * 2)) > 0) return steer(p, G.los - d * 2.5, by + side * 4.6, mul, 0.2);
+  steer(p, bx, by, mul, 0.2);
+}
+// you on the rush: steer, SPACE / tap = jump, E (or tap while blocked on a phone) = swim
+function fgHumanRush(p, dt, L) {
+  const mob = ctlMobile();
+  if (L.snapT == null) { // before the snap: switch rushers
+    if (!(G.lock && lockedGuy())) {
+      const rush = G.D.filter(q => q.assign.type === 'rush');
+      if (Input.hit('KeyQ') || Input.hit('Tab')) { G.humanDef = rush[(rush.indexOf(p) + 1) % rush.length]; updateHuman(); }
+      for (const c of Input.taps) { let best = null, bd = 55; for (const q of rush) { const dd = Math.hypot(sx(q.x) - c.x, sy(q.y) - 30 - c.y); if (dd < bd) { bd = dd; best = q; } } if (best) { G.humanDef = best; updateHuman(); } }
+    }
+    p.dvx = p.dvy = 0; return true;
+  }
+  if (L.kicked != null) return false;
+  const tap = Input.taps.length > 0;
+  if (p.engaged && (Input.hit('KeyE') || (mob && tap))) fgSwim(p);
+  else if (Input.hit('Space') || (mob && tap)) doJump(p);
+  if (mob) {
+    const st = Input.stick, P = Input.pointer;
+    if (st.m > 0.15 && isFinite(st.x) && isFinite(st.y)) { p.dvx = st.x * p.spd; p.dvy = st.y * p.spd; return true; }
+    if (P.down && !P.aiming && P.t > 0.12) { steer(p, wx(P.x), wy(P.y), 1, 0.4); return true; }
+    return false; // not touching: he rushes on his own
+  }
+  const ax = Input.axis();
+  if (ax.m < 0.1) return false;
+  const sprint = Input.held('ShiftLeft') && p.stamina > 0.05;
+  if (sprint) p.stamina = Math.max(0, p.stamina - dt * 0.42);
+  const mul = sprint ? sprintBoost(p) : 1;
+  p.dvx = ax.x * p.spd * mul * ax.m; p.dvy = ax.y * p.spd * mul * ax.m;
+  return true;
+}
+// swim move on a kick block: harder than on a pass rush (everybody's set, nobody's going anywhere)
+function fgSwim(p) {
+  if (p.swimCd > 0 || !p.engaged || p.engaged === true) return;
+  p.swimCd = 1.2;
+  const bl = p.engaged;
+  if (chance(clamp(0.25 + (rat(p, 'PRS') - rat(bl, 'PBK')) / 90, 0.1, 0.4))) {
+    unlink(bl, p); p.shedCd = 0.8; bl.stun = 0.6; bl.head.vx += 250;
+    addText(p.x, p.y, 'SWIM MOVE!', '#ff8a8a', 18, 0.7); Sound.juke();
+  } else addText(p.x, p.y, 'STUFFED', '#ccc', 14, 0.6);
+}
+// does anybody get a hand on it? Reach near the kick point, big guys in the lane at the line on a low kick,
+// a timed jump, pass rush vs the line's pass block. CPU tuning: ~1.5% of XPs, 1-2% of short FGs, ~4% of 45+ yarders.
+function fgBlockChance(L) {
+  const km = G.km, d = dirOf(km.side), bx = L.kx + d * 1.2, by = L.ky;
+  const low = 1 + clamp((km.yds - 30) / 30, 0, 0.8) + clamp(0.8 - km.power, 0, 0.6) * 1.5; // long kicks / a weak leg = a lower ball
+  const ol = (rat(G.O[5], 'PBK') + rat(G.O[6], 'PBK') + rat(G.O[7], 'PBK')) / 3;
+  const each = [];
+  for (const p of G.D) {
+    if (p.down > 0 || p.assign.type !== 'rush') continue;
+    const r = Math.hypot(p.x - bx, p.y - by), q = clamp((3 - r) / 2.2, 0, 1);
+    const s = d * (p.x - L.kx), lane = Math.abs(p.y - by) < 1.4 && s > 1 && s < 9 ? 0.04 * (low - 0.6) * (1 + clamp(6.5 - s, 0, 4) * 0.5) : 0;
+    let pb = 0.3 * q * q + lane;
+    if (pb <= 0) continue;
+    const jf = p.jump > 0 ? 1 + 0.8 * Math.sin((1 - p.jump / 0.55) * Math.PI) : p.isHuman ? 0.7 : 1; // a human has to time his jump
+    pb *= jf * (1 + (low - 1) * 0.5) * clamp(Math.pow(rat(p, 'PRS') / ol, 2), 0.6, 1.6) * (p.engaged ? 0.35 : 1);
+    each.push([p, Math.min(0.4, pb)]);
+  }
+  return each;
+}
+function fgBlockRoll(L) {
+  const each = fgBlockChance(L);
+  if (G.fgDbg) G.fgDbg.push(1 - each.reduce((m, e) => m * (1 - e[1]), 1));
+  for (const [p, pb] of each) if (chance(pb)) return p;
+  return null;
+}
+function fgBlocked(by) {
+  const km = G.km, s = km.side, d = dirOf(s), b = G.ball;
+  G.blk = { kind: km.kind, side: s, clock: G.clock, flip: false };
+  G.special = 'fgblock'; G.phase = 'live'; G.bstate = 'loose'; G.play.t = 0;
+  b.holder = null; b.flight = null; b.z = 1.4; b.x = by.x - d * 0.7; b.y = lerp(b.y, by.y, 0.7); // off his hands
+  const k = G.O[0]; k.throwAnim = 0.3; k.vx = d * 3; // he still swings through
+  b.loose = { vx: -d * rand(3, 8), vy: rand(-3, 3) + Math.sign(b.y - by.y) * 2, t: 0 };
+  for (const p of G.players) { p.engaged = null; p.kneel = 0; }
+  by.jump = Math.max(by.jump || 0, 0.3); by.head.vy -= 300;
+  showBanner('BLOCKED!', `${by.name} gets a hand on it!`, isHumanSide(by.side) && !isHumanSide(s) ? '#9cff9c' : '#ff6040', 1.6);
+  Sound.tackle(); cam.shake = 9; G.crowdHype = 1.3; G.slowmo = 0.5;
+  addText(b.x, b.y, 'BLOCKED!', '#ff9a3d', 26, 1);
+  addPbp(`${lastName(km.kk.name)}'s ${km.kind === 'xp' ? 'extra point' : `${km.yds}-yard field goal`} is BLOCKED by ${lastName(by.name)}!`, 'Special teams!');
+  G.lastResult = { big: true, type: 'block' };
+}
+// a blocked kick bounces loose: the defense can scoop it and take it the other way
+function fgScoop(p) {
+  const b = G.ball;
+  b.loose = null; b.holder = p; G.bstate = 'run'; G.blk.flip = true; Sound.catch();
+  addText(p.x, p.y, 'SCOOP!', '#ffd23f', 22, 0.9);
+  if (isHumanSide(p.side)) setHD(p.side, p);
+}
+function endBlocked(res) {
+  const B = G.blk, s = B.side, car = res.carrier, cs = car ? car.side : s;
+  let x = res.x != null ? res.x : G.ball.x;
+  G.special = null; G.blk = null;
+  if (B.kind === 'xp') { G.clock = B.clock; G.patSide = null; } // a try never runs the clock
+  if (res.type === 'td' && cs !== s) {
+    G.score[cs] += B.kind === 'xp' ? 2 : 6; G.deadT = isHumanSide(cs) ? 3.8 : 2.5;
+    car.down = 0; car.dive = 0;
+    if (isHumanSide(cs) && !coachOn()) G.cellyGuy = car; else Celly.cpu(car);
+    showBanner(B.kind === 'xp' ? 'DEFENSIVE 2 POINTS!' : 'BLOCKED KICK TD!', `${car.name} • ${G.teams[cs].name}`, isHumanSide(cs) ? '#ffd23f' : '#ff6040', 2.6);
+    Sound.td(); G.crowdHype = 1.5; G.slowmo = 0.9; if (B.kind !== 'xp') stat(car).td++;
+    for (const q of G.players) if (q.side === cs) q.celebrate = 2.6;
+    addPbp(`${lastName(car.name)} scoops up the blocked kick and takes it all the way!`, B.kind === 'xp' ? 'Two points for the defense' : 'Touchdown!');
+    G.next = B.kind === 'xp' ? { kickoff: s } : { pat: cs }; return;
+  }
+  if (B.kind === 'xp') { G.next = { kickoff: s }; return; }
+  if (cs !== s) { // defense ball where he went down
+    const cd = dirOf(cs);
+    if (cd * (x - ownGoal(cs)) <= 0) x = ownGoal(cs) + cd * 20;
+    showBanner('TURNOVER!', `${G.teams[cs].name} ball`, '#ff9a3d', 1.4);
+    G.next = { drive: cs, x: clamp(x, 11, 109) }; return;
+  }
+  if (B.flip) { G.next = { drive: s, x: clamp(x, 11, 109) }; return; } // got it back after the defense had it: new set of downs
+  G.ballY = clamp(res.y != null ? res.y : G.ballY, 20, FIELD_W - 20);
+  G.next = advanceDown(x, true); // kicking team falls on it: on 4th down that's a turnover on downs
 }
 
 // ======== fakes ========
