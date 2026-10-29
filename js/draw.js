@@ -818,7 +818,7 @@ function drawMeter(g, G) {
 function drawFlightMeter(g, G) {
   const f = G.ball && G.ball.flight, me = G.humanPlayer; if (!f || f.pitch || f.kick || !me || G.human < 0 || !(f.T > 0)) return;
   const off = G.poss === G.human, on = off ? catchMeterOn() && f.intended === me : defMeterOn() && me.side !== G.poss;
-  if (!on) return;
+  if (!on || Math.hypot(me.x - f.tx, me.y - f.ty) > METER_NEAR) return; // only when the ball is coming down by your guy
   const u = clamp(f.t / f.T, 0, 1), w = 120, h = 12, x = sx(f.tx) - w / 2, y = sy(f.ty) - 78;
   const done = off ? f.cp : f.dp && f.dp.res;
   g.fillStyle = '#0c1016e0'; g.fillRect(x - 4, y - 4, w + 8, h + 8);
@@ -885,7 +885,7 @@ function drawFx(g, G) {
     else if (f.kind === 'confetti') { g.fillStyle = f.color; g.globalAlpha = a; g.fillRect(f.px, f.py, 6, 9); g.globalAlpha = 1; }
     else if (f.kind === 'text') {
       const pop = Math.min(1, (f.max - f.life) * 8);
-      g.save(); g.translate(sx(f.x), sy(f.y) - 60 - f.z); g.scale(0.5 + pop * 0.5, 0.5 + pop * 0.5);
+      g.save(); g.translate(sx(f.x), sy(f.y) - 78 - f.z); // above the name tags g.scale(0.5 + pop * 0.5, 0.5 + pop * 0.5);
       g.font = `900 ${f.size || 20}px "Barlow Condensed", "Arial Black", sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
       g.globalAlpha = a; g.lineWidth = 6; g.strokeStyle = '#000'; g.strokeText(f.text, 0, 0); g.fillStyle = f.color || '#fff'; g.fillText(f.text, 0, 0);
       g.restore(); g.globalAlpha = 1;

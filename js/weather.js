@@ -177,16 +177,18 @@ function drawWeather(g, G) {
   if (G.night) {
     // real night game: everything outside the lights goes dark blue, the field is lit by banks of stadium lights
     g.save();
-    g.globalCompositeOperation = 'multiply'; g.fillStyle = 'rgb(52,64,112)'; g.fillRect(0, 0, CW, CH);
+    // the field stays bright under the lights (you have to see the play); the stands and sky go dark
+    g.globalCompositeOperation = 'multiply'; g.fillStyle = 'rgb(150,164,210)'; g.fillRect(-CW, -CH, CW * 3, CH * 3);
+    g.fillStyle = 'rgb(58,68,110)'; g.beginPath(); g.rect(-CW, -CH, CW * 3, CH * 3); g.rect(sx(-1), sy(-1.5), sx(121) - sx(-1), sy(FIELD_W + 1.5) - sy(-1.5)); g.fill('evenodd');
     g.globalCompositeOperation = 'source-over';
-    const vg = g.createRadialGradient(CW / 2, CH / 2, CH * 0.3, CW / 2, CH / 2, CW * 0.66);
-    vg.addColorStop(0, 'rgba(0,0,12,0)'); vg.addColorStop(1, 'rgba(0,0,14,0.85)');
+    const vg = g.createRadialGradient(CW / 2, CH / 2, CH * 0.45, CW / 2, CH / 2, CW * 0.75);
+    vg.addColorStop(0, 'rgba(0,0,12,0)'); vg.addColorStop(1, 'rgba(0,0,14,0.55)');
     g.fillStyle = vg; g.fillRect(0, 0, CW, CH);
     g.globalCompositeOperation = 'soft-light';
     const xs = [0.1, 0.37, 0.63, 0.9].map(f => CW * f);
     for (const [ly, dy] of [[-30, 1], [CH + 30, -1]]) for (const lx of xs) {
       const lg = g.createRadialGradient(lx, ly, 10, lx, ly + dy * 200, 480);
-      lg.addColorStop(0, 'rgba(255,246,215,0.7)'); lg.addColorStop(0.5, 'rgba(255,246,215,0.18)'); lg.addColorStop(1, 'rgba(255,246,215,0)');
+      lg.addColorStop(0, 'rgba(255,246,215,0.55)'); lg.addColorStop(0.5, 'rgba(255,246,215,0.12)'); lg.addColorStop(1, 'rgba(255,246,215,0)');
       g.fillStyle = lg; g.fillRect(0, 0, CW, CH);
     }
     g.globalCompositeOperation = 'lighter';

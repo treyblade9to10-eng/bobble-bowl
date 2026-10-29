@@ -606,6 +606,7 @@ function snap() {
   }
   burnHuddleClock();
   if (G.down === 3 && !G.twoPt && !G.special && G.tstats) { const t = G.tstats[G.poss]; t.a3 = (t.a3 || 0) + 1; }
+  if (G.banner) G.banner.dur = Math.min(G.banner.dur, G.banner.t + 0.25); // ball is snapped: get the banner off the field
   G.phase = 'live'; G.play.t = 0; Sound.hike(); G.throwT = null; G.playClock = 0;
   G.play.fakeSpike = !!G.fakeSpike; G.fakeSpike = false;
   if (G.play.fakeSpike) { G.O[0].throwAnim = 0.35; addText(G.O[0].x, G.O[0].y - 3, 'FAKE SPIKE!', '#7fd3ff', 18, 1.0); }
@@ -1785,8 +1786,9 @@ function receiverFor(qb, tx, ty) {
 }
 // ---- throw meter: hold to aim, the bar fills up and back down. Let go in the green = PERFECT (on target, easier catch)
 // tap a receiver = touch LOB, hold = the POWER bar fills: green = PERFECT bullet, past it = TOO HARD. Catch + defense meters time the ball's arrival
-const optOn = k => { try { return (JSON.parse(localStorage.getItem('bobbleOpts') || '{}')[k] || '1') === '1'; } catch (e) { return true; } };
-const meterOn = () => optOn('optMeter'), catchMeterOn = () => optOn('optCatchM'), defMeterOn = () => optOn('optDefM');
+const optOn = (k, d = '1') => { try { return (JSON.parse(localStorage.getItem('bobbleOpts') || '{}')[k] || d) === '1'; } catch (e) { return d === '1'; } };
+const meterOn = () => optOn('optMeter'), catchMeterOn = () => optOn('optCatchM', '0'), defMeterOn = () => optOn('optDefM', '0'); // catch + defense meters start OFF
+const METER_NEAR = 7; // the catch / defense bar only shows when your guy is this close to where the ball comes down
 const TAP_LOB = 0.18; // let go faster than this = it was a tap
 const METER_CYCLE = 1.0; // seconds from empty to full
 function meterStart(qb, key, r) { G.meter = { t0: G.time, key, r: r || null, green: meterGreen(qb) }; }
@@ -1806,6 +1808,7 @@ const CATCH_WIN = [0.78, 0.96];
 function flightPress(p, kind) {
   const f = G.ball && G.ball.flight; if (!f || f.pitch || f.kick) return;
   if (kind === 'catch' ? (!catchMeterOn() || f.intended !== p || f.cp) : (!defMeterOn() || f.dp)) return;
+  if (Math.hypot(p.x - f.tx, p.y - f.ty) > METER_NEAR) return; // too far from the ball to matter
   const u = f.t / f.T, res = u >= CATCH_WIN[0] && u <= CATCH_WIN[1] ? 'perfect' : u >= 0.62 && u <= 1 ? 'good' : 'early';
   if (kind === 'catch') f.cp = res; else f.dp = { p, res };
   if (res !== 'early') addText(p.x, p.y - 1.5, res === 'perfect' ? (kind === 'catch' ? 'PERFECT CATCH' : 'PERFECT READ') : 'GOOD TIMING', res === 'perfect' ? '#5dff7a' : '#fff', 15, 0.8);
@@ -1906,7 +1909,7 @@ function updateFlight(dt) {
       const jumping = p.jump > 0, reach = jumping ? 1.4 : 0.5, high = jumping ? 3.6 : 2.0;
       if (b.z > high || Math.hypot(p.x - b.x, p.y - b.y) > reach) continue;
       p.laneChecked = true;
-      const pInt = clamp((jumping ? (p.isHuman ? 0.7 : 0.4) : 0.45) + (rat(p, 'CTH') - 80) / 200 + (p.isHuman ? 0.05 : 0) + (xfOn(p, 'lurker') ? 0.1 : 0), 0.25, 0.9);
+      const pInt = clamp((jumping ? (p.isHuman ? 0.7 : 0.3) : p.isHuman ? 0.45 : 0.28) + (rat(p, 'CTH') - 80) / 200 + (p.isHuman ? 0.05 : 0) + (xfOn(p, 'lurker') ? 0.1 : 0), 0.15, 0.9); // CPU: fewer picks, more tips (players said too many INTs)
       b.flight = null; G.showTarget = false;
       if (chance(pInt)) { addText(p.x, p.y, jumping ? 'SKY HIGH!' : 'PICKED!', '#7fd3ff', 22, 0.9); return intercept(p); }
       return incomplete(p, 'TIPPED!');
@@ -1945,7 +1948,7 @@ function resolveCatch() {
   if (jumper) {
     const jd = dist(jumper, land);
     const dpj = f.dp && f.dp.p === jumper ? f.dp.res : null; // a well-timed jump wins more often
-    const pInt = clamp((jumper.isHuman ? 0.62 : 0.4) + (rat(jumper, 'CTH') - 75) / 90 - (rd < jd ? 0.25 : 0) - jd * 0.12 + (dpj === 'perfect' ? 0.2 : dpj === 'good' ? 0.08 : 0), 0.1, 0.9);
+    const pInt = clamp((jumper.isHuman ? 0.62 : 0.3) + (rat(jumper, 'CTH') - 75) / 90 - (rd < jd ? 0.25 : 0) - jd * 0.12 + (dpj === 'perfect' ? 0.2 : dpj === 'good' ? 0.08 : 0), 0.1, 0.9);
     if (chance(pInt)) return intercept(jumper);
     if (chance(0.6)) return incomplete(jumper, 'SWATTED!');
   }
@@ -1954,11 +1957,11 @@ function resolveCatch() {
   const R = 1.45;
   const hands = (xfOn(rcv, 'hands') || f.cp === 'perfect') && rd < 1.6; // a "Double Me" guy (or a PERFECT catch) usually wins the 50-50 ball
   if (def && dd < 0.5 && dd < rd - 0.3 && !(hands && chance(0.7))) { // ball hits the defender right in the body: 7 out of 10 get picked
-    if (chance(def.isHuman ? 0.55 : 0.2)) return intercept(def);
+    if (chance(def.isHuman ? 0.55 : 0.13)) return intercept(def);
     return incomplete(def, 'BROKEN UP!');
   }
   if (def && dd < 1.25 && dd < rd - 0.25 && !(hands && chance(0.7))) { // defender has inside position
-    const pInt = clamp(0.08 + (rat(def, 'COV') - 75) / 140 + humanDefBonus + (G.diff === 3 && !def.isHuman ? 0.08 : 0) - (rd < 1 ? 0.08 : 0), 0.05, 0.6);
+    const pInt = clamp((def.isHuman ? 0.08 : 0.04) + (rat(def, 'COV') - 75) / 160 + humanDefBonus + (G.diff === 3 && !def.isHuman ? 0.06 : 0) - (rd < 1 ? 0.08 : 0), 0.03, 0.6);
     if (chance(pInt)) return intercept(def);
     return incomplete(def, 'BROKEN UP!');
   }
@@ -1968,7 +1971,7 @@ function resolveCatch() {
     if (hands) pc += 0.15;
     if (f.perfect) pc += 0.12; // a PERFECT meter throw is right in his hands
     if (f.cp === 'perfect') pc += 0.1; else if (f.cp === 'good') pc += 0.08; // timed catch
-    if (def && dd < 1.8) { pc -= (hands ? 0.08 : 0.24) - (rat(rcv, 'CTH') - rat(def, 'COV')) / 150; if (chance(0.03 + humanDefBonus * 0.5)) return intercept(def); }
+    if (def && dd < 1.8) { pc -= (hands ? 0.08 : 0.24) - (rat(rcv, 'CTH') - rat(def, 'COV')) / 150; if (chance((def.isHuman ? 0.03 : 0.015) + humanDefBonus * 0.5)) return intercept(def); }
     if (chance(clamp(pc, 0.25, 0.97))) {
       const backLine = rcv.x < -0.25 || rcv.x > 120.25, sideLine = rcv.y < -0.25 || rcv.y > FIELD_W + 0.25;
       if (backLine || sideLine) { addText(clamp(rcv.x, 1, 119), clamp(rcv.y, 1, FIELD_W - 1), backLine ? 'OUT THE BACK' : 'NO FEET IN', '#fff', 15, 1); return incomplete(rcv, 'OUT OF BOUNDS'); }
@@ -2377,7 +2380,13 @@ function updateBallPhysicsDead(dt) {
 }
 
 // ---------------- fx / camera / hints ----------------
-function addText(x, y, text, color, size = 18, life = 1) { G.fx.push({ kind: 'text', x, y, text, color, size, z: 40, vz: 30, life, max: life }); }
+// floating words stack instead of piling on top of each other (max 2 at one spot, newest on top)
+function addText(x, y, text, color, size = 18, life = 1) {
+  const near = G.fx.filter(f => f.kind === 'text' && Math.abs(f.x - x) < 4 && Math.abs(f.y - y) < 2.5 && f.life > 0.15);
+  if (near.length >= 2) { const old = near.sort((a, b) => a.life - b.life)[0]; old.life = 0; }
+  const z = 40 + near.filter(f => f.life > 0).reduce((m, f) => Math.max(m, f.z - 40 + 24), 0);
+  G.fx.push({ kind: 'text', x, y, text, color, size, z, vz: 30, life, max: life });
+}
 function addDust(x, y, n) { for (let i = 0; i < n; i++) G.fx.push({ kind: 'dust', x: x + rand(-0.6, 0.6), y: y + rand(-0.6, 0.6), z: 0, vz: rand(5, 20), r: rand(3, 6), life: 0.5, max: 0.5 }); }
 function addStars(x, y) { for (let i = 0; i < 5; i++) G.fx.push({ kind: 'star', x: x + rand(-1, 1), y: y + rand(-1, 1), z: 20 + rand(0, 20), vz: rand(20, 50), life: 0.8, max: 0.8 }); addDust(x, y, 6); }
 function showBanner(text, sub, color, dur) { G.banner = { text, sub, color, t: 0, dur }; }
