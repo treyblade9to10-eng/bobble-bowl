@@ -25,6 +25,7 @@
 <link rel="stylesheet" href="css/style.css">
 <link rel="stylesheet" href="css/stadium.css">
 <link rel="stylesheet" href="css/matchup.css">
+<link rel="stylesheet" href="css/highlights.css">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#0c1016">
 <link rel="icon" type="image/png" sizes="48x48" href="icons/favicon-48.png">
@@ -300,6 +301,7 @@
       <div id="overWeek"></div>
       <div id="overMain">
         <div id="mvpBox"><div class="mvpTag">PLAYER OF THE GAME</div><canvas id="mvpCv" width="260" height="300"></canvas><div id="mvpText"></div></div>
+        <div id="potgBox" style="display:none"><div class="mvpTag">PLAY OF THE GAME</div><div id="potgTitle"></div><div id="potgWho"></div><button class="gold" id="potgWatch">WATCH</button><button id="potgAll">ALL HIGHLIGHTS</button></div>
         <div id="overStats"></div>
       </div>
     </div>
@@ -315,7 +317,15 @@
     <h2>Halftime</h2>
     <div id="halfScore"></div>
     <div id="halfStats"></div>
-    <button class="big" id="btnHalf">START 2ND HALF</button>
+    <div class="row"><button class="big" id="btnHalf">START 2ND HALF</button><button id="btnHalfHl" style="display:none">HIGHLIGHTS</button></div>
+  </div>
+
+  <!-- Highlights: pick one or play them all -->
+  <div id="hlMenu" class="screen">
+    <h2>HIGHLIGHTS</h2>
+    <div id="hlSub"></div>
+    <div id="hlList"></div>
+    <div class="row"><button class="big gold" id="hlAll">PLAY ALL</button><button id="hlBack">BACK</button></div>
   </div>
 
   <!-- Pause -->
@@ -387,6 +397,7 @@
 <script src="js/injury.js"></script>
 <script src="js/celly.js"></script>
 <script src="js/special.js"></script>
+<script src="js/highlights.js"></script>
 <script src="js/season.js"></script>
 <script src="js/modes.js"></script>
 <script src="js/savegame.js"></script>

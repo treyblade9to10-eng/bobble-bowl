@@ -543,12 +543,14 @@ G.hooks.onHalftime = () => {
   $('halfScore').innerHTML = `${t[1].id} ${G.score[1]} - ${G.score[0]} ${t[0].id}`;
   $('halfStats').innerHTML = statTable(G.tstats, t, me);
   G.halfFrom = $('playcall').classList.contains('show') ? 'playcall' : null;
+  Highlights.finalize(); $('btnHalfHl').style.display = Highlights.clips.length ? '' : 'none';
   G.paused = true; show('half');
 };
 $('btnHalf').onclick = () => { G.paused = false; show(G.halfFrom); };
+$('btnHalfHl').onclick = () => { Sound.click(); hlMenu('half'); };
 
 // ---------- game over / YOU WIN ----------
-let mvpAnim = null;
+let mvpAnim = null, mvpLoop = null;
 G.hooks.onGameOver = s => {
   if (G.demo) return;
   const me = s.human, them = 1 - me;
@@ -577,6 +579,7 @@ G.hooks.onGameOver = s => {
   const score = p => p.pass / 20 + p.rush / 8 + p.rec / 8 + p.td * 6 + p.tkl * 1.5 + p.sack * 4 + p.int * 6;
   const cand = Object.values(G.pstats || {}).filter(p => p.side === mvpSide).sort((a, b) => score(b) - score(a))[0];
   drawMvp(cand, mvpSide);
+  hlOver(s);
   // confetti
   const box = $('confetti'); box.innerHTML = '';
   if (won) for (let i = 0; i < 70; i++) {
@@ -641,14 +644,39 @@ function drawMvp(st, side) {
     g.drawImage(Logo.canvas(t, 96), 206, 10, 44, 44);
     if ($('over').classList.contains('show')) mvpAnim = requestAnimationFrame(loop);
   };
+  mvpLoop = loop; // restarted after watching highlights
   setTimeout(loop, 1450);
 }
+// ---------- highlights: PLAY OF THE GAME card + the list (only the computer running the game films it) ----------
+const hlBack = to => () => { show(to); if (to === 'over' && mvpLoop) { cancelAnimationFrame(mvpAnim); mvpLoop(); } };
+function hlOver(s) {
+  const list = Highlights.done(s), top = Highlights.best(); // an online guest's list comes back empty (nothing filmed in this game)
+  $('potgBox').style.display = top ? '' : 'none'; if (!top) return;
+  const t = G.teams[top.team];
+  $('potgBox').style.setProperty('--tc', t.c1);
+  $('potgTitle').innerHTML = (top.gw ? '<em>GAME-WINNING</em>' : '') + top.title.split(' ').map(w => `<span>${w}</span>`).join(' '); // spans: only wrap between words
+  $('potgWho').textContent = [top.who, `${top.q}\u00a0${top.clock}`].filter(Boolean).join(' · ');
+  $('potgAll').textContent = `ALL HIGHLIGHTS (${list.length})`; $('potgAll').style.display = list.length > 1 ? '' : 'none';
+}
+$('potgWatch').onclick = () => { Sound.click(); Highlights.play([Highlights.best()], hlBack('over')); };
+$('potgAll').onclick = () => { Sound.click(); hlMenu('over'); };
+function hlMenu(from) {
+  const list = Highlights.clips, top = Highlights.best(), T = G.teams;
+  $('hlSub').textContent = `${from === 'half' ? 'HALFTIME' : 'FINAL'}  ·  ${T[1].id} ${G.score[1]} - ${G.score[0]} ${T[0].id}  ·  ${list.length} PLAY${list.length === 1 ? '' : 'S'}`;
+  $('hlList').innerHTML = list.map((c, i) => `<button class="hlRow${c === top ? ' top' : ''}" data-i="${i}" style="--tc:${T[c.team].c1 === '#000000' ? '#555' : T[c.team].c1}">
+    <span class="hlQ">${c.q}<i>${c.clock}</i></span><span class="hlT">${c === top ? '<em>PLAY OF THE GAME</em>' : ''}<b>${Highlights.label(c)}</b><i>${c.who}</i></span><span class="hlS">${T[1].id} ${c.score[1]} - ${c.score[0]} ${T[0].id}</span></button>`).join('');
+  $('hlList').querySelectorAll('.hlRow').forEach(b => b.onclick = () => { Sound.click(); Highlights.play([list[+b.dataset.i]], () => hlMenu(from)); });
+  $('hlAll').onclick = () => { Sound.click(); Highlights.play(list, () => hlMenu(from)); };
+  $('hlBack').onclick = () => { Sound.click(); hlBack(from)(); };
+  show('hlMenu');
+}
+screens.push('hlMenu');
 $('btnAgain').onclick = () => { const c = G.challenge; show(null); if (c) runChallenge(c.type); else startGame(); };
 $('btnNewTeams').onclick = () => { if (G.online) { Net.leave(); G.teams = null; G.online = false; show('title'); return; } const c = G.challenge; G.teams = null; G.challenge = null; if (c) openModes(); else { renderSelect(); show('select'); } };
 
 // ---------- pause ----------
 function togglePause() {
-  if (!G.teams || G.phase === 'over' || G.demo) return;
+  if (!G.teams || G.phase === 'over' || G.demo || Highlights.on || $('hlMenu').classList.contains('show')) return;
   if (G.online) { const on = !$('pause').classList.contains('show'); if (on) { $('pausePbp').innerHTML = '<div class="pbpHead">ONLINE GAME KEEPS GOING WHILE THIS IS OPEN</div>' + pbpHtml(6); show('pause'); } else show(null); return; }
   G.paused = !G.paused;
   if (G.paused) { G.pauseFrom = $('playcall').classList.contains('show') ? 'playcall' : null; coachLabel(); $('btnCoachOpt').style.display = G.versus || G.lock || G.mini || G.challenge ? 'none' : ''; $('pausePbp').innerHTML = pbpHtml(8); show('pause'); }
@@ -856,7 +884,8 @@ function step(now) {
   Pad.poll(dt);
   Input.versus = !!G.versus && !G.demo; if (!Input.versus) Input.ctl = 0;
   const inMenu = menuScreens.some(id => $(id).classList.contains('show')) && !(G.mini && $('miniOver').classList.contains('show'));
-  if (inMenu) {
+  if (Highlights.on) Highlights.update(raw); // the highlight reel drives the picture by itself
+  else if (inMenu) {
     if (!G.demo || G.phase === 'over') demoSetup();
     if (G.phase === 'live' && G.play.t > 7) G.phase = 'dead';
     if ((G.phase === 'dead' && G.deadT < 0.4) || G.phase === 'playcall' || G.phase === 'kick') demoSetup();
@@ -898,6 +927,7 @@ function render() {
   ctx.restore();
   if (G.teams && !G.demo) {
     if (G.phase === 'replay') safeDraw('replay', () => Replay.drawOverlay(ctx));
+    else if (Highlights.on) safeDraw('hl', () => Highlights.drawOverlay(ctx));
     else safeDraw('hud', () => { drawBanner(ctx, G); if (G.mini) drawMiniHUD(ctx, G); else { drawHUD(ctx, G); drawTicker(ctx, G); } drawKickMeter(ctx, G); });
   }
 }

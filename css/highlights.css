@@ -1,0 +1,34 @@
+/* ---- Highlights: PLAY OF THE GAME card on the final screen + the highlight list ---- */
+#potgBox { background: linear-gradient(170deg, color-mix(in srgb, var(--tc, #222) 40%, var(--panel)) 0%, var(--panel) 65%); border-top: 4px solid var(--gold);
+  padding: 10px 16px 12px; text-align: center; width: 230px; display: flex; flex-direction: column; align-items: center; }
+#potgBox .mvpTag { font-family: var(--hd); color: var(--gold); font-weight: 800; letter-spacing: .25em; }
+#potgTitle { font-family: var(--hd); font-style: italic; font-weight: 900; font-size: 34px; line-height: 1; margin: 10px 0 4px; text-transform: uppercase; }
+#potgTitle span { white-space: nowrap; }
+#potgTitle em { display: block; font-size: .5em; color: var(--gold); letter-spacing: .12em; margin-bottom: 2px; }
+#potgWho { font-family: var(--hd); font-weight: 600; font-size: 16px; color: #c9d3df; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 8px; }
+#potgBox button { width: 100%; margin: 3px 0; }
+#potgWatch { font-style: italic; font-weight: 900; font-size: 22px; }
+#hlMenu { justify-content: flex-start; padding-top: 24px; }
+#hlSub { font-family: var(--hd); font-weight: 800; letter-spacing: .14em; color: var(--dim); margin-bottom: 12px; }
+#hlList { width: min(760px, 94vw); overflow-y: auto; flex: 0 1 auto; min-height: 0; margin-bottom: 10px; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
+.hlRow { display: flex; align-items: center; gap: 14px; width: 100%; margin: 0 0 6px; padding: 8px 16px 8px 0; text-align: left; clip-path: none;
+  background: var(--panel); border-left: 8px solid var(--tc, #555); text-transform: none; letter-spacing: 0; }
+.hlRow:hover { background: var(--panel2); transform: translateX(3px); }
+.hlRow.top { box-shadow: inset 0 0 0 2px var(--gold); }
+.hlQ { width: 64px; text-align: center; font-family: var(--hd); font-weight: 800; font-size: 20px; color: var(--gold); flex-shrink: 0; }
+.hlQ i { display: block; font-style: normal; font-size: 13px; color: var(--dim); }
+.hlT { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.hlT em { font-style: normal; font-family: var(--hd); font-weight: 800; font-size: 12px; letter-spacing: .22em; color: var(--gold); }
+.hlT b { font-family: var(--hd); font-style: italic; font-weight: 900; font-size: 26px; line-height: 1.05; text-transform: uppercase; }
+.hlT i { font-style: normal; font-family: var(--hd); font-weight: 600; font-size: 15px; color: #c9d3df; text-transform: uppercase; letter-spacing: .04em; }
+.hlS { font-family: var(--hd); font-weight: 800; font-size: 16px; color: var(--dim); white-space: nowrap; }
+#btnHalfHl { align-self: center; }
+@media (max-height: 500px) {
+  #potgBox { width: 168px; padding: 5px 10px 6px; } #potgBox .mvpTag { font-size: 11px; letter-spacing: .18em; }
+  #potgTitle { font-size: 22px; margin: 4px 0 2px; } #potgWho { font-size: 12px; margin-bottom: 4px; }
+  #potgBox button { padding: 5px 10px; font-size: 13px; margin: 2px 0; } #potgWatch { font-size: 17px; }
+  #hlMenu { padding-top: 8px; } #hlMenu h2 { margin-bottom: 4px; } #hlSub { font-size: 12px; margin-bottom: 6px; }
+  #hlList { max-height: 58vh; margin-bottom: 4px; } .hlRow { padding: 4px 12px 4px 0; margin-bottom: 4px; }
+  .hlQ { width: 50px; font-size: 16px; } .hlT b { font-size: 19px; } .hlT i { font-size: 12px; } .hlT em { font-size: 10px; } .hlS { font-size: 13px; }
+  #hlMenu .big { font-size: 19px; padding: 7px 26px; }
+}
