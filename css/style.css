@@ -12,7 +12,10 @@
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; background: var(--ink); overflow: hidden;
-  font-family: var(--bd); font-weight: 500; color: var(--text); user-select: none; -webkit-user-select: none; touch-action: none; }
+  font-family: var(--bd); font-weight: 500; color: var(--text); user-select: none; -webkit-user-select: none; touch-action: none; overscroll-behavior: none; }
+/* pin the page so a double tap or a swipe can't scroll/zoom it off to the black background */
+body { position: fixed; inset: 0; width: 100%; }
+canvas { touch-action: none; }
 #stage { position: relative; width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; }
 canvas { width: min(100vw, calc(100vh * var(--ar, 1.7778))); height: min(calc(100vw / var(--ar, 1.7778)), 100vh); display: block; background: #0e1420; }
 b { font-weight: 700; }

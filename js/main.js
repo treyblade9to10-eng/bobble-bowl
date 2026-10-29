@@ -20,6 +20,26 @@ function show(id) {
 
 
 
+// ---------- Phones: double tap / pinch must not zoom or scroll the page (it slid down to a black screen) ----------
+(() => {
+  const typing = el => el && el.closest && el.closest('input, textarea, select, [contenteditable="true"]');
+  let lastEnd = 0, moved = false, sx = 0, sy = 0;
+  document.addEventListener('touchstart', e => { const p = e.touches[0]; moved = false; sx = p.clientX; sy = p.clientY; }, { passive: true });
+  document.addEventListener('touchmove', e => { const p = e.touches[0]; if (Math.abs(p.clientX - sx) + Math.abs(p.clientY - sy) > 10) moved = true; }, { passive: true });
+  document.addEventListener('touchend', e => {
+    const now = e.timeStamp; if (now - lastEnd < 350 && !moved && !typing(e.target)) {
+      e.preventDefault(); // stops the zoom; game buttons already fired on pointerdown, menu buttons still get their click
+      const t = e.target, b = t.closest && t.closest('button');
+      if (!(b && b.disabled)) t.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+    }
+    lastEnd = now;
+  }, { passive: false });
+  for (const ev of ['gesturestart', 'gesturechange', 'dblclick']) document.addEventListener(ev, e => { if (!typing(e.target)) e.preventDefault(); }, { passive: false });
+  const snap = () => { if (window.scrollX || window.scrollY) window.scrollTo(0, 0); };
+  window.addEventListener('scroll', snap, { passive: true });
+  if (window.visualViewport) visualViewport.addEventListener('resize', snap);
+})();
+
 // ---------- Mobile / Computer mode ----------
 const looksTouch = ('ontouchstart' in window || navigator.maxTouchPoints > 0) && Math.min(screen.width, screen.height) < 900;
 let modeAfter = 'select'; // where to go after picking a mode
