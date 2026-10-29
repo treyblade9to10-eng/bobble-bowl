@@ -146,24 +146,35 @@
   <div id="rosterPeek"></div>
 
   <!-- Season: new -->
+  <!-- same look as the Quick Game matchup: one big team card (muCard from main.js) + the season setup panel -->
   <div id="seasonNew" class="screen">
-    <h2>New Season</h2>
+    <div id="snTop"><span>SEASON</span><b>NEW FRANCHISE</b></div>
     <div id="snRow">
-      <div class="tpanel" id="pSeason">
-        <div class="pside">YOUR TEAM</div>
-        <button class="arr" id="snUp"><svg viewBox="0 0 24 24" class="chev"><path d="M5 15l7-7 7 7"/></svg></button>
-        <div class="tbig"></div>
-        <button class="arr" id="snDn"><svg viewBox="0 0 24 24" class="chev"><path d="M5 9l7 7 7-7"/></svg></button>
+      <div class="muCard" id="pSeason">
+        <div class="muHead"><span class="pside">YOUR TEAM</span><span class="who you">YOU</span><span class="muCnt"></span></div>
+        <div class="muBody"></div>
+        <button class="muArr l" id="snUp" aria-label="previous team"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+        <button class="muArr r" id="snDn" aria-label="next team"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></button>
+        <div class="muFoot"><button class="allTeams" id="snAll">ALL TEAMS</button><button class="allTeams" id="snMine">MY TEAMS</button></div>
       </div>
+      <!-- right panel: the setup rows are built from the hidden selects (Season.start reads them) -->
       <div id="snOpts">
-        <label>Season <select id="snGames"><option value="6">6 games</option><option value="8" selected>8 games</option><option value="12">12 games</option><option value="17">17 games (full)</option></select></label>
-        <label>Quarter <select id="snQtr"><option value="120" selected>2 min</option><option value="180">3 min</option><option value="300">5 min</option></select></label>
-        <label>CPU <select id="snDiff"><option value="0">Rookie</option><option value="1" selected>Pro</option><option value="2">All-Pro</option><option value="3">All-Madden</option></select></label>
-        <label>Coach Mode <select id="snCoachMode"><option value="0" selected>Off</option><option value="1">On</option></select></label>
-        <div class="snInfo">Top 4 in your conference make the playoffs.<br>Win 3 playoff games to take the Bobble Bowl.</div>
-        <button class="big" id="snStart">START SEASON</button>
-        <button id="snBack">Back</button>
+        <div id="snHead"><b>SEASON SETUP</b></div>
+        <div id="snSetBody"></div>
+        <div id="snHidden">
+          <label>Season <select id="snGames"><option value="6">6 games</option><option value="8" selected>8 games</option><option value="12">12 games</option><option value="17">17 games (full)</option></select></label>
+          <label>Quarter <select id="snQtr"><option value="120" selected>2 min</option><option value="180">3 min</option><option value="300">5 min</option></select></label>
+          <label>CPU <select id="snDiff"><option value="0">Rookie</option><option value="1" selected>Pro</option><option value="2">All-Pro</option><option value="3">All-Madden</option></select></label>
+          <label>Coach Mode <select id="snCoachMode"><option value="0" selected>Off</option><option value="1">On</option></select></label>
+        </div>
+        <div id="snDiv"></div>
+        <div class="snInfo" id="snInfo"></div>
+        <div id="snGo"><button id="snBack" class="muBack">BACK</button><button class="big" id="snStart">START SEASON</button></div>
       </div>
+    </div>
+    <div id="snGrid">
+      <div id="snGHead"><span id="snGTitle">PICK <b>YOUR</b> TEAM</span><div id="snGTabs"><button data-f="all">ALL</button><button data-f="AFC">AFC</button><button data-f="NFC">NFC</button><button data-f="MINE">MY TEAMS</button></div><button id="snGClose">CLOSE</button></div>
+      <div id="snGList"></div>
     </div>
   </div>
 
