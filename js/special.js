@@ -322,7 +322,7 @@ function fgSwim(p) {
   if (p.swimCd > 0 || !p.engaged || p.engaged === true) return;
   p.swimCd = 1.2;
   const bl = p.engaged;
-  if (chance(clamp(0.25 + (rat(p, 'PRS') - rat(bl, 'PBK')) / 90, 0.1, 0.4))) {
+  if (chance(clamp(0.18 + (rat(p, 'PRS') - rat(bl, 'PBK')) / 90, 0.08, 0.28))) { // hard to beat a kick-protection lineman
     unlink(bl, p); p.shedCd = 0.8; bl.stun = 0.6; bl.head.vx += 250;
     addText(p.x, p.y, 'SWIM MOVE!', '#ff8a8a', 18, 0.7); Sound.juke();
   } else addText(p.x, p.y, 'STUFFED', '#ccc', 14, 0.6);
@@ -340,9 +340,9 @@ function fgBlockChance(L) {
     const s = d * (p.x - L.kx), lane = Math.abs(p.y - by) < 1.4 && s > 1 && s < 9 ? 0.04 * (low - 0.6) * (1 + clamp(6.5 - s, 0, 4) * 0.5) : 0;
     let pb = 0.3 * q * q + lane;
     if (pb <= 0) continue;
-    const jf = p.jump > 0 ? 1 + 0.8 * Math.sin((1 - p.jump / 0.55) * Math.PI) : p.isHuman ? 0.7 : 1; // a human has to time his jump
+    const jf = p.jump > 0 ? 1 + 0.45 * Math.sin((1 - p.jump / 0.55) * Math.PI) : p.isHuman ? 0.7 : 1; // a human has to time his jump
     pb *= jf * (1 + (low - 1) * 0.5) * clamp(Math.pow(rat(p, 'PRS') / ol, 2), 0.6, 1.6) * (p.engaged ? 0.35 : 1);
-    each.push([p, Math.min(0.4, pb)]);
+    each.push([p, Math.min(0.25, pb)]); // even a perfect rush only gets a hand on it sometimes
   }
   return each;
 }
