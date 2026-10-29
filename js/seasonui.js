@@ -11,17 +11,100 @@ function openSeason() {
   if (d) { if (!d.history) d.history = []; if (!d.year) d.year = 1; if (!d.stats) d.stats = {}; renderHub(); }
   else renderSeasonNew();
 }
+// New season: looks + works like the Quick Game matchup screen. One big team card (muCard from main.js, same CSS),
+// arrows / swipe / mouse wheel to scroll teams, tap the card (or ALL TEAMS) for the team grid, setup rows on the right.
+// The hidden selects (snGames, snQtr, snDiff, snCoachMode) still hold the values; START reads them (teamlab.js wraps START for custom teams).
 function renderSeasonNew() {
-  const el = $('pSeason').querySelector('.tbig'), t = TEAMS[snIdx];
-  el.innerHTML = teamCard(t); el.style.background = `linear-gradient(160deg, ${t.c1} 55%, ${t.c2})`; el.style.color = textOn(t.c1);
+  if (!Season.data && typeof CT !== 'undefined' && CT.mode !== 'all') { // NEW TEAM from the hub: bring My Teams back into the list
+    const id = TEAMS[snIdx] && TEAMS[snIdx].id; CT.useAll(); const i = TEAMS.findIndex(t => t.id === id); if (i >= 0) snIdx = i;
+  }
+  if (!(snIdx >= 0 && snIdx < TEAMS.length)) snIdx = 0;
+  const t = TEAMS[snIdx], card = $('pSeason');
+  card.querySelector('.muBody').innerHTML = muCard(t);
+  card.style.setProperty('--c1', t.c1); card.style.setProperty('--c2', t.c2); card.style.setProperty('--fg', textOn(t.c1));
+  card.querySelector('.muCnt').textContent = `${snIdx + 1} / ${TEAMS.length}`;
+  $('snMine').style.display = TEAMS.some(x => x.custom) ? '' : 'none';
+  const dv = t.custom ? [] : TEAMS.filter(x => x !== t && x.conf === t.conf && x.div === t.div); // who you play twice a year in a full season
+  $('snDiv').innerHTML = dv.length ? `<span>${t.conf} ${t.div.toUpperCase()}</span>${dv.map(x => `<i>${teamBadge(x)}${x.name}</i>`).join('')}` : '';
+  $('snDiv').style.display = dv.length ? '' : 'none';
+  snPaint();
   show('seasonNew');
 }
-$('snUp').onclick = () => { snIdx = (snIdx + TEAMS.length - 1) % TEAMS.length; Sound.click(); renderSeasonNew(); };
-$('snDn').onclick = () => { snIdx = (snIdx + 1) % TEAMS.length; Sound.click(); renderSeasonNew(); };
-$('snBack').onclick = () => show('title');
+function snMove(d) {
+  snIdx = (snIdx + d + TEAMS.length) % TEAMS.length; Sound.click(); renderSeasonNew();
+  const c = $('pSeason'); c.classList.remove('bump'); void c.offsetWidth; c.classList.add('bump');
+}
+$('snUp').onclick = e => { if (e) e.stopPropagation(); snMove(-1); };
+$('snDn').onclick = e => { if (e) e.stopPropagation(); snMove(1); };
+{ // card body: tap = team grid, swipe = next / previous team, mouse wheel scrolls teams
+  const el = $('pSeason').querySelector('.muBody'); let x0 = null, y0 = 0, swiped = false;
+  el.addEventListener('wheel', e => { e.preventDefault(); snMove(e.deltaY > 0 ? 1 : -1); }, { passive: false });
+  el.addEventListener('pointerdown', e => { x0 = e.clientX; y0 = e.clientY; swiped = false; });
+  el.addEventListener('pointerup', e => {
+    if (x0 == null) return; const dx = e.clientX - x0, dy = e.clientY - y0; x0 = null;
+    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) { swiped = true; snMove(dx < 0 ? 1 : -1); }
+  });
+  el.addEventListener('pointercancel', () => { x0 = null; });
+  el.addEventListener('click', () => { if (swiped) { swiped = false; return; } snOpenGrid('all'); });
+}
+// setup rows: same segmented buttons as the matchup settings panel
+const SN_ROWS = [['snGames', 'GAMES', o => o.value === '17' ? '17 FULL' : o.value], ['snQtr', 'QUARTERS'], ['snDiff', 'CPU'], ['snCoachMode', 'COACH MODE']];
+const snPaints = [];
+{
+  const grp = document.createElement('div'); grp.className = 'muGrp';
+  for (const [id, label, fmt] of SN_ROWS) {
+    const sl = $(id), row = document.createElement('div'); row.className = 'muRow'; row.id = 'snR_' + id;
+    row.innerHTML = `<span class="muL">${label}</span><div class="muC seg"></div>`;
+    const c = row.querySelector('.muC');
+    for (const o of sl.options) { const b = document.createElement('button'); b.dataset.v = o.value; b.textContent = fmt ? fmt(o) : o.text; b.onclick = () => snSetVal(id, o.value); c.appendChild(b); }
+    snPaints.push(() => c.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === sl.value)));
+    sl.addEventListener('change', () => snPaint());
+    grp.appendChild(row);
+  }
+  $('snSetBody').appendChild(grp);
+}
+function snSetVal(id, v) { const sl = $(id); if (sl.value === v) return; sl.value = v; sl.dispatchEvent(new Event('change')); Sound.click(); snPaint(); }
+function snPaint() {
+  for (const f of snPaints) f();
+  const g = +$('snGames').value;
+  $('snInfo').innerHTML = `<b>${g} GAMES</b>, then the playoffs. Top 7 in each conference get in (No. 1 seed gets a bye). Win it all to take the Bobble Bowl.`;
+}
+// team grid: every team, grouped by division, plus MY TEAMS
+let snGConf = 'all';
+function snOpenGrid(f) { snGConf = f || 'all'; Sound.click(); snRenderGrid(); $('snGrid').classList.add('show'); $('snGList').scrollTop = 0; }
+function snRenderGrid() {
+  document.querySelectorAll('#snGTabs button').forEach(b => b.classList.toggle('on', b.dataset.f === snGConf));
+  const tile = (t, i) => `<button class="tgT${snIdx === i ? ' cur' : ''}" data-i="${i}" style="--c1:${t.c1};--c2:${t.c2}">${teamBadge(t)}<span class="tgN">${t.city}<br><b>${t.name}</b></span><span class="tgO">${teamOvr(Career.withCAP(t))}</span></button>`;
+  let h = '';
+  for (const conf of ['AFC', 'NFC']) for (const dv of ['East', 'North', 'South', 'West']) {
+    if (snGConf !== 'all' && snGConf !== conf) continue;
+    const list = TEAMS.map((t, i) => [t, i]).filter(([t]) => t.conf === conf && t.div === dv);
+    if (list.length) h += `<div class="tgDiv"><div class="tgDn">${conf} ${dv.toUpperCase()}</div><div class="tgRow">${list.map(([t, i]) => tile(t, i)).join('')}</div></div>`;
+  }
+  const mine = TEAMS.map((t, i) => [t, i]).filter(([t]) => t.custom);
+  if (mine.length && (snGConf === 'all' || snGConf === 'MINE')) h = `<div class="tgDiv tgMine"><div class="tgDn">MY TEAMS</div><div class="tgRow">${mine.map(([t, i]) => tile(t, i)).join('')}</div></div>` + (snGConf === 'MINE' ? '' : h);
+  else if (snGConf === 'MINE') h = `<div class="tgEmpty">No custom teams yet. Make one in CREATE A TEAM on the title screen.</div>`;
+  $('snGList').innerHTML = h;
+  $('snGList').querySelectorAll('.tgT').forEach(b => b.onclick = () => {
+    snIdx = +b.dataset.i; Sound.click(); $('snGrid').classList.remove('show'); renderSeasonNew();
+    const c = $('pSeason'); c.classList.remove('bump'); void c.offsetWidth; c.classList.add('bump');
+  });
+}
+document.querySelectorAll('#snGTabs button').forEach(b => b.onclick = () => { snGConf = b.dataset.f; Sound.click(); snRenderGrid(); });
+$('snGClose').onclick = () => { Sound.click(); $('snGrid').classList.remove('show'); };
+$('snAll').onclick = e => { e.stopPropagation(); snOpenGrid('all'); };
+$('snMine').onclick = e => { e.stopPropagation(); snOpenGrid('MINE'); };
+if (typeof Logo !== 'undefined' && Logo.onReady) Logo.onReady(() => { if ($('seasonNew').classList.contains('show')) renderSeasonNew(); });
+
+$('snBack').onclick = () => { Sound.click(); $('snGrid').classList.remove('show'); show('title'); };
 $('snStart').onclick = () => { Season.start(TEAMS[snIdx].id, +$('snGames').value, +$('snQtr').value, +$('snDiff').value); Sound.whistle(); renderHub(); };
 window.addEventListener('keydown', e => {
-  if ($('seasonNew').classList.contains('show')) { if (e.code === 'ArrowUp' || e.code === 'KeyW') $('snUp').onclick(); if (e.code === 'ArrowDown' || e.code === 'KeyS') $('snDn').onclick(); if (e.code === 'Enter') $('snStart').onclick(); }
+  if ($('seasonNew').classList.contains('show')) {
+    if ($('snGrid').classList.contains('show')) { if (e.code === 'Escape' || e.code === 'Enter') { e.preventDefault(); $('snGrid').classList.remove('show'); } return; }
+    if (['ArrowUp', 'ArrowLeft', 'KeyW', 'KeyA'].includes(e.code)) $('snUp').onclick();
+    if (['ArrowDown', 'ArrowRight', 'KeyS', 'KeyD'].includes(e.code)) $('snDn').onclick();
+    if (e.code === 'Enter') { e.preventDefault(); $('snStart').onclick(); }
+  }
   else if ($('seasonHub').classList.contains('show') && e.code === 'Enter' && $('shPlay').style.display !== 'none') $('shPlay').onclick();
 });
 
