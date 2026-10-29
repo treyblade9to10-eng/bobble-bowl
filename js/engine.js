@@ -102,7 +102,7 @@ function setFirstDown() {
 function stat(p) {
   if (!G.pstats) G.pstats = {};
   const k = p.side + ':' + p.name;
-  return G.pstats[k] || (G.pstats[k] = { name: p.name, side: p.side, pos: p.pos, pass: 0, rush: 0, rec: 0, td: 0, tkl: 0, int: 0, sack: 0, comp: 0, att: 0 });
+  return G.pstats[k] || (G.pstats[k] = { name: p.name, side: p.side, pos: p.pos, pass: 0, rush: 0, rec: 0, td: 0, tkl: 0, int: 0, sack: 0, comp: 0, att: 0, blk: 0 });
 }
 
 // ---------------- play calling ----------------
@@ -656,7 +656,7 @@ function update(dt) {
   if (G.phase === 'replay') { Replay.update(dt); return; }
   if (G.slowmo > 0) { G.slowmo -= dt; dt *= 0.35; }
   G.time += dt;
-  for (const p of G.players) { p.throwAnim = Math.max(0, p.throwAnim - dt); p.celebrate = Math.max(0, p.celebrate - dt); if (p.down <= 0) p.dizzy = 0; }
+  for (const p of G.players) { p.throwAnim = Math.max(0, p.throwAnim - dt); p.celebrate = Math.max(0, p.celebrate - dt); if (p.down <= 0) p.dizzy = 0; if (p.kickT != null && (p.kickT += dt) > 0.9) p.kickT = null; }
   G.crowdHype = Math.max(0, G.crowdHype - dt * 0.4);
   // game clock keeps running between plays after a tackle in bounds (dead ball, play call, pre-snap) until the snap or a timeout
   if (G.pendingRunoff > 0 && G.clock > 0 && !G.demo && !G.mini && (G.phase === 'dead' || G.phase === 'playcall' || G.phase === 'presnap')) {
@@ -898,7 +898,9 @@ const FOULS = {
   RTP: { name: 'ROUGHING THE PASSER', def: true, text: '15 yards • Automatic 1st down' },
   OFFSIDE: { name: 'OFFSIDE', def: true, text: '5 yards' },
   HOLD: { name: 'HOLDING', def: false, text: '10 yards • Replay the down' },
-  DELAY: { name: 'DELAY OF GAME', def: false, text: '5 yards • Replay the down' }
+  DELAY: { name: 'DELAY OF GAME', def: false, text: '5 yards • Replay the down' },
+  ROUGHK: { name: 'ROUGHING THE KICKER', def: true, text: '15 yards • Automatic 1st down' }, // kick fouls are enforced in special.js
+  RIK: { name: 'RUNNING INTO THE KICKER', def: true, text: '5 yards' }
 };
 function throwFlag(type, foulSide, x, y, who) {
   if (!G.flags) G.flags = [];
@@ -912,6 +914,7 @@ function throwFlag(type, foulSide, x, y, who) {
 }
 function checkFouls() {
   const b = G.ball, pl = G.play, qb = G.lastPasser || G.O[0], off = G.poss;
+  if (G.special === 'punt' && G.km && G.km.live) kickerHit(G.km.live, G.km.live.P); // roughing the punter (special.js)
   // roughing the passer: hitting the QB after he already threw it
   if (G.throwT != null && pl.t - G.throwT < 1.0 && b.holder !== qb && qb.down <= 0) {
     for (const df of G.D) {
@@ -1124,6 +1127,8 @@ function callForBall(p) {
 function humanFor() {
   let h = null;
   const b = G.ball;
+  if ((G.phase === 'kickmeter' || G.phase === 'playcall') && G.km && G.km.live && G.km.live.punt && G.km.live.kicked == null) return G.humanDef && G.humanDef.side === G.human ? G.humanDef : null; // live punt: the guy you picked (special.js)
+  if (G.special === 'fgblock' && !b.holder && G.humanDef && G.humanDef.side === G.human) return G.humanDef; // blocked kick on the ground: the guy closest to it
   if (G.poss === G.human) {
     if (b.holder && b.holder.side === G.human) h = b.holder;
     else if (b.flight && b.flight.intended && b.flight.intended.side === G.human && !b.flight.pitch) h = b.flight.intended;
@@ -1160,6 +1165,7 @@ function cycleHumanDef() {
 function humanControl(p, dt) {
   const b = G.ball;
   const isCarrier = b.holder === p;
+  if (!isCarrier && b.flight && b.flight.kick === 'punt') puntRetInput(p); // fair catch (special.js)
   if (trickBusy() && (isCarrier || trickWaits(p))) return false; // trick play: the handoffs / pitches run themselves, you get him when he can throw or run
   if (Input.hit('KeyQ') && !isCarrier) { cycleHumanDef(); }
   if (isCarrier && Input.hit('KeyG') && G.bstate !== 'snap') toggleTuck(p);
@@ -1929,12 +1935,14 @@ function throwTo(qb, r, pitch = false, aimed = null, style = 'normal', lead = nu
   if (!pitch && isHumanSide(r.side)) setHD(r.side, r);
 }
 
+// ball height along a throw / kick: leaves at hand height (a punt: foot height, f.z0), comes down at chest height
+const flightZ = (f, u) => { const z0 = f.z0 != null ? f.z0 : 1.7; return z0 + f.peak * 4 * u * (1 - u) + u * (1.1 - z0); };
 function updateFlight(dt) {
   const b = G.ball, f = b.flight;
   f.t += dt;
   const u = Math.min(1, f.t / f.T);
   b.x = lerp(f.sx, f.tx, u); b.y = lerp(f.sy, f.ty, u);
-  b.z = 1.7 + f.peak * 4 * u * (1 - u) - u * 0.6;
+  b.z = flightZ(f, u);
   b.spin = (b.spin || 0) + dt * 30;
   // the ball can be picked off on the way: a defender in the passing lane (jumping = higher reach)
   if (!f.pitch && !f.kick && !G.thrownAway && u > 0.12 && u < 0.88) {
@@ -2111,9 +2119,11 @@ function updateLoose(dt) {
   if (b.y < 0 || b.y > FIELD_W) { // rolled out: last team to have it keeps it
     b.loose = null; endPlay({ type: 'oob', carrier: G.O[1].side === G.poss ? G.O[1] : null, x: b.x, y: b.y, keep: true }); return;
   }
+  if (l.punt && puntRoll(l)) return; // a punt nobody caught (special.js)
   if (l.t < 0.3) return;
   for (const p of G.players) if (p.down <= 0 && dist(p, b) < 0.9) {
-    if (G.special === 'fgblock' && p.side !== G.poss) return fgScoop(p); // blocked kick: the defense can run with it
+    if (l.punt) return puntTouch(p);
+    if (G.special === 'fgblock') return blkTouch(p); // blocked kick: the defense can run with it
     b.loose = null; b.holder = p; Sound.catch();
     if (p.side !== G.poss) { G.tstats[G.poss].to++; showBanner('RECOVERED!', p.name, '#ff5050', 1.3); if (b.fumbler && b.fumbler.side === G.poss) { const t = stat(b.fumbler); t.tov = (t.tov || 0) + 1; } }
     else showBanner('RECOVERED!', p.name, '#9cff9c', 1.1);
@@ -2142,7 +2152,7 @@ function endPlay(res) {
   Sound.whistle();
   for (const p of G.players) { p.throwKey = 0; p.engaged = null; }
   G.flagNote = null; G.pendingRunoff = 0;
-  if (G.special) { G.flags = []; return endReturn(res); }
+  if (G.special) { const fl = G.flags; G.flags = []; return endReturn(res, fl); } // (a punt can carry a roughing-the-kicker flag)
   G.lastResult = pbpPlay(res);
   xfAfterPlay(res, G.lastResult);
   if (G.flags && G.flags.length) { if (G.twoPt) G.flags = []; else if (enforcePenalty(res)) return; }
@@ -2271,7 +2281,7 @@ function gameOver() {
   const top = (k, side) => all.filter(s => s.side === side && s[k] > 0).sort((a, b) => b[k] - a[k])[0];
   G.hooks.onGameOver({
     score: G.score.slice(), teams: G.teams, human: G.human, tstats: G.tstats,
-    leaders: [0, 1].map(s => ({ pass: top('pass', s), rush: top('rush', s), rec: top('rec', s), tkl: top('tkl', s), int: top('int', s), sack: top('sack', s) }))
+    leaders: [0, 1].map(s => ({ pass: top('pass', s), rush: top('rush', s), rec: top('rec', s), tkl: top('tkl', s), int: top('int', s), sack: top('sack', s), blk: top('blk', s) }))
   });
 }
 
@@ -2364,7 +2374,7 @@ function launchKick() {
   }
   k.sx = G.ball.x; k.sy = G.ball.y;
   G.kick = k; G.phase = 'kick';
-  kicker.throwAnim = 0.3; kicker.vx = d * 4;
+  if (kicker.kickT == null) kicker.kickT = KICK_HIT; kicker.vx = d * 4; // follow-through (a live kick already started his swing)
   Sound.tone(140, 0.15, 'square', 0.15, -40); Sound.tone(90, 0.12, 'sine', 0.2);
   if (km.kind === 'fg') addText(G.los, G.ballY - 6, `${km.yds} YARD TRY`, '#fff', 18, 1.5);
 }
@@ -2400,6 +2410,7 @@ function updateKick(dt) {
     else { showBanner('XP MISSED!', '', '#ff6040', 1.3); Sound.bad(); }
     G.patSide = null; G.next = { kickoff: s };
   }
+  if (G.km && G.km.live && G.km.live.flag) kickFoul(k); // roughing / running into the kicker (special.js)
 }
 
 function updateBallPhysicsDead(dt) {
@@ -2459,6 +2470,7 @@ function updateHint() {
   if (!G.teams) return;
   const km = G.km, def = km ? 1 - km.side : -1;
   if (G.versus && !G.online && G.phase === 'kickmeter' && km && (km.kind === 'fg' || km.kind === 'xp') && G.hp && G.hp[def] && !G.hp[def].off) { G.hint = `${pName(def)}: BLOCK THE KICK!  •  ${def === G.p1 ? 'WASD rush  •  SPACE jump  •  E swim' : 'ARROWS rush  •  ENTER jump  •  / swim'}`; return; }
+  const ph = puntHint(); if (ph != null) { G.hint = ph; return; } // live punt: rush it / fair catch (special.js)
   if (fgRushing() && !coachOn()) { // you're rushing the kick
     G.hint = G.mode === 'mobile' ? 'BLOCK THE KICK!  •  Stick to rush  •  TAP = jump (swim when blocked)' : 'BLOCK THE KICK!  •  WASD rush  •  SPACE jump  •  E swim' + (G.lock ? '' : '  •  Q switch');
     return;

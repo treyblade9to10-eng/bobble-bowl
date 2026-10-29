@@ -341,8 +341,9 @@ const Net = {
       ok: G.play && G.play.off && G.play.off.key, dk: G.play && G.play.def && G.play.def.key, fm: G.play && G.play.form && G.play.form.name, pt: G.play && G.play.t,
       ps: P.map(p => PSTAT.map(k => typeof p[k] === 'number' ? Math.round(p[k] * 100) / 100 : 0).concat([p.face.dir, p.engaged ? 1 : 0, p.isHuman ? 1 : 0, p.mouth || '',
         Math.round(p.head.ox), Math.round(p.head.oy), p.sprinting ? 1 : 0, p.xf && p.xf.on ? 1 : 0, p.celly ? p.celly.type : 0, p.celly ? Math.round(p.celly.t * 100) / 100 : 0,
-        p.throwKey || 0, p.openness == null ? -1 : Math.round(p.openness * 10) / 10])),
-      b: b ? [r2(b.x), r2(b.y), r2(b.z), r2(b.spin || 0), idx(b.holder), b.flight ? [r2(b.flight.sx), r2(b.flight.sy), r2(b.flight.tx), r2(b.flight.ty), r2(b.flight.t), r2(b.flight.T), r2(b.flight.peak), b.flight.pitch ? 1 : 0, b.flight.kick || 0, b.flight.duck ? 1 : 0, idx(b.flight.intended), b.flight.style || ''] : null, b.loose ? 1 : 0] : null,
+        p.throwKey || 0, p.openness == null ? -1 : Math.round(p.openness * 10) / 10,
+        p.kneel > 0 ? 1 : 0, p.kickT != null ? r2(p.kickT) : -1, p.kpose === 'hold' ? 1 : p.kpose === 'pc' ? 2 : 0, p.fair ? 1 : 0])), // kick poses (at the end: older guests just ignore them)
+      b: b ? [r2(b.x), r2(b.y), r2(b.z), r2(b.spin || 0), idx(b.holder), b.flight ? [r2(b.flight.sx), r2(b.flight.sy), r2(b.flight.tx), r2(b.flight.ty), r2(b.flight.t), r2(b.flight.T), r2(b.flight.peak), b.flight.pitch ? 1 : 0, b.flight.kick || 0, b.flight.duck ? 1 : 0, idx(b.flight.intended), b.flight.style || ''] : null, b.loose ? 1 : 0, r2(b.hold || 0), b.snap || 0] : null,
       rf: (G.refs || []).map(r => [r2(r.x), r2(r.y), r.face, r2(r.anim || 0), r.moving, r2(r.throwT || 0)]),
       hp: [idx(G.hp && G.hp[0]), idx(G.hp && G.hp[1])], hd: [idx(G.hd && G.hd[0]), idx(G.hd && G.hd[1])],
       km: G.km && (G.phase === 'kickmeter' || G.phase === 'kick') ? { kind: G.km.kind, stage: G.km.stage, power: G.km.power, aim: G.km.aim, side: G.km.side, need: G.km.need, tol: G.km.tol, yds: G.km.yds, kk: G.km.kk, cpuT: G.km.cpuT != null ? 1 : null, wait: G.km.wait, needle: G.km.needle, wind: G.wind } : null,
@@ -439,12 +440,13 @@ const Net = {
       p.face.dir = a[n]; p.engaged = a[n + 1] ? true : null; p.isHuman = !!a[n + 2]; p.mouth = a[n + 3]; p.head.ox = a[n + 4]; p.head.oy = a[n + 5];
       p.sprinting = !!a[n + 6]; if (p.xf) p.xf.on = !!a[n + 7]; p.celly = a[n + 8] ? { type: a[n + 8], t: a[n + 9] } : null;
       p.throwKey = a[n + 10]; p.openness = a[n + 11] < 0 ? null : a[n + 11];
+      p.kneel = a[n + 12] || 0; p.kickT = a[n + 13] >= 0 ? a[n + 13] : null; p.kpose = [null, 'hold', 'pc'][a[n + 14]] || null; p.fair = a[n + 15] || 0;
       p.ctl = p.side === G.human ? 0 : 1; // you're always the yellow ring on your own screen
     });
     if (s.b) {
       const b = G.ball || (G.ball = {});
       if (b.x == null) { b.x = s.b[0]; b.y = s.b[1]; b.z = s.b[2]; }
-      b.spin = s.b[3]; b.holder = s.b[4] >= 0 ? P[s.b[4]] : null; b.loose = s.b[6] ? {} : null;
+      b.spin = s.b[3]; b.holder = s.b[4] >= 0 ? P[s.b[4]] : null; b.loose = s.b[6] ? {} : null; b.hold = s.b[7] || 0; b.snap = s.b[8] || 0;
       const f = s.b[5];
       b.flight = f ? { sx: f[0], sy: f[1], tx: f[2], ty: f[3], t: f[4], T: f[5], peak: f[6], pitch: !!f[7], kick: f[8] || null, duck: !!f[9], intended: P[f[10]] || null, style: f[11] } : null;
     } else G.ball = null;
