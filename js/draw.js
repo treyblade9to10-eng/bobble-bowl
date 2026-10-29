@@ -431,7 +431,7 @@ function drawPlayer(g, p, G, at) {
   if (pose) hop = pose.hop;
 
   // ground marks
-  if (p.isHuman && !at && G.phase !== 'kick' && G.phase !== 'kickmeter') {
+  if (p.isHuman && !at && (G.phase !== 'kick' && G.phase !== 'kickmeter' || (G.phase === 'kickmeter' && !p.off))) { // + your rusher on a field goal
     const pulse = 1 + Math.sin(G.time * 8) * 0.08;
     g.strokeStyle = G.versus && p.ctl === 1 ? '#5ad1ff' : '#ffe14d'; g.lineWidth = 3.5;
     g.beginPath(); g.ellipse(x, y, 22 * pulse, 9 * pulse, 0, 0, 7); g.stroke();

@@ -36,7 +36,7 @@ const POS_SPD = { QB: 80, RB: 89, WR: 91, TE: 82, OL: 66, DL: 76, LB: 84, CB: 91
 
 G.downText = function () {
   if (G.special === 'punt' || (G.km && G.km.kind === 'punt' && G.phase === 'kickmeter')) return 'PUNT';
-  if (G.special || (G.phase === 'playcall' && G.kickoffSide != null && G.koPending) || (G.km && (G.km.kind === 'ko' || G.km.kind === 'onside') && G.phase === 'kickmeter')) return 'KICKOFF';
+  if ((G.special && G.special !== 'fgblock') || (G.phase === 'playcall' && G.kickoffSide != null && G.koPending) || (G.km && (G.km.kind === 'ko' || G.km.kind === 'onside') && G.phase === 'kickmeter')) return 'KICKOFF';
   if (G.patSide != null && !G.twoPt) return 'EXTRA POINT';
   if (G.twoPt) return '2-PT TRY';
   if (G.los == null) return '';
@@ -659,10 +659,10 @@ function update(dt) {
     if (G.deadT <= 0) { if (Replay.want()) Replay.start(); else afterPlay(); }
   } else if (G.phase === 'kick') {
     updateKick(dt);
-    idlePlayers(dt);
+    if (G.km && G.km.live) fgLive(dt); else idlePlayers(dt);
   } else if (G.phase === 'kickmeter') {
     withSide(G.km ? G.km.side : G.human, () => updateKickMeter(dt));
-    idlePlayers(dt);
+    if (G.phase === 'kickmeter' && G.km && G.km.live) fgLive(dt); else idlePlayers(dt);
   } else if (G.phase === 'mini') {
     miniUpdate(dt);
   } else if (G.phase === 'playcall') {
@@ -2079,6 +2079,7 @@ function updateLoose(dt) {
   }
   if (l.t < 0.3) return;
   for (const p of G.players) if (p.down <= 0 && dist(p, b) < 0.9) {
+    if (G.special === 'fgblock' && p.side !== G.poss) return fgScoop(p); // blocked kick: the defense can run with it
     b.loose = null; b.holder = p; Sound.catch();
     if (p.side !== G.poss) { G.tstats[G.poss].to++; showBanner('RECOVERED!', p.name, '#ff5050', 1.3); if (b.fumbler && b.fumbler.side === G.poss) { const t = stat(b.fumbler); t.tov = (t.tov || 0) + 1; } }
     else showBanner('RECOVERED!', p.name, '#9cff9c', 1.1);
@@ -2257,29 +2258,21 @@ function doKick(kind) {
   const kicker = G.O[0];
   Object.assign(kicker, { name: kk.name, num: kk.num, ovr: kk.ovr, pos: kind === 'punt' ? 'P' : 'K', cap: false, xf: null, rt: null });
   if (kk.skin != null) kicker.face.skin = kk.skin;
-  kicker.x = G.los - d * (kind === 'punt' ? 12 : 8.5); kicker.y = G.ballY - (kind === 'punt' ? 0 : 1.2);
-  if (kind !== 'punt') { const h = G.O[1]; h.x = G.los - d * 7; h.y = G.ballY; h.face.dir = -d; }
-  // everybody lines up tight for the kick
-  [2, 3, 4].forEach((i, j) => { G.O[i].x = G.los - d * 0.8; G.O[i].y = G.ballY + [-4.2, 4.2, 6.2][j]; });
-  G.D.forEach((p, i) => { if (kind === 'punt' && i >= 5) { p.x = G.los + d * 38; p.y = G.ballY + (i - 6) * 6; } else { p.x = G.los + d * 1.3; p.y = G.ballY + (i - 3.5) * 1.6; } });
-  G.ball.holder = null; G.ball.x = kind === 'punt' ? kicker.x : G.los - d * 7; G.ball.y = G.ballY; G.ball.z = 0.3;
+  const live = fgSetup(kind); // live play: snap, hold, the line blocks, the defense rushes (special.js)
   const yds = kind === 'xp' ? 33 : kind === 'fg' ? Math.round(Math.abs(goalX(s) - G.los) + 17) : 0;
   const ovr = kk.ka, pw = kk.kp; // accuracy runs the meter + the green zone, power the range
   G.km = { kind, yds, kk, stage: 0, t: 0, power: 0, aim: 0, side: s,
            rateP: 0.7 + (90 - ovr) * 0.015, rateA: 0.6 + (90 - ovr) * 0.015,
-           need: kind === 'punt' ? 0 : yds / fgRange(pw), tol: kind === 'punt' ? 0.35 : Math.min(0.45, fgTol(yds, ovr) * (kind === 'xp' ? 1.6 : 1.35)) };
+           need: kind === 'punt' ? 0 : yds / fgRange(pw), tol: kind === 'punt' ? 0.35 : Math.min(0.45, fgTol(yds, ovr) * (kind === 'xp' ? 1.6 : 1.35)), live };
   G.playClock = 0;
-  if (isHumanSide(s) && !G.demo && !G.sitOut && !autoKick()) { G.phase = 'kickmeter'; G.km.wait = 0.35; return; }
+  if (isHumanSide(s) && !G.demo && !G.sitOut && !autoKick()) { G.phase = 'kickmeter'; G.km.wait = 0.35; return; } // setting the power snaps it
   // computer kicks: roll the dice using the kicker's rating
   const km = G.km;
-  if (kind === 'punt') { km.power = rand(0.55, 0.95); km.aim = rand(-0.45, 0.45); }
-  else {
-    const pGood = kind === 'xp' ? clamp(0.86 + (ovr - 70) * 0.005, 0.8, 0.98) : clamp(1.0 - Math.max(0, yds - 25) * 0.021 * (1 + (78 - ovr) / 40), 0.03, 0.97);
-    const good = chance(pGood);
-    km.power = good ? Math.max(km.need + 0.05, rand(0.8, 1)) : (km.need > 0.85 && chance(0.5) ? km.need - rand(0.05, 0.2) : rand(Math.min(1, km.need + 0.05), 1));
-    km.aim = good ? rand(-km.tol * 0.8, km.tol * 0.8) : (km.power < km.need ? rand(-0.2, 0.2) : pick([-1, 1]) * rand(km.tol * 1.15, km.tol * 2.2));
-  }
-  launchKick();
+  const pGood = kind === 'xp' ? clamp(0.86 + (ovr - 70) * 0.005, 0.8, 0.98) : clamp(1.0 - Math.max(0, yds - 25) * 0.021 * (1 + (78 - ovr) / 40), 0.03, 0.97);
+  const good = chance(pGood);
+  km.power = good ? Math.max(km.need + 0.05, rand(0.8, 1)) : (km.need > 0.85 && chance(0.5) ? km.need - rand(0.05, 0.2) : rand(Math.min(1, km.need + 0.05), 1));
+  km.aim = good ? rand(-km.tol * 0.8, km.tol * 0.8) : (km.power < km.need ? rand(-0.2, 0.2) : pick([-1, 1]) * rand(km.tol * 1.15, km.tol * 2.2));
+  G.phase = 'kickmeter'; km.stage = 3; km.cpuT = Infinity; km.locked = true; // fgLive snaps it and kicks it
 }
 
 const tri = t => 1 - Math.abs(((t % 2) + 2) % 2 - 1); // 0..1..0
@@ -2293,12 +2286,14 @@ function gameWind() {
 function updateKickMeter(dt) {
   const km = G.km;
   km.t += dt;
+  if (km.live && km.cpuT != null) return; // CPU field goal: fgLive runs it
   if (km.cpuT != null) { km.cpuT -= dt; if (km.cpuT <= 0) { km.cpuT = null; launchReturnKick(); } return; }
   if (km.wait > 0) { km.wait -= dt; Input.taps.length = 0; km.t = 0; return; }
-  const press = Input.hit('Space') || Input.taps.length > 0;
+  const L = km.live, rushed = L && L.snapT != null && L.t - L.snapT > 2.6; // took too long: he has to kick it now
+  const press = Input.hit('Space') || Input.taps.length > 0 || (km.stage === 1 && rushed);
   if (km.stage === 0) { // power bar fills up and back down
     km.power = tri(km.t * km.rateP);
-    if (press) { km.stage = 1; km.t2 = 0; Sound.click(); }
+    if (press) { km.stage = 1; km.t2 = 0; Sound.click(); if (L) fgSnap(); } // field goals: setting the power snaps the ball
   } else if (km.stage === 1) { // aim slider sweeps left and right
     km.t2 += dt;
     km.aim = tri(km.t2 * km.rateA) * 2 - 1;
@@ -2307,7 +2302,8 @@ function updateKickMeter(dt) {
       if (km.kind === 'punt' || km.kind === 'ko' || km.kind === 'onside') { const w = gameWind(); km.aim = clamp(km.aim + w.dir * w.mph / 15 * 0.12, -1, 1); }
       const good = Math.abs(km.aim) <= km.tol;
       if (km.kind === 'fg' || km.kind === 'xp') addText(G.los, G.ballY - 8, km.power < km.need ? 'NOT ENOUGH LEG' : good ? (Math.abs(km.aim) < km.tol * 0.35 ? 'PERFECT!' : 'GOOD CONTACT') : km.aim > 0 ? 'PUSHED IT' : 'PULLED IT', good && km.power >= km.need ? '#9cff9c' : '#ff8a8a', 18, 1.2);
-      (km.kind === 'punt' || km.kind === 'ko' || km.kind === 'onside') ? launchReturnKick() : launchKick();
+      if (L) km.locked = true; // the kick goes when the kicker gets to the ball (fgLive)
+      else (km.kind === 'punt' || km.kind === 'ko' || km.kind === 'onside') ? launchReturnKick() : launchKick();
     }
   }
 }
@@ -2408,7 +2404,10 @@ function updateCamera(dt) {
   }
   const half = CW / 2 / PX;
   const kicking = G.phase === 'kick' || G.phase === 'kickmeter';
-  if (G.phase === 'kickmeter' && G.km && G.km.kind !== 'punt') tx = lerp(G.los, goalX(G.poss) + dirOf(G.poss) * 10, 0.6); // show the posts while you aim
+  if (G.phase === 'kickmeter' && G.km && G.km.kind !== 'punt') { // show the posts while you aim, but keep the kick spot + the rush in view
+    const d = dirOf(G.poss), keep = G.los + d * (half - 14); // the kicker (~10 yards back) stays on screen
+    tx = lerp(G.los, goalX(G.poss) + d * 10, 0.6); tx = d > 0 ? Math.min(tx, keep) : Math.max(tx, keep);
+  }
   const cel = G.phase === 'dead' ? G.players.find(p => p.celly) : null;
   if (cel) tx = cel.x; // follow the celebration (the Lambeau Leap goes right into the stands)
   tx = clamp(tx, half - (kicking || cel ? 9 : 5), (kicking || cel ? 129 : 125) - half);
@@ -2424,6 +2423,12 @@ function updateCamera(dt) {
 }
 function updateHint() {
   if (!G.teams) return;
+  const km = G.km, def = km ? 1 - km.side : -1;
+  if (G.versus && !G.online && G.phase === 'kickmeter' && km && (km.kind === 'fg' || km.kind === 'xp') && G.hp && G.hp[def] && !G.hp[def].off) { G.hint = `${pName(def)}: BLOCK THE KICK!  •  ${def === G.p1 ? 'WASD rush  •  SPACE jump  •  E swim' : 'ARROWS rush  •  ENTER jump  •  / swim'}`; return; }
+  if (fgRushing() && !coachOn()) { // you're rushing the kick
+    G.hint = G.mode === 'mobile' ? 'BLOCK THE KICK!  •  Stick to rush  •  TAP = jump (swim when blocked)' : 'BLOCK THE KICK!  •  WASD rush  •  SPACE jump  •  E swim' + (G.lock ? '' : '  •  Q switch');
+    return;
+  }
   if (G.phase === 'kickmeter' || G.mini) { G.hint = ''; return; }
   if (G.cellyGuy && G.phase === 'dead') { G.hint = G.versus && !G.online ? `${pName(G.cellyGuy.side)}: CELEBRATE!` : G.mode === 'mobile' ? '' : 'CELLY:  ↑ Leap  ↓ Griddy  ← Spike  → Dab   1 Flex  2 Bow  3 Shush  4 Moonwalk   E Nap   F Bowling' + (G.weather === 'snow' ? '   R Snow Angel' : G.weather === 'rain' ? '   C Mud Slide' : '') + (clubCelly(G.cellyGuy) ? `   G ${clubCelly(G.cellyGuy).name}` : '') + CELLYS.filter(c => c.lock && Unlocks.has(c.id)).map(c => `   ${CELLY_KEY_NAME[c.keys[0]]} ${c.name}`).join(''); return; }
   if (coachOn()) { G.hint = G.phase === 'presnap' && G.poss === G.human ? (G.mode === 'mobile' ? 'You call the plays, your team plays them  •  TAP to snap' : 'You call the plays, your team plays them  •  SPACE snap  •  Z audible  •  T timeout') : G.phase === 'presnap' || G.phase === 'live' ? 'You call the plays, your team plays them' + (G.phase === 'presnap' && G.mode !== 'mobile' ? '  •  Z audible  •  T timeout' : '') : ''; return; }
