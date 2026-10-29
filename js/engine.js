@@ -180,6 +180,33 @@ const COACH_STYLES = {
 };
 function savedCoach() { try { const o = JSON.parse(localStorage.getItem('bobbleOpts') || 'null'); if (o && COACH_STYLES[o.optCoach]) return o.optCoach; } catch (e) {} return 'balanced'; }
 const coachStyle = () => COACH_STYLES[G.coach] || COACH_STYLES.balanced;
+// how smart the CPU offense is (play calls, QB reads): scales with difficulty; your own team's CPU coach/QB in career is a steady PRO
+const cpuIQ = () => G.versus || isHumanSide(G.poss) ? 1 : [0.6, 1, 1.2, 1.4][G.diff] || 1;
+// play value by situation = success rates from CPU v CPU play-lab sims (render/co_lab.js): E = 1st/2nd down, S = 1-2 to go, M = 3rd/4th & 3-6, L = 3rd/4th & 7+, G = goal line
+const CPU_BOOK = {
+  E: { mesh: 62, mdrag: 55, drive: 52, mwheel: 51, smash: 48, slants: 46, wrscreen: 40, flood: 40, mflat: 38, curls: 37, verts: 37, pa: 34, stopgo: 34, mseam: 32, ycross: 31, bubble: 28, boot: 28, screen: 26, outs: 17,
+    stretch: 52, rpo: 48, power: 41, zone: 30, dive: 30, counter: 29, shovel: 26, toss: 24, sneak: 20, jet: 20, qbdraw: 15 },
+  S: { mesh: 66, wrscreen: 50, drive: 50, curls: 48, flood: 46, smash: 44, slants: 42, mwheel: 42, mflat: 40, ycross: 38, verts: 36, stopgo: 34, mdrag: 32, bubble: 25, screen: 25, pa: 24, mseam: 23, boot: 20, outs: 18,
+    counter: 85, stretch: 82, shovel: 75, power: 68, toss: 55, rpo: 45, zone: 32, sneak: 32, jet: 30, dive: 28, qbdraw: 14 },
+  M: { mesh: 60, mwheel: 50, slants: 48, drive: 44, mdrag: 44, smash: 44, wrscreen: 38, mflat: 34, mseam: 34, ycross: 32, verts: 32, stopgo: 30, flood: 30, pa: 28, curls: 28, boot: 28, screen: 25, outs: 21, bubble: 18,
+    rpo: 48, power: 39, stretch: 38, counter: 28, jet: 20, shovel: 20, zone: 20, dive: 18, toss: 14, sneak: 13, qbdraw: 13 },
+  L: { flood: 37, verts: 36, boot: 35, drive: 34, mflat: 34, pa: 33, mesh: 32, stopgo: 32, mseam: 29, mdrag: 28, slants: 28, wrscreen: 28, mwheel: 26, ycross: 26, curls: 24, smash: 22, screen: 13, outs: 11, bubble: 11,
+    rpo: 40, power: 12, dive: 10, stretch: 10, jet: 8, toss: 7, zone: 7, counter: 6, shovel: 5, sneak: 3, qbdraw: 3 },
+  G: { mesh: 46, mflat: 44, slants: 38, drive: 38, smash: 24, curls: 22, outs: 20, flood: 18,
+    stretch: 64, shovel: 50, rpo: 46, power: 32, toss: 30, sneak: 24, jet: 15, zone: 8, dive: 6, counter: 4, qbdraw: 2 }
+};
+// weighted pick from a list: plays that work in this spot come up more (sharper on higher difficulty), but it still mixes it up
+function cpuPick(keys, bucket) {
+  const tbl = CPU_BOOK[bucket] || CPU_BOOK.E, sharp = 5 * cpuIQ();
+  const w = keys.map(k => Math.exp(((tbl[k] != null ? tbl[k] : 20) - 40) / 100 * sharp)), tot = w.reduce((a, b) => a + b, 0);
+  const one = () => { let r = Math.random() * tot; for (let i = 0; i < keys.length; i++) { r -= w[i]; if (r <= 0) return keys[i]; } return keys[keys.length - 1]; };
+  const last = G.cpuLast || (G.cpuLast = [null, null]);
+  let k = one(); if (k === last[G.poss] && chance(0.6)) k = one(); // don't run the same play over and over
+  return (last[G.poss] = k);
+}
+const CPU_RUNS = ['zone', 'toss', 'dive', 'counter', 'jet', 'power', 'stretch', 'rpo', 'shovel', 'qbdraw'];
+const CPU_PASSES = ['slants', 'mesh', 'curls', 'screen', 'pa', 'verts', 'outs', 'bubble', 'smash', 'drive', 'ycross', 'flood', 'stopgo', 'mflat', 'mdrag', 'mseam', 'mwheel', 'boot', 'wrscreen'];
+const cpuBucket = (toGo, down, own) => own >= 92 && toGo <= 3 ? 'G' : toGo <= 2 ? 'S' : down <= 2 ? (toGo >= 13 ? 'L' : 'E') : toGo <= 6 ? 'M' : 'L';
 // ---- CPU coach: reads the score, the clock, timeouts and field position ----
 // rough game-clock costs in this game: a hurry-up play ~11s, a normal play ~15s, a team milking the clock ~38s a snap
 function situation(side = G.poss) {
@@ -258,10 +285,9 @@ function cpuOffCall() {
       return fgOk ? 'fg' : (S.own >= 62 && S.fgLong ? 'fg' : 'punt'); // a long FG beats punting it into the end zone
     }
     // going for it: pick a play that can actually get the yards
-    if (toGo <= 1) return pick(['sneak', 'power', 'sneak', 'zone', 'dive']);
-    if (toGo <= 3) return pick(['power', 'slants', 'mesh', 'zone', 'mflat', 'curls']);
-    if (toGo <= 9) return pick(['curls', 'smash', 'ycross', 'slants', 'outs', 'mesh', 'drive']);
-    return pick(['verts', 'flood', 'ycross', 'drive', 'stopgo', 'smash']);
+    const b4 = cpuBucket(toGo, 4, S.own);
+    if (toGo <= 2) return cpuPick(chance(0.6) ? CPU_RUNS.concat('sneak') : ['mesh', 'smash', 'flood', 'slants', 'mflat', 'curls', 'drive'], b4);
+    return cpuPick(CPU_PASSES.filter(k => k !== 'screen' && k !== 'bubble'), b4);
   }
   // end of half/game with the ball and time for one shot only (too far for a Hail Mary and losing: hook and lateral)
   if (S.endHalf < 8 && S.own > 45 && margin <= 0 && !S.fgLong) return 'hail';
@@ -270,16 +296,18 @@ function cpuOffCall() {
   const trick = cpuTrickCall(S, hurry, milk);
   if (trick) return trick;
   // run/pass mix by down and distance (1st down is a real coin flip, 3rd and long is a passing down)
-  let runW = G.down === 1 ? (toGo >= 15 ? 0.2 : 0.34) : G.down === 2 ? (toGo <= 3 ? 0.55 : toGo >= 8 ? 0.2 : 0.35) : (toGo <= 2 ? 0.55 : toGo <= 4 ? 0.3 : 0.1);
-  runW = clamp(runW * coachStyle().run, 0.05, 0.85);
+  // 3rd and short is a running down (power / counter / stretch convert ~75%), 3rd and long is a passing down
+  let runW = G.down === 1 ? (toGo >= 15 ? 0.2 : 0.36) : G.down === 2 ? (toGo <= 3 ? 0.55 : toGo >= 8 ? 0.22 : 0.38) : (toGo <= 2 ? 0.62 : toGo <= 4 ? 0.3 : 0.06);
+  runW = clamp(runW * coachStyle().run, 0.04, 0.85);
   if (hurry) runW = toGo <= 1 ? 0.35 : 0.05;
   if (milk) runW = toGo >= 10 ? 0.4 : 0.85;
-  if (!hurry && !milk && toGo >= 4 && chance(coachStyle().deep)) return pick(['verts', 'pa', 'stopgo', 'drive', 'mseam']); // take a shot
-  if (toGo <= 1 && chance(0.35) && !hurry) return 'sneak';
-  if (chance(runW)) return milk ? pick(['zone', 'power', 'dive', 'counter', 'power', 'stretch']) : pick(['zone', 'zone', 'toss', 'qbdraw', 'dive', 'counter', 'jet', 'power', 'power', 'stretch', 'rpo', 'shovel']);
-  if (hurry) return toGo >= 10 ? pick(['verts', 'flood', 'outs', 'drive', 'smash', 'outs']) : pick(['outs', 'smash', 'flood', 'curls', 'outs', 'slants']); // sideline routes stop the clock
-  if (milk) return pick(['screen', 'bubble', 'slants', 'mesh', 'curls']); // safe, short, keep the clock moving
-  return toGo >= 12 ? pick(['verts', 'pa', 'mesh', 'curls', 'verts', 'ycross', 'flood', 'stopgo', 'drive', 'mwheel', 'mseam', 'boot']) : pick(['slants', 'mesh', 'curls', 'screen', 'pa', 'verts', 'slants', 'outs', 'bubble', 'smash', 'drive', 'ycross', 'mflat', 'mdrag', 'mseam', 'mwheel', 'boot', 'wrscreen']);
+  const bk = G.twoPt ? 'G' : cpuBucket(toGo, G.down, S.own);
+  if (!hurry && !milk && toGo >= 4 && (G.down <= 2 || toGo >= 10) && chance(coachStyle().deep)) return cpuPick(['verts', 'pa', 'stopgo', 'drive', 'mseam', 'mwheel'], bk); // take a shot
+  if (toGo <= 1 && !hurry && chance(0.2)) return 'sneak'; // 4th/3rd and inches: the sneak converts ~80%
+  if (chance(runW)) return cpuPick(milk ? ['zone', 'power', 'dive', 'counter', 'stretch'] : CPU_RUNS, bk);
+  if (hurry) return cpuPick(['outs', 'smash', 'flood', 'curls', 'mwheel', 'drive', 'slants', 'mflat', ...(toGo >= 10 ? ['verts', 'ycross'] : ['mesh'])], bk); // sideline routes stop the clock (the QB looks there first)
+  if (milk) return cpuPick(['screen', 'bubble', 'slants', 'mesh', 'curls', 'smash', 'mwheel'], bk); // safe, short, keep the clock moving
+  return cpuPick(CPU_PASSES, bk);
 }
 // trick plays: rare, never when the clock matters, and a coach only goes to the well a couple of times a game
 function cpuTrickCall(S, hurry, milk) {
@@ -1476,8 +1504,9 @@ function cpuQB(dt) {
   let minT = (pl.off.fake ? 1.15 : pl.off.screen || pl.off.quick ? 0.6 : 1.0) + [0.15, 0, -0.1, -0.2][G.diff];
   if (G.trickPasser) minT = Math.max(G.trickT + 0.35, G.trickMinT); // trick play: set your feet, let the deep guys get open
   else if (G.rpoKeep) minT = 0.5;
-  if (pl.t < minT) return;
-  const d = dirOf(G.poss);
+  let pressure = 99; for (const df of G.D) if (!df.engaged && df.down <= 0) pressure = Math.min(pressure, dist(qb, df));
+  if (pl.t < minT && !(pl.t > 0.45 && pressure < 2.4 && !G.trickPasser && !G.rpoKeep)) return; // a free rusher: hot read before the play is fully developed
+  const d = dirOf(G.poss), iq = cpuIQ(), toGo = Math.abs(G.firstDownX - G.los), late = pl.t - minT;
   let best = null, bs = -1e9;
   const scr = pl.off.screenTo || 1;
   for (const s of [1, 2, 3, 4, 0]) {
@@ -1495,18 +1524,23 @@ function cpuQB(dt) {
     if (G.lock && r.cap && G.poss === G.human) sc += G.callBall > 0 ? 0.9 : 0; // your QB looks for you (more when you call for it)
     if (op < 1.2) sc -= 2.5; // don't throw into a defender
     sc += [-0.6, 0, 0.3, 0.6][G.diff] * (op > 2 ? 1 : 0);
-    if (down < Math.abs(G.firstDownX - G.los) && G.down >= 3) sc -= G.down === 4 ? 2 : 0.8; // 4th down: short of the sticks is a turnover
+    if (G.down >= 3 || G.twoPt) { // 3rd/4th down: where he'll catch it (end of a sit route, or ahead of a runner) + a step after the catch vs the sticks
+      const rt = r.route, last = rt && rt.end === 'sit' && rt.i < rt.pts.length ? rt.pts[rt.pts.length - 1] : null;
+      const reach = (last ? Math.max(down, d * (last.x - G.los)) : down + Math.max(0, d * r.vx) * dist(qb, r) / (19 * GAME_SPEED) * 0.8) + 1.5;
+      const short = toGo - reach;
+      if (short > 0) sc -= iq * (G.down === 4 || G.twoPt ? 1.6 + short * 0.25 : 0.6 + short * 0.18) * (late > 1.4 || pressure < 2 ? 0.5 : 1); // short of the sticks = punt (less picky once he's out of time)
+      else if (op > 1.5) sc += 0.5 * iq;
+    }
     if (G.cpuHurry && !isHumanSide(G.poss) && (r.y < 8 || r.y > FIELD_W - 8)) sc += 0.6;        // two-minute drill: sideline throws stop the clock
     if (G.cpuMilk && !isHumanSide(G.poss) && op < 2.5) sc -= 1;                                 // ahead late: no risky throws
     sc += rand(-0.3, 0.3);
     if (sc > bs) { bs = sc; best = r; }
   }
-  let pressure = 99; for (const df of G.D) if (!df.engaged && df.down <= 0) pressure = Math.min(pressure, dist(qb, df));
-  const need = 4.7 - (pl.t - minT) * 1.9; // throw on time: the longer he holds it, the less open the guy has to be
+  const need = 4.7 - late * 1.9; // throw on time: the longer he holds it, the less open the guy has to be
   // hot read: a free rusher is coming, so take what's there
   if (best && pressure < 3.2 && bs > 0.6 + (pressure < 1.8 ? -0.6 : 0) && chance(0.5)) { throwTo(qb, best); return; }
   if (best && (bs > need || (pressure < 1.6 && bs > 1.0 && chance(0.6)))) { throwTo(qb, best); return; }
-  if (pl.t > minT + 2.0) { if (best && bs > 0.3) throwTo(qb, best); else throwAway(qb); return; } // held it too long: take it or get rid of it
+  if (late > 2.0) { if (best && bs > 0.3) throwTo(qb, best); else throwAway(qb); return; } // held it too long: take it or get rid of it
   // nothing open and about to get hit: smart QBs throw it away instead of taking the sack
   if (pressure < 1.6 && pl.t > 0.9 && chance(0.45 + (rat(qb, 'AWR') - 70) / 100)) { throwAway(qb); return; }
   if (pressure < 1.5 && chance(0.12 + (qb.spdR > 86 ? 0.2 : 0))) G.qbScramble = true;
