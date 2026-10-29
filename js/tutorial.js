@@ -22,7 +22,7 @@ const Tutorial = {
     { key: 'pass', name: 'Passing', goal: 'Complete a pass', own: 30, plays: p => p.type === 'pass' && !p.special,
       hint: (m, st) => st === 'call' ? 'Pick any PASS play (blue tag). The dotted lines on the card are the routes.'
         : st === 'snap' ? (m ? 'Tap the field to snap the ball.' : 'Press SPACE to snap the ball.')
-        : st === 'qb' ? (m ? 'Find an open receiver. Tap his triangle, or put your finger down, DRAG BACK and let go to throw.' : 'Press 1 2 3 or 4 to throw to that receiver, or click him.')
+        : st === 'qb' ? (m ? 'Find an open receiver. Tap his icon to lob it, or hold it and let go in the green for a bullet.' : 'Press 1 2 3 or 4 to throw to that receiver, or click him.')
         : 'Run with it!' },
     { key: 'run', name: 'Running', goal: 'Run for 4+ yards', own: 30, plays: p => p.type === 'run' && !p.special && !p.qbRun,
       hint: (m, st) => st === 'call' ? 'Pick any RUN play (red tag). The orange line is where the runner goes.'
@@ -44,7 +44,7 @@ const Tutorial = {
     { key: 'td', name: 'Final Test: Score!', goal: 'Score a touchdown', own: 75, plays: p => !p.special,
       hint: (m, st) => st === 'call' ? 'Put it all together. You have 4 downs to score from here. Pick any play.'
         : st === 'snap' ? (m ? 'Tap the field to snap.' : 'Press SPACE to snap.')
-        : st === 'qb' ? (m ? 'Drag back to throw, or tap a receiver.' : '1-4 to throw, or run it with WASD.')
+        : st === 'qb' ? (m ? 'Tap a receiver to throw, hold for power.' : '1-4 to throw, or run it with WASD.')
         : 'Get in the end zone!' }
   ],
   menu(msg) {

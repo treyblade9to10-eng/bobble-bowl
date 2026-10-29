@@ -48,7 +48,7 @@ function buildHow() {
   $('howGrid').innerHTML = m ? `
     <div><h3>Offense</h3>
       <p><b>Tap a play</b>, then <b>tap the field</b> to snap.</p>
-      <p><b>Pass:</b> put your finger down, <b>DRAG BACK</b> (like a slingshot) and let go. Pull further = throw further. The yellow ring shows where it lands.</p>
+      <p><b>Pass:</b> <b>TAP</b> a receiver's icon for a soft lob, or <b>HOLD</b> it and let go when the power bar is in the green for a perfect bullet. <b>RUN</b> = the QB takes off.</p>
       <p>Or just <b>tap a receiver's ▲</b> to throw to him.</p>
       <p><b>RUN</b> button = QB takes off.</p></div>
     <div><h3>Running</h3>
@@ -60,7 +60,7 @@ function buildHow() {
   : `
     <div><h3>Offense</h3>
       <p><b>Pick a play</b> (1-9), <b>SPACE</b> to snap.</p>
-      <p>Throw: <b>1 2 3 4</b>, <b>click</b> a receiver, or <b>drag back with the mouse</b> and let go to throw to that spot.</p>
+      <p>Throw: <b>1 2 3 4</b>, <b>click</b> a receiver. Tap = lob, hold = power bar (let go in the green). <b>X</b> = QB run.</p>
       <p>Move the QB with <b>WASD</b>; run past the line to scramble.</p></div>
     <div><h3>Running</h3>
       <p><b>WASD</b> move, <b>SHIFT</b> sprint.</p>
@@ -243,7 +243,7 @@ for (const [side, id] of [[0, 'pHome'], [1, 'pAway']]) {
 const MU_GROUPS = [
   ['GAME', [['optQtr', 'QUARTERS'], ['optDiff', 'CPU'], ['optPlayers', 'PLAYERS'], ['optGame', 'GAME']]],
   ['CONDITIONS', [['optWeather', 'WEATHER'], ['optNight', 'TIME']]],
-  ['CONTROLS', [['optMeter', 'PASS METER'], ['optCatchM', 'CATCH METER'], ['optDefM', 'DEFENSE METER'], ['optCoach', 'COACH'], ['optCoachMode', 'COACH MODE']]],
+  ['CONTROLS', [['optMeter', 'PASS METER'], ['optMeterSpd', 'METER SPEED'], ['optCatchM', 'CATCH METER'], ['optDefM', 'DEFENSE METER'], ['optCoach', 'COACH'], ['optCoachMode', 'COACH MODE']]],
   ['LOOK', [['optLogos', 'LOGOS'], ['uni', 'UNIFORMS'], ['stad', 'STADIUM']]]
 ];
 const muRows = []; // [select id, paint fn]
@@ -317,9 +317,11 @@ const fillSel = (id, list, val) => { $(id).innerHTML = list.map(([v, t]) => `<op
 fillSel('optUni0', UNIFORMS, 'home');
 $('optPlayers').onchange = () => renderSelect(); fillSel('optUni1', UNIFORMS, 'away'); fillSel('optWeather', WEATHER, 'clear');
 // v9.3: catch + defense meters now start OFF (v9.2 saved them ON for everybody)
+// v10: catch meter is hold-to-catch now (bar only shows while you hold), so it's back ON for everybody
+try { const o = JSON.parse(localStorage.getItem('bobbleOpts') || 'null'); if (o && !o.m100) { o.optCatchM = '1'; o.m100 = 1; o.m93 = 1; localStorage.setItem('bobbleOpts', JSON.stringify(o)); } } catch (e) {}
 try { const o = JSON.parse(localStorage.getItem('bobbleOpts') || 'null'); if (o && !o.m93) { o.optCatchM = '0'; o.optDefM = '0'; o.m93 = 1; localStorage.setItem('bobbleOpts', JSON.stringify(o)); } } catch (e) {}
 try { const o = JSON.parse(localStorage.getItem('bobbleOpts') || 'null'); if (o) for (const k in o) if ($(k)) $(k).value = o[k]; } catch (e) {}
-function saveOpts() { const o = {}; for (const k of ['optUni0', 'optUni1', 'optWeather', 'optNight', 'optGame', 'optLogos', 'optQtr', 'optDiff', 'optCoach', 'optCoachMode', 'optPlayers', 'optMeter', 'optCatchM', 'optDefM']) o[k] = $(k).value; o.m93 = 1; try { localStorage.setItem('bobbleOpts', JSON.stringify(o)); } catch (e) {} }
+function saveOpts() { const o = {}; for (const k of ['optUni0', 'optUni1', 'optWeather', 'optNight', 'optGame', 'optLogos', 'optQtr', 'optDiff', 'optCoach', 'optCoachMode', 'optPlayers', 'optMeter', 'optMeterSpd', 'optCatchM', 'optDefM']) o[k] = $(k).value; o.m93 = 1; o.m100 = 1; try { localStorage.setItem('bobbleOpts', JSON.stringify(o)); } catch (e) {} }
 buildMuSet(); // after the weather/uniform lists are filled
 $('optLogos').addEventListener('change', () => { Logo.setStyle($('optLogos').value); renderSelect(); });
 Logo.onReady(() => { if ($('select').classList.contains('show')) renderSelect(); });

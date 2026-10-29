@@ -543,7 +543,7 @@ function setupPlay(offPlay, defPlay, preview) {
   else G.ball.holder = O[6]; // center holds it while we pick
   G.motion = null; G.press = !!G.cpuPress; G.cpuPress = false; G.showBlitz = false;
   G.cpuMotion = (!preview && !isHumanSide(o) && G.human >= 0 && offPlay.type === 'pass' && !offPlay.chain && chance(0.3)) ? 1.0 : null;
-  G.bstate = 'snap'; G.meter = null; G.meterV = null; G.qbScramble = false; G.humanScramble = false; G.aim = null; G.fake = null; G.special = null; G.qbThink = 0; G.handedOff = false; G.intended = null;
+  G.bstate = 'snap'; G.meter = null; G.meterV = null; G.chold = null; G.qbScramble = false; G.humanScramble = false; G.aim = null; G.fake = null; G.special = null; G.qbThink = 0; G.handedOff = false; G.intended = null;
   G.trickI = 0; G.decoy = null; G.trickPasser = null; G.trickT = 0; G.trickMinT = 0; G.bite = false; G.pumped = false; G.pumpAt = null; G.rpoKeep = false; G.lastPasser = null; G.latDone = false; G.catchT = null;
   G.runoff = 0; G.passPlay = offPlay.type === 'pass'; G.thrownAway = false;
   // human control
@@ -867,24 +867,11 @@ function humanQBInput() {
       if (best) meterStart(qb, null, best);
     }
     if (G.meter && G.meter.r && !G.meter.key) {
-      if (P.moved || G.ball.holder !== qb || !eligible(G.meter.r)) G.meter = null; // slid off: it's a drag-back aim now
+      if (P.moved || G.ball.holder !== qb || !eligible(G.meter.r)) G.meter = null; // slid off the icon: cancel
       else if (!P.down) { meterThrow(qb, G.meter.r, style); Input.taps.length = 0; }
       else Input.taps.length = 0;
     }
-    if (G.ball.holder === qb && P.down && P.moved) {
-      P.aiming = true;
-      const t = aimTarget(qb, P.x0 - P.x, P.y0 - P.y);
-      const back = dirOf(G.poss) * (t.x - qb.x) < -1.5;
-      G.aim = { style: ctlMobile() ? '' : style, tx: t.x, ty: t.y, run: back, target: back ? null : receiverFor(qb, t.x, t.y), from: { x: P.x0, y: P.y0 }, to: { x: P.x, y: P.y } };
-    }
-    if (G.ball.holder === qb && Input.release) {
-      const v = Input.release;
-      if (Math.hypot(v.x, v.y) > 28) {
-        const t = aimTarget(qb, v.x, v.y);
-        if (dirOf(G.poss) * (t.x - qb.x) < -1.5) qbTakeOff(qb); // aimed backwards = QB runs it
-        else throwAt(qb, t.x, t.y, ctlMobile() ? (Input.flick ? 'bullet' : 'normal') : style);
-      }
-    }
+    // (drag-back throwing was removed: tap / hold a receiver's icon or key instead; RUN button / X = QB takes off)
     G.meterV = G.meter && G.time - G.meter.t0 >= TAP_LOB * 0.6 ? [meterVal(), G.meter.green[0], G.meter.green[1]] : null;
     if (G.ball.holder === qb) for (const c of Input.taps) {
       const best = iconAt(c.x, c.y);
@@ -1182,7 +1169,7 @@ function humanControl(p, dt) {
   }
   const chasing = b.holder ? b.holder.side !== p.side : p.side !== G.poss;
   if (G.lock && !isCarrier && !chasing && p !== G.O[0] && G.bstate === 'snap' && !b.flight && Input.hit('Space')) callForBall(p);
-  if (!isCarrier && !chasing && b.flight && !b.flight.pitch && Input.hit('Space')) flightPress(p, 'catch');
+  if (!isCarrier && !chasing && b.flight && !b.flight.pitch) catchHold(p, Input.held('Space'));
   if (!isCarrier && chasing && b.flight && !b.flight.pitch && Input.hit('Space')) { flightPress(p, 'def'); doJump(p); }
   else if (!isCarrier && chasing && Input.hit('Space') && p.dive <= 0) { doDive(p, ax); return true; }
   if (!isCarrier && p.engaged && Input.hit('KeyE')) doSwim(p);
@@ -1216,7 +1203,7 @@ function mobileControl(p, dt, isCarrier) {
   const onD = p.side !== G.poss || (b.holder && b.holder.side !== p.side);
   const inAir = !isCarrier && onD && b.flight && !b.flight.pitch;
   if (inAir && (Input.taps.length || Input.hit('Space'))) { flightPress(p, 'def'); doJump(p); Input.taps.length = 0; }
-  if (!isCarrier && !onD && b.flight && !b.flight.pitch && b.flight.intended === p && (Input.taps.length || Input.hit('Space'))) { flightPress(p, 'catch'); Input.taps.length = 0; }
+  if (!isCarrier && !onD && b.flight && !b.flight.pitch && b.flight.intended === p) { catchHold(p, Input.pointer.down || Input.held('Space')); Input.taps.length = 0; }
   if (!isCarrier && p.engaged && Input.hit('KeyE')) doSwim(p);
   if (!isCarrier && onD && Input.hit('KeyC')) doHitStick(p);
   if (p.hit > 0) return true;
@@ -1827,13 +1814,14 @@ function receiverFor(qb, tx, ty) {
 // ---- throw meter: hold to aim, the bar fills up and back down. Let go in the green = PERFECT (on target, easier catch)
 // tap a receiver = touch LOB, hold = the POWER bar fills: green = PERFECT bullet, past it = TOO HARD. Catch + defense meters time the ball's arrival
 const optOn = (k, d = '1') => { try { return (JSON.parse(localStorage.getItem('bobbleOpts') || '{}')[k] || d) === '1'; } catch (e) { return d === '1'; } };
-const meterOn = () => optOn('optMeter'), catchMeterOn = () => optOn('optCatchM', '0'), defMeterOn = () => optOn('optDefM', '0'); // catch + defense meters start OFF
+const meterOn = () => optOn('optMeter'), catchMeterOn = () => optOn('optCatchM', '1'), defMeterOn = () => optOn('optDefM', '0'); // catch + defense meters start OFF
 const METER_NEAR = 7; // the catch / defense bar only shows when your guy is this close to where the ball comes down
 const TAP_LOB = 0.18; // let go faster than this = it was a tap
-const METER_CYCLE = 1.0; // seconds from empty to full
-function meterStart(qb, key, r) { G.meter = { t0: G.time, key, r: r || null, green: meterGreen(qb) }; }
+const METER_SPD = { slow: 1.45, normal: 1.0, fast: 0.7 }; // PASS METER SPEED setting
+const meterCycle = () => { try { return METER_SPD[JSON.parse(localStorage.getItem('bobbleOpts') || '{}').optMeterSpd] || 1; } catch (e) { return 1; } };
+function meterStart(qb, key, r) { G.meter = { t0: G.time, key, r: r || null, green: meterGreen(qb), cyc: meterCycle() }; }
 function meterGreen(qb) { const w = clamp(0.13 + (qbArm(qb).acc - 70) * 0.005, 0.11, 0.24); return [0.92 - w, 0.92]; } // better accuracy = bigger green
-function meterVal() { const m = G.meter; if (!m) return 0; return Math.min(1, Math.max(0, G.time - m.t0 - 0.08) / METER_CYCLE); }
+function meterVal() { const m = G.meter; if (!m) return 0; return Math.min(1, Math.max(0, G.time - m.t0 - 0.08) / (m.cyc || 1)); }
 // what the release did: power 0..1 and whether it was perfect
 function meterRead() { const m = G.meter; if (!m) return null; const v = meterVal(); G.meter = null; return { v, perfect: v >= m.green[0] && v <= m.green[1], over: v > m.green[1], g0: m.green[0] }; }
 // let go of a held receiver: a quick tap is a lob, a hold throws with the meter's power (strong enough = a bullet)
@@ -1843,7 +1831,21 @@ function meterThrow(qb, r, style, lead) {
   const mt = meterRead();
   throwTo(qb, r, false, null, style !== 'normal' ? style : mt.v >= mt.g0 ? 'bullet' : 'normal', lead, mt);
 }
-// catch / defense meter: press when the ball gets there. Window = last part of the flight
+// catch meter: HOLD Space / your finger while the ball is coming, the bar fills; let go in the green (or still be in it when the ball gets there) = PERFECT CATCH
+const CATCH_FILL = 0.7, CATCH_GREEN = [0.72, 0.92];
+const catchFill = () => G.chold ? Math.min(1, (G.time - G.chold.t0) / CATCH_FILL) : 0;
+function catchHold(p, held) {
+  const f = G.ball && G.ball.flight;
+  if (!f || f.pitch || f.kick || f.intended !== p || f.cp || !catchMeterOn()) { G.chold = null; return; }
+  if (held && !G.chold) G.chold = { t0: G.time };
+  else if (!held && G.chold) catchLock(f);
+}
+function catchLock(f) {
+  const v = catchFill(), p = f.intended; G.chold = null;
+  f.cp = v >= CATCH_GREEN[0] && v <= CATCH_GREEN[1] ? 'perfect' : v >= 0.45 ? 'good' : 'early';
+  addText(p.x, p.y - 1.5, f.cp === 'perfect' ? 'PERFECT CATCH' : f.cp === 'good' ? 'GOOD CATCH' : 'TOO EARLY', f.cp === 'perfect' ? '#5dff7a' : f.cp === 'good' ? '#fff' : '#ff8a8a', 15, 0.8);
+}
+// defense meter: press when the ball gets there. Window = last part of the flight
 const CATCH_WIN = [0.78, 0.96];
 function flightPress(p, kind) {
   const f = G.ball && G.ball.flight; if (!f || f.pitch || f.kick) return;
@@ -1957,7 +1959,7 @@ function updateFlight(dt) {
       return incomplete(p, 'TIPPED!');
     }
   }
-  if (u >= 1) { if (f.kick) { b.flight = null; return catchKick(f); } resolveCatch(); }
+  if (u >= 1) { if (f.kick) { b.flight = null; return catchKick(f); } if (G.chold && !f.cp) catchLock(f); G.chold = null; resolveCatch(); }
 }
 
 function resolveCatch() {
@@ -2379,14 +2381,25 @@ function launchKick() {
   if (km.kind === 'fg') addText(G.los, G.ballY - 6, `${km.yds} YARD TRY`, '#fff', 18, 1.5);
 }
 
+// after the posts: the ball sails on into the net, drops and skips
+function kickCarry(k, b, dt) {
+  const c = k.carry; if (!c) return;
+  b.x += c.vx * dt; b.y += c.vy * dt; c.vz -= 30 * dt; b.z = Math.max(0, (b.z || 3.5) + c.vz * dt); b.spin = (b.spin || 0) + dt * 14;
+  if (b.z <= 0) { if (Math.abs(c.vz) > 4) { c.vz = -c.vz * 0.35; b.z = 0.01; } else c.vz = 0; c.vx *= 0.9; c.vy *= 0.9; }
+}
 function updateKick(dt) {
   const k = G.kick, b = G.ball;
   k.t += dt;
+  if (k.done && k.carry) { kickCarry(k, b, dt); k.wait -= dt; if (k.wait <= 0) afterPlay(); return; } // past the posts: keep it flying
   const u = Math.min(1, k.t / k.T);
   b.x = lerp(k.sx, k.land, u); b.y = lerp(k.sy, k.ty, u);
   b.z = k.peak * 4 * u * (1 - u) + (k.kind !== 'punt' && !k.short ? u * 3.5 : 0); b.spin = (b.spin || 0) + dt * 14;
   if (u < 1) return;
-  if (k.done) { k.wait -= dt; if (k.wait <= 0) afterPlay(); return; }
+  if (k.done) { if (k.carry) kickCarry(k, b, dt); k.wait -= dt; if (k.wait <= 0) afterPlay(); return; }
+  if (k.kind !== 'punt' && !k.short) { // field goals keep flying through (or past) the uprights instead of freezing at the bar
+    k.carry = { vx: (k.land - k.sx) / k.T, vy: (k.ty - k.sy) / k.T, vz: (-4 * k.peak + 3.5) / k.T * 0.35 };
+    b.x = k.land; b.y = k.ty; kickCarry(k, b, 0);
+  }
   k.done = true; k.wait = 1.7;
   const s = k.side, d = dirOf(s);
   if (k.kind === 'punt') {
@@ -2491,9 +2504,9 @@ function updateHint() {
   if (G.phase === 'presnap') G.hint = humanOff ? (G.play.off.type === 'run' ? 'SPACE snap  •  Z audible  •  T timeout' : `SPACE snap  •  1-4 hot route  •  M motion${G.versus ? '' : '  •  Z audible'}  •  T timeout`) : `Q / TAB pick defender  •  V press  •  B show blitz${G.versus ? '' : '  •  Z audible'}  •  T timeout`;
   else if (G.phase === 'live') {
     const h = G.humanPlayer;
-    if (h && b.holder === h && h.side === G.human) G.hint = humanCanThrow() ? (meterOn() ? 'TAP 1-4 = lob  •  HOLD 1-4 = power, let go in the green  •  hold WASD to lead' : '1-4 throw (SHIFT = bullet, CTRL = lob, hold WASD to lead)  •  or drag back with mouse') : 'WASD move  •  SHIFT sprint  •  E juke  •  F spin  •  R stiff arm';
+    if (h && b.holder === h && h.side === G.human) G.hint = humanCanThrow() ? (meterOn() ? 'TAP 1-4 / click = lob  •  HOLD = power, let go in the green  •  X = QB run' : '1-4 or click a receiver to throw (SHIFT = bullet, CTRL = lob)  •  X = QB run') : 'WASD move  •  SHIFT sprint  •  E juke  •  F spin  •  R stiff arm';
     else if (h && (h.side !== G.poss || (b.holder && b.holder.side !== G.human))) G.hint = b.flight ? 'SPACE = JUMP for the pick!  •  WASD move' : h.engaged ? 'E = SWIM MOVE past the blocker!' : 'WASD move  •  SHIFT sprint  •  SPACE dive  •  C HIT STICK  •  Q switch';
-    else G.hint = 'Steer to the ball marker to catch it!';
+    else G.hint = catchMeterOn() ? `Steer to the ball  •  HOLD ${ctlMobile() ? 'your finger on the field' : 'SPACE'} and let go in the green to catch` : 'Steer to the ball marker to catch it!';
   } else G.hint = '';
 }
 
@@ -2504,7 +2517,7 @@ function updateHintMobile() {
   if (G.phase === 'presnap') G.hint = humanOff ? (G.play.off.type === 'pass' ? 'TAP field to snap  •  TAP a receiver = hot route' : 'TAP to snap') : 'SWITCH or TAP a defender to pick your guy';
   else if (G.phase === 'kickmeter') G.hint = '';
   else if (G.phase === 'live') {
-    if (humanCanThrow()) G.hint = 'DRAG BACK to throw  •  drag FORWARD = QB run  •  or tap a receiver';
+    if (humanCanThrow()) G.hint = 'TAP a receiver = lob  •  HOLD = power, let go in the green  •  RUN = QB takes off';
     else if (h && b.holder === h) G.hint = 'Hold to steer  •  TAP = juke';
     else if (h && (h.side !== G.poss || (b.holder && b.holder.side !== G.human))) G.hint = b.flight ? 'TAP = JUMP for the pick!' : h.engaged ? 'SWIM to beat the blocker!' : 'Joystick / hold to move  •  TAP near runner = dive';
     else G.hint = '';
