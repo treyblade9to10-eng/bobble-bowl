@@ -415,6 +415,55 @@ function shadowSprite(r) {
   g.fillStyle = shg; g.beginPath(); g.arc(m, m, m, 0, 7); g.fill();
   return (shadowSprites[r] = c);
 }
+// ---- kick poses (fields set in special.js): kickT = leg swing clock, kpose 'hold' (FG holder) / 'pc' (punter wants the snap), fair = fair catch wave ----
+// kicking leg angle from straight down (+ = forward): cock it back, whip through the ball at KICK_HIT, follow through high
+function kickSwingAng(t, punt) {
+  const top = punt ? 3.1 : 2.4;
+  if (t < 0.1) return lerp(0, -1.1, t / 0.1);
+  if (t < KICK_HIT) return lerp(-1.1, 0.6, (t - 0.1) / (KICK_HIT - 0.1));
+  if (t < 0.42) return lerp(0.6, top, ease((t - KICK_HIT) / (0.42 - KICK_HIT)));
+  return lerp(top, 0, clamp((t - 0.42) / 0.4, 0, 1));
+}
+function kickPose(p, G, HIP) {
+  if (p.down > 0) return null;
+  if (p.kickT != null) {
+    const a = kickSwingAng(p.kickT, p.pos === 'P'), Lg = HIP * 0.6; // (a little stretch so the swing reads at game size)
+    const a1 = a > 0 ? a * 0.85 : a * 0.4, a2 = a1 - (a < 0 ? -a * 1.4 : Math.max(0, 0.7 - a) * 0.6); // thigh, shin (the knee folds on the backswing)
+    return {
+      lean: a > 0.8 ? -0.24 * Math.min(1, (a - 0.8) / 1.0) : 0.06, // leans back as the leg comes up
+      leg: (side, hx, hy) => {
+        if (side < 0) return { kx: hx + 2, ky: hy * 0.5, fx: hx + 3, fy: 0 }; // plant leg
+        const kx = hx + Math.sin(a1) * Lg, ky = hy + Math.cos(a1) * Lg;
+        return { kx, ky, fx: kx + Math.sin(a2) * Lg, fy: ky + Math.cos(a2) * Lg + 2 };
+      },
+      arm: (front, shx, shy) => front ? { ex: shx + 5, ey: shy + 8, hx: shx + 3 - a * 3, hy: shy + 15 } : { ex: shx - 8, ey: shy - 1, hx: shx - 15, hy: shy - 7 } // arms out for balance
+    };
+  }
+  if (p.kpose === 'hold' && p.kneel > 0) {
+    const b = G.ball, e = b && b.hold > 0 ? ease(Math.min(1, b.hold)) : -1; // -1: waiting for the snap
+    if (e < 0) return { arm: (front, shx, shy) => front ? { ex: shx + 8, ey: shy + 1, hx: shx + 15, hy: shy - 1 } : { ex: shx + 7, ey: shy + 4, hx: shx + 13, hy: shy + 3 } }; // hands up: give me a target
+    // the ball goes from his hands (flat, out front) to standing point-down on the spot: just behind his front knee, a bit toward the camera
+    const S = 1.2, SX = -13.2, SY = 11.2, rot = -Math.PI / 2 * e, bc = { x: lerp(16, SX, e), y: lerp(-21, SY - 9 * S, e) };
+    const top = { x: bc.x + Math.cos(rot) * 9 * S, y: bc.y + Math.sin(rot) * 9 * S }, bot = { x: bc.x - Math.cos(rot) * 9 * S, y: bc.y - Math.sin(rot) * 9 * S };
+    const elbow = (sh, h, out) => ({ ex: (sh.x + h.x) / 2 + out, ey: (sh.y + h.y) / 2 + 2, hx: h.x, hy: h.y });
+    return {
+      arm: (front, shx, shy, toT) => {
+        if (front) return elbow({ x: shx, y: shy }, toT(top.x - 1, top.y - 2), 4); // one finger on top of the ball
+        const rest = toT(13, -13), h = e < 0.75 ? toT(bot.x, bot.y) : rest; // both hands on it, then the back hand goes to his knee
+        return elbow({ x: shx, y: shy }, h, 3);
+      },
+      ball: (g, toT, lean) => {
+        const sp = toT(SX, SY), c = toT(bc.x, bc.y);
+        g.fillStyle = '#0005'; g.beginPath(); g.ellipse(sp.x, sp.y, 6, 2.2, 0, 0, 7); g.fill();
+        if (e < 1) drawSpiral(g, c.x, c.y, rot - lean, (1 - e) * 18, S); // spinning the laces out
+        else drawFootball(g, c.x, c.y, S, rot - lean);
+      }
+    };
+  }
+  if (p.kpose === 'pc') return { arm: (front, shx, shy) => front ? { ex: shx + 8, ey: shy + 4, hx: shx + 15, hy: shy + 2 } : { ex: shx + 6, ey: shy + 6, hx: shx + 13, hy: shy + 4 } }; // arms out: snap it here
+  if (p.fair) return { arm: (front, shx, shy) => front ? { ex: shx + 10, ey: shy - 12, hx: shx + 18 + Math.sin(G.time * 14) * 3, hy: shy - 26 } : null }; // waving for a fair catch
+  return null;
+}
 function drawPlayer(g, p, G, at) {
   const x = at ? at.x : sx(p.x), y = at ? at.y : sy(p.y);
   if (!at && (x < -80 - CW * 0.4 || x > CW * 1.4 + 80 || y < -40 || y > CH + 140)) return; // a bit wide so the zoomed celly cam never loses anyone
@@ -431,7 +480,7 @@ function drawPlayer(g, p, G, at) {
   if (pose) hop = pose.hop;
 
   // ground marks
-  if (p.isHuman && !at && (G.phase !== 'kick' && G.phase !== 'kickmeter' || (G.phase === 'kickmeter' && !p.off))) { // + your rusher on a field goal
+  if (p.isHuman && !at && (G.phase !== 'kick' && G.phase !== 'kickmeter' || (G.phase === 'kickmeter' && (!p.off || (G.km && G.km.kind === 'punt'))))) { // + your rusher on a field goal / your guy on a punt
     const pulse = 1 + Math.sin(G.time * 8) * 0.08;
     g.strokeStyle = G.versus && p.ctl === 1 ? '#5ad1ff' : '#ffe14d'; g.lineWidth = 3.5;
     g.beginPath(); g.ellipse(x, y, 22 * pulse, 9 * pulse, 0, 0, 7); g.stroke();
@@ -475,11 +524,13 @@ function drawPlayer(g, p, G, at) {
   // victory formation: the QB drops to one knee (front knee up, back knee on the grass)
   const kn = p.kneel > 0 ? ease(Math.min(1, p.kneel / 0.3)) : 0;
   const W = big ? 30 : 24, TH = big ? 24 : 22, HIP = (big ? 17 : 18) - kn * 9.5;
+  const kp = pose ? null : kickPose(p, G, HIP); // holder / kicker / punter / fair catch
   const kneelLeg = kn ? (side, hx, hy, kx, ky, fx, fy) => side > 0
     ? { kx: lerp(kx, hx + 10, kn), ky: lerp(ky, hy - 2, kn), fx: lerp(fx, hx + 11, kn), fy: lerp(fy, 0, kn) }      // front leg: thigh flat, shin straight down
     : { kx: lerp(kx, hx - 1, kn), ky: lerp(ky, -1, kn), fx: lerp(fx, hx - 13, kn), fy: lerp(fy, -2, kn) } : null; // back leg: knee on the grass, shin flat behind
-  const legPose = kneelLeg || (pose && pose.leg) || null;
-  const lean = (p.down > 0 ? 0 : k * 0.18) + (p.engaged ? 0.25 : 0) + kn * 0.12;
+  const legPose = kneelLeg || (pose && pose.leg) || (kp && kp.leg) || null;
+  const lean = (p.down > 0 ? 0 : k * 0.18) + (p.engaged ? 0.25 : 0) + kn * 0.12 + (kp && kp.lean || 0);
+  const lc = Math.cos(lean), ls = Math.sin(lean), toT = (x, y) => ({ x: x * lc + (y + HIP) * ls, y: -x * ls + (y + HIP) * lc }); // feet coords -> torso coords
 
   // legs (two segments) + cleats
   const leg = (side, ph) => {
@@ -527,7 +578,7 @@ function drawPlayer(g, p, G, at) {
   const arm = (front) => {
     const shx = front ? W * 0.3 : -W * 0.22, shy = -TH + 5;
     let ex, ey, hx, hy;
-    const pa = pose && pose.arm ? pose.arm(front, shx, shy) : null;
+    const pa = pose && pose.arm ? pose.arm(front, shx, shy) : kp && kp.arm ? kp.arm(front, shx, shy, toT) : null;
     if (pa) ({ ex, ey, hx, hy } = pa);
     else if (carrying && front) { ex = shx + 4; ey = shy + 10; hx = shx + (p.tuck ? 7 : 10); hy = shy + (p.tuck ? 6 : 8); }
     else if (carrying && p.tuck) { ex = shx + 6; ey = shy + 9; hx = shx + 13; hy = shy + 7; } // two hands on it
@@ -568,6 +619,7 @@ function drawPlayer(g, p, G, at) {
     if (c) g.drawImage(c, -c.BX, -c.BY, c.BX * 2, c.BY + 6);
   }
   // front arm + ball
+  if (kp && kp.ball) kp.ball(g, toT, lean); // the holder's ball goes under his hand
   const hand = arm(true);
   if (carrying && !(pose && pose.noBall)) drawFootball(g, hand.hx - 2, hand.hy - 1, 0.95, 0.4);
 
@@ -777,18 +829,19 @@ function drawSpiral(g, x, y, ang, phase, s) {
   g.restore();
 }
 function drawBallFree(g, G) {
-  const b = G.ball; if (!b || b.holder) return;
+  const b = G.ball; if (!b || b.holder || b.hold) return; // (the holder draws the ball he's spotting)
   const x = sx(b.x), y = sy(b.y);
   g.fillStyle = '#0006'; g.beginPath(); g.ellipse(x, y, 8, 3.5, 0, 0, 7); g.fill();
   if (b.flight) { // trail
     g.strokeStyle = '#ffffff40'; g.lineWidth = 3; g.beginPath();
-    for (let i = 0; i < 6; i++) { const u = Math.max(0, b.flight.t / b.flight.T - i * 0.03); const tx = lerp(b.flight.sx, b.flight.tx, u), ty = lerp(b.flight.sy, b.flight.ty, u), tz = 1.7 + b.flight.peak * 4 * u * (1 - u) - u * 0.6; const px = sx(tx), py = sy(ty) - tz * PX * 0.9; i ? g.lineTo(px, py) : g.moveTo(px, py); }
+    for (let i = 0; i < 6; i++) { const u = Math.max(0, b.flight.t / b.flight.T - i * 0.03); const tx = lerp(b.flight.sx, b.flight.tx, u), ty = lerp(b.flight.sy, b.flight.ty, u), tz = flightZ(b.flight, u); const px = sx(tx), py = sy(ty) - tz * PX * 0.9; i ? g.lineTo(px, py) : g.moveTo(px, py); }
     g.stroke();
   }
-  if (b.flight && b.flight.duck && !b.flight.kick) drawFootball(g, x, y - b.z * PX * 0.9, 1.3, Math.sin(G.time * 9) * 0.9 + G.time * 2); // wobbly duck
+  if (b.snap && !b.flight) drawSpiral(g, x, y - b.z * PX * 0.9, b.snap > 0 ? 0 : Math.PI, b.spin || 0, 1.25); // long snap: a tight spiral back
+  else if (b.flight && b.flight.duck && !b.flight.kick) drawFootball(g, x, y - b.z * PX * 0.9, 1.3, Math.sin(G.time * 9) * 0.9 + G.time * 2); // wobbly duck
   else if (b.flight) {
     const f = b.flight, u = Math.min(1, f.t / f.T);
-    const dz = (f.peak * 4 * (1 - 2 * u) - 0.6) / f.T;            // height change per second
+    const dz = (f.peak * 4 * (1 - 2 * u) + 1.1 - (f.z0 != null ? f.z0 : 1.7)) / f.T; // height change per second
     const vxs = (f.tx - f.sx) / f.T * PX, vys = (f.ty - f.sy) / f.T * PY - dz * PX * 0.9;
     drawSpiral(g, x, y - b.z * PX * 0.9, Math.atan2(vys, vxs), b.spin || 0, 1.35);
   } else drawFootball(g, x, y - b.z * PX * 0.9, 1.3, b.spin || 0);

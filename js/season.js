@@ -98,6 +98,7 @@ const Season = {
       const l = this.line(t.id, [s.pos, s.name]);
       if (!seen.has(l)) { l.g++; seen.add(l); }
       for (const k of ['pass', 'rush', 'rec', 'td', 'tkl', 'sack', 'int']) l[k] += s[k] || 0;
+      if (s.blk) l.blk = (l.blk || 0) + s.blk; // blocked kicks (older saves don't have the field)
     }
   },
   leaders(k, n = 5) { return Object.values(this.data.stats || {}).filter(l => l[k] > 0).sort((a, b) => b[k] - a[k]).slice(0, n); },

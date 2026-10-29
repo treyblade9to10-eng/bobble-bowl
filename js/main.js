@@ -527,6 +527,7 @@ function statTable(ts, teams, me) {
     ['Turnovers', t => g(t, 'to'), -1],
     ['Possession', t => mmss(g(t, 'top')), 0, t => g(t, 'top')]
   ];
+  if (g(ts[0], 'blk') + g(ts[1], 'blk') > 0) rows.push(['Blocked kicks', t => g(t, 'blk'), 1]); // only when it happened
   const tag = t => `<span style="color:${t.c1 === '#000000' ? '#ccc' : t.c1}">${t.id}</span>`;
   let h = `<table class="stTab"><tr><th></th><th>${tag(teams[sides[0]])}</th><th>${tag(teams[sides[1]])}</th></tr>`;
   for (const [lbl, f, better, raw] of rows) {
@@ -561,6 +562,7 @@ G.hooks.onGameOver = s => {
   const lead = side => { const L = s.leaders[side], b = [];
     if (L.pass) b.push(`${lastName(L.pass.name)} ${L.pass.pass} pass`); if (L.rush) b.push(`${lastName(L.rush.name)} ${L.rush.rush} rush`); if (L.rec) b.push(`${lastName(L.rec.name)} ${L.rec.rec} rec`);
     if (L.sack) b.push(`${lastName(L.sack.name)} ${L.sack.sack} sk`); if (L.int) b.push(`${lastName(L.int.name)} ${L.int.int} INT`);
+    if (L.blk) b.push(`${lastName(L.blk.name)} ${L.blk.blk} blocked kick${L.blk.blk > 1 ? 's' : ''}`);
     return b.length ? `<div class="stLead"><b>${s.teams[side].id}</b> ${b.join(' &middot; ')}</div>` : ''; };
   html += lead(me) + lead(them);
   $('overStats').innerHTML = html;
@@ -743,6 +745,7 @@ function updateMobileButtons() {
     else if (b.holder === h) st = 'carrier';
     else if (h.side !== G.poss || (b.holder && b.holder.side !== h.side)) st = 'def';
     else if (G.lock && h !== G.O[0] && G.bstate === 'snap' && !b.flight) st = 'call';
+    else if (b.flight && b.flight.kick === 'punt' && b.flight.intended === h && !h.fair) st = 'ret'; // punt coming down: FAIR CATCH button
   }
   if (G.phase === 'dead' && G.cellyGuy && !G.cellyGuy.celly && !G.cellyGuy.cellyNext && !G.demo && (!G.online || G.cellyGuy.side === G.human)) st = 'celly'; // buttons hide once he's celebrating
   if (G.phase === 'presnap' && !G.demo) st = 'presnap';
@@ -755,7 +758,7 @@ function updateMobileButtons() {
   const po = G.play && G.play.off, canMotion = !!po && !po.chain && (po.type === 'pass' || po.toss || po.carrier === 4);
   const club = st === 'celly' ? clubCelly(G.cellyGuy) : null;
   const cc = coachCalls(); // career: the coach has the audible / timeout
-  const key = st + side + coach + cc + canMotion + G.weather + (club ? club.id : '') + (b && b.flight ? 'air' : '') + (h && h.engaged ? 'eng' : '');
+  const key = st + side + coach + cc + canMotion + G.weather + (club ? club.id : '') + (b && b.flight ? 'air' : '') + (h && h.engaged ? 'eng' : '') + (h && h.fair ? 'fc' : '');
   if (key === mbState) return;
   mbState = key;
   document.querySelectorAll('#mbtns button').forEach(x => x.classList.toggle('on', x.dataset.show === st && (!x.dataset.side || x.dataset.side === side) && (x.dataset.k !== 'KeyM' || canMotion) && (!x.dataset.wx || x.dataset.wx === G.weather) && (!x.dataset.lock || Unlocks.has(x.dataset.lock)) && (!coach || x.dataset.k === 'KeyZ' || x.dataset.k === 'KeyT') && !(cc && (x.dataset.k === 'KeyZ' || x.dataset.k === 'KeyT'))));
