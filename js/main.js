@@ -122,19 +122,40 @@ function teamCard(t) {
     ${xfs.length ? `<div class="xfl"><span>X-FACTOR</span> ${xfs.map(x => lastName(x.name)).join(', ')}</div>` : ''}
     <div class="cnt">${TEAMS.findIndex(x => x.id === t.id) + 1} / ${TEAMS.length}</div>`;
 }
+// Matchup screen card: big logo, city + name, OVR with OFF/DEF bars, QB + best player
+function muBadge(t) { // a bigger copy of teamBadge for the matchup cards
+  if (t && t.custom && t.logo) return `<img class="badge" src="${t.logo}" alt="${t.id}">`;
+  if (typeof Logo !== 'undefined' && Logo.has(t)) { const u = Logo.url(t, 256); if (u) return `<img class="badge" src="${u}" alt="${t.id}">`; }
+  return teamBadge(t);
+}
+function muCard(t) {
+  t = Career.withCAP(t);
+  const avg = a => a.length ? Math.round(a.reduce((s, p) => s + p[3], 0) / a.length) : 0;
+  const xf = teamXFactors(t).map(x => x.name), all = t.off.concat(t.def);
+  const qb = t.off.find(p => p[0] === 'QB') || t.off[0], star = all.filter(p => p !== qb).sort((a, b) => b[3] - a[3])[0];
+  const bar = (k, v) => `<div class="muB"><span>${k}</span><i><u style="width:${Math.round(clamp((v - 55) / 45, 0.05, 1) * 100)}%"></u></i><b>${v}</b></div>`;
+  const pl = (tag, p) => p ? `<div class="muP"><span class="tg">${tag}</span><span class="nm">${p[1]}${xf.includes(p[1]) ? '<em>X</em>' : ''}</span><b>${p[3]}</b></div>` : '';
+  return `<div class="muLogo">${muBadge(t)}</div>
+    <div class="muCity">${t.city}</div><div class="muName">${t.name}</div>
+    <div class="muRat"><div class="muOvr"><b>${teamOvr(t)}</b><span>OVR</span></div><div class="muBars">${bar('OFF', avg(t.off))}${bar('DEF', avg(t.def))}</div></div>
+    <div class="muPl">${pl('QB', qb)}${pl(star ? star[0] : '', star)}</div>`;
+}
 function renderSelect(bumpSide) {
   if (typeof renderUniBtns === 'function') setTimeout(renderUniBtns, 0);
+  const two = $('optPlayers').value === '2' && G.mode !== 'mobile';
   for (const [side, id] of [[0, 'pHome'], [1, 'pAway']]) {
-    const t = TEAMS[sel.idx[side]], el = $(id).querySelector('.tbig');
-    el.innerHTML = teamCard(t);
-    el.style.background = `linear-gradient(160deg, ${t.c1} 55%, ${t.c2})`; el.style.color = textOn(t.c1);
-    const who = $(id).querySelector('.who');
-    const two = $('optPlayers').value === '2' && G.mode !== 'mobile';
-    if ($('optCoachModeBtn')) $('optCoachModeBtn').style.display = two ? 'none' : '';
+    const t = TEAMS[sel.idx[side]], card = $(id), el = card.querySelector('.muBody');
+    el.innerHTML = muCard(t);
+    card.style.setProperty('--c1', t.c1); card.style.setProperty('--c2', t.c2); card.style.setProperty('--fg', textOn(t.c1));
+    card.querySelector('.muCnt').textContent = `${sel.idx[side] + 1} / ${TEAMS.length}`;
+    const who = card.querySelector('.who');
     who.textContent = sel.you === side ? (two ? 'P1' : 'YOU') : (two ? 'P2' : 'CPU'); who.className = 'who ' + (sel.you === side ? 'you' : two ? 'p2' : 'cpu');
-    if (bumpSide === side) { el.classList.add('bump'); setTimeout(() => el.classList.remove('bump'), 120); }
+    const foot = card.querySelector('.muFoot'); // the ROSTER button (benchedit.js) lives in the card footer
+    card.querySelectorAll(':scope > .beOpen').forEach(b => foot.appendChild(b));
+    if (bumpSide === side) { card.classList.remove('bump'); void card.offsetWidth; card.classList.add('bump'); }
   }
-  $('selHint').textContent = G.mode === 'mobile' ? 'Tap a team card to see every team' : $('optPlayers').value === '2' ? 'P1: WASD move, SPACE snap/dive, SHIFT sprint, 1-4 throw, E/F/R moves, Q switch      P2: ARROWS, ENTER, RIGHT SHIFT, 7-0 throw, / . , moves, L switch' : 'W / S  away team      ↑ / ↓  home team      ENTER  kickoff';
+  muPaint();
+  $('selHint').textContent = G.mode === 'mobile' ? '' : two ? 'P1: WASD move, SPACE snap/dive, SHIFT sprint, 1-4 throw, E/F/R moves, Q switch      P2: ARROWS, ENTER, RIGHT SHIFT, 7-0 throw, / . , moves, L switch' : 'W / S  away team      ↑ / ↓  home team      ENTER  play';
   try { localStorage.setItem('bobbleSel', JSON.stringify(sel)); } catch (e) {}
 }
 function moveTeam(side, d) {
@@ -142,11 +163,26 @@ function moveTeam(side, d) {
   do { i = (i + d + TEAMS.length) % TEAMS.length; } while (i === sel.idx[1 - side]);
   sel.idx[side] = i; Sound.click(); renderSelect(side);
 }
-document.querySelectorAll('.arr').forEach(b => b.onclick = () => moveTeam(+b.dataset.side, +b.dataset.d));
+document.querySelectorAll('#select .muArr').forEach(b => b.onclick = e => { e.stopPropagation(); moveTeam(+b.dataset.side, +b.dataset.d); });
 $('btnSwap').onclick = () => { sel.you = 1 - sel.you; Sound.click(); renderSelect(); };
-document.querySelectorAll('.tbig').forEach((el, i) => el.addEventListener('wheel', e => { e.preventDefault(); moveTeam(el.closest('#pHome') ? 0 : 1, e.deltaY > 0 ? 1 : -1); }, { passive: false }));
+// card body: tap = team grid, swipe left/right = next/previous team, mouse wheel scrolls teams
+document.querySelectorAll('#select .muBody').forEach(el => {
+  const side = +el.parentNode.dataset.side; let x0 = null, y0 = 0, swiped = false;
+  el.addEventListener('wheel', e => { e.preventDefault(); moveTeam(side, e.deltaY > 0 ? 1 : -1); }, { passive: false });
+  el.addEventListener('pointerdown', e => { x0 = e.clientX; y0 = e.clientY; swiped = false; });
+  el.addEventListener('pointerup', e => {
+    if (x0 == null) return; const dx = e.clientX - x0, dy = e.clientY - y0; x0 = null;
+    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) { swiped = true; moveTeam(side, dx < 0 ? 1 : -1); }
+  });
+  el.addEventListener('pointercancel', () => { x0 = null; });
+  el.addEventListener('click', () => { if (swiped) { swiped = false; return; } openTeamGrid(side); });
+});
 window.addEventListener('keydown', e => {
   if (!$('select').classList.contains('show')) return;
+  if ($('tgrid').classList.contains('show') || $('muSet').classList.contains('show')) { // an overlay is up: ESC / ENTER just closes it
+    if (e.code === 'Escape' || e.code === 'Enter') { e.preventDefault(); $('tgrid').classList.remove('show'); muSetShow(false); }
+    return;
+  }
   if (e.code === 'KeyW') moveTeam(1, -1); if (e.code === 'KeyS') moveTeam(1, 1);
   if (e.code === 'ArrowUp') moveTeam(0, -1); if (e.code === 'ArrowDown') moveTeam(0, 1);
   if (e.code === 'Enter') startGame();
@@ -199,21 +235,79 @@ function renderTeamGrid() {
 document.querySelectorAll('#tgTabs button').forEach(b => b.onclick = () => { tgConf = b.dataset.f; Sound.click(); renderTeamGrid(); });
 $('tgClose').onclick = () => { Sound.click(); $('tgrid').classList.remove('show'); };
 for (const [side, id] of [[0, 'pHome'], [1, 'pAway']]) {
-  $(id).querySelector('.tbig').addEventListener('click', () => openTeamGrid(side));
   const b = document.createElement('button'); b.className = 'allTeams'; b.textContent = 'ALL TEAMS'; b.onclick = () => openTeamGrid(side);
-  $(id).appendChild(b);
+  $(id).querySelector('.muFoot').appendChild(b);
 }
 
-// game options as tap-to-cycle buttons (the hidden <select>s still hold the values)
-function cycleBtn(id, label) {
-  const sl = $(id), lab = sl.closest('label'), b = document.createElement('button');
-  b.className = 'cyc'; b.id = id + 'Btn';
-  const paint = () => { b.innerHTML = `${label} <b>${sl.options[sl.selectedIndex] ? sl.options[sl.selectedIndex].text : ''}</b>`; };
-  b.onclick = () => { sl.selectedIndex = (sl.selectedIndex + 1) % sl.options.length; sl.dispatchEvent(new Event('change')); saveOpts(); Sound.click(); paint(); };
-  sl.addEventListener('change', paint);
-  lab.parentNode.insertBefore(b, lab); lab.style.display = 'none'; paint();
-  return paint;
+// ---- game settings panel: grouped rows of tap targets. The hidden <select>s still hold the values (other code reads them) ----
+const MU_GROUPS = [
+  ['GAME', [['optQtr', 'QUARTERS'], ['optDiff', 'CPU'], ['optPlayers', 'PLAYERS'], ['optGame', 'GAME']]],
+  ['CONDITIONS', [['optWeather', 'WEATHER'], ['optNight', 'TIME']]],
+  ['CONTROLS', [['optMeter', 'PASS METER'], ['optCatchM', 'CATCH METER'], ['optDefM', 'DEFENSE METER'], ['optCoach', 'COACH'], ['optCoachMode', 'COACH MODE']]],
+  ['LOOK', [['optLogos', 'LOGOS'], ['uni', 'UNIFORMS'], ['stad', 'STADIUM']]]
+];
+const muRows = []; // [select id, paint fn]
+function muSetShow(on) { $('muSet').classList.toggle('show', on); if (on) muPaint(); }
+function muSetVal(id, v) { const sl = $(id); if (sl.value === v) return; sl.value = v; sl.dispatchEvent(new Event('change')); saveOpts(); Sound.click(); muPaint(); }
+let muStadFrom = false;
+function muOpenStadium() { // STADIUM straight from the matchup screen; DONE comes back here instead of the Uniform Room
+  if (typeof StadiumRoom === 'undefined') return;
+  const sd = $('sdDone');
+  if (!sd.muWrapped) { const orig = sd.onclick; sd.onclick = function () { if (muStadFrom) { muStadFrom = false; fieldKey = ''; Sound.click(); show('select'); renderSelect(); } else orig.call(this); }; sd.muWrapped = true; }
+  Sound.click(); muStadFrom = true; muSetShow(false); StadiumRoom.open(0);
 }
+function buildMuSet() {
+  const body = $('muSetBody');
+  for (const [g, rows] of MU_GROUPS) {
+    const grp = document.createElement('div'); grp.className = 'muGrp'; grp.innerHTML = `<div class="muGh">${g}</div>`;
+    for (const [id, label] of rows) {
+      const row = document.createElement('div'); row.className = 'muRow'; row.id = 'muRow_' + id;
+      row.innerHTML = `<span class="muL">${label}</span><div class="muC"></div>`;
+      const c = row.querySelector('.muC');
+      if (id === 'uni' || id === 'stad') { // these open their own rooms
+        const b = document.createElement('button'); b.className = 'muGo'; b.id = id === 'uni' ? 'muUniGo' : 'muStadGo';
+        b.onclick = id === 'uni' ? () => { Sound.click(); muSetShow(false); Locker.open(); } : muOpenStadium;
+        c.appendChild(b);
+        muRows.push([id, () => { const un = v => typeof uniName === 'function' ? uniName(v) : v; b.innerHTML = id === 'uni' ? `${un($('optUni1').value)} / ${un($('optUni0').value)}<i>OPEN</i>` : `${muStadium()}<i>OPEN</i>`; }]);
+      } else {
+        const sl = $(id), opts = [...sl.options];
+        if (opts.length <= 4) { // segmented: every choice visible
+          c.classList.add('seg');
+          for (const o of opts) { const b = document.createElement('button'); b.dataset.v = o.value; b.textContent = o.text; b.onclick = () => muSetVal(id, o.value); c.appendChild(b); }
+          muRows.push([id, () => c.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === sl.value))]);
+        } else { // long lists: arrows + value
+          c.classList.add('step');
+          const mk = (d, svg) => { const b = document.createElement('button'); b.className = 'muStep'; b.innerHTML = `<svg viewBox="0 0 24 24"><path d="${svg}"/></svg>`; b.onclick = () => muSetVal(id, sl.options[(sl.selectedIndex + d + sl.options.length) % sl.options.length].value); return b; };
+          const v = document.createElement('span'); v.className = 'muV';
+          c.append(mk(-1, 'M15 5l-7 7 7 7'), v, mk(1, 'M9 5l7 7-7 7'));
+          muRows.push([id, () => { v.textContent = sl.options[sl.selectedIndex] ? sl.options[sl.selectedIndex].text : ''; }]);
+        }
+        sl.addEventListener('change', () => muPaint());
+      }
+      grp.appendChild(row);
+    }
+    body.appendChild(grp);
+  }
+}
+function muStadium() {
+  const t = TEAMS[sel.idx[0]]; if (!t) return '';
+  try { return t.custom ? (t.stadium || 'Home Field') : ((typeof FieldStyle !== 'undefined' && (FieldStyle.get(t.id) || {}).name) || (STADIUMS[t.id] || ['Home Field'])[0]); } catch (e) { return 'Home Field'; }
+}
+// one summary line on the SETTINGS button, so you can see the setup without opening the panel
+function muPaint() {
+  const txt = id => { const s = $(id); return s.options[s.selectedIndex] ? s.options[s.selectedIndex].text : ''; };
+  const two = $('optPlayers').value === '2' && G.mode !== 'mobile';
+  $('muRow_optPlayers').style.display = G.mode === 'mobile' ? 'none' : '';
+  $('muRow_optCoachMode').style.display = two ? 'none' : '';
+  for (const [, f] of muRows) f();
+  const bits = [txt('optQtr') + ' QTRS', two ? '2 PLAYERS' : 'CPU ' + txt('optDiff'), txt('optWeather') + (txt('optNight') === 'Night' ? ' NIGHT' : ''), $('optGame').value === 'bowl' ? 'BOBBLE BOWL' : ''];
+  $('muSetSum').textContent = bits.filter(Boolean).join('  ·  ');
+  $('muStadName').textContent = muStadium();
+}
+$('muSetBtn').onclick = () => { Sound.click(); muSetShow(true); };
+$('muSetDone').onclick = () => { Sound.click(); muSetShow(false); };
+$('muStadBtn').onclick = muOpenStadium;
+$('muSet').addEventListener('click', e => { if (e.target === $('muSet')) muSetShow(false); });
 
 $('btnBackSel').onclick = () => show('title');
 $('btnKick').onclick = startGame;
@@ -224,11 +318,9 @@ fillSel('optUni0', UNIFORMS, 'home');
 $('optPlayers').onchange = () => renderSelect(); fillSel('optUni1', UNIFORMS, 'away'); fillSel('optWeather', WEATHER, 'clear');
 try { const o = JSON.parse(localStorage.getItem('bobbleOpts') || 'null'); if (o) for (const k in o) if ($(k)) $(k).value = o[k]; } catch (e) {}
 function saveOpts() { const o = {}; for (const k of ['optUni0', 'optUni1', 'optWeather', 'optNight', 'optGame', 'optLogos', 'optQtr', 'optDiff', 'optCoach', 'optCoachMode', 'optPlayers', 'optMeter', 'optCatchM', 'optDefM']) o[k] = $(k).value; try { localStorage.setItem('bobbleOpts', JSON.stringify(o)); } catch (e) {} }
-const cycPaint = [['optQtr', 'QUARTERS'], ['optDiff', 'CPU'], ['optCoach', 'COACH'], ['optCoachMode', 'COACH MODE'], ['optWeather', 'WEATHER'], ['optNight', 'TIME'], ['optGame', 'GAME'], ['optLogos', 'LOGOS'], ['optMeter', 'PASS METER'], ['optCatchM', 'CATCH METER'], ['optDefM', 'DEFENSE METER'], ['optPlayers', 'PLAYERS']].map(([id, l]) => cycleBtn(id, l));
+buildMuSet(); // after the weather/uniform lists are filled
 $('optLogos').addEventListener('change', () => { Logo.setStyle($('optLogos').value); renderSelect(); });
 Logo.onReady(() => { if ($('select').classList.contains('show')) renderSelect(); });
-const repaintCycles = () => cycPaint.forEach(f => f());
-$('optPlayersBtn').classList.add('optPl');
 // Coach Mode (you call the plays, the CPU plays them): one saved setting shared by Quick Game, Season and the pause menu
 function setCoachMode(on) {
   $('optCoachMode').value = $('snCoachMode').value = on ? '1' : '0'; $('optCoachMode').dispatchEvent(new Event('change')); saveOpts();

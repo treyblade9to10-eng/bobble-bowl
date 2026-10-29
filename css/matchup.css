@@ -1,0 +1,138 @@
+/* ---- Quick Game matchup screen: two team cards, VS + PLAY in the middle, a bottom bar, settings panel ---- */
+#select.screen { justify-content: center; padding: 14px max(18px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left)); overflow: hidden;
+  background: radial-gradient(ellipse at 50% 45%, #0c1016de, #0c1016f7 75%); }
+#muTop { display: flex; flex-direction: column; align-items: center; margin-bottom: 12px; font-family: var(--hd); line-height: 1; }
+#muTop span { font-weight: 800; font-size: 13px; letter-spacing: .34em; color: var(--dim); padding-left: .34em; }
+#muTop b { font-style: italic; font-weight: 900; font-size: 34px; letter-spacing: .02em; position: relative; padding-bottom: 7px; }
+#muTop b::after { content: ''; position: absolute; left: 50%; bottom: 0; width: 44px; height: 3px; margin-left: -22px; background: var(--gold); transform: skewX(-20deg); }
+
+#select #matchRow { display: grid; grid-template-columns: minmax(0, 420px) auto minmax(0, 420px); justify-content: center; align-items: stretch; gap: 22px;
+  width: 100%; flex: 0 1 470px; min-height: 0; }
+
+/* team card */
+.muCard { position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; color: var(--fg, #fff);
+  background: linear-gradient(155deg, var(--c1) 0%, var(--c1) 48%, var(--c2) 135%);
+  clip-path: polygon(20px 0, 100% 0, 100% calc(100% - 20px), calc(100% - 20px) 100%, 0 100%, 0 20px); }
+.muCard::before { content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(115deg, #ffffff0a 0 16px, #0000 16px 32px), linear-gradient(180deg, #0000 45%, #00000059); }
+.muCard > * { position: relative; }
+.muCard.bump .muBody { animation: muBump .2s ease-out; }
+@keyframes muBump { 0% { transform: translateX(0) scale(.97); opacity: .6; } 100% { transform: none; opacity: 1; } }
+
+.muHead { display: flex; align-items: center; gap: 8px; padding: 8px 16px 8px 24px; background: #000000a6; color: #fff; font-family: var(--hd); font-weight: 800; }
+.muHead .pside { font-size: 15px; letter-spacing: .26em; }
+.muHead .who { font-size: 12px; letter-spacing: .14em; padding: 2px 8px; }
+.muHead .who.you { background: var(--gold); color: #111; } .muHead .who.cpu { background: #3a4452; color: #fff; } .muHead .who.p2 { background: #5ad1ff; color: #111; }
+.muHead .muCnt { margin-left: auto; font-size: 12px; letter-spacing: .1em; color: #ffffff8c; font-weight: 600; }
+
+.muBody { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 10px 58px; cursor: pointer; text-align: center; }
+.muLogo { display: flex; align-items: center; justify-content: center; height: min(150px, 21vh); }
+.muLogo .badge { height: 100%; width: auto; max-width: 180px; object-fit: contain; filter: drop-shadow(0 4px 6px #0009); }
+.muCity { margin-top: 8px; font-family: var(--hd); font-weight: 800; font-size: 16px; letter-spacing: .2em; text-transform: uppercase; opacity: .85; padding-left: .2em; }
+.muName { max-width: 100%; font-family: var(--hd); font-style: italic; font-weight: 900; font-size: 48px; line-height: .95; text-transform: uppercase;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 2px 3px 0 #00000059; padding: 0 4px; }
+.muRat { display: flex; align-items: center; gap: 14px; margin-top: 10px; padding: 6px 14px 6px 12px; background: #000000b8; color: #fff; }
+.muOvr { display: flex; flex-direction: column; align-items: center; font-family: var(--hd); line-height: .9; }
+.muOvr b { font-style: italic; font-weight: 900; font-size: 40px; color: var(--gold); }
+.muOvr span { font-weight: 800; font-size: 11px; letter-spacing: .2em; color: var(--dim); padding-left: .2em; }
+.muBars { display: flex; flex-direction: column; gap: 5px; width: 150px; }
+.muB { display: grid; grid-template-columns: 30px 1fr 24px; align-items: center; gap: 6px; font-family: var(--hd); font-weight: 800; font-size: 13px; letter-spacing: .08em; }
+.muB span { color: var(--dim); text-align: left; } .muB b { text-align: right; }
+.muB i { height: 6px; background: #ffffff26; display: block; } .muB u { display: block; height: 100%; background: var(--gold); }
+.muPl { display: flex; flex-direction: column; gap: 3px; margin-top: 8px; width: 100%; max-width: 300px; }
+.muP { display: flex; align-items: center; gap: 8px; padding: 4px 10px; background: #0000008c; color: #fff; font-size: 13px; text-align: left; }
+.muP .tg { width: 24px; font-family: var(--hd); font-weight: 800; color: var(--gold); letter-spacing: .04em; }
+.muP .nm { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 700; }
+.muP .nm em { font-style: normal; font-family: var(--hd); font-weight: 800; font-size: 11px; background: #ff8a1a; color: #111; padding: 0 4px; margin-left: 6px; vertical-align: 1px; }
+.muP b { font-family: var(--hd); font-weight: 800; font-size: 15px; }
+
+.muArr { position: absolute; top: calc(50% - 44px); width: 50px; height: 88px; margin: 0; padding: 0; clip-path: none; background: #0000004d; display: flex; align-items: center; justify-content: center; }
+.muArr.l { left: 0; } .muArr.r { right: 0; }
+.muArr svg { width: 30px; height: 30px; fill: none; stroke: #fff; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.muArr:hover { background: #00000080; } .muArr:hover svg { stroke: var(--gold); }
+.muArr:active { transform: none; background: #000000a6; }
+
+.muFoot { display: flex; justify-content: center; gap: 8px; padding: 8px 10px 10px; background: #000000a6; }
+.muFoot button { margin: 0; padding: 8px 18px; font-size: 14px; letter-spacing: .12em; background: #ffffff1f; color: #fff; }
+.muFoot button:hover { background: var(--gold); color: #111; }
+
+/* middle */
+#muMid { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; min-width: 0; width: 200px; }
+#muMid .vs { font-family: var(--hd); font-style: italic; font-weight: 900; font-size: 92px; line-height: .85; color: var(--gold); text-shadow: 4px 4px 0 #00000080; }
+#btnSwap { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 14px; padding: 9px 18px; }
+#btnSwap svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+#select #btnKick { margin: 0; font-size: 38px; padding: 14px 50px; }
+
+/* bottom bar */
+#select #selOpts { display: flex; flex-wrap: nowrap; justify-content: center; align-items: stretch; gap: 10px; width: 100%; max-width: 1084px; margin: 14px 0 0; font-size: inherit; color: var(--text); }
+#muHidden { display: none; }
+#select .muBar, #select #uniBtn { margin: 0; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 2px; padding: 7px 26px; background: var(--panel2); min-width: 0; font-size: 15px; }
+#select .muBar:hover, #select #uniBtn:hover { background: #2a3544; }
+.muBar .k { font-size: 11px; letter-spacing: .2em; color: var(--dim); }
+.muBar .v { font-size: 15px; color: var(--gold); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+#select .muBack { order: 0; flex: none; justify-content: center; font-size: 16px; padding: 7px 30px; }
+#muSetBtn { order: 1; flex: 1.25 1 0; } #select #uniBtn { order: 2; flex: 1 1 0; flex-direction: row; align-items: center; justify-content: center; } #muStadBtn { order: 3; flex: 1 1 0; }
+#muSetBtn { border-bottom: 3px solid var(--gold); }
+#select #selHint { margin-top: 8px; font-size: 12px; color: var(--dim); white-space: pre; min-height: 0; }
+
+/* settings panel */
+#muSet { display: none; position: absolute; inset: 0; z-index: 25; background: #0c1016f7; flex-direction: column; align-items: center;
+  padding: 14px max(22px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(22px, env(safe-area-inset-left)); }
+#muSet.show { display: flex; }
+#muSetHead { display: flex; align-items: center; width: 100%; max-width: 1060px; margin-bottom: 12px; padding-right: 56px; }
+#muSetHead b { font-family: var(--hd); font-style: italic; font-weight: 900; font-size: 32px; letter-spacing: .02em; }
+#muSetDone { margin: 0 0 0 auto; font-size: 22px; padding: 8px 34px; }
+#muSetBody { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 36px; width: 100%; max-width: 1060px; overflow-y: auto; align-content: start; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
+.muGh { font-family: var(--hd); font-weight: 800; font-size: 14px; letter-spacing: .26em; color: var(--gold); padding: 0 0 4px; border-bottom: 1px solid var(--line2); margin-bottom: 4px; }
+.muRow { display: flex; align-items: center; gap: 12px; padding: 4px 0; }
+.muL { width: 128px; flex: none; font-family: var(--hd); font-weight: 800; font-size: 15px; letter-spacing: .08em; color: var(--dim); }
+.muC { flex: 1; min-width: 0; display: flex; gap: 3px; min-height: 36px; }
+.muC button { margin: 0; clip-path: none; padding: 9px 6px; font-size: 14px; letter-spacing: .04em; background: var(--panel2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.muC.seg button { flex: 1 1 0; min-width: 0; }
+.muC.seg button.on { background: var(--gold); color: #111; }
+.muC.step { align-items: stretch; }
+.muC .muStep { width: 46px; flex: none; padding: 0; display: flex; align-items: center; justify-content: center; }
+.muStep svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.muV { flex: 1; display: flex; align-items: center; justify-content: center; background: var(--panel); font-family: var(--hd); font-weight: 800; font-size: 16px; letter-spacing: .06em; text-transform: uppercase; color: var(--gold); }
+.muC .muGo { flex: 1; display: flex; align-items: center; text-align: left; padding: 9px 12px; }
+.muGo i { margin-left: auto; padding-left: 10px; font-style: normal; font-size: 12px; letter-spacing: .16em; color: var(--gold); }
+
+/* team grid: tile hover/active matches the cards */
+#select #tgrid { z-index: 25; }
+
+/* ---- phones in landscape / short screens ---- */
+@media (max-height: 500px) {
+  #select.screen { padding: 8px max(10px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left)); }
+  #muTop { display: none; }
+  #select #matchRow { flex: 1 1 auto; gap: 10px; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); }
+  .muCard { clip-path: polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px); }
+  .muHead { padding: 4px 10px 4px 18px; } .muHead .muCnt { display: none; } #pHome .muHead { padding-right: 58px; } .muHead .pside { font-size: 13px; } .muHead .who { font-size: 11px; padding: 1px 7px; } .muHead .muCnt { font-size: 11px; }
+  .muBody { padding: 4px 46px; }
+  .muLogo { height: min(72px, 19vh); }
+  .muCity { margin-top: 3px; font-size: 12px; }
+  .muName { font-size: 28px; }
+  .muRat { margin-top: 5px; gap: 10px; padding: 3px 10px 3px 8px; }
+  .muOvr b { font-size: 26px; } .muOvr span { font-size: 9px; }
+  .muBars { width: 112px; gap: 3px; } .muB { font-size: 11px; grid-template-columns: 26px 1fr 20px; gap: 4px; } .muB i { height: 5px; }
+  .muPl { margin-top: 5px; gap: 2px; } .muP { font-size: 11.5px; padding: 2px 8px; } .muP b { font-size: 13px; }
+  .muArr { width: 42px; height: 76px; top: calc(50% - 38px); } .muArr svg { width: 26px; height: 26px; }
+  .muFoot { padding: 5px 8px 6px; gap: 6px; } .muFoot button { padding: 7px 14px; font-size: 13px; }
+  #muMid { width: 158px; gap: 10px; } #muMid .vs { font-size: 52px; }
+  #btnSwap { font-size: 12px; padding: 8px 12px; } #btnSwap svg { width: 15px; height: 15px; }
+  #select #btnKick { font-size: 28px; padding: 11px 34px; }
+  #select #selOpts { margin-top: 8px; gap: 8px; }
+  #select .muBar, #select #uniBtn { padding: 4px 18px; font-size: 13px; }
+  .muBar .k { font-size: 10px; } .muBar .v { font-size: 13px; }
+  #select .muBack { font-size: 14px; padding: 4px 20px; }
+  #select #selHint { display: none; }
+  #muSet { padding: 8px max(12px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); }
+  #muSetHead { margin-bottom: 6px; } #muSetHead b { font-size: 22px; } #muSetDone { font-size: 17px; padding: 6px 26px; }
+  #muSetBody { gap: 8px 18px; }
+  .muGh { font-size: 12px; margin-bottom: 2px; padding-bottom: 2px; }
+  .muRow { gap: 8px; padding: 2px 0; }
+  .muL { width: 92px; font-size: 12px; letter-spacing: .04em; }
+  .muC { min-height: 31px; }
+  .muC button { padding: 7px 3px; font-size: 12px; letter-spacing: .02em; }
+  .muC .muStep { width: 40px; } .muV { font-size: 13px; }
+  .muC .muGo { padding: 7px 10px; } .muGo i { font-size: 10px; }
+}
