@@ -24,6 +24,7 @@
 <link rel="preload" href="fonts/bc-900i.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="css/style.css">
 <link rel="stylesheet" href="css/stadium.css">
+<link rel="stylesheet" href="css/matchup.css">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#0c1016">
 <link rel="icon" type="image/png" sizes="48x48" href="icons/favicon-48.png">
@@ -84,48 +85,60 @@
 
   <!-- Team select: away on the left, home on the right -->
   <div id="select" class="screen">
-    <h2>Matchup</h2>
+    <div id="muTop"><span>QUICK GAME</span><b>MATCHUP</b></div>
     <div id="matchRow">
-      <div class="tpanel" id="pAway">
-        <div class="pside">AWAY <span class="who"></span></div>
-        <button class="arr" data-side="1" data-d="-1"><svg viewBox="0 0 24 24" class="chev"><path d="M5 15l7-7 7 7"/></svg></button>
-        <div class="tbig"></div>
-        <button class="arr" data-side="1" data-d="1"><svg viewBox="0 0 24 24" class="chev"><path d="M5 9l7 7 7-7"/></svg></button>
+      <div class="muCard" id="pAway" data-side="1">
+        <div class="muHead"><span class="pside">AWAY</span><span class="who"></span><span class="muCnt"></span></div>
+        <div class="muBody"></div>
+        <button class="muArr l" data-side="1" data-d="-1" aria-label="previous team"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+        <button class="muArr r" data-side="1" data-d="1" aria-label="next team"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></button>
+        <div class="muFoot"></div>
       </div>
-      <div id="vsCol">
+      <div id="muMid">
         <div class="vs">VS</div>
-        <button id="btnSwap">Switch sides</button>
-        <label>Quarter <select id="optQtr"><option value="120">2 min</option><option value="180" selected>3 min</option><option value="300">5 min</option></select></label>
-        <label>CPU <select id="optDiff"><option value="0">Rookie</option><option value="1" selected>Pro</option><option value="2">All-Pro</option><option value="3">All-Madden</option></select></label>
-        <label>Coach <select id="optCoach"><option value="balanced" selected>Balanced</option><option value="aggressive">Aggressive</option><option value="conservative">Old School</option><option value="air">Air Raid</option><option value="ground">Ground + Pound</option></select></label>
-        <label>Coach Mode <select id="optCoachMode"><option value="0" selected>Off</option><option value="1">On</option></select></label>
-        <button class="big" id="btnKick">KICKOFF</button>
-        <button id="btnBackSel">Back</button>
+        <button id="btnSwap"><svg viewBox="0 0 24 24"><path d="M4 8h14l-4-4M20 16H6l4 4"/></svg>SWITCH SIDES</button>
+        <button class="big" id="btnKick">PLAY</button>
       </div>
-      <div class="tpanel" id="pHome">
-        <div class="pside">HOME <span class="who"></span></div>
-        <button class="arr" data-side="0" data-d="-1"><svg viewBox="0 0 24 24" class="chev"><path d="M5 15l7-7 7 7"/></svg></button>
-        <div class="tbig"></div>
-        <button class="arr" data-side="0" data-d="1"><svg viewBox="0 0 24 24" class="chev"><path d="M5 9l7 7 7-7"/></svg></button>
+      <div class="muCard" id="pHome" data-side="0">
+        <div class="muHead"><span class="pside">HOME</span><span class="who"></span><span class="muCnt"></span></div>
+        <div class="muBody"></div>
+        <button class="muArr l" data-side="0" data-d="-1" aria-label="previous team"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+        <button class="muArr r" data-side="0" data-d="1" aria-label="next team"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></button>
+        <div class="muFoot"></div>
       </div>
     </div>
     <div id="tgrid">
       <div id="tgHead"><span id="tgTitle"></span><div id="tgTabs"><button data-f="all">ALL</button><button data-f="AFC">AFC</button><button data-f="NFC">NFC</button><button data-f="MINE">MY TEAMS</button></div><button id="tgClose">CLOSE</button></div>
       <div id="tgList"></div>
     </div>
+    <!-- bottom bar: BACK, SETTINGS (summary), UNIFORMS (added by locker.js), STADIUM. The hidden selects hold the real values. -->
     <div id="selOpts">
-      <label>Away uniform <select id="optUni1"></select></label>
-      <label>Home uniform <select id="optUni0"></select></label>
-      <label>Weather <select id="optWeather"></select></label>
-      <label>Time <select id="optNight"><option value="0">Day</option><option value="1">Night</option></select></label>
-      <label>Game <select id="optGame"><option value="reg">Regular</option><option value="bowl">Bobble Bowl</option></select></label>
-      <label>Logos <select id="optLogos"><option value="real">Real</option><option value="cartoon">Cartoon</option></select></label>
-      <label>Pass meter <select id="optMeter"><option value="1">On</option><option value="0">Off</option></select></label>
-      <label>Catch meter <select id="optCatchM"><option value="0">Off</option><option value="1">On</option></select></label>
-      <label>Defense meter <select id="optDefM"><option value="0">Off</option><option value="1">On</option></select></label>
-      <label class="optPl">Players <select id="optPlayers"><option value="1">1 vs CPU</option><option value="2">2 Players</option></select></label>
+      <button id="btnBackSel" class="muBar muBack">BACK</button>
+      <button id="muSetBtn" class="muBar"><span class="k">SETTINGS</span><span class="v" id="muSetSum"></span></button>
+      <button id="muStadBtn" class="muBar"><span class="k">STADIUM</span><span class="v" id="muStadName"></span></button>
+      <div id="muHidden">
+        <label>Quarter <select id="optQtr"><option value="120">2 min</option><option value="180" selected>3 min</option><option value="300">5 min</option></select></label>
+        <label>CPU <select id="optDiff"><option value="0">Rookie</option><option value="1" selected>Pro</option><option value="2">All-Pro</option><option value="3">All-Madden</option></select></label>
+        <label>Coach <select id="optCoach"><option value="balanced" selected>Balanced</option><option value="aggressive">Aggressive</option><option value="conservative">Old School</option><option value="air">Air Raid</option><option value="ground">Ground + Pound</option></select></label>
+        <label>Coach Mode <select id="optCoachMode"><option value="0" selected>Off</option><option value="1">On</option></select></label>
+        <label>Away uniform <select id="optUni1"></select></label>
+        <label>Home uniform <select id="optUni0"></select></label>
+        <label>Weather <select id="optWeather"></select></label>
+        <label>Time <select id="optNight"><option value="0">Day</option><option value="1">Night</option></select></label>
+        <label>Game <select id="optGame"><option value="reg">Regular</option><option value="bowl">Bobble Bowl</option></select></label>
+        <label>Logos <select id="optLogos"><option value="real">Real</option><option value="cartoon">Cartoon</option></select></label>
+        <label>Pass meter <select id="optMeter"><option value="1">On</option><option value="0">Off</option></select></label>
+        <label>Catch meter <select id="optCatchM"><option value="0">Off</option><option value="1">On</option></select></label>
+        <label>Defense meter <select id="optDefM"><option value="0">Off</option><option value="1">On</option></select></label>
+        <label>Players <select id="optPlayers"><option value="1">1 vs CPU</option><option value="2">2 Players</option></select></label>
+      </div>
     </div>
     <div id="selHint"></div>
+    <!-- settings panel (opens over the matchup) -->
+    <div id="muSet">
+      <div id="muSetHead"><b>GAME SETTINGS</b><button id="muSetDone" class="big gold">DONE</button></div>
+      <div id="muSetBody"></div>
+    </div>
   </div>
 
   <div id="rosterPeek"></div>
