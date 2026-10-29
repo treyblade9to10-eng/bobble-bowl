@@ -1,0 +1,135 @@
+/* ---- Franchise Hub tab, League Stats, Pro Bowl (js/fhub.js, js/leaguestats.js, js/seasonform.js) ---- */
+#seasonHub #shLeft { flex-basis: 47%; }
+#seasonHub #shRight { flex-basis: 53%; }
+#shTabs button { padding-left: 10px; padding-right: 10px; }
+#shStand.fhOn { background: transparent; padding: 0; max-height: max(360px, calc(100vh - 210px)); }
+.fhGrid { display: flex; gap: 6px; align-items: flex-start; }
+.fhCol { flex: 1 1 50%; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.fhCard { background: var(--panel); padding: 6px 9px 7px; min-width: 0; border-top: 2px solid #ffffff10; }
+.fhCard.fhStand { border-top-color: var(--gold); }
+.fhT { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 3px; }
+.fhT > span { font-family: var(--hd); font-weight: 800; letter-spacing: .14em; color: var(--gold); font-size: 13px; white-space: nowrap; }
+.fhLink { margin: 0; padding: 1px 8px; font-size: 11px; letter-spacing: .08em; background: var(--panel2); color: var(--dim); clip-path: polygon(4px 0, 100% 0, calc(100% - 4px) 100%, 0 100%); white-space: nowrap; }
+.fhLink:hover { color: #fff; }
+.fhBig { font-family: var(--hd); font-style: italic; font-weight: 900; font-size: 24px; line-height: 1.05; text-transform: uppercase; }
+.fhLine { font-size: 12px; color: var(--text); line-height: 1.35; margin: 1px 0; }
+.fhLine.dim, .dim { color: var(--dim); }
+.fhSub { font-family: var(--hd); font-weight: 800; letter-spacing: .1em; font-size: 11px; color: var(--dim); margin: 1px 0 2px; }
+.fhGap { margin-top: 6px; }
+.fhTag { display: inline-block; font-style: normal; font-family: var(--hd); font-weight: 800; font-size: 11px; letter-spacing: .08em; padding: 1px 7px; margin-top: 3px; background: #ffffff14; color: var(--text); white-space: nowrap; }
+.fhTag.g { background: #f6c31c26; color: var(--gold); } .fhTag.r { background: #ff6b6b22; color: #ff8a8a; } .fhTag.c { background: #5aa9ff22; color: #8cc4ff; }
+.fhRow .fhTag { margin: 0 4px 0 0; padding: 0 5px; font-size: 10px; }
+.fhRow { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; padding: 2px 0; border-bottom: 1px solid var(--line); font-size: 12px; min-width: 0; }
+.fhRow:last-child { border-bottom: 0; }
+.fhRow > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fhRow i { font-style: normal; font-family: var(--hd); font-weight: 800; font-size: 10px; letter-spacing: .08em; color: var(--gold); margin-right: 5px; }
+.fhRow small { color: var(--dim); font-size: 11px; }
+.fhRow .fhStat { flex-shrink: 1; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.fhRow.me > span:first-child { color: var(--gold); }
+.fhAwR { display: grid; grid-template-columns: auto 1fr; column-gap: 6px; padding: 2px 0; border-bottom: 1px solid var(--line); font-size: 12px; line-height: 1.25; }
+.fhAwR i { grid-row: span 2; font-style: normal; font-family: var(--hd); font-weight: 800; font-size: 10px; letter-spacing: .08em; color: var(--gold); padding-top: 2px; min-width: 30px; }
+.fhAwR span, .fhAwR > small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.fhAwR span small { color: var(--dim); font-size: 11px; } .fhAwR > small { color: var(--dim); font-size: 11px; }
+.fhAwR.me span { color: var(--gold); }
+.fhR { display: flex; align-items: baseline; gap: 4px; flex-shrink: 0; } .fhR b { min-width: 18px; text-align: right; }
+.fhOut { font-style: normal; color: #ff8a8a; font-size: 10px; font-family: var(--hd); font-weight: 800; letter-spacing: .06em; white-space: nowrap; }
+.fhNews { font-size: 11.5px; line-height: 1.3; padding: 2px 0; border-bottom: 1px solid var(--line); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.fhNews:last-child { border-bottom: 0; }
+.fhNews span { color: var(--gold); font-family: var(--hd); font-weight: 800; font-size: 11px; margin-right: 6px; }
+.fhOffer span b { color: var(--gold); }
+.fhMv { font-style: normal; font-family: var(--hd); font-weight: 800; font-size: 11px; color: var(--dim); margin-left: 3px; }
+.fhMv.up { color: #4fe08a; } .fhMv.dn { color: #ff6b6b; }
+.fhPb, .fhPw { font-style: normal; font-family: var(--hd); font-weight: 800; font-size: 10px; letter-spacing: .06em; padding: 0 5px; margin-left: 5px; vertical-align: 1px; white-space: nowrap; }
+.fhPb { background: var(--gold); color: #111; } .fhPw { background: #f6c31c22; color: var(--gold); }
+.fhRow .fhPb { margin: 0; }
+.fhHot { color: var(--gold); }
+.fhCapN { display: flex; align-items: baseline; gap: 8px; }
+.fhCapN b { font-family: var(--hd); font-style: italic; font-weight: 900; font-size: 24px; color: #4fe08a; } .fhCapN b.neg { color: #ff6b6b; }
+.fhCapN span { font-family: var(--hd); font-weight: 800; letter-spacing: .1em; font-size: 11px; color: var(--dim); }
+.fhBar { height: 5px; background: #ffffff14; margin: 3px 0; } .fhBar u { display: block; height: 100%; background: var(--gold); }
+.fhBtn { display: block; width: 100%; margin: 5px 0 0; padding: 5px 10px; font-size: 13px; }
+.fhBtn.gold { background: var(--gold); color: #111; } .fhBtn.gold:hover { background: #ffd54a; }
+.fhQuick { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; justify-content: center; }
+.fhQuick button { margin: 0; padding: 5px 14px; font-size: 13px; background: var(--panel); }
+.fhQuick button:hover { background: var(--panel2); color: var(--gold); }
+.dcRow .fhMv { font-size: 10px; margin-left: 1px; }
+
+/* ---- league stats ---- */
+#lgStats, #proBowl { justify-content: flex-start; padding: 10px 12px 8px; }
+.lsHead { display: flex; align-items: baseline; justify-content: center; gap: 14px; flex-wrap: wrap; flex-shrink: 0; }
+.lsHead h3 { margin: 0; font-family: var(--hd); font-style: italic; font-weight: 900; font-size: 34px; line-height: 1; color: #fff; text-shadow: 2px 2px 0 #0008; }
+.lsHead span { font-family: var(--hd); font-weight: 800; font-size: 14px; letter-spacing: .14em; color: var(--gold); }
+.lsBar { display: flex; justify-content: space-between; gap: 10px; width: min(1100px, 100%); margin-top: 8px; flex-shrink: 0; flex-wrap: wrap; }
+#lsTabs, #lsWho { overflow-x: auto; scrollbar-width: none; } #lsTabs button, #lsWho button { flex-shrink: 0; }
+#lsBody { width: min(1100px, 100%); flex: 1 1 auto; min-height: 0; overflow-y: auto; margin-top: 6px; background: var(--panel); }
+.lsTab { width: 100%; border-collapse: collapse; font-size: 13px; }
+.lsTab th { position: sticky; top: 0; z-index: 1; background: #10151d; text-align: right; color: var(--dim); font-family: var(--hd); font-weight: 800; letter-spacing: .08em; font-size: 13px; padding: 5px 8px; cursor: pointer; white-space: nowrap; }
+.lsTab th.on { color: var(--gold); box-shadow: inset 0 -2px 0 var(--gold); }
+.lsTab td { text-align: right; padding: 4px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.lsTab td.on { color: #fff; font-weight: 700; }
+.lsTab .lsRk { text-align: center; width: 34px; color: var(--dim); cursor: default; }
+.lsTab .lsNm, .lsTab .lsTm { text-align: left; }
+.lsTab td.lsNm { max-width: 320px; overflow: hidden; text-overflow: ellipsis; }
+.lsTab td.lsNm i { font-style: normal; font-family: var(--hd); font-weight: 800; font-size: 11px; color: var(--dim); display: inline-block; min-width: 24px; }
+.lsTab tr.me td { background: #f6c31c1c; } .lsTab tr.me td.lsNm { color: var(--gold); font-weight: 700; }
+.lsNote { padding: 6px 10px; opacity: .6; font-size: 11px; }
+.lsNone { padding: 18px; text-align: center; }
+.lsBtns { flex-shrink: 0; margin-top: 4px; } .lsBtns button { margin: 0 4px; padding: 7px 22px; font-family: var(--hd); font-style: italic; font-weight: 800; }
+.lsBtns button.gold { background: var(--gold); color: #111; }
+.lsAwWrap { display: flex; gap: 10px; padding: 8px; align-items: flex-start; }
+.lsAwCol { flex: 1 1 auto; min-width: 0; } .lsAwSide { flex: 0 0 260px; background: var(--panel2); padding: 8px 10px; }
+.lsAw td { text-align: left; vertical-align: top; white-space: normal; font-size: 12px; }
+.lsAw th { text-align: left; cursor: default; }
+.lsAw td i { font-style: normal; color: var(--dim); font-size: 11px; }
+.lsAw td small { display: block; color: var(--dim); font-size: 11px; }
+.lsAw td.me b { color: var(--gold); }
+
+/* ---- pro bowl ---- */
+#prbBody { width: min(1100px, 100%); flex: 1 1 auto; min-height: 0; overflow-y: auto; margin-top: 8px; }
+.prbTabs { justify-content: center; flex-wrap: wrap; }
+.prbTabs button { position: relative; min-width: 48px; }
+.prbTabs button.voted:not(.on) { color: var(--gold); box-shadow: inset 0 -3px 0 var(--gold); }
+.prbHint { text-align: center; font-family: var(--hd); font-weight: 800; letter-spacing: .2em; font-size: 13px; color: var(--dim); margin: 8px 0 6px; }
+.prbGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 8px; }
+.prbCard { position: relative; display: flex; align-items: center; gap: 10px; background: linear-gradient(100deg, color-mix(in srgb, var(--tc) 40%, var(--panel)) 0%, var(--panel) 55%); border: 2px solid transparent; padding: 7px 10px; cursor: pointer; transition: transform .1s, border-color .1s; min-width: 0; }
+.prbCard:hover:not(.lock) { transform: translateY(-2px); border-color: #ffffff40; }
+.prbCard.on { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold); }
+.prbCard.lock { cursor: default; }
+.prbLogo .badge { width: 34px; height: 38px; display: block; object-fit: contain; }
+.prbInfo { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.prbInfo b { font-family: var(--hd); font-style: italic; font-weight: 900; font-size: 19px; text-transform: uppercase; line-height: 1.05; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.prbInfo i { font-style: normal; font-family: var(--hd); font-weight: 800; font-size: 11px; letter-spacing: .08em; color: var(--dim); }
+.prbCard.me .prbInfo i { color: var(--gold); }
+.prbInfo span { font-size: 12px; font-weight: 700; }
+.prbOvr { font-style: normal; font-family: var(--hd); font-weight: 900; font-size: 24px; color: var(--gold); }
+.prbCard u { position: absolute; top: -1px; right: -1px; text-decoration: none; background: var(--gold); color: #111; font-family: var(--hd); font-weight: 800; font-size: 10px; letter-spacing: .1em; padding: 0 6px; }
+.prbNote { text-align: center; opacity: .6; font-size: 11px; margin-top: 8px; }
+#prbBtns button.gold { background: var(--gold); color: #111; }
+.prbCols { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.prbConf { background: var(--panel); padding: 6px 10px; }
+.prbCH { font-family: var(--hd); font-style: italic; font-weight: 900; font-size: 24px; color: var(--gold); border-bottom: 2px solid var(--gold); margin-bottom: 3px; }
+.prbGrp { display: flex; gap: 8px; padding: 3px 0; border-bottom: 1px solid var(--line); }
+.prbPos { flex: 0 0 26px; font-family: var(--hd); font-weight: 800; color: var(--dim); font-size: 13px; padding-top: 1px; }
+.prbGrp > div { flex: 1; min-width: 0; }
+.prbSel { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.prbSel i { font-style: normal; color: var(--dim); font-size: 11px; margin-left: 6px; }
+.prbSel.me b { color: var(--gold); }
+
+@media (max-height: 500px) {
+  #seasonHub #shLeft { flex-basis: 42%; } #seasonHub #shRight { flex-basis: 58%; } #shTabs button { padding-left: 7px; padding-right: 7px; }
+  #shStand.fhOn { max-height: none; overflow: visible; }
+  .fhGrid, .fhCol { gap: 4px; } .fhCard { padding: 4px 7px 5px; }
+  .fhT > span { font-size: 11px; } .fhLink { font-size: 10px; padding: 0 6px; }
+  .fhBig { font-size: 18px; } .fhLine, .fhRow { font-size: 11px; } .fhNews { font-size: 10.5px; } .fhCapN b { font-size: 19px; }
+  .fhQuick button { padding: 3px 10px; font-size: 11px; }
+  #lgStats, #proBowl { padding: 5px 8px 4px; }
+  .lsHead h3 { font-size: 22px; } .lsHead span { font-size: 11px; }
+  .lsBar { margin-top: 3px; padding-right: 46px; } .lsBar .tlTabs button { font-size: 12px; padding: 4px 9px; }
+  .lsTab, .lsTab th { font-size: 11.5px; } .lsTab td, .lsTab th { padding: 3px 6px; }
+  .lsBtns button { padding: 4px 16px; font-size: 13px; }
+  .lsAwSide { flex-basis: 200px; }
+  .prbHint { margin: 4px 0 3px; font-size: 11px; } .prbGrid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
+  .prbCard { padding: 4px 7px; gap: 7px; } .prbInfo b { font-size: 15px; } .prbOvr { font-size: 19px; } .prbLogo .badge { width: 26px; height: 29px; }
+  .prbTabs button { min-width: 0; padding: 4px 10px; font-size: 12px; }
+  .prbCH { font-size: 18px; } .prbSel { font-size: 11.5px; }
+}
