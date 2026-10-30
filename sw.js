@@ -11,6 +11,7 @@ const FILES = [
   'css/franchisehub.css', 'css/spooky.css',
   'css/franchise3.css',
   'css/trade.css',
+  'css/gamepad.css',
   'manifest.webmanifest',
   'icons/icon-192.png',
   'icons/icon-512.png',

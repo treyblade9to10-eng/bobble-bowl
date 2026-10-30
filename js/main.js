@@ -84,7 +84,7 @@ function buildHow() {
       <p>Move the QB with <b>WASD</b>; run past the line to scramble.</p></div>
     <div><h3>Running</h3>
       <p><b>WASD</b> move, <b>SHIFT</b> sprint.</p>
-      <p><b>E</b> juke, <b>F</b> spin, <b>R</b> stiff arm.</p></div>
+      <p><b>E</b> juke, <b>F</b> spin, <b>R</b> stiff arm, <b>X</b> slide (ends the play, no fumble).</p></div>
     <div><h3>Defense</h3>
       <p>You control the player with the <b>yellow ring</b>.</p>
       <p><b>Q</b> switch to the guy closest to the ball, <b>SPACE</b> dive tackle, <b>SHIFT</b> sprint.</p></div>
@@ -110,7 +110,7 @@ function buildHow() {
       <p>Pick colors, a badge, a stadium and a roster, and set every player's rating. Play it in <b>Quick Game</b>, or start a <b>Season</b> where it takes over an NFL team's spot.</p>
       <p>Set it to <b>PUBLIC</b> to share it in the <b>Team Database</b>, and grab teams other players made.</p></div>
     <div><h3>Controller</h3>
-      <p>Plug in an Xbox or PlayStation controller. Stick moves, <b>A</b> snap / dive, <b>B</b> juke, <b>X</b> spin, <b>Y</b> stiff arm, <b>RT</b> sprint. Passing: A B X Y throw to receivers 1-4.</p></div>`;
+      <p>Plug in an Xbox or PlayStation controller. Stick moves, <b>RT</b> sprint, <b>A</b> snap / dive. Passing: each receiver gets a button (<b>A B X Y</b>). Running: <b>Y</b> juke, <b>B</b> spin, <b>A</b> stiff arm, <b>X</b> slide. Every button: <b>CONTROLLER</b> below.</p></div>`;
 }
 
 // ---------- title ----------
@@ -459,7 +459,8 @@ function renderCards() {
     const el = document.createElement('div');
     el.className = 'pcard' + (p.special ? ' special' : '') + (p.key === pcCoach ? ' coach' : ''); el.tabIndex = 0;
     const kind = (p.card || p.type) === 'run' ? 'run' : p.type === 'pass' ? 'pass' : p.special ? 'kick' : ''; // card: what the play looks like to you (Statue of Liberty is a run)
-    const label = G.mode === 'mobile' ? (kind === 'run' ? 'RUN' : kind === 'pass' ? 'PASS' : kind === 'kick' ? 'KICK' : 'D') : (j + 1) % 10;
+    const word = kind === 'run' ? 'RUN' : kind === 'pass' ? 'PASS' : kind === 'kick' ? 'KICK' : 'D';
+    const label = G.mode === 'mobile' ? word : `<i class="kn">${(j + 1) % 10}</i><i class="kw">${word}</i>`; // (controller: the word, see gamepad.css)
     el.innerHTML = `${p.key === pcCoach ? '<span class="cp">COACH PICK</span>' : ''}<div class="ph"><span class="k ${kind}">${label}</span><div class="t">${p.name}</div></div>`;
     const mini = document.createElement('canvas'); mini.width = 480; mini.height = 288; // 4x so the art stays sharp
     if (p.key === 'xp' || p.key === 'two') { const g = mini.getContext('2d'); g.scale(4, 4); g.fillStyle = '#2b6b31'; g.fillRect(0, 0, 120, 72); g.font = "italic 900 34px 'Barlow Condensed', sans-serif"; g.textAlign = 'center'; g.fillStyle = '#fff'; g.fillText(p.key === 'xp' ? '+1' : '+2', 60, 48); }

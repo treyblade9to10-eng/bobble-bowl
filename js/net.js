@@ -7,7 +7,7 @@
 const NET_VERSION = 4;
 const NET_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 const NET_KEYS = ['Space', 'ShiftLeft', 'ControlLeft', 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyE', 'KeyF', 'KeyR', 'KeyQ', 'Tab', 'KeyC',
-  'Digit1', 'Digit2', 'Digit3', 'Digit4', 'Numpad1', 'Numpad2', 'Numpad3', 'Numpad4', 'KeyT', 'KeyX', 'KeyM', 'KeyV', 'KeyB', 'Enter', 'Escape', 'KeyY'];
+  'Digit1', 'Digit2', 'Digit3', 'Digit4', 'Numpad1', 'Numpad2', 'Numpad3', 'Numpad4', 'KeyT', 'KeyX', 'KeyM', 'KeyV', 'KeyB', 'Enter', 'Escape', 'KeyY', 'KeyG', 'KeyU'];
 const PSTAT = ['x', 'y', 'vx', 'vy', 'anim', 'speedNow', 'down', 'downDir', 'dive', 'jump', 'spin', 'stiff', 'throwAnim', 'celebrate', 'dizzy', 'hit', 'stamina', 'juke'];
 
 // Backup route (relay): when a direct connection can't get through (phone data, school Wi-Fi, two different houses),
@@ -275,7 +275,7 @@ const Net = {
     c.on('open', () => {
       if (c !== this.conn) return;
       this.ready = true; this.okT = this.rxT = this.inT = this.snapRxT = performance.now();
-      if (this.role === 'guest') c.send({ t: 'hello', team: TEAMS[sel.idx[sel.you]].id, mode: G.mode, v: NET_VERSION, on: G.online ? 1 : 0 });
+      if (this.role === 'guest') c.send({ t: 'hello', team: TEAMS[sel.idx[sel.you]].id, mode: Pad.ui ? 'computer' : G.mode, v: NET_VERSION, on: G.online ? 1 : 0 });
       onStatus(this.onRelay ? 'CONNECTED (RELAY)' : 'CONNECTED (DIRECT)');
     });
     c.on('data', m => { if (c === this.conn) this.recv(m); });

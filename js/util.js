@@ -36,7 +36,7 @@ const lastName = n => { const p = n.split(' '); return p.length > 1 ? p.slice(1)
 // player 2 keys: arrows move, right shift sprint, enter = snap / dive / jump, / . , = juke spin stiff arm, 7 8 9 0 = throw, L switch, K hit stick
 const P2KEYS = { KeyW: 'ArrowUp', KeyA: 'ArrowLeft', KeyS: 'ArrowDown', KeyD: 'ArrowRight', ArrowUp: 'ArrowUp', ArrowDown: 'ArrowDown', ArrowLeft: 'ArrowLeft', ArrowRight: 'ArrowRight',
   Space: 'Enter', ShiftLeft: 'ShiftRight', ControlLeft: 'ControlRight', ControlRight: 'ControlRight', KeyE: 'Slash', KeyF: 'Period', KeyR: 'Comma', KeyQ: 'KeyL', Tab: 'KeyL',
-  KeyC: 'KeyK', Digit1: 'Digit7', Digit2: 'Digit8', Digit3: 'Digit9', Digit4: 'Digit0', Numpad1: 'Digit7', Numpad2: 'Digit8', Numpad3: 'Digit9', Numpad4: 'Digit0', KeyT: 'KeyN', KeyX: 'KeyJ', KeyG: 'KeyH', KeyY: 'KeyO' };
+  KeyC: 'KeyK', Digit1: 'Digit7', Digit2: 'Digit8', Digit3: 'Digit9', Digit4: 'Digit0', Numpad1: 'Digit7', Numpad2: 'Digit8', Numpad3: 'Digit9', Numpad4: 'Digit0', KeyT: 'KeyN', KeyX: 'KeyJ', KeyG: 'KeyH', KeyY: 'KeyO', KeyU: 'KeyI' };
 const P1BLOCK = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter']);
 const Input = {
   down: {},      // key code -> held
@@ -48,13 +48,14 @@ const Input = {
   release: null, // drag-back vector released this frame
   press(code) { if (!this.down[code]) this.pressed[code] = true; this.down[code] = true; },
   release_(code) { this.down[code] = false; },
-  endFrame() { this.pressed = {}; this.taps.length = 0; this.release = null; },
+  endFrame() { this.pressed = {}; this.taps.length = 0; this.release = null; this.jukeAx = null; },
   // 2-player on one keyboard: the engine always asks for P1's keys, and we translate them for whoever is acting
   versus: false, ctl: 0,
   map(c) { if (!this.versus || this.online) return c; if (this.ctl === 1) return P2KEYS[c] || '-'; return P1BLOCK.has(c) ? '-' : c; },
   hit(...codes) { return codes.some(c => this.pressed[this.map(c)]); },
   held(...codes) { return codes.some(c => this.down[this.map(c)]); },
   pads: [null, null], // controller left sticks (see gamepad.js)
+  jukeAx: null, // controller right stick flick: juke that way
   // online play: the host swaps in the other player's input while the engine runs their side
   online: false, cur: 0, store: [{}, null],
   remote() { return { down: {}, pressed: {}, stick: { x: 0, y: 0, m: 0 }, pointer: { down: false, x: 0, y: 0, x0: 0, y0: 0, t: 0, moved: false, aiming: false }, taps: [], release: null, flick: false, pads: [null, null] }; },
