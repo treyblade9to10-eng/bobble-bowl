@@ -164,6 +164,7 @@ function endReturn(res, flags) {
   if (G.special === 'fgblock') return endBlocked(res);
   const r = G.poss, k = 1 - r, kind = G.special, rd = dirOf(r);
   if (kind === 'punt' && flags && flags.length && puntFoul(res, flags)) return;
+  if (flags && flags.some(f => f.type === 'IBB') && ibbFoul(res, flags.find(f => f.type === 'IBB'))) return;
   const car = res.carrier, cs = car ? car.side : r;
   let x = res.x != null ? res.x : G.ball.x;
   G.special = null;
@@ -174,6 +175,7 @@ function endReturn(res, flags) {
     Sound.td(); G.crowdHype = 1.5; stat(car).td++; G.slowmo = 0.9;
     for (const q of G.players) if (q.side === cs) q.celebrate = 2.6;
     addPbp(`${lastName(car.name)} takes the ${kind === 'punt' ? 'punt' : 'kick'} back for a TOUCHDOWN!`, 'Special teams!'); G.lastResult = { big: true, type: 'td' };
+    Momentum.kick('rettd', cs);
     G.next = { pat: cs }; return;
   }
   if (res.type === 'kickdead') {
@@ -183,11 +185,13 @@ function endReturn(res, flags) {
   }
   if (cs === k) { // kicking team got it back (onside or fumble)
     showBanner(kind === 'onside' ? 'ONSIDE RECOVERED!' : 'FUMBLE RECOVERED!', `${G.teams[k].name} ball!`, k === G.human ? '#9cff9c' : '#ff6040', 1.8);
+    Momentum.kick('recover', k);
     G.next = { drive: k, x: clamp(x, 11, 109) }; return;
   }
   if (rd * (x - ownGoal(r)) <= 0) x = ownGoal(r) + rd * 20; // downed in own end zone
   const ret = G.retStart != null ? Math.round(rd * (x - G.retStart)) : 0;
   if (ret > 0) addText(x, MID, `${ret} YD RETURN`, '#9cff9c', 20, 1.2);
+  if (ret >= 35) Momentum.kick('bigret', r);
   if (car && cs === r) addPbp(`${lastName(car.name)} ${ret > 0 ? `returns the ${kind === 'punt' ? 'punt' : 'kick'} ${ret} yards` : `fields the ${kind === 'punt' ? 'punt' : 'kick'} and gets stopped right there`}${G.lastTackler ? `, tackled by ${lastName(G.lastTackler.name)}` : ''}.`);
   if (kind === 'onside' && res.type !== 'tackle') showBanner('RECOVERED!', `${G.teams[r].name} ball`, '#fff', 1.3);
   G.next = { drive: r, x: clamp(x, 11, 109) };
@@ -410,6 +414,7 @@ function blockedBy(by, kind) {
   st.blk = (st.blk || 0) + 1; if (ts) ts.blk = (ts.blk || 0) + 1;
   by.jump = Math.max(by.jump || 0, 0.3); by.head.vy -= 300;
   showBanner('BLOCKED!', `${by.name} gets a hand on it!`, isHumanSide(by.side) && !isHumanSide(s) ? '#9cff9c' : '#ff6040', 1.6);
+  Momentum.kick('recover', by.side);
   Sound.tackle(); cam.shake = 9; G.crowdHype = 1.3; G.slowmo = 0.5;
   addText(G.ball.x, G.ball.y, kind === 'punt' ? 'PUNT BLOCKED!' : 'BLOCKED!', '#ff9a3d', 26, 1);
   G.lastResult = { big: true, type: 'block' };
@@ -727,6 +732,20 @@ function puntFoul(res, flags) {
   G.deadT = 2.4; G.next = { drive: k, x };
   return true;
 }
+// illegal block in the back on a return: 10 yards back from where the block was (or from the end of the run if he got stopped behind it)
+function ibbFoul(res, f) {
+  const r = G.poss, rd = dirOf(r), F = FOULS.IBB, who = `${G.teams[r].name}${f.num != null ? ' #' + f.num : ''}`, car = res.carrier;
+  if (!car || car.side !== r) { addPbp(`Penalty on ${who}: ${F.name.toLowerCase()}, declined.`); return false; } // the kicking team got the ball anyway
+  const end = res.type === 'td' ? goalX(r) : res.x != null ? res.x : f.x, base = rd * (end - f.x) < 0 ? end : f.x;
+  const x = clamp(base - rd * Math.min(10, rd * (base - ownGoal(r)) / 2), 11, 109);
+  const ret = G.retStart != null ? Math.round(rd * (end - G.retStart)) : 0;
+  G.special = null;
+  if (ret > 0) addPbp(`${lastName(car.name)} returns it ${ret} yards, but there's a flag.`);
+  addPbp(`PENALTY on ${who}: ${F.name.toLowerCase()}. 10 yards from the spot of the foul.`);
+  showBanner(F.name, `${who} • ${F.text}${res.type === 'td' ? '  •  Touchdown comes off the board' : ''}`, '#ffe14d', 2.4); Sound.whistle(); refSignal('BLOCK IN THE BACK');
+  G.deadT = 2.4; G.next = { drive: r, x };
+  return true;
+}
 
 // ======== fakes ========
 const FAKE_PLAYS = [
@@ -801,6 +820,7 @@ function spikeBall(cpu) {
 }
 function audible() {
   if (G.phase !== 'presnap' || coachCalls()) return;
+  if (Crowd.cantHear()) return; // loud road crowd: the call doesn't get through
   Sound.click();
   G.phase = 'playcall';
   G.hooks.onPlayCall(playCallCtx());
@@ -814,6 +834,7 @@ const HOT_RB = [['FLAT', [[1, 5], [3, 10]], 'sit'], ['WHEEL', [[1, 5], [25, 8]],
 function hotRoute(slot) {
   if (G.phase !== 'presnap' || G.poss !== G.human || G.play.off.type !== 'pass') return;
   const p = G.O[slot]; if (!p || (G.play.off.paths && G.play.off.paths[slot]) || G.play.off.lateral) return; // trick plays keep their design
+  if (Crowd.cantHear()) return;
   const list = slot === 1 ? HOT_RB : HOT;
   const i = ((p.hotI == null ? -1 : p.hotI) + 1) % list.length;
   p.hotI = i; const [name, steps, end] = list[i];

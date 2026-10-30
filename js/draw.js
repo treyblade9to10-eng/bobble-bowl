@@ -1021,6 +1021,10 @@ function drawHUD(g, G) {
   g.fillText(`${q}   ${m}:${s}`, x0 + W - 112, y0 + 16);
   g.font = '800 15px "Barlow Condensed", Arial, sans-serif'; g.fillStyle = '#ffd23f';
   g.fillText(G.downText(), x0 + W - 112, y0 + 35);
+  // momentum bar under the two team cells + the road crowd meter on the big downs (rules.js)
+  const moOn = !G.mini && !G.demo && G.mo != null;
+  if (moOn) drawMomentum(g, x0 + 5, y0 + H + 1, 405);
+  if (moOn && Crowd.show()) drawCrowd(g, x0 + W - 126, y0 + H + 4, Crowd.level());
 
   // crunch time: a little tab on the right of the scorebug with the clock, timeouts and what you need
   const sit = crunchText(G);
@@ -1038,9 +1042,10 @@ function drawHUD(g, G) {
   // play clock
   if (G.playClock > 0 && (G.phase === 'playcall' || G.phase === 'presnap')) {
     const pc = Math.ceil(G.playClock), red = pc <= 5;
-    g.fillStyle = red ? '#c0141ccc' : '#0b0f16e0'; roundRect(g, CW / 2 - 36, y0 + H + 4, 72, 26, 2); g.fill();
+    const py = y0 + H + 10; // below the momentum bar
+    g.fillStyle = red ? '#c0141ccc' : '#0b0f16e0'; roundRect(g, CW / 2 - 36, py, 72, 26, 2); g.fill();
     g.fillStyle = red ? '#fff' : '#ffd23f'; g.font = '900 15px "Barlow Condensed", "Arial Black", sans-serif'; g.textAlign = 'center';
-    g.fillText(`:${String(pc).padStart(2, '0')}`, CW / 2, y0 + H + 22);
+    g.fillText(`:${String(pc).padStart(2, '0')}`, CW / 2, py + 18);
   }
   // your play
   if (G.play && (G.phase === 'presnap' || G.phase === 'live') && !G.demo && (!G.versus || G.online)) {

@@ -1484,3 +1484,15 @@ span.pePos { font-family: var(--hd); font-weight: 800; letter-spacing: .06em; di
   .peRow { padding: 3px 6px; gap: 6px; } .peRow .ov { font-size: 20px; } .peRow .nm { font-size: 13px; } .peRow .nm i { font-size: 10px; }
 }
 @media (max-width: 700px) { .peL { width: 250px; } }
+
+/* coach's challenge: the red flag, right after a close call that went against you */
+#chalBtn { display: none; position: absolute; z-index: 29; right: max(16px, calc(env(safe-area-inset-right) + 8px)); top: 56px; width: 184px; padding: 9px 14px 12px 12px; margin: 0;
+  background: #0b0f16ee; border-left: 4px solid var(--red); text-align: left; font-style: italic; font-weight: 900; font-size: 22px; line-height: 1; overflow: hidden; }
+#chalBtn.on { display: block; }
+#chalBtn:hover { background: #1a2230; }
+#chalBtn svg { width: 26px; height: 26px; float: left; margin: -1px 8px 0 0; }
+#chalBtn svg .pole { stroke: #d8d8d8; stroke-width: 2; fill: none; } #chalBtn svg .flg { fill: var(--red); }
+#chalBtn .ct { display: block; }
+#chalLeft { display: block; font-style: normal; font-weight: 800; font-size: 13px; color: var(--dim); letter-spacing: .08em; margin-top: 3px; }
+#chalBar { position: absolute; left: 0; bottom: 0; height: 3px; background: var(--red); width: 100%; }
+body.mobile #chalBtn { top: 50px; width: 170px; font-size: 21px; padding: 10px 12px 13px 10px; }
