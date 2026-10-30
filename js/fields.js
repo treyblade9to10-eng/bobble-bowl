@@ -110,7 +110,7 @@ const FieldStyle = {
   preview(cv, team, view) {
     if (typeof buildField !== 'function' || !cv) return;
     const opp = team.id === 'DAL' ? CT.NFL[0] : CT.NFL.find(x => x.id === 'DAL') || CT.NFL[0];
-    const fake = { teams: [team, opp], demo: false, bigGame: null };
+    const fake = { teams: [team, opp], demo: false, bigGame: null, preview: true };
     const keep = [fieldCv, fieldKey, crowdCv, crowdPat]; // the real game's field stays untouched
     fieldKey = '#preview'; fieldCv = null;
     try { buildField(fake); } catch (e) { [fieldCv, fieldKey, crowdCv, crowdPat] = keep; return; }

@@ -101,21 +101,8 @@ function buildField(G) {
   }
   // sidelines
   g.strokeStyle = '#fff'; g.lineWidth = 7; g.strokeRect(fx(0), fy(0), 120 * PX, FIELD_W * PY);
-  // goal posts at the back of each end zone (fake 3D: height goes up and leans outward)
-  for (const [ex, side] of [[0, -1], [120, 1]]) {
-    const P = (y, z) => [fx(ex) + side * z * PX * 0.12, fy(y) - z * PX * 0.75];
-    const half = 3.1, bar = 3.4, top = 12;
-    const seg = (a, b, w, col) => { g.strokeStyle = col; g.lineWidth = w; g.lineCap = 'round'; g.beginPath(); g.moveTo(...a); g.lineTo(...b); g.stroke(); };
-    g.fillStyle = '#00000040'; g.beginPath(); g.ellipse(fx(ex), fy(MID_Y), 10, 4, 0, 0, 7); g.fill();
-    for (const [w, col] of [[11, '#3a2c00'], [7, '#ffd400']]) {
-      seg(P(MID_Y, 0), P(MID_Y, bar * 0.7), w, col);                       // post
-      seg(P(MID_Y, bar * 0.7), P(MID_Y - 0.6, bar), w, col);               // gooseneck
-      seg(P(MID_Y - half, bar), P(MID_Y + half, bar), w, col);            // crossbar
-      seg(P(MID_Y - half, bar), P(MID_Y - half, top), w - 1, col);        // uprights
-      seg(P(MID_Y + half, bar), P(MID_Y + half, top), w - 1, col);
-    }
-    g.fillStyle = '#ff3b30'; for (const yy of [MID_Y - half, MID_Y + half]) { const [px, py] = P(yy, top); g.fillRect(px - 2, py - 10, 5, 10); }
-  }
+  // goal posts: drawn live in the game (drawGoalPosts), only baked in for the field editor pictures
+  if (G.preview) for (const [ex, side] of [[0, -1], [120, 1]]) paintPost(g, fx(ex), side, fy, null);
   // stands + a big video board behind each end zone
   for (const side of [-1, 1]) {
     const xa = side < 0 ? 0 : fx(122.6), w = side < 0 ? fx(-2.6) : W - fx(122.6), top = fy(-1.2); // stands start right behind the wall (Lambeau Leap territory)
@@ -175,6 +162,7 @@ function drawField(g, G) {
   if (pat) { const ox = ((-cam.x * PX) % 156 + 156) % 156, oy = ((-cam.y * PY) % 72 + 72) % 72; g.save(); g.translate(ox - 156, oy - 72); g.fillStyle = pat; g.fillRect(-CW, -CH, CW * 3 + 312, CH * 3 + 144); g.restore(); }
   else if (edge) { g.fillStyle = '#0e1420'; g.fillRect(0, 0, CW, CH); }
   blitWorld(g, fieldCv);
+  drawGoalPosts(g, G, false);
   // jumping fans when hyped
   if (G.crowdHype > 0.05) {
     const top = sy(-FIELD_PAD_TOP);
@@ -185,6 +173,50 @@ function drawField(g, G) {
     }
   }
 }
+// ---------- goal posts ----------
+// drawn every frame (not baked into the field) so a kick can sail between them. Fake 3D: height goes up the screen at the
+// same scale as the ball and leans outward, and the near upright sits further out than the far one (seen from midfield),
+// so the crossbar is a slanted line a good kick clearly goes over. The camera looks down from the near sideline, so
+// whatever is nearer the camera (bigger y) than the ball covers it: behind the near upright, in front of the far one
+const GPOST = { half: 3.08, bar: 3.33, top: 11, lean: 0.12, skew: 0.45 }; // yards: 18'6" wide, crossbar 10 ft up
+const ZPX = PX * 0.9; // screen pixels per yard of height (the ball uses the same)
+// how far (yards, toward the end of the field) the post fakes 3D moves a point at depth y, height z
+const postShift = (y, z) => z * GPOST.lean + (y - MID_Y) * GPOST.skew;
+// cut = depth (y) of the ball: only draw the parts nearer the camera than that (null = the whole post)
+function paintPost(g, bx, side, fy, cut) {
+  const { half, bar, top } = GPOST, P = (y, z) => [bx + side * postShift(y, z) * PX, fy(y) - z * ZPX];
+  const segs = [], add = (y0, z0, y1, z1, w, d) => { if (cut == null || d > cut) segs.push([P(y0, z0), P(y1, z1), w]); };
+  if (cut == null) { g.fillStyle = '#00000040'; g.beginPath(); g.ellipse(bx, fy(MID_Y), 10, 4, 0, 0, 7); g.fill(); }
+  add(MID_Y, 0, MID_Y, bar * 0.7, 0, MID_Y);                     // post
+  add(MID_Y, bar * 0.7, MID_Y - 0.6, bar, 0, MID_Y - 0.6);       // gooseneck
+  if (cut == null) add(MID_Y - half, bar, MID_Y + half, bar, 0, 0); // crossbar
+  else if (cut < MID_Y + half) segs.push([P(Math.max(cut, MID_Y - half), bar), P(MID_Y + half, bar), 0, true]); // just the near piece of it
+  add(MID_Y - half, bar, MID_Y - half, top, 1, MID_Y - half);   // uprights
+  add(MID_Y + half, bar, MID_Y + half, top, 1, MID_Y + half);
+  for (const [w, col] of [[11, '#3a2c00'], [7, '#ffd400']]) for (const [a, b, t, butt] of segs) {
+    g.strokeStyle = col; g.lineWidth = w - t; g.lineCap = butt ? 'butt' : 'round'; g.beginPath(); g.moveTo(...a); g.lineTo(...b); g.stroke();
+  }
+  g.fillStyle = '#ff3b30'; for (const yy of [MID_Y - half, MID_Y + half]) if (cut == null || yy > cut) { const [px, py] = P(yy, top); g.fillRect(px - 2, py - 10, 5, 10); }
+}
+// over = after the ball: redraw the bits of the post that are in front of a ball flying through it
+function drawGoalPosts(g, G, over) {
+  const b = G.ball;
+  for (const [ex, side] of [[0, -1], [120, 1]]) {
+    const bx = sx(ex); if (bx < -120 || bx > CW + 120) continue;
+    if (!over) paintPost(g, bx, side, sy, null);
+    else if (b && !b.holder && !b.hold && b.z > 0.15 && Math.abs(b.x - ex) < 4) paintPost(g, bx, side, sy, b.y);
+  }
+}
+// a field goal / extra point gets the same fake 3D as the posts it's flying at (so it lines up with them).
+// Returns the screen x shift for the ball and for its shadow
+function kickLean(G, b) {
+  const k = G.phase === 'kick' && (G.kick || G.km);
+  if (!k || (k.kind !== 'fg' && k.kind !== 'xp')) return [0, 0];
+  const d = dirOf(k.side), ex = d > 0 ? 120 : 0, w = clamp(1 - (Math.abs(b.x - ex) - 2) / 10, 0, 1); // eases in over the last 12 yards
+  const dy = (b.y - MID_Y) * GPOST.skew * w * PX * d;
+  return [d * (b.z || 0) * GPOST.lean * PX + dy, dy];
+}
+
 // draw a canvas laid out like the field canvas (same padding + scale) under the current camera
 function blitWorld(g, cv) {
   // draw a bit past the screen edges too, so the zoomed celly cam never runs off the painted area
@@ -849,8 +881,9 @@ function drawSpiral(g, x, y, ang, phase, s) {
 }
 function drawBallFree(g, G) {
   const b = G.ball; if (!b || b.holder || b.hold) return; // (the holder draws the ball he's spotting)
-  const x = sx(b.x), y = sy(b.y);
-  g.fillStyle = '#0006'; g.beginPath(); g.ellipse(x, y, 8, 3.5, 0, 0, 7); g.fill();
+  const [lb, ls] = kickLean(G, b), x0 = sx(b.x) + ls, y = sy(b.y), x = sx(b.x) + lb;
+  const sh = 1 / (1 + (b.z || 0) * 0.06); // shadow on the grass: smaller + lighter the higher it goes
+  g.fillStyle = `rgba(0,0,0,${(0.4 * sh).toFixed(2)})`; g.beginPath(); g.ellipse(x0, y, 6 * sh + 2, 2.5 * sh + 1, 0, 0, 7); g.fill();
   if (b.flight) { // trail
     g.strokeStyle = '#ffffff40'; g.lineWidth = 3; g.beginPath();
     for (let i = 0; i < 6; i++) { const u = Math.max(0, b.flight.t / b.flight.T - i * 0.03); const tx = lerp(b.flight.sx, b.flight.tx, u), ty = lerp(b.flight.sy, b.flight.ty, u), tz = flightZ(b.flight, u); const px = sx(tx), py = sy(ty) - tz * PX * 0.9; i ? g.lineTo(px, py) : g.moveTo(px, py); }
@@ -864,6 +897,7 @@ function drawBallFree(g, G) {
     const vxs = (f.tx - f.sx) / f.T * PX, vys = (f.ty - f.sy) / f.T * PY - dz * PX * 0.9;
     drawSpiral(g, x, y - b.z * PX * 0.9, Math.atan2(vys, vxs), b.spin || 0, 1.35);
   } else drawFootball(g, x, y - b.z * PX * 0.9, 1.3, b.spin || 0);
+  drawGoalPosts(g, G, true);
   if (b.flight && G.showTarget && !b.flight.pitch) {
     const tx = sx(b.flight.tx), ty = sy(b.flight.ty), pulse = 1 + Math.sin(G.time * 12) * 0.1;
     g.strokeStyle = '#ffe14d'; g.lineWidth = 3; g.setLineDash([5, 5]);
