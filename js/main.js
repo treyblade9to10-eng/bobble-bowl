@@ -612,6 +612,7 @@ G.hooks.onGameOver = s => {
     if (L.pass) b.push(`${lastName(L.pass.name)} ${L.pass.pass} pass`); if (L.rush) b.push(`${lastName(L.rush.name)} ${L.rush.rush} rush`); if (L.rec) b.push(`${lastName(L.rec.name)} ${L.rec.rec} rec`);
     if (L.sack) b.push(`${lastName(L.sack.name)} ${L.sack.sack} sk`); if (L.int) b.push(`${lastName(L.int.name)} ${L.int.int} INT`);
     if (L.blk) b.push(`${lastName(L.blk.name)} ${L.blk.blk} blocked kick${L.blk.blk > 1 ? 's' : ''}`);
+    for (const p of Object.values(G.pstats || {})) if (p.tw && p.side === side && (p.rec || p.rush || p.td || p.tkl || p.int || p.sack)) b.push(`${lastName(p.name)} 2-WAY: ${[p.rush && p.rush + ' rush', p.rec && p.rec + ' rec', p.td && p.td + ' TD', p.tkl + ' tkl', p.int && p.int + ' INT', p.pd && p.pd + ' PD'].filter(Boolean).join(', ')}`); // both sides, one line
     return b.length ? `<div class="stLead"><b>${s.teams[side].id}</b> ${b.join(' &middot; ')}</div>` : ''; };
   html += lead(me) + lead(them);
   $('overStats').innerHTML = html;
@@ -677,7 +678,7 @@ function drawMvp(st, side) {
   if (st.td) bits.push(`${st.td} TD`); if (st.tkl) bits.push(`${st.tkl} tkl`); if (st.sack) bits.push(`${st.sack} sack${st.sack === 1 ? "" : "s"}`); if (st.int) bits.push(`${st.int} INT`);
   const ln = lastName(st.name), lines = (G.pbp || []).filter(l => l.text.includes(ln));
   const key = lines.find(l => /TOUCHDOWN/i.test(l.text)) || lines.find(l => /INTERCEPT|SACK|FUMBLE/i.test(l.text)) || lines[lines.length - 1];
-  $('mvpText').innerHTML = `<b>${st.name}</b> &middot; ${st.pos} &middot; ${t.name}<div class="mvpLine">${bits.join(' &middot; ') || 'Did a bit of everything'}</div>${key ? `<div class="mvpKey">${key.q} ${key.clock} &middot; ${key.text}</div>` : ''}`;
+  $('mvpText').innerHTML = `<b>${st.name}</b> &middot; ${st.tw ? st.pos + '/' + st.tw : st.pos} &middot; ${t.name}<div class="mvpLine">${bits.join(' &middot; ') || 'Did a bit of everything'}</div>${key ? `<div class="mvpKey">${key.q} ${key.clock} &middot; ${key.text}</div>` : ''}`;
   const fake = { teams: G.teams, ball: null, phase: 'over', human: G.human, mode: G.mode, time: 0 };
   const loop = () => {
     fake.time = performance.now() / 1000; p.anim += 0.05; p.speedNow = 0;

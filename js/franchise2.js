@@ -281,17 +281,27 @@ function renderDepth() {
   const row = (k, p, slotPos) => {
     const on = dcSel === k, can = dcSel && dcSel !== k && grpOf(dcSel) === grpOf(k) && !(dcSel[0] === 'b' && k[0] === 'b'), m = p[6] || {};
     const tag = Season.hurt(p) ? `<em class="out">OUT ${wkStr(m.inj)}</em>` : k[0] === 's' ? '<em class="st">STARTER</em>' : '';
-    return `<div class="dcRow ${k[0] === 's' ? 'st' : 'bk'}${on ? ' on' : ''}${can ? ' can' : ''}" tabindex="0" data-k="${k}"><span class="pos">${slotPos}</span><b>${p[3]}</b><span class="nm">${p[1]}${xf.has(p[1]) ? ' <small class="rsXf">X-FACTOR</small>' : ''}<i>${p[0]}  ·  AGE ${m.age || '?'}  ·  SPD ${p[4]}</i></span>${tag}</div>`;
+    const tw = TwoWay.info(p), twT = TwoWay.can(p) ? `<small class="twTag${tw ? '' : ' off'}">${tw ? `2-WAY ${tw.pos} ${TwoWay.ovr2(p)}` : '2-WAY OFF'}</small>` : '';
+    return `<div class="dcRow ${k[0] === 's' ? 'st' : 'bk'}${on ? ' on' : ''}${can ? ' can' : ''}" tabindex="0" data-k="${k}"><span class="pos">${slotPos}</span><b>${p[3]}</b><span class="nm">${p[1]}${xf.has(p[1]) ? ' <small class="rsXf">X-FACTOR</small>' : ''}${twT}<i>${p[0]}  ·  AGE ${m.age || '?'}  ·  SPD ${p[4]}</i></span>${tag}</div>`;
   };
   const col = side => DC_GROUPS[side].map(([g, lbl]) => {
     const st = R[side].map((p, i) => [p, i]).filter(([, i]) => posGroup(base[side][i][0]) === g);
     const bk = bench.map((p, j) => [p, j]).filter(([p]) => p && posGroup(p[0]) === g).sort((a, b) => b[0][3] - a[0][3]);
-    return `<div class="dcGrp">${lbl}</div>` + st.map(([p, i]) => row(`s:${side}:${i}`, p, base[side][i][0])).join('') + bk.map(([p, j]) => row(`b:${j}`, p, '')).join('');
+    // two-way starters from the other side who also play this spot: tap to switch it on / off
+    const tws = R[side === 'off' ? 'def' : 'off'].filter(p => p && TwoWay.can(p) && !Season.hurt(p) && posGroup((TwoWay.info(p) || p[6].twWas || TW_REAL[p[1]] || {}).pos) === g);
+    const twRow = p => { const on = !!TwoWay.info(p), pos = (TwoWay.info(p) || p[6].twWas || TW_REAL[p[1]]).pos;
+      return `<div class="dcRow st dcTw" tabindex="0" data-tw="${p[1].replace(/"/g, '')}"><span class="pos">${pos}</span><b>${on ? TwoWay.ovr2(p) : '-'}</b><span class="nm">${p[1]} <small class="twTag${on ? '' : ' off'}">${on ? '2-WAY ON' : '2-WAY OFF'}</small><i>${on ? `Also starts here (in for the weakest ${pos}). Tap to rest him on ${side === 'off' ? 'offense' : 'defense'}.` : `Tap to play him at ${pos} too`}</i></span></div>`; };
+    return `<div class="dcGrp">${lbl}</div>` + st.map(([p, i]) => row(`s:${side}:${i}`, p, base[side][i][0])).join('') + tws.map(twRow).join('') + bk.map(([p, j]) => row(`b:${j}`, p, '')).join('');
   }).join('');
   $('dcBody').innerHTML = `<div class="dHead">${Season.team(me).city.toUpperCase()} ${Season.team(me).name.toUpperCase()}  ·  ${teamOvr(Season.team(me))} OVR</div>
     <div class="dcWrap"><div class="dcCol"><div class="leadHead">OFFENSE</div>${col('off')}</div><div class="dcCol"><div class="leadHead">DEFENSE</div>${col('def')}</div></div>
     <div id="dcMsg">${dcMsg || 'Tap a starter, then tap a backup at the same spot to swap them. Receivers and tight ends can cover for each other.'}</div>`;
-  document.querySelectorAll('.dcRow').forEach(r => r.onclick = () => {
+  document.querySelectorAll('.dcTw').forEach(r => r.onclick = () => {
+    const p = R.off.concat(R.def).find(q => q && q[1] === r.dataset.tw); if (!p) return;
+    TwoWay.set(p, !TwoWay.info(p)); Season.save(); dcSel = null; Sound.click();
+    dcMsg = TwoWay.info(p) ? `${p[1]} plays both ways again.` : `${p[1]} only plays ${p[0]} now. Fresh legs.`; renderDepth();
+  });
+  document.querySelectorAll('.dcRow[data-k]').forEach(r => r.onclick = () => {
     const k = r.dataset.k; dcMsg = '';
     if (!dcSel || dcSel === k) dcSel = dcSel === k ? null : k;
     else if (grpOf(dcSel) !== grpOf(k) || (dcSel[0] === 'b' && k[0] === 'b')) dcSel = k;

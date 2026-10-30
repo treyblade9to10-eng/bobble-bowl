@@ -51,7 +51,7 @@ function spotText(s, x) {
 
 // ---------------- game setup ----------------
 function newGame(home, away, opts) {
-  home = Career.withCAP(home); away = Career.withCAP(away);
+  home = TwoWay.expand(Career.withCAP(home)); away = TwoWay.expand(Career.withCAP(away)); // two-way guys play both sides (twoway.js)
   initGame(home, away, opts);
   if (opts.scenario) { // e.g. the Two-Minute Challenge
     const sc = opts.scenario;
@@ -70,7 +70,7 @@ function initGame(home, away, opts) {
   Object.assign(G, {
     tend: null, trickUsed: null, trickSeen: null, prevClock: null, rivalry: null, wind: null, teams: [home, away], human: opts.humanSide || 0, diff: opts.diff, flags: [], playClock: 0, playoff: !!opts.playoff, qtrLen: opts.qtr, score: [0, 0], quarter: 1, clock: opts.qtr,
     fx: [], banner: null, players: [], ball: null, patSide: null, twoPt: false, next: null, firstPoss: 1, paused: false,
-    pstats: {}, tstats: [{ pass: 0, rush: 0, to: 0 }, { pass: 0, rush: 0, to: 0 }],
+    pstats: {}, tstats: [{ pass: 0, rush: 0, to: 0 }, { pass: 0, rush: 0, to: 0 }], twFat: {},
     timeouts: [3, 3], special: null, pendingRunoff: 0, twoMinQ: 0, twoMinAfterPlay: false, runFrom: 0, mini: null, scenario: opts.scenario || null,
     weather: stadiumOf(home).dome ? 'clear' : opts.weather === 'storm' ? 'rain' : opts.weather === 'fog' ? 'clear' : (opts.weather || 'clear'),
     storm: !stadiumOf(home).dome && opts.weather === 'storm', fog: !stadiumOf(home).dome && opts.weather === 'fog', ltn: null, night: !!opts.night || !!(typeof BCAST !== 'undefined' && BCAST[opts.bcast] && BCAST[opts.bcast].night), stadium: stadiumOf(home), uni: opts.uni || null, pbp: [], pbpShow: null, lastResult: null,
@@ -104,7 +104,7 @@ function setFirstDown() {
 function stat(p) {
   if (!G.pstats) G.pstats = {};
   const k = p.side + ':' + p.name;
-  return G.pstats[k] || (G.pstats[k] = { name: p.name, side: p.side, pos: p.pos, pass: 0, rush: 0, rec: 0, td: 0, tkl: 0, int: 0, sack: 0, comp: 0, att: 0, blk: 0 });
+  return G.pstats[k] || (G.pstats[k] = { name: p.name, side: p.side, pos: p.tw2 ? p.tw2[0] : p.pos, tw: p.tw2 ? p.tw2[1] : undefined, pass: 0, rush: 0, rec: 0, td: 0, tkl: 0, int: 0, sack: 0, comp: 0, att: 0, blk: 0 });
 }
 
 // ---------------- play calling ----------------
@@ -441,8 +441,10 @@ function makePlayer(side, isOff, slot, tuple) {
     role: 'idle', route: null, assign: null, aiIdle: 0,
     xf: (G.xf && G.xf[side + ':' + name]) || null, ab: abFor(name), dirt: (G.dirt && G.dirt[side + ':' + name]) || 0, slip: 0, slipCd: 0,
     cap: !!(ex && ex.cap), thp: ex && ex.thp || null, tha: ex && ex.tha || null, gloves: ex && ex.gloves || null, teamGloves: !!(ex && ex.teamGloves),
-    rt: ex && ex.r ? Ratings.clean(ex.r, ovr0, spdR) : null // specific ratings (ratings.js), offsets from OVR
+    rt: ex && ex.r ? Ratings.clean(ex.r, ovr0, spdR) : null, // specific ratings (ratings.js), offsets from OVR
+    tw2: TwoWay.pos2(ex, pos) // two-way: [main spot, other spot]
   };
+  if (pl.tw2) TwoWay.apply(pl); // plays every snap: wears down a little
   if (pl.rt) pl.acc *= accMul(pl);
   if (abHas(pl, 'cuts')) pl.acc *= 1.12; // Route Technician / Human Joystick
   return typeof Gear !== 'undefined' && !(ex && ex.cap) ? Gear.apply(pl, G.teams && G.teams[side]) : pl; // Gear Locker picks
@@ -485,6 +487,7 @@ function setupPlay(offPlay, defPlay, preview) {
   offTuples.forEach((t, i) => P.push(makePlayer(o, true, i, t)));
   defT.def.forEach((t, i) => P.push(makePlayer(dsd, false, i, t)));
   const O = P.slice(0, 8), D = P.slice(8);
+  if (!preview) TwoWay.snap(P);
   const at = (p, x, y) => { p.x = x; p.y = y; p.hx = x; p.hy = y; };
   const form = FORMATIONS[preview ? 'gun' : formationFor(offPlay)] || FORMATIONS.gun;
   for (let k = 0; k <= 4; k++) { const [bk, w] = (!preview && offPlay.spots && offPlay.spots[k]) || form.spots[k]; at(O[k], L - d * bk, clamp(by + ws * w, 4, FIELD_W - 4)); }
@@ -1183,12 +1186,12 @@ function updateHuman() {
   G.humanPlayer = h;
 }
 // Player Lock (career): you only ever control your own player
-// a WR can't play defense (and a CB can't play offense): when your guy's side of the ball is off the field, you watch
+// a WR can't play defense (and a CB can't play offense): when your guy's side of the ball is off the field, you watch. A two-way guy never sits
 function lockSitsOut() {
   if (!G.lock || G.versus || G.online || G.mini || !G.teams || G.human < 0) return false;
-  const t = G.teams[G.human], cap = t.off.concat(t.def).find(p => p[6] && p[6].cap);
-  if (!cap) return false;
-  return (G.poss === G.human) !== t.off.includes(cap);
+  const t = G.teams[G.human], isCap = p => p && p[6] && p[6].cap;
+  if (!t.off.concat(t.def).some(isCap)) return false;
+  return !(G.poss === G.human ? t.off : t.def).some(isCap);
 }
 function lockedGuy() { return G.players.find(p => p.cap && p.side === G.human && p.down <= 0) || G.players.find(p => p.cap && p.side === G.human); }
 // career receiver / back: ask the QB for the ball
@@ -2216,7 +2219,7 @@ function incomplete(who, text) {
   const b = G.ball;
   b.loose = null; b.dead = { vx: rand(-3, 3), vy: rand(-2, 2) }; b.z = 1;
   if (who) addText(who.x, who.y, text, '#fff', 16, 1);
-  if (who && who.side !== G.poss) G.breakup = who;
+  if (who && who.side !== G.poss) { G.breakup = who; const s = stat(who); s.pd = (s.pd || 0) + 1; } // pass defended
   endPlay({ type: 'inc', text });
 }
 
@@ -2439,6 +2442,7 @@ function afterPlay() {
 
 function endQuarter() {
   G.pendingRunoff = 0; // new quarter: clock waits for the snap
+  TwoWay.rest(G.quarter === 2);
   if (G.quarter === 2) {
     Injury.half();
     G.quarter = 3; G.clock = G.qtrLen; G.timeouts = [3, 3];

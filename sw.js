@@ -44,6 +44,7 @@ const FILES = [
   'js/modes.js',
   'js/draftchamps.js',
   'js/savegame.js',
+  'js/twoway.js',
   'js/gamepad.js',
   'js/lib/peerjs.min.js',
   'js/lib/firebase-app-compat.js',

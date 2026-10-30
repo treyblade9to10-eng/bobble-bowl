@@ -96,7 +96,7 @@ const Practice = {
     this.save();
     const s = this.s, you = this.team('you'), opp = this.team('opp');
     G.demo = false; G.season = false; G.challenge = null; G.mini = null; G.career = false; show(null);
-    initGame(Career.withCAP(you), Career.withCAP(opp), { qtr: 300, diff: +$('optDiff').value, humanSide: 0, weather: 'clear', coachMode: false, uni: ['home', 'away'],
+    initGame(TwoWay.expand(Career.withCAP(you)), TwoWay.expand(Career.withCAP(opp)), { qtr: 300, diff: +$('optDiff').value, humanSide: 0, weather: 'clear', coachMode: false, uni: ['home', 'away'],
       practice: { ...s, reps: 0, yds: 0, att: 0, comp: 0, conv: 0, td: 0, to: 0, flags: 0 } });
     Highlights.reset();
     this.hidePanel(); this.reset(); toPlayCall();

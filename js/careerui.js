@@ -74,7 +74,8 @@ const CareerUI = {
     const f = capForm = capForm || { name: '', pos: 'WR', arch: CAP_ARCH.WR[0][0], num: 7, skin: 2, stars: 3, college: 'MICH', games: 10, diff: 1, qtr: 180, bowls: 1, cfp: 1 };
     const offers = collegeOffers(f.stars, f.pos + f.arch);
     if (!offers.some(t => t.id === f.college)) f.college = offers[0].id;
-    const rc = RECRUIT[f.stars], arch = CAP_ARCH[f.pos].find(x => x[0] === f.arch)[1];
+    if (f.tw && !(TW_COMBOS[f.pos] || []).includes(f.tw)) f.tw = null;
+    const rc = RECRUIT[f.stars], arch = CAP_ARCH[f.pos].find(x => x[0] === f.arch)[1], tw = Career.blankTW(f), tw2 = tw && Math.round((tw.a[0] + tw.a[1]) / 2);
     const startOvr = Math.round((arch.a[0] + arch.a[1]) / 2) + rc.ovr, col = COLLEGES.find(t => t.id === f.college);
     const star = (on, cls = 'rStar') => `<svg viewBox="0 0 24 24" class="${cls}${on ? ' on' : ''}"><path d="M12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7L12 17.3 5.8 20.9l1.6-7L2 9.2l7.1-.6z"/></svg>`;
     const chips = (k, list, cur) => `<div class="cpChips">${list.map(([v, t]) => `<button class="cpChip${String(v) === String(cur) ? ' on' : ''}" data-k="${k}" data-v="${v}">${t}</button>`).join('')}</div>`;
@@ -84,10 +85,10 @@ const CareerUI = {
         <canvas id="capCv" width="260" height="310"></canvas>
         <div class="cpId">
           <div class="cpNm">${(f.name || 'Your Name').replace(/[<>&"]/g, '')}</div>
-          <div class="cpPos">${f.pos}  ·  ${f.arch.toUpperCase()}  ·  #${f.num}</div>
+          <div class="cpPos">${tw ? `${f.pos}/${tw.pos}  ·  TWO-WAY` : `${f.pos}  ·  ${f.arch.toUpperCase()}`}  ·  #${f.num}</div>
           <div class="cpStars">${[1, 2, 3, 4, 5].map(n => star(n <= f.stars, 'cpStar')).join('')}</div>
         </div>
-        <div class="cpOvr"><b>${startOvr}</b><span>OVR</span></div>
+        <div class="cpOvr"><b>${startOvr}</b><span>OVR</span>${tw ? `<em>${tw.pos} ${tw2}</em>` : ''}</div>
         <div class="cpCol">${teamBadge(col)}<div><b>${col.city}</b><span>${col.name}  ·  ${TIER[col.pr]}</span></div></div>
       </div>
       <div class="cpPane">
@@ -99,6 +100,11 @@ const CareerUI = {
         <div class="tlSec">PLAY STYLE</div>
         <div class="cpArchs">${CAP_ARCH[f.pos].map(([n, a]) => `<button class="cpArch${n === f.arch ? ' on' : ''}" data-a="${n}"><b>${n}</b>
           <span><i>SPD</i> ${Math.min(99, a.spd + rc.spd)}</span><span><i>${CAP_SKILLS[f.pos][0]}</i> ${a.a[0] + rc.ovr}</span><span><i>${CAP_SKILLS[f.pos][1]}</i> ${a.a[1] + rc.ovr}</span></button>`).join('')}</div>
+        ${TW_COMBOS[f.pos] ? `<div class="tlSec">TWO-WAY <span class="cpSecR">${tw ? 'PLAYS OFFENSE AND DEFENSE' : 'OFFENSE ONLY'}</span></div>
+        <div class="cpArchs cpTws">${[null, ...TW_COMBOS[f.pos]].map(p => { const b = p && Career.blankTW({ ...f, tw: p }); return `<button class="cpArch${(f.tw || null) === p ? ' on' : ''}" data-tw="${p || ''}"><b>${p ? `${f.pos} + ${p}` : 'One Way'}</b>${b
+          ? `<span><i>${p} ${CAP_SKILLS[p][0]}</i> ${b.a[0]}</span><span><i>${p} ${CAP_SKILLS[p][1]}</i> ${b.a[1]}</span>`
+          : `<span><i>Every skill point on offense</i></span><span><i>Rests when the defense is out</i></span>`}</button>`; }).join('')}</div>
+        ${tw ? `<div class="capNote cpTwNote">You start at ${f.pos} and ${tw.pos} and stay on the field every snap. Skill points split between both sides, and you tire a little late in halves.</div>` : ''}` : ''}
         <div class="tlSec">SKIN TONE</div>
         <div class="cpSkins">${SKIN.map((c, i) => `<button class="cpSkin${i === f.skin ? ' on' : ''}" data-i="${i}" style="background:${c}"></button>`).join('')}</div>
         <div class="tlSec">RECRUIT RATING <span class="cpSecR">${f.stars}-STAR  ·  STARTS AT ${startOvr} OVR</span></div>
@@ -117,7 +123,7 @@ const CareerUI = {
     const preview = () => capPreview([f.pos, f.name || 'My Player', f.num, startOvr, arch.spd + rc.spd, f.skin], col);
     const re = () => { Sound.click(); this.form(); };
     document.querySelectorAll('.cpChip').forEach(b => b.onclick = () => { const k = b.dataset.k, v = b.dataset.v; if (k === 'pos') { f.pos = v; f.arch = CAP_ARCH[v][0][0]; } else f[k] = +v; re(); });
-    document.querySelectorAll('.cpArch').forEach(b => b.onclick = () => { f.arch = b.dataset.a; re(); });
+    document.querySelectorAll('.cpArch').forEach(b => b.onclick = () => { if (b.dataset.tw != null) f.tw = b.dataset.tw || null; else f.arch = b.dataset.a; re(); });
     document.querySelectorAll('.cpSkin').forEach(b => b.onclick = () => { f.skin = +b.dataset.i; re(); });
     document.querySelectorAll('.cpRec').forEach(b => b.onclick = () => { f.stars = +b.dataset.n; re(); });
     document.querySelectorAll('.cpOffer').forEach(b => b.onclick = () => { f.college = b.dataset.c; re(); });
@@ -140,11 +146,11 @@ const CareerUI = {
     return `<div class="ccCard" style="--tc:${team.c1}">
       <canvas id="capCv" width="260" height="310"></canvas>
       <div class="ccName">${c.name}</div>
-      <div class="ccSub">#${c.num} ${c.pos} · ${c.arch} · Age ${c.age}</div>
-      <div class="ccOvr"><b>${o}</b> OVR${o >= 85 ? '<span class="xfTag">X-FACTOR</span>' : ''}</div>
+      <div class="ccSub">#${c.num} ${Career.posLabel()} · ${c.tw ? 'Two-Way' : c.arch} · Age ${c.age}</div>
+      <div class="ccOvr"><b>${o}</b> OVR${c.tw ? `<span class="ccTwO">${c.tw.pos} <b>${Career.ovr2()}</b></span>` : ''}${o >= 85 ? '<span class="xfTag">X-FACTOR</span>' : ''}</div>
       <div class="xpbar"><i style="width:${Math.round(100 * c.xp / need)}%"></i></div>
       <div class="xptext">Level ${c.lvl} · ${c.xp}/${need} XP</div>
-      <div class="ccRat"><span>${sk[0]} <b>${c.a[0]}</b></span><span>${sk[1]} <b>${c.a[1]}</b></span><span>Speed <b>${Math.round(c.spd)}</b></span></div>
+      <div class="ccRat"><span>${sk[0]} <b>${c.a[0]}</b></span><span>${sk[1]} <b>${c.a[1]}</b></span>${c.tw ? CAP_SKILLS[c.tw.pos].map((n, i) => `<span>${c.tw.pos} ${n} <b>${c.tw.a[i]}</b></span>`).join('') : ''}<span>Speed <b>${Math.round(c.spd)}</b></span></div>
       <div class="row ccBtns"><button class="${c.sp ? 'gold pulse' : ''}" id="ccUp">UPGRADE${c.sp ? ` (${c.sp})` : ''}</button><button id="ccGear">GEAR</button></div>
     </div>`;
   },
@@ -152,6 +158,13 @@ const CareerUI = {
     $('ccUp').onclick = () => { Sound.click(); this.upgrade(); };
     $('ccGear').onclick = () => { Sound.click(); this.gear(); };
     capPreview(Career.tuple(), team);
+  },
+  // two-way prospects: what the scouts say
+  twScout() {
+    const c = Career.cap; if (!c.tw) return '';
+    const o2 = Career.ovr2(), s = c.seasons.find(x => x.lvl === 'NCAA') || {};
+    const say = o2 >= Career.ovr() - 2 ? `could start on either side of the ball` : o2 >= 62 ? `is a ${c.pos} first, but teams want him at ${c.tw.pos} too` : `is raw at ${c.tw.pos}, but the tools are there`;
+    return `<div class="ccLine ccTwScout"><b>SCOUTS:</b> True two-way player. ${c.name} ${say}${s.tkl || s.int ? ` (${s.tkl || 0} tkl, ${s.int || 0} INT on defense this year)` : ''}. Two-way guys go higher on draft boards.</div>`;
   },
   goalsHtml() { return `<div class="ccGoals"><div class="lbl">GAME GOALS (+20 XP EACH)</div>${Career.goals().map(g => `<span>${g.text}</span>`).join('')}</div>`; },
   // coach trust meter: who calls the plays in your games
@@ -202,7 +215,7 @@ const CareerUI = {
         ${g ? `<div class="ccNext" style="background:linear-gradient(110deg, ${me.c1} 45%, ${opp.c1} 55%)"><div class="lbl">${g.cfp || g.bowl ? Career.postName(g).toUpperCase() + (g.cfp === 4 ? ' · WIN IT ALL' : '') : Career.isRival(g.opp) ? 'RIVALRY WEEK · 1.5x XP' : 'NEXT GAME'}</div><div class="mu">${g.home ? 'vs' : '@'} ${opp.city} ${opp.name}</div><div class="sub">${opp.id} ${ovr(opp)} OVR · you are ${g.home ? 'HOME' : 'AWAY'}</div></div>
         ${this.goalsHtml()}${this.trustHtml()}
         <div class="row"><button class="big" id="ccPlay">PLAY</button><button id="ccSim">SIM</button>${this.lockBtn()}</div>` : ''}
-        <div class="ccStock">DRAFT STOCK: <b>${Career.projText()}</b></div>
+        <div class="ccStock">DRAFT STOCK: <b>${Career.projText()}</b></div>${this.twScout()}
         ${cl.postDone ? '' : `<div class="ccLine">Postseason: ${[post.cfp ? 'go 5-1 or better for the College Football Playoff' : '', post.bowls ? 'go 4-2 or better for a bowl game' : ''].filter(Boolean).join(', ') || 'off (season ends after week 6)'}</div>`}
         <div class="ccLine">This season: ${s.g} games · ${Career.line(s)}</div>
         <div class="ccSched">${sched}</div>
@@ -254,7 +267,7 @@ const CareerUI = {
       <div class="ccMain">
         <div class="ccHead">COMBINE RESULTS</div>
         <div class="ccCombine"><div><b>${cb.forty.toFixed(2)}s</b><span>40-YARD DASH</span></div><div><b>${cb.bench}</b><span>BENCH REPS</span></div><div><b>${cb.vert}"</b><span>VERTICAL</span></div></div>
-        <div class="ccStock">PROJECTED: <b>${Career.projText()}</b></div>
+        <div class="ccStock">PROJECTED: <b>${Career.projText()}</b></div>${this.twScout()}
         <div class="ccText">Spend your skill points before the draft. A higher overall still moves you up.</div>
         <div class="row"><button class="big gold" id="ccDraft">GO TO DRAFT DAY</button><button id="capBack">MENU</button></div>
       </div></div>`, 'Draft Day');
@@ -278,7 +291,7 @@ const CareerUI = {
         $('ddReveal').innerHTML = `<div class="ddCard" style="background:linear-gradient(140deg, ${t.c1} 55%, ${t.c2})">
           <div class="r">ROUND ${d.round} · PICK ${d.pick}${d.round > 1 ? ` (#${d.inRound} in the round)` : ''}</div>
           <div class="t" style="color:${textOn(t.c1)}">THE ${t.city.toUpperCase()} ${t.name.toUpperCase()} SELECT</div>
-          <div class="p">${c.name}</div><div class="s">${c.pos} · ${tFull(c.college.id)} · ${Career.ovr()} OVR</div>
+          <div class="p">${c.name}</div><div class="s">${c.tw ? `TWO-WAY ${c.pos}/${c.tw.pos}` : c.pos} · ${tFull(c.college.id)} · ${Career.ovr()} OVR${c.tw ? ` / ${c.tw.pos} ${Career.ovr2()}` : ''}</div>
           <div class="k">Rookie contract: 4 years, ${money(c.contract.total)}</div>
           <button class="big gold" id="ddGo">START ROOKIE SEASON</button></div>`;
         Sound.td(); for (let k = 0; k < 3; k++) setTimeout(() => Sound.td(), 250 * k);
@@ -351,10 +364,10 @@ const CareerUI = {
       box.innerHTML = `<div class="ccLine">This season: ${Career.cur(false).g} games · ${Career.line(Career.cur(false))}</div>` + this.logHtml() +
         `<div class="ccSched">${d.weeks.map((wk, i) => { const x = wk[0], home = x.home === c.team, o = home ? x.away : x.home; const r = x.score ? ((home ? x.score[0] > x.score[1] : x.score[1] > x.score[0]) ? `<b class="w">W ${x.score[0]}-${x.score[1]}</b>` : `<b class="l">L ${x.score[0]}-${x.score[1]}</b>`) : ''; return `<div class="${i === d.week && d.phase === 'regular' ? 'cur' : ''}">Wk ${i + 1} ${home ? 'vs' : '@'} ${o} ${r}</div>`; }).join('')}</div>`;
     } else if (capTab === 'career') {
-      const k = SEASON_RT.includes(c.pos) ? [['pass', 'PASS'], ['rush', 'RUSH'], ['rec', 'REC'], ['td', 'TD']] : [['tkl', 'TKL'], ['sack', 'SACK'], ['int', 'INT']];
+      const k = c.tw ? [['rush', 'RUSH'], ['rec', 'REC'], ['td', 'TD'], ['tkl', 'TKL'], ['int', 'INT']] : SEASON_RT.includes(c.pos) ? [['pass', 'PASS'], ['rush', 'RUSH'], ['rec', 'REC'], ['td', 'TD']] : [['tkl', 'TKL'], ['sack', 'SACK'], ['int', 'INT']];
       box.innerHTML = `<div class="ccDraftNote">${c.draft && c.draft.round ? `Drafted: Round ${c.draft.round}, Pick ${c.draft.pick} by ${tFull(c.draft.team)}` : ''}${c.combine ? ` · 40: ${c.combine.forty.toFixed(2)}s` : ''}</div>
         <table class="ccTable"><tr><th>YEAR</th><th>TEAM</th><th>G</th>${k.map(x => `<th>${x[1]}</th>`).join('')}<th>OVR</th><th></th></tr>
-        ${c.seasons.map((s, i) => `<tr><td>${s.lvl === 'NCAA' ? 'College' : 'Yr ' + c.seasons.slice(0, i + 1).filter(z => z.lvl === 'NFL').length}</td><td>${s.team}</td><td>${s.g}</td>${k.map(x => `<td>${s[x[0]]}</td>`).join('')}<td>${s.ovr || (s.open ? Career.ovr() : '')}</td><td>${s.champ ? 'CHAMP ' : ''}${(s.awards || []).map(a => a === 'Offensive Player of the Year' ? 'OPOY' : a === 'Defensive Player of the Year' ? 'DPOY' : a).join(' ')}</td></tr>`).join('')}
+        ${c.seasons.map((s, i) => `<tr><td>${s.lvl === 'NCAA' ? 'College' : 'Yr ' + c.seasons.slice(0, i + 1).filter(z => z.lvl === 'NFL').length}</td><td>${s.team}</td><td>${s.g}</td>${k.map(x => `<td>${s[x[0]]}</td>`).join('')}<td>${s.ovr || (s.open ? Career.ovr() : '')}</td><td>${s.champ ? 'CHAMP ' : ''}${(s.awards || []).map(a => a === 'Offensive Player of the Year' ? 'OPOY' : a === 'Defensive Player of the Year' ? 'DPOY' : a === 'Two-Way Player of the Year' ? '2-WAY POY' : a).join(' ')}</td></tr>`).join('')}
         <tr class="tot"><td>TOTAL</td><td></td><td>${c.stats.g}</td>${k.map(x => `<td>${c.stats[x[0]]}</td>`).join('')}<td></td><td></td></tr></table>`;
     } else if (capTab === 'badges') {
       box.innerHTML = `<div class="ccBadges">${Object.keys(BADGES).map(k => { const b = c.badges.find(x => x.k === k); return `<div class="bd${b ? ' on' : ''}"><b>${BADGES[k]}</b><span>${b ? b.lvl : 'locked'}</span></div>`; }).join('')}</div>`;
@@ -362,7 +375,7 @@ const CareerUI = {
       const st = Season.standings(teamById(c.team).conf).slice(0, 6);
       const L = (k, t) => { const l = Season.leaders(k, 3); return l.length ? `<div class="ccLead"><b>${t}</b>${l.map(x => `<span class="${x.name === c.name ? 'me' : ''}">${x.name} (${x.t}) ${x[k]}</span>`).join('')}</div>` : ''; };
       box.innerHTML = `<div class="ccLeague"><div><div class="lbl">${teamById(c.team).conf} STANDINGS</div>${st.map((id, i) => `<div class="${id === c.team ? 'me' : ''}">${i + 1}. ${tFull(id)} <b>${recStr(id)}</b></div>`).join('')}</div>
-        <div>${SEASON_RT.includes(c.pos) ? L('pass', 'PASSING') + L('rush', 'RUSHING') + L('rec', 'RECEIVING') : L('tkl', 'TACKLES') + L('sack', 'SACKS') + L('int', 'INTERCEPTIONS')}</div></div>`;
+        <div>${c.tw ? L(c.pos === 'RB' ? 'rush' : 'rec', c.pos === 'RB' ? 'RUSHING' : 'RECEIVING') + L('tkl', 'TACKLES') + L('int', 'INTERCEPTIONS') : SEASON_RT.includes(c.pos) ? L('pass', 'PASSING') + L('rush', 'RUSHING') + L('rec', 'RECEIVING') : L('tkl', 'TACKLES') + L('sack', 'SACKS') + L('int', 'INTERCEPTIONS')}</div></div>`;
     }
   },
   // sim one of your games: your line comes from the league sim
@@ -408,10 +421,11 @@ const CareerUI = {
   },
   plaque(L) {
     const tms = L.teams.map(tFull).join(', ');
-    const k = SEASON_RT.includes(L.pos) ? `${L.stats.pass ? L.stats.pass + ' pass yds · ' : ''}${L.stats.rush ? L.stats.rush + ' rush yds · ' : ''}${L.stats.rec ? L.stats.rec + ' rec yds · ' : ''}${L.stats.td} TD` : `${L.stats.tkl} tackles · ${L.stats.sack} sacks · ${L.stats.int} INT`;
+    const tw = String(L.pos).includes('/'), dk = `${L.stats.tkl} tackles · ${L.stats.sack} sacks · ${L.stats.int} INT`;
+    const k = SEASON_RT.includes(String(L.pos).split('/')[0]) ? `${L.stats.pass ? L.stats.pass + ' pass yds · ' : ''}${L.stats.rush ? L.stats.rush + ' rush yds · ' : ''}${L.stats.rec ? L.stats.rec + ' rec yds · ' : ''}${L.stats.td} TD${tw ? ' · ' + dk : ''}` : dk;
     this.set(`<div class="hofWrap"><div class="hof${L.hof ? ' gold' : ''}">
       <div class="h1">${L.hof ? 'PRO FOOTBALL HALL OF FAME' : 'CAREER COMPLETE'}</div>
-      <div class="nm">${L.name}</div><div class="ps">${L.pos} · #${L.num} · ${L.college ? tFull(L.college) : ''}</div>
+      <div class="nm">${L.name}</div><div class="ps">${L.pos}${tw ? ' · TWO-WAY' : ''} · #${L.num} · ${L.college ? tFull(L.college) : ''}</div>
       <div class="ln">${L.years} NFL season${L.years === 1 ? '' : 's'} · ${tms || ''}</div>
       <div class="ln">${k}</div>
       <div class="ln">Peak ${L.peak} OVR · ${L.awards} award${L.awards === 1 ? '' : 's'} · ${L.titles} title${L.titles === 1 ? '' : 's'}${L.draft ? ' · ' + L.draft : ''}</div>
@@ -428,17 +442,17 @@ const CareerUI = {
 
   // ---------------- upgrades + gear ----------------
   upgrade() {
-    const c = Career.cap, sk = CAP_SKILLS[c.pos], team = teamById(c.team);
+    const c = Career.cap, sk = CAP_SKILLS[c.pos], team = teamById(c.team), tw = c.tw;
     const bar = (k, label, v, cost) => `<div class="upRow"><span>${label}</span><div class="upBar"><i style="width:${v}%"></i></div><b>${Math.round(v)}</b><button data-k="${k}" ${c.sp < cost || v >= 99 ? 'disabled' : ''}>+1 <small>(${cost} pt${cost > 1 ? 's' : ''})</small></button></div>`;
     this.set(`<div class="ccWrap">${this.card(team)}
       <div class="ccMain">
         <div class="ccHead">SKILL POINTS: <b class="gold">${c.sp}</b></div>
-        <div class="ccText">You get 2 points every level. Overall is the average of your two skills. Speed costs 2 points but makes you faster on every play.</div>
-        ${bar(0, sk[0], c.a[0], 1)}${bar(1, sk[1], c.a[1], 1)}${bar('spd', 'Speed', c.spd, 2)}
+        <div class="ccText">You get 2 points every level. Overall is the average of your two skills. Speed costs 2 points but makes you faster on every play.${tw ? ` Two-way: your ${tw.pos} skills are a second overall (${Career.ovr2()}), so split your points.` : ''}</div>
+        ${bar(0, sk[0], c.a[0], 1)}${bar(1, sk[1], c.a[1], 1)}${tw ? bar('t0', `${tw.pos} ${CAP_SKILLS[tw.pos][0]}`, tw.a[0], 1) + bar('t1', `${tw.pos} ${CAP_SKILLS[tw.pos][1]}`, tw.a[1], 1) : ''}${bar('spd', 'Speed', c.spd, 2)}
         <div class="row"><button class="big" id="upDone">DONE</button></div>
       </div></div>`, 'Upgrade');
     this.wireCard(team);
-    document.querySelectorAll('.upRow button').forEach(b => b.onclick = () => { const k = b.dataset.k; if (Career.upgrade(k === 'spd' ? 'spd' : +k)) Sound.click(); this.upgrade(); });
+    document.querySelectorAll('.upRow button').forEach(b => b.onclick = () => { const k = b.dataset.k; if (Career.upgrade(k === 'spd' || k[0] === 't' ? k : +k)) Sound.click(); this.upgrade(); });
     $('upDone').onclick = () => this.open();
   },
   gear() {
@@ -521,7 +535,7 @@ function openCareerSlots() {
         <div class="ssSlot">SLOT ${n}${last ? '  ·  LAST PLAYED' : ''}</div>
         <div class="csTop">${t ? `<div class="csLogo">${teamBadge(t)}</div>` : ''}<div class="csOvr"><b>${s.ovr}</b><span>OVR</span></div></div>
         <div class="csName">${s.c.name.replace(/[<>&"]/g, '')}</div>
-        <div class="csPos">${s.c.pos}  ·  #${s.c.num}  ·  ${String(s.c.arch || '').toUpperCase()}</div>
+        <div class="csPos">${s.c.tw ? `${s.c.pos}/${s.c.tw.pos}` : s.c.pos}  ·  #${s.c.num}  ·  ${s.c.tw ? 'TWO-WAY' : String(s.c.arch || '').toUpperCase()}</div>
         <div class="csTeam">${t ? `${t.city} ${t.name}` : ''}</div>
         <div class="ssWhere"><b class="csLvl">${s.lvl}</b>  ·  ${s.where}</div>
         <button class="gold ssGo" data-n="${n}">CONTINUE</button><button class="ssDel" data-n="${n}">DELETE</button></div>`

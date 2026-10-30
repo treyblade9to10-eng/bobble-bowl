@@ -65,17 +65,19 @@ const Season = {
 
   // ---- season stats ----
   line(teamId, p) {
-    const S = this.data.stats || (this.data.stats = {}), k = teamId + ':' + p[1];
-    return S[k] || (S[k] = { t: teamId, name: p[1], pos: p[0], g: 0, pass: 0, rush: 0, rec: 0, td: 0, tkl: 0, sack: 0, int: 0 });
+    const S = this.data.stats || (this.data.stats = {}), k = teamId + ':' + p[1], m = p[6] || {};
+    const l = S[k] || (S[k] = { t: teamId, name: p[1], pos: m.twin || p[0], g: 0, pass: 0, rush: 0, rec: 0, td: 0, tkl: 0, sack: 0, int: 0 });
+    const tw = m.twin ? p[0] : m.twAlso; if (tw && !l.tw) l.tw = tw; // two-way player: one line, both sides (twoway.js)
+    return l;
   },
   // a believable box score for a game nobody played
   simStats(teamId, pts, oppPts) {
     if (!this.data) return;
-    const t = this.team(teamId), [qb, rb, ...rest] = t.off, recs = rest.filter(p => p[0] !== 'OL');
+    const t = TwoWay.expand(this.team(teamId)), [qb, rb, ...rest] = t.off, recs = rest.filter(p => p[0] !== 'OL');
     const tds = Math.round(pts / 7), pTD = Math.round(tds * rand(0.45, 0.75)), rTD = Math.max(0, tds - pTD);
     const passY = Math.max(60, Math.round(150 + pts * 4 + rand(-50, 60) + (qb[3] - 80) * 3));
     const rushY = Math.max(10, Math.round(55 + rand(-20, 70) + (rb[3] - 80) * 2));
-    const L = p => { const l = this.line(teamId, p); l.g++; return l; };
+    const seen = new Set(), L = p => { const l = this.line(teamId, p); if (!seen.has(l)) { l.g++; seen.add(l); } return l; }; // a two-way guy is one game played
     const lq = L(qb); lq.pass += passY; lq.td += pTD; lq.rush += Math.round(rand(-5, 25));
     const lr = L(rb); lr.rush += rushY; lr.td += rTD; lr.rec += Math.round(passY * rand(0.05, 0.15));
     const w = recs.map(p => Math.pow(p[3], 3) * rand(0.6, 1.4)), sw = w.reduce((a, b) => a + b, 0);
@@ -95,7 +97,7 @@ const Season = {
     const seen = new Set();
     for (const s of Object.values(pstats || {})) {
       const t = teams[s.side]; if (!t) continue;
-      const l = this.line(t.id, [s.pos, s.name]);
+      const l = this.line(t.id, [s.pos, s.name, 0, 0, 0, 0, s.tw ? { twAlso: s.tw } : null]);
       if (!seen.has(l)) { l.g++; seen.add(l); }
       for (const k of ['pass', 'rush', 'rec', 'td', 'tkl', 'sack', 'int']) l[k] += s[k] || 0;
       if (s.blk) l.blk = (l.blk || 0) + s.blk; // blocked kicks (older saves don't have the field)
@@ -202,11 +204,14 @@ const Season = {
     const d = this.data; if (d.awards) return;
     const all = Object.values(d.stats || {}), win = id => this.pct(id);
     const best = (list, f) => list.slice().sort((a, b) => f(b) - f(a))[0];
-    const mvp = best(all.filter(l => ['QB', 'RB', 'WR', 'TE'].includes(l.pos)), l => l.pass / 25 + l.rush / 10 + l.rec / 10 + l.td * 4 + win(l.t) * 40);
-    const opoy = best(all.filter(l => ['RB', 'WR', 'TE'].includes(l.pos) && l !== mvp), l => l.rush / 10 + l.rec / 10 + l.td * 6);
-    const dpoy = best(all.filter(l => ['DL', 'LB', 'CB', 'S'].includes(l.pos)), l => l.tkl + l.sack * 5 + l.int * 6);
-    const line = l => !l ? '' : ['QB'].includes(l.pos) ? `${l.pass} pass yds, ${l.td} TD` : ['RB', 'WR', 'TE'].includes(l.pos) ? `${l.rush + l.rec} total yds, ${l.td} TD` : `${l.tkl} tkl, ${l.sack} sacks, ${l.int} INT`;
-    d.awards = [['MVP', mvp], ['Offensive Player of the Year', opoy], ['Defensive Player of the Year', dpoy]].filter(a => a[1]).map(([award, l]) => ({ award, name: l.name, team: l.t, pos: l.pos, line: line(l) }));
+    const at = (l, list) => list.includes(l.pos) || list.includes(l.tw); // two-way players count at both spots
+    const mvp = best(all.filter(l => at(l, ['QB', 'RB', 'WR', 'TE'])), l => l.pass / 25 + l.rush / 10 + l.rec / 10 + l.td * 4 + win(l.t) * 40);
+    const opoy = best(all.filter(l => at(l, ['RB', 'WR', 'TE']) && l !== mvp), l => l.rush / 10 + l.rec / 10 + l.td * 6);
+    const dpoy = best(all.filter(l => at(l, ['DL', 'LB', 'CB', 'S'])), l => l.tkl + l.sack * 5 + l.int * 6);
+    // Two-Way Player of the Year: real production on both sides
+    const twoW = best(all.filter(l => l.tw && l.g >= Math.min(4, d.games) && l.rush + l.rec > 0 && l.tkl + l.int + l.sack > 0), l => l.rush / 10 + l.rec / 10 + l.td * 6 + l.tkl + l.sack * 5 + l.int * 6);
+    const line = l => !l ? '' : l.tw ? `${l.rush + l.rec} total yds, ${l.td} TD, ${l.tkl} tkl, ${l.int} INT` : ['QB'].includes(l.pos) ? `${l.pass} pass yds, ${l.td} TD` : ['RB', 'WR', 'TE'].includes(l.pos) ? `${l.rush + l.rec} total yds, ${l.td} TD` : `${l.tkl} tkl, ${l.sack} sacks, ${l.int} INT`;
+    d.awards = [['MVP', mvp], ['Offensive Player of the Year', opoy], ['Defensive Player of the Year', dpoy], ['Two-Way Player of the Year', twoW]].filter(a => a[1]).map(([award, l]) => ({ award, name: l.name, team: l.t, pos: l.tw ? `${l.pos}/${l.tw}` : l.pos, line: line(l) }));
     // your stuff goes in the trophy case
     if (d.champ === d.team) Career.addTitle(d.team, d.year);
     for (const a of d.awards) if (a.team === d.team) Career.addAward(a.award, a.name, a.team, d.year);

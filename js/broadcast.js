@@ -143,5 +143,7 @@ function teamFacts(tm) {
     cats.sort((a, b) => a.r - b.r); facts.push(...cats.slice(0, 2).map(c => c.t));
     if (tm.rb2 && tm.rb2[3] >= 72 && tm.off[1] && tm.rb2[3] >= tm.off[1][3] - 14) facts.push(`Two-back team: ${lastName(tm.off[1][1])} and ${lastName(tm.rb2[1])} split the carries`);
   }
+  const tw = tm.off.concat(tm.def).find(p => p && p[6] && p[6].twin); // two-way star (twoway.js) leads the graphic
+  if (tw) facts.unshift(`Two-way star: ${tw[1]} starts at ${tw[6].twin} and ${tw[0]}`);
   return facts.slice(0, 2);
 }
