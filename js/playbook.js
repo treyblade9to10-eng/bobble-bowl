@@ -58,9 +58,9 @@ const Playbook = {
     } else if (m.carrier === 'qb') {
       p.qbRun = true;
       if (F.under) p.sneak = true;
-      else p.routes = { 2: { r: [[15, 0]], end: 'go' }, 3: { r: [[15, 0]], end: 'go' }, 4: { r: [[8, 0]], end: 'block' } };
+      else { p.draw = true; p.routes = { 2: { r: [[15, 0]], end: 'go' }, 3: { r: [[15, 0]], end: 'go' }, 4: { r: [[4, 0]], end: 'block' } }; }
     } else if (m.carrier === 'jet') {
-      Object.assign(p, { carrier: 4, jet: true, wr: 'block', rb: { path: [[-2.6, 0.5], [-2.1, 5], [-0.4, 9.5], [3, 13.5], [14, 15]], end: 'go' } });
+      Object.assign(p, { carrier: 4, jet: true, wr: 'block', rb: { path: [[-2.6, 0.5], [-1.9, 4.4], [-0.6, 7.8], [1.8, 10], [14, 11.5]], end: 'go' } });
     } else Object.assign(p, this.runPath(m));
     return p;
   },
