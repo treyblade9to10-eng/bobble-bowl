@@ -483,6 +483,7 @@ function shadowSprite(r) {
 // and copied over straight on whole pixels. Anything zoomed or squashed draws the normal way
 const rotSprites = new Map(); let rotSpriteId = 0;
 function blitRot(g, c, dx, dy, dw, dh) {
+  if (G.demo) return g.drawImage(c, dx, dy, dw, dh); // (the menu demo changes teams every play: nothing would get reused)
   const m = g.getTransform(), a = m.a, b = m.b, cc = m.c, d = m.d;
   if (Math.abs(b) < 1e-9 && Math.abs(cc) < 1e-9 || Math.abs(a * a + b * b - 1) > 1e-6 || Math.abs(cc * cc + d * d - 1) > 1e-6 || Math.abs(a * cc + b * d) > 1e-6) return g.drawImage(c, dx, dy, dw, dh);
   const flip = a * d - b * cc < 0, q = Math.round((flip ? Math.atan2(-b, -a) : Math.atan2(b, a)) / 0.02), th = q * 0.02, co = Math.cos(th), si = Math.sin(th);
@@ -665,7 +666,7 @@ function drawPlayer(g, p, G, at) {
   const W = big ? 30 : 24, TH = big ? 24 : 22, HIP = (big ? 17 : 18) - kn * 9.5;
   const kp = pose ? null : kickPose(p, G, HIP); // holder / kicker / punter / fair catch
   // plain standing/running (most of the time): the player goes on whole pixels and his arms/legs come from the limb sheet
-  const m0 = !at && !pose && !kn && !kp && p.down <= 0 && !(p.dive > 0) && !(p.spin > 0) && g.globalAlpha === 1 ? g.getTransform() : null;
+  const m0 = !at && !G.demo && !pose && !kn && !kp && p.down <= 0 && !(p.dive > 0) && !(p.spin > 0) && g.globalAlpha === 1 ? g.getTransform() : null;
   const fast = !!m0 && m0.a === 1 && m0.b === 0 && m0.c === 0 && m0.d === 1 && m0.e === Math.round(m0.e) && m0.f === Math.round(m0.f);
   g.save(); g.translate(fast ? Math.round(x) : x, fast ? Math.round(y - hop) : y - hop);
   if (pose) {
@@ -1156,6 +1157,43 @@ function drawHUD(g, G) {
   // primetime games (TNF / SNF / MNF / Christmas / Halloween, see primetime.js) get their own colors + a badge at the left end
   const S = typeof bcStyle === 'function' ? bcStyle(G) : null, BW = S ? 64 : 0;
   const W = 640 + BW, x0 = (CW - W) / 2, y0 = 6, H = 46, bx = x0 + BW;
+  // the bar + both team boxes only change on a score / timeout / change of possession: painted once and copied
+  const T0 = G.teams[0], T1 = G.teams[1], vs = G.versus ? (G.online ? 'o' + G.human : 'v' + G.p1) : '';
+  const hk = S && G.bcast === 'HWN' ? null : [S ? G.bcast : '', CW, T0.id, T0.c1, T0.c2, T1.id, T1.c1, T1.c2, G.score[0], G.score[1], G.poss, G.timeouts ? G.timeouts.join() : '', vs, typeof Logo !== 'undefined' ? picId(Logo.canvas(T0, 64)) + picId(Logo.canvas(T1, 64)) : ''].join('|');
+  const hc = hk && hudLayer(hk, Math.floor(x0) - 2, W + 5, y0 + H + 4, hg => drawHUDBase(hg, G, S, x0, y0, W, H, bx));
+  if (hc) g.drawImage(hc, hc.X0, 0); else drawHUDBase(g, G, S, x0, y0, W, H, bx);
+  g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = '800 21px "Barlow Condensed", Arial, sans-serif';
+  const q = G.quarter > 4 ? 'OT' : ordinal(G.quarter);
+  const c = Math.max(0, Math.ceil(G.clock)), m = Math.floor(c / 60), s = String(c % 60).padStart(2, '0');
+  g.fillText(`${q}   ${m}:${s}`, x0 + W - 112, y0 + 16);
+  g.font = '800 15px "Barlow Condensed", Arial, sans-serif'; g.fillStyle = S ? S.down : '#ffd23f';
+  g.fillText(G.downText(), x0 + W - 112, y0 + 35);
+  if (S) {
+    bcTrim(g, G.bcast, x0, y0, W, H);
+    const bc = G.bcast === 'HWN' ? null : hudLayer('badge|' + G.bcast + '|' + CW, Math.floor(x0) - 2, BW + 4, y0 + H + 2, hg => bcBadge(hg, G.bcast, x0, y0, BW, H));
+    if (bc) g.drawImage(bc, bc.X0, 0); else bcBadge(g, G.bcast, x0, y0, BW, H);
+  }
+  // momentum bar under the two team cells + the road crowd meter on the big downs (rules.js)
+  const moOn = !G.mini && !G.demo && G.mo != null;
+  if (moOn) drawMomentum(g, bx + 5, y0 + H + (G.bcast === 'XMAS' ? 7 : 1), 405);
+  if (moOn && Crowd.show()) drawCrowd(g, x0 + W - 126, y0 + H + (G.bcast === 'XMAS' ? 10 : 4), Crowd.level());
+  drawHUDRest(g, G, S, x0, y0, W, H);
+}
+// a picture of part of the scorebug, painted in screen pixels (keeps any half pixel of the centered bar)
+const hudCache = new Map(); let picN = 0;
+const picId = c => (c.pid || (c.pid = ++picN)) + ','; // (a logo picture swapped for the real one = new key)
+function hudLayer(key, X0, w, h, paint) {
+  let c = hudCache.get(key);
+  if (!c) {
+    c = document.createElement('canvas'); c.width = w; c.height = h; c.X0 = X0;
+    const hg = c.getContext('2d'); if (!hg || !hg.translate) return null;
+    hg.translate(-X0, 0); paint(hg);
+    if (hudCache.size > 12) hudCache.clear();
+    hudCache.set(key, c);
+  }
+  return c;
+}
+function drawHUDBase(g, G, S, x0, y0, W, H, bx) {
   if (S) bcBar(g, S, x0, y0, W, H); else { g.fillStyle = '#0b0f16f0'; roundRect(g, x0, y0, W, H, 3); g.fill(); }
   const cell = (t, s, x, poss) => {
     const cg = g.createLinearGradient(x, 0, x + 200, 0); cg.addColorStop(0, t.c1); cg.addColorStop(1, shade(t.c1, -0.3));
@@ -1182,18 +1220,8 @@ function drawHUD(g, G) {
   };
   cell(G.teams[1], G.score[1], bx + 5, G.poss === 1);
   cell(G.teams[0], G.score[0], bx + 210, G.poss === 0);
-  g.fillStyle = '#fff'; g.textAlign = 'center'; g.font = '800 21px "Barlow Condensed", Arial, sans-serif';
-  const q = G.quarter > 4 ? 'OT' : ordinal(G.quarter);
-  const c = Math.max(0, Math.ceil(G.clock)), m = Math.floor(c / 60), s = String(c % 60).padStart(2, '0');
-  g.fillText(`${q}   ${m}:${s}`, x0 + W - 112, y0 + 16);
-  g.font = '800 15px "Barlow Condensed", Arial, sans-serif'; g.fillStyle = S ? S.down : '#ffd23f';
-  g.fillText(G.downText(), x0 + W - 112, y0 + 35);
-  if (S) { bcTrim(g, G.bcast, x0, y0, W, H); bcBadge(g, G.bcast, x0, y0, BW, H); }
-  // momentum bar under the two team cells + the road crowd meter on the big downs (rules.js)
-  const moOn = !G.mini && !G.demo && G.mo != null;
-  if (moOn) drawMomentum(g, bx + 5, y0 + H + (G.bcast === 'XMAS' ? 7 : 1), 405);
-  if (moOn && Crowd.show()) drawCrowd(g, x0 + W - 126, y0 + H + (G.bcast === 'XMAS' ? 10 : 4), Crowd.level());
-
+}
+function drawHUDRest(g, G, S, x0, y0, W, H) {
   // crunch time: a little tab on the right of the scorebug with the clock, timeouts and what you need
   const sit = crunchText(G);
   if (sit && !G.mini) {
