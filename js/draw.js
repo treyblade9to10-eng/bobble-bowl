@@ -1028,7 +1028,7 @@ function drawHUD(g, G) {
   if (S) { bcTrim(g, G.bcast, x0, y0, W, H); bcBadge(g, G.bcast, x0, y0, BW, H); }
   // momentum bar under the two team cells + the road crowd meter on the big downs (rules.js)
   const moOn = !G.mini && !G.demo && G.mo != null;
-  if (moOn) drawMomentum(g, x0 + 5, y0 + H + (G.bcast === 'XMAS' ? 7 : 1), 405);
+  if (moOn) drawMomentum(g, bx + 5, y0 + H + (G.bcast === 'XMAS' ? 7 : 1), 405);
   if (moOn && Crowd.show()) drawCrowd(g, x0 + W - 126, y0 + H + (G.bcast === 'XMAS' ? 10 : 4), Crowd.level());
 
   // crunch time: a little tab on the right of the scorebug with the clock, timeouts and what you need
