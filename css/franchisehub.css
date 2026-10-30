@@ -133,3 +133,21 @@
   .prbTabs button { min-width: 0; padding: 4px 10px; font-size: 12px; }
   .prbCH { font-size: 18px; } .prbSel { font-size: 11.5px; }
 }
+
+/* phones: the whole hub fits on one screen, page buttons always visible in one row at the bottom (Trey: buttons were cut off, no scrolling) */
+@media (max-height: 560px) {
+  #seasonHub { overflow: hidden; padding-bottom: max(5px, env(safe-area-inset-bottom)); }
+  #seasonHub #shMain { flex: 1 1 auto; min-height: 0; align-items: stretch; }
+  #seasonHub #shLeft, #seasonHub #shRight { min-height: 0; display: flex; flex-direction: column; }
+  #seasonHub #shSched { flex: 1 1 auto; min-height: 0; max-height: none; }
+  #seasonHub #shStand, #seasonHub #shStand.fhOn { flex: 1 1 auto; min-height: 0; max-height: none; overflow-y: auto; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
+  #seasonHub > .row { flex: none; flex-wrap: nowrap; gap: 5px; margin: 5px 0 0; width: min(1150px, 96vw); }
+  #seasonHub > .row button { flex: 1 1 0; min-width: 0; margin: 0; padding: 8px 4px; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* shorter names so nothing gets cut off */
+  #shPO, #shStats, #shDepth, #shQuit { font-size: 0 !important; }
+  #shPO::after, #shStats::after, #shDepth::after, #shQuit::after { font-size: 13px; }
+  #shPO::after { content: 'PLAYOFFS'; } #shStats::after { content: 'STATS'; } #shDepth::after { content: 'DEPTH'; } #shQuit::after { content: 'QUIT'; }
+}
+@media (max-height: 560px) and (max-width: 760px) {
+  #seasonHub #shTabs button { padding-left: 4px; padding-right: 4px; font-size: 12px; letter-spacing: .02em; }
+}
