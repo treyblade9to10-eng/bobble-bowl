@@ -1286,6 +1286,7 @@ function mobileControl(p, dt, isCarrier) {
   if (qbHolding && !G.humanScramble) { // QB moves himself in the pocket unless you slide him with the stick; you aim + throw on the field
     const st = Input.stick;
     if (st.m > 0.15 && isFinite(st.x) && isFinite(st.y)) { p.dvx = st.x * p.spd * 0.75; p.dvy = st.y * p.spd * 0.75; return true; }
+    if (G.meter) { p.dvx = 0; p.dvy = 0; return true; } // charging a throw: he plants his feet (only the stick moves him)
     return false;
   }
   const onD = p.side !== G.poss || (b.holder && b.holder.side !== p.side);
