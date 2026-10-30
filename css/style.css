@@ -67,6 +67,30 @@ h2::after { content: ''; position: absolute; left: 50%; bottom: 0; width: 56px; 
 #playcall { background: linear-gradient(to top, #0c1016f0 0%, #0c1016b0 55%, #0c101600 100%); justify-content: flex-end; padding-bottom: 16px; }
 #pcHead { font-family: var(--hd); font-style: italic; font-weight: 900; font-size: 30px; letter-spacing: .02em; margin-bottom: 10px; text-align: center; text-transform: uppercase; }
 #pcHead .pcsub { font-style: normal; font-weight: 600; font-size: 20px; color: var(--gold); margin-left: 10px; letter-spacing: .04em; }
+/* X-Factors next to the play call header: diamond zone meter + what it takes */
+#pcTop { display: flex; align-items: center; gap: 10px; width: min(1180px, calc(100vw - 20px)); margin-bottom: 10px; }
+#pcTop #pcHead { flex: none; margin-bottom: 0; }
+.pcXF { flex: 1 1 0; min-width: 0; display: flex; gap: 6px; overflow: hidden; }
+#pcXF1 { justify-content: flex-end; }
+.xfc { display: flex; align-items: center; gap: 6px; min-width: 0; background: #0c1016d9; border-left: 3px solid var(--tc, #888); padding: 3px 8px 3px 6px; line-height: 1.05; }
+.xfc > span { display: flex; flex-direction: column; min-width: 0; }
+.xfc b { font-family: var(--hd); font-weight: 800; font-size: 14px; letter-spacing: .03em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.xfc b em { font-style: normal; font-weight: 700; color: #ffb27a; margin-left: 3px; }
+.xfc s { text-decoration: none; font-family: var(--hd); font-weight: 700; font-size: 11px; letter-spacing: .05em; color: var(--dim); white-space: nowrap; }
+.xfc.on s { color: #ff8a1a; }
+.xfc.more { font-family: var(--hd); font-weight: 800; font-size: 13px; color: var(--dim); border-left-color: #444; }
+.xfd { flex: none; position: relative; width: 18px; height: 18px; background: #ff8a1a; clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+.xfd::before { content: ''; position: absolute; inset: 2.5px; background: #111; clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+.xfd u { position: absolute; left: 0; right: 0; bottom: 0; background: #ff8a1a; clip-path: inset(0); z-index: 1; }
+.xfc.on .xfd { background: #ffd0a0; }
+.xfc.on .xfd u { background: #ff8a1a; }
+body.mobile #pcTop { margin-bottom: 8px; gap: 6px; }
+body.mobile .xfc { padding: 2px 6px 2px 4px; gap: 4px; } body.mobile .xfc b { font-size: 12px; } body.mobile .xfc s { font-size: 10px; } body.mobile .xfd { width: 13px; height: 13px; }
+#pauseXF { display: flex; gap: 10px; margin-top: 12px; width: min(760px, 94vw); }
+#pauseXF:empty { display: none; }
+.pxCol { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 4px; background: var(--panel); padding: 6px 10px 8px; }
+.pxCol .pbpHead { text-transform: uppercase; font-size: 13px; }
+@media (max-height: 500px) { #pauseXF { margin-top: 6px; } .pxCol { padding: 4px 8px 6px; gap: 3px; } .pxCol .pbpHead { font-size: 11px; margin-bottom: 0; } }
 #pcCards { display: grid; gap: 8px; width: min(1180px, calc(100vw - 20px)); }
 .pcard { min-width: 0; position: relative; background: #161d28; color: var(--text); border-radius: 4px; padding: 4px; cursor: pointer; border: 1px solid #ffffff24;
   box-shadow: 0 4px 14px #0007; transition: transform .1s, border-color .1s, background .1s; }
@@ -1452,6 +1476,14 @@ span.pePos { font-family: var(--hd); font-weight: 800; letter-spacing: .06em; di
 .peRow .nm { flex: 1; min-width: 0; font-weight: 700; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.15; }
 .peRow .nm i { display: block; font-style: normal; font-weight: 600; font-size: 11px; color: var(--dim); overflow: hidden; text-overflow: ellipsis; }
 .peRow .ov { font-family: var(--hd); font-style: italic; font-weight: 900; font-size: 24px; min-width: 30px; text-align: right; }
+/* superstar abilities (abilities.js): gold diamond + name + one line */
+.abIco { display: inline-block; flex: none; width: 10px; height: 10px; background: var(--gold); transform: rotate(45deg); margin: 0 6px 0 2px; vertical-align: 0; }
+.abList { display: flex; flex-direction: column; gap: 5px; padding-top: 6px; border-top: 1px solid var(--line); }
+.abRow { display: grid; grid-template-columns: 18px 1fr; align-items: center; column-gap: 2px; line-height: 1.15; }
+.abRow b { font-family: var(--hd); font-weight: 800; font-size: 15px; letter-spacing: .03em; text-transform: uppercase; color: var(--gold); }
+.abRow span { grid-column: 2; font-size: 12px; color: var(--dim); }
+.abRow.xf .abIco { background: #ff8a1a; } .abRow.xf b { color: #ff8a1a; } .abRow.xf b::after { content: 'X-FACTOR'; margin-left: 6px; font-size: 10px; letter-spacing: .1em; background: #ff8a1a; color: #111; padding: 0 4px; vertical-align: 2px; }
+.abTag { margin-left: 8px; color: var(--gold); } .abTag .abIco { width: 7px; height: 7px; margin: 0 5px 0 1px; }
 .peRow .go .chev { width: 14px; height: 14px; display: block; fill: none; stroke: var(--dim); stroke-width: 3; }
 .peRow .beX, .peRow .tlBkX { margin: 0; flex: none; }
 .peRow .go { flex: none; }

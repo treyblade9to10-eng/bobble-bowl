@@ -112,6 +112,7 @@ const PlayerEd = {
           </div>
           <div class="peF"><span>POS</span><div class="pePosL">${posBtns}</div></div>
           <div class="peF"><span>SKIN</span><div class="peSkL">${SKIN.map((s, j) => `<button class="peSk${p[I.sk] === j ? ' on' : ''}" data-s="${j}" style="background:${s}" aria-label="Skin tone ${j + 1}"></button>`).join('')}</div></div>
+          ${typeof abHtml === 'function' ? abHtml(p[I.n]) : ''}
         </div>
         <div class="peR">
           <div class="peSec">${kick ? 'KICKING' : 'SPEED + KEY RATINGS'}<span>${pos}</span></div>
@@ -208,7 +209,7 @@ const PlayerEd = {
   row(e, k, extra = '') {
     const p = e.p, I = this.ix(e), pos = this.pos(e), ov = this.ovr(e), edited = !!(this.ex(e) && this.ex(e).r);
     return `<div class="peRow" tabindex="0" data-k="${k}"><span class="pos">${pos}</span><span class="no">${p[I.no]}</span>
-      <span class="nm">${esc(p[I.n])}<i>AGE ${this.age(e)}${e.kick ? '' : `  ·  SPD ${p[4]}`}${e.tag === 'HURT' ? '  ·  HURT' : ''}${edited ? '  ·  EDITED' : ''}</i></span>
+      <span class="nm">${esc(p[I.n])}<i>AGE ${this.age(e)}${e.kick ? '' : `  ·  SPD ${p[4]}`}${e.tag === 'HURT' ? '  ·  HURT' : ''}${edited ? '  ·  EDITED' : ''}${typeof abTags === 'function' ? abTags(p[I.n]) : ''}</i></span>
       <b class="ov" style="color:${peCol(ov)}">${ov}</b>${extra}<span class="go">${peChev(1)}</span></div>`;
   },
   wireRows(root, open) {
