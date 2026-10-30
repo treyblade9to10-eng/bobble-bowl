@@ -1,0 +1,96 @@
+/* ---- Trade Center (js/trades.js) + 7-round draft extras (js/franchise.js) ---- */
+#trade { justify-content: flex-start; padding: 10px 12px; overflow: hidden; }
+#trTop { display: flex; align-items: center; gap: 10px; width: min(1180px, 100%); flex-shrink: 0; margin-bottom: 8px; padding-right: 58px; } /* room for the sound button */
+#trTop h2 { font-size: 32px; margin: 0 8px 0 0; padding: 0 0 6px; white-space: nowrap; }
+#trTop h2::after { left: 0; margin-left: 0; }
+#trPickT { display: flex; align-items: stretch; gap: 3px; flex: 0 1 360px; min-width: 0; }
+#trPickT button { margin: 0; padding: 4px 10px; clip-path: none; display: flex; align-items: center; }
+#trTeam { flex: 1; min-width: 0; font-size: 14px; }
+#trInfo { margin-left: auto; font-family: var(--hd); font-weight: 800; font-size: 13px; letter-spacing: .1em; color: var(--gold); white-space: nowrap; }
+#trTop #trBack { margin: 0; padding: 6px 20px; font-size: 15px; }
+
+#trade #trWrap { flex: 1 1 auto; min-height: 0; display: flex; gap: 8px; width: min(1180px, 100%); align-items: stretch; margin: 0; }
+#trade .trCol { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; padding: 6px; background: var(--panel); }
+#trade .trHead { display: flex; align-items: baseline; gap: 6px; white-space: nowrap; overflow: hidden; flex-shrink: 0; line-height: 1.25; padding-top: 1px; margin-bottom: 4px; color: var(--text); letter-spacing: .04em; }
+.trTn { font-family: var(--hd); font-style: italic; font-weight: 900; font-size: 19px; line-height: 1; }
+.trTi { font-family: var(--hd); font-weight: 600; font-size: 12px; color: var(--dim); overflow: hidden; text-overflow: ellipsis; }
+.trTi b { color: #5cdd8a; } .trTi b.neg { color: #ff6a6a; }
+.trMode { margin-left: auto; font-style: normal; font-family: var(--hd); font-weight: 800; font-size: 10.5px; letter-spacing: .08em; padding: 1px 6px; background: var(--panel2); color: var(--dim); }
+.trMode.g { background: #5cdd8a22; color: #5cdd8a; } .trMode.r { background: #e8401c2a; color: #ff8a6a; }
+.trTabs { display: flex; gap: 3px; margin-bottom: 4px; flex-shrink: 0; }
+.trTabs button { flex: 1; margin: 0; padding: 4px 6px; font-size: 12px; clip-path: none; background: var(--panel2); color: var(--dim); }
+.trTabs button.on { background: var(--gold); color: #111; }
+#trade .trList { flex: 1 1 auto; min-height: 0; max-height: none; overflow-y: auto; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
+#trade .trGrp { padding: 5px 4px 1px; }
+#trade .trRow { gap: 6px; padding: 3px 5px; font-size: 12.5px; white-space: nowrap; border-left: 3px solid transparent; }
+#trade .trRow.up { border-left-color: #5cdd8a; }
+#trade .trRow.on { background: #f6c31c33; box-shadow: none; border-left-color: var(--gold); }
+#trade .trRow .pos { flex: 0 0 24px; width: 24px; font-size: 12px; }
+#trade .trRow b { flex: 0 0 20px; width: 20px; font-family: var(--hd); font-weight: 800; font-size: 14px; }
+#trade .trRow .nm { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+#trade .trRow .nm small { margin-left: 5px; font-family: var(--hd); font-weight: 800; font-size: 10px; letter-spacing: .06em; color: var(--dim); }
+#trade .trRow .nm small.out { color: #ff6a6a; }
+#trade .trRow em { flex: 0 0 auto; margin-left: auto; font-size: 11px; color: var(--dim); }
+#trade .trRow em i { font-style: normal; margin-left: 6px; color: #c9d1db; font-family: var(--bd); font-weight: 500; font-size: 10.5px; letter-spacing: 0; }
+#trade .trPk .nm { font-family: var(--hd); font-weight: 800; letter-spacing: .04em; }
+#trade .trPk .pos { color: var(--gold); }
+
+#trade #trMid { flex: 0 0 260px; width: 260px; display: flex; flex-direction: column; gap: 6px; padding: 0; align-items: stretch; text-align: left; min-height: 0; }
+#trade #trSum { display: flex; flex-wrap: wrap; gap: 6px; flex: 0 1 auto; min-height: 0; overflow-y: auto; width: auto; font-size: 12px; }
+#trade .trSumCol { flex: 1 1 0; min-width: 0; background: var(--panel); padding: 5px; min-height: 64px; }
+#trade .trSumCol .lbl { font-size: 11px; }
+#trade .trSumCol .dim { font-size: 11px; margin-top: 3px; }
+.trChip { display: flex; gap: 4px; align-items: center; font-size: 11.5px; padding: 2px 4px; background: var(--panel2); margin-top: 3px; cursor: pointer; white-space: nowrap; overflow: hidden; }
+.trChip .pos { color: var(--dim); font-family: var(--hd); font-weight: 800; }
+.trChip b { color: var(--gold); margin-left: auto; }
+.trChip:hover { background: #e8401c55; }
+.trCapA { flex-basis: 100%; font-family: var(--hd); font-weight: 800; font-size: 11px; letter-spacing: .08em; color: var(--dim); }
+.trCapA b { color: #5cdd8a; } .trCapA b.neg { color: #ff6a6a; }
+#trMeterBox { background: var(--panel); padding: 5px 8px 6px; flex-shrink: 0; }
+.trMLbl { display: flex; justify-content: space-between; align-items: baseline; font-family: var(--hd); font-weight: 800; font-size: 12px; letter-spacing: .14em; color: var(--gold); }
+.trMLbl b { color: #fff; font-size: 18px; font-style: italic; letter-spacing: .02em; }
+#trade #trMeter { position: relative; height: 12px; background: var(--panel2); margin: 3px 0 4px; width: auto; }
+#trMeter i { display: block; height: 100%; width: 0; transition: width .2s; }
+#trMeter u { position: absolute; left: 80%; top: -3px; bottom: -3px; width: 2px; background: #fff; }
+#trVerdict { font-family: var(--hd); font-weight: 800; font-size: 12px; letter-spacing: .05em; color: var(--dim); line-height: 1.2; }
+#trVerdict .g { color: #5cdd8a; } #trVerdict .c { color: var(--gold); } #trVerdict .r { color: #ff6a6a; }
+#trade #trMsg { font-size: 12px; color: var(--dim); flex: 1 1 auto; min-height: 0; overflow-y: auto; touch-action: pan-y; line-height: 1.3; }
+#trade #trGo { margin: 0; font-size: 22px; padding: 8px 10px; flex-shrink: 0; }
+.trB2 { display: flex; gap: 4px; flex-shrink: 0; }
+.trB2 button { margin: 0; padding: 6px 6px; font-size: 11.5px; flex: 1; clip-path: none; }
+#trade #trAsk { flex: 2.2; margin: 0; font-size: 11.5px; padding: 6px; }
+.trOfr { background: var(--panel2); padding: 4px 6px; margin-bottom: 3px; cursor: pointer; font-size: 11.5px; color: var(--text); }
+.trOfr b { display: block; color: var(--gold); font-family: var(--hd); font-weight: 800; letter-spacing: .08em; font-size: 12px; }
+.trOfr:hover { background: #2a3544; }
+@media (max-height: 500px) {
+  #trade { padding: 6px 8px; } #trTop { margin-bottom: 5px; } #trTop h2 { display: none; }
+  #trade #trMid { flex-basis: 214px; width: 214px; gap: 4px; } #trade .trSumCol { min-height: 48px; padding: 4px; }
+  #trade #trGo { font-size: 18px; padding: 5px 8px; } .trB2 button, #trade #trAsk { padding: 4px; font-size: 10.5px; }
+  #trade .trRow { padding: 2px 4px; font-size: 12px; } .trTn { font-size: 16px; } #trTop #trBack { padding: 4px 16px; font-size: 13px; }
+  #trMeterBox { padding: 3px 6px 4px; } .trMLbl b { font-size: 15px; } #trade #trMsg { font-size: 11px; }
+}
+@media (max-width: 720px) {
+  #trade #trMid { flex-basis: 190px; width: 190px; } #trade .trRow em i { display: none; } .trTi { display: none; }
+  #trPickT { flex-basis: 260px; }
+}
+
+/* draft: your picks left, your class, roster cut-down */
+.dLeft { font-family: var(--hd); font-weight: 800; font-size: 12px; letter-spacing: .06em; color: var(--text); margin: 2px 0 8px; }
+.dpRow.me b { color: var(--gold); }
+#drBody .dMine { display: flex; align-items: baseline; gap: 8px; text-align: left; font-size: 13px; line-height: 1.3; margin: 0; padding: 4px 2px; border-bottom: 1px solid var(--line); }
+#drBody .dMine span { flex: 0 0 52px; font-family: var(--hd); font-weight: 800; color: var(--dim); }
+#drBody .dMine b { flex: 0 0 auto; }
+#drBody .dMine i { flex: 1; min-width: 0; font-style: normal; color: var(--dim); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#drBody .dMine em { font-style: normal; font-family: var(--hd); font-weight: 800; font-size: 11px; letter-spacing: .06em; color: var(--dim); }
+#drBody .dMine em.up { color: #5cdd8a; }
+#drBody .dDone { font-size: 20px; }
+.dCutNote { font-size: 12px; color: var(--dim); margin: 2px 0 4px; line-height: 1.3; }
+.dCut { display: flex; align-items: center; gap: 7px; padding: 3px 4px; border-bottom: 1px solid var(--line); font-size: 12.5px; cursor: pointer; border-left: 3px solid transparent; }
+.dCut .pos { flex: 0 0 24px; color: var(--dim); font-family: var(--hd); font-weight: 800; }
+.dCut b { flex: 0 0 20px; color: var(--gold); font-family: var(--hd); font-weight: 800; }
+.dCut .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dCut .nm i { font-style: normal; color: var(--dim); font-size: 11px; margin-left: 6px; }
+.dCut em { font-style: normal; font-family: var(--hd); font-weight: 800; font-size: 11px; letter-spacing: .08em; color: #5cdd8a; }
+.dCut.on { background: #e8401c22; border-left-color: var(--red); } .dCut.on em { color: #ff6a6a; }
+.dCut:hover { background: #ffffff10; }
+@media (max-height: 500px) { .dCut { padding: 2px 4px; font-size: 11.5px; } .dCut .nm i { display: none; } #drBody .dMine { font-size: 11.5px; padding: 2px; } }

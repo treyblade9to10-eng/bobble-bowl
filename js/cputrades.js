@@ -11,29 +11,11 @@ const LeagueTrades = {
   sal(p) { const c = p && p[6] && p[6].con; return c ? c.sal || 0 : 0; },
   age(p) { return footballAge(p[0], (p[6] && p[6].age) || 27); },
   // cap check for a CPU-CPU deal (only once contracts exist)
-  capOk(a, b, ka, kb) {
-    if (typeof Contracts === 'undefined' || !Season.data.rosters || !Contracts.all(a).some(p => Contracts.con(p))) return true;
-    const s = (id, keys) => keys.reduce((t, k) => { const x = Season.asset(id, k); return t + (x && x.p ? this.sal(x.p) : 0); }, 0);
-    const out = s(a, ka), inn = s(b, kb);
-    return Contracts.room(a) + out - inn >= 0 && Contracts.room(b) + inn - out >= 0;
-  },
+  capOk(a, b, ka, kb) { return !Season.capProblem(a, b, ka, kb); },
   // move assets between any two teams (picks change owners, the best player at each spot starts)
-  swap(a, b, ka, kb) {
-    const R = Season.ensureRosters(), d = Season.data;
-    const pull = (id, to, keys) => {
-      const got = [], rows = keys.map(k => k.split(':'));
-      for (const [k, v] of rows) if (k === 'pick') (d.pickOwner || (d.pickOwner = {}))[v] = to;
-      for (const [k, v] of rows) if (k !== 'pick') { const arr = k === 'bench' ? Season.bench(id) : R[id][k]; got.push(arr[+v]); arr[+v] = null; }
-      const bn = Season.bench(id); bn.splice(0, bn.length, ...bn.filter(Boolean));
-      for (const p of got) if (p && p[6]) delete p[6].injSlot;
-      return got;
-    };
-    const toB = pull(a, b, ka), toA = pull(b, a, kb);
-    Season.bench(a).push(...toA); Season.bench(b).push(...toB);
-    Season.setLineup(a); Season.setLineup(b); // empty spots get the best backup (or a signing)
-    const nm = (id, keys, ps) => ps.map(p => `${p[0]} ${p[1]} (${p[3]})`).concat(keys.filter(k => k.startsWith('pick:')).map(k => `the ${tName(k.slice(5))} 1st round pick`));
-    return { aGot: nm(b, kb, toA), bGot: nm(a, ka, toB) };
-  },
+  swap(a, b, ka, kb) { return Season.moveAssets(a, b, ka, kb); },
+  // the picks a team would actually deal: rounds 1-3, any year
+  dealPicks(id) { return Season.assets(id).filter(x => x.pk && x.pk.r <= 3); },
   // value of a package to a team (getting it or giving it up)
   val(id, from, keys, getting) { return keys.reduce((s, k) => { const x = Season.asset(from, k); return s + (x ? Season.worth(id, x, getting) : 0); }, 0); },
   // one sensible CPU-CPU deal. kind: 'season' | 'deadline' | 'offseason'
@@ -50,7 +32,7 @@ const LeagueTrades = {
       const targets = Season.assets(B).filter(x => x.p && x.starter && this.ok(x.p) && posGroup(x.p[0]) === posGroup(need.p[0]) && x.p[3] >= need.p[3] + 3 && x.p[3] >= 74);
       // sellers move older guys first
       targets.sort((x, y) => this.age(y.p) - this.age(x.p)); const T = targets[0]; if (!T) continue;
-      const mine = Season.assets(A), picks = mine.filter(x => x.pick), bench = mine.filter(x => x.p && !x.starter && this.ok(x.p) && x.p[3] >= 66 && (posGroup(x.p[0]) === posGroup(T.p[0]) || this.age(x.p) <= 24)); // a backup at the same spot or a young prospect
+      const mine = Season.assets(A), picks = shuffle(this.dealPicks(A)).slice(0, 5), bench = mine.filter(x => x.p && !x.starter && this.ok(x.p) && x.p[3] >= 66 && (posGroup(x.p[0]) === posGroup(T.p[0]) || this.age(x.p) <= 24)); // a backup at the same spot or a young prospect
       const opts = [[need.key]];
       for (const pk of picks) { opts.push([need.key, pk.key]); opts.push([pk.key]); }
       for (const bn of bench.slice(0, 6)) { opts.push([need.key, bn.key]); if (picks[0]) opts.push([bn.key, picks[0].key]); }
@@ -80,16 +62,18 @@ const LeagueTrades = {
     if (!Season.canTrade() || d.offer) return;
     const dl = Season.deadline(), got = (d.offerLog || []).filter(o => o.y === d.year), last = got[got.length - 1];
     if (got.length >= 4 || (last && d.week - last.wk < (dl >= 8 ? 2 : 1)) || !chance(clamp(5 / dl, 0.25, 0.75))) return;
-    const wants = Season.assets(me).filter(a => a.p && this.ok(a.p) && (a.starter ? a.p[3] >= 76 : a.p[3] >= 72));
+    let wants = Season.assets(me).filter(a => a.p && this.ok(a.p) && (a.starter ? a.p[3] >= 76 : a.p[3] >= 72));
+    const block = wants.filter(a => (d.block || []).includes(a.p[1])); if (block.length && chance(0.7)) wants = block; // guys you shopped get calls first
     const myNeed = (() => { const R = Season.ensureRosters()[me]; let w = null; for (const side of ['off', 'def']) for (const p of R[side]) if (p && (!w || p[3] < w[3])) w = p; return w; })();
     for (let tries = 0; tries < 30; tries++) {
       const want = pick(wants); if (!want) return;
       const other = pick(TEAMS.filter(t => t.id !== me)).id;
-      const A = Season.assets(other), pk = A.find(a => a.pick);
+      const A = Season.assets(other), pks = shuffle(this.dealPicks(other)), pk = pks[0];
       const same = A.filter(a => a.p && this.ok(a.p) && posGroup(a.p[0]) === posGroup(want.p[0]));
       const fill = myNeed ? A.filter(a => a.p && this.ok(a.p) && posGroup(a.p[0]) === posGroup(myNeed[0]) && a.p[3] > myNeed[3]) : [];
       const opts = [];
       for (const t of same) { opts.push([t.key]); if (pk) opts.push([t.key, pk.key]); }
+      if (pks.length > 1) { opts.push([pks[0].key, pks[1].key]); if (pks[2]) opts.push([pks[0].key, pks[1].key, pks[2].key]); } // picks for a star
       for (const f of fill) { opts.push([f.key]); if (same[0]) opts.push([f.key, same[0].key]); if (pk) opts.push([f.key, pk.key]); }
       if (pk) opts.push([pk.key]);
       shuffle(opts);

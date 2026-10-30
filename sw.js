@@ -10,6 +10,7 @@ const FILES = [
   'css/practice.css',
   'css/franchisehub.css', 'css/spooky.css',
   'css/franchise3.css',
+  'css/trade.css',
   'manifest.webmanifest',
   'icons/icon-192.png',
   'icons/icon-512.png',
