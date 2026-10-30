@@ -36,7 +36,7 @@ const lastName = n => { const p = n.split(' '); return p.length > 1 ? p.slice(1)
 // player 2 keys: arrows move, right shift sprint, enter = snap / dive / jump, / . , = juke spin stiff arm, 7 8 9 0 = throw, L switch, K hit stick
 const P2KEYS = { KeyW: 'ArrowUp', KeyA: 'ArrowLeft', KeyS: 'ArrowDown', KeyD: 'ArrowRight', ArrowUp: 'ArrowUp', ArrowDown: 'ArrowDown', ArrowLeft: 'ArrowLeft', ArrowRight: 'ArrowRight',
   Space: 'Enter', ShiftLeft: 'ShiftRight', ControlLeft: 'ControlRight', ControlRight: 'ControlRight', KeyE: 'Slash', KeyF: 'Period', KeyR: 'Comma', KeyQ: 'KeyL', Tab: 'KeyL',
-  KeyC: 'KeyK', Digit1: 'Digit7', Digit2: 'Digit8', Digit3: 'Digit9', Digit4: 'Digit0', Numpad1: 'Digit7', Numpad2: 'Digit8', Numpad3: 'Digit9', Numpad4: 'Digit0', KeyT: 'KeyN', KeyX: 'KeyJ', KeyG: 'KeyH' };
+  KeyC: 'KeyK', Digit1: 'Digit7', Digit2: 'Digit8', Digit3: 'Digit9', Digit4: 'Digit0', Numpad1: 'Digit7', Numpad2: 'Digit8', Numpad3: 'Digit9', Numpad4: 'Digit0', KeyT: 'KeyN', KeyX: 'KeyJ', KeyG: 'KeyH', KeyY: 'KeyO' };
 const P1BLOCK = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter']);
 const Input = {
   down: {},      // key code -> held

@@ -35,6 +35,7 @@ const FILES = [
   'js/injury.js',
   'js/celly.js',
   'js/special.js',
+  'js/rules.js',
   'js/highlights.js',
   'js/season.js',
   'js/modes.js',

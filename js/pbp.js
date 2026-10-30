@@ -57,7 +57,7 @@ function drawTicker(g, G) {
   g.save(); g.globalAlpha = a;
   g.font = '600 17px "Barlow Condensed", Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
   const txt = L.text.length > 110 ? L.text.slice(0, 107) + '...' : L.text;
-  const w = Math.min(CW - 40, g.measureText(txt).width + 70), y = G.playClock > 0 ? 100 : 74;
+  const w = Math.min(CW - 40, g.measureText(txt).width + 70), y = G.playClock > 0 || (typeof Crowd !== 'undefined' && Crowd.show()) ? 102 : 76;
   g.fillStyle = '#0b0f16e8'; g.fillRect(CW / 2 - w / 2, y - 14, w, 28);
   g.fillStyle = '#f6c31c'; g.fillRect(CW / 2 - w / 2, y - 14, 4, 28);
   g.fillStyle = '#9aa6b5'; g.textAlign = 'left'; g.font = '800 13px "Barlow Condensed", Arial, sans-serif'; g.fillText(`${L.q} ${L.clock}`, CW / 2 - w / 2 + 12, y + 1);

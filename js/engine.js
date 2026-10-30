@@ -87,6 +87,7 @@ function initGame(home, away, opts) {
   Injury.reset();
   Input.versus = G.versus; Input.ctl = 0;
   setupXFactors();
+  G.mo = 0; Review.reset(); // momentum meter + challenges (rules.js)
 }
 
 function setDrive(side, x) {
@@ -663,6 +664,7 @@ function snap() {
     if (crossedTwoMin(c0)) { G.clock = 120; G.pendingRunoff = 0; twoMinWarning(); }
     if (G.clock <= 0) return clockRanOut();
   }
+  if (falseStartRoll()) return;
   burnHuddleClock();
   if (G.down === 3 && !G.twoPt && !G.special && G.tstats) { const t = G.tstats[G.poss]; t.a3 = (t.a3 || 0) + 1; }
   if (G.banner) G.banner.dur = Math.min(G.banner.dur, G.banner.t + 0.25); // ball is snapped: get the banner off the field
@@ -670,6 +672,7 @@ function snap() {
   G.play.fakeSpike = !!G.fakeSpike; G.fakeSpike = false;
   if (G.play.fakeSpike) { G.O[0].throwAnim = 0.35; addText(G.O[0].x, G.O[0].y - 3, 'FAKE SPIKE!', '#7fd3ff', 18, 1.0); }
   G.credit = null; G.lastTackler = null; G.intBy = null; G.breakup = null; G.lastResult = null;
+  Review.snapReset();
   if (typeof Replay !== 'undefined') Replay.begin();
   if (G.fake) { showBanner(G.fake === 'punt' ? 'FAKE PUNT!' : 'FAKE FIELD GOAL!', '', '#7fd3ff', 1.3); G.crowdHype = 1; }
   if (!G.twoPt && chance(0.012)) { const dl = pick(G.D.slice(0, 3)); throwFlag('OFFSIDE', dl.side, dl.x, dl.y, dl); }
@@ -685,6 +688,7 @@ function update(dt) {
   if (G.prevClock != null && G.clock < G.prevClock && G.tstats && G.tstats[G.poss] && !G.demo) G.tstats[G.poss].top = (G.tstats[G.poss].top || 0) + G.prevClock - G.clock;
   G.prevClock = G.clock;
   if (G.phase === 'replay') { Replay.update(dt); return; }
+  if (G.phase === 'review') { Review.update(dt); return; } // coach's challenge / booth review (rules.js)
   if (G.slowmo > 0) { G.slowmo -= dt; dt *= 0.35; }
   G.time += dt;
   for (const p of G.players) { p.throwAnim = Math.max(0, p.throwAnim - dt); p.celebrate = Math.max(0, p.celebrate - dt); if (p.down <= 0) p.dizzy = 0; if (p.kickT != null && (p.kickT += dt) > 0.9) p.kickT = null; }
@@ -714,8 +718,9 @@ function update(dt) {
     const cg = G.cellyGuy;
     if (cg) withSide(cg.side, () => Celly.input(cg));
     updateBallPhysicsDead(dt);
+    Review.tick(dt);
     G.deadT -= dt;
-    if (G.deadT <= 0) { if (Replay.want()) Replay.start(); else afterPlay(); }
+    if (G.deadT <= 0) { if (Review.pending()) Review.start(); else if (!G.rvDone && Replay.want()) Replay.start(); else afterPlay(); }
   } else if (G.phase === 'kick') {
     updateKick(dt);
     if (G.km && G.km.live) fgLive(dt); else idlePlayers(dt);
@@ -919,7 +924,10 @@ const FOULS = {
   HOLD: { name: 'HOLDING', def: false, text: '10 yards • Replay the down' },
   DELAY: { name: 'DELAY OF GAME', def: false, text: '5 yards • Replay the down' },
   ROUGHK: { name: 'ROUGHING THE KICKER', def: true, text: '15 yards • Automatic 1st down' }, // kick fouls are enforced in special.js
-  RIK: { name: 'RUNNING INTO THE KICKER', def: true, text: '5 yards' }
+  RIK: { name: 'RUNNING INTO THE KICKER', def: true, text: '5 yards' },
+  FACEMASK: { name: 'FACEMASK', def: true, text: '15 yards • Automatic 1st down' },
+  GROUND: { name: 'INTENTIONAL GROUNDING', def: false, text: 'Loss of down • Ball at the spot' },
+  IBB: { name: 'ILLEGAL BLOCK IN THE BACK', def: false, text: '10 yards from the spot' } // kick returns: enforced in special.js
 };
 function throwFlag(type, foulSide, x, y, who) {
   if (!G.flags) G.flags = [];
@@ -973,6 +981,12 @@ function checkFouls() {
     pl.holdRolled = true;
     if (chance(0.025)) { const ol = pick(G.O.slice(5)); throwFlag('HOLD', off, ol.x, ol.y, ol); }
   }
+  // illegal block in the back on a kick / punt return (rare): rolled once when the return gets going
+  if ((G.special === 'ko' || G.special === 'punt') && G.bstate === 'run' && !pl.ibbRolled && G.retStart != null && b.holder && b.holder.side === off && Math.abs(b.holder.x - G.retStart) > 8) {
+    pl.ibbRolled = true;
+    const car = b.holder, bl = G.O.filter(p => p !== car && p.down <= 0 && G.D.some(c => dist(c, p) < 2.2));
+    if (bl.length && chance(0.06)) { const p = pick(bl); throwFlag('IBB', off, p.x, p.y, p); }
+  }
 }
 
 // ---------- penalty enforcement ----------
@@ -995,7 +1009,13 @@ function enforcePenalty(res) {
       newLos = base + d * Math.min(15, d * (goalX(off) - base) / 2); autoFirst = true;
     } else if (f.type === 'OFFSIDE') {
       newLos = G.los + d * Math.min(5, toGoal / 2); accept = turnover || d * (resX - G.los) < 5;
+    } else if (f.type === 'FACEMASK') { // from the end of the run (or the line if he was stopped behind it)
+      const base = d * (resX - G.los) > 0 ? resX : G.los;
+      newLos = base + d * Math.min(15, d * (goalX(off) - base) / 2); autoFirst = true;
     }
+  } else if (f.type === 'GROUND') { // intentional grounding: the spot of the pass (at least 10 back) and the down is lost
+    const ten = G.los - d * Math.min(10, d * (G.los - ownGoal(off)) / 2);
+    newLos = d * (f.x - ten) < 0 ? f.x : ten; accept = !turnover;
   } else { // offense fouled
     newLos = G.los - d * Math.min(10, d * (G.los - ownGoal(off)) / 2);
     accept = !turnover && (td || res.type === 'inc' || d * (resX - G.los) > -10);
@@ -1004,12 +1024,19 @@ function enforcePenalty(res) {
   const who = `${G.teams[f.side].name}${f.num != null ? ' #' + f.num : ''}`;
   if (!accept) { G.flagNote = `FLAG: ${F.name}, DECLINED`; addPbp(`Penalty on ${who}: ${F.name.toLowerCase()}, declined.`); return false; }
   addPbp(`PENALTY on ${who}: ${F.name.toLowerCase()}. ${F.text.replace(/ • /g, ', ')}.`);
-  G.los = clamp(newLos, 11, 109);
-  if (autoFirst || d * (G.los - G.firstDownX) >= 0) { G.down = 1; setFirstDown(); }
-  else if (!F.def) { /* same down, longer to go */ }
   G.next = null; G.runoff = 0; G.deadT = 2.4;
   showBanner(F.name, `${who} • ${F.text}`, '#ffe14d', 2.4);
   Sound.whistle();
+  refSignal(F.name);
+  if (f.type === 'GROUND') {
+    if (d * (newLos - ownGoal(off)) <= 0) { G.score[1 - off] += 2; showBanner('SAFETY!', 'Intentional grounding in the end zone', '#ff6040', 2.4); G.next = { kickoff: off, from: 20 }; return true; }
+    G.los = clamp(newLos, 11, 109);
+    if (++G.down > 4) { showBanner('TURNOVER ON DOWNS', 'Intentional grounding on 4th down', '#ff9a3d', 2.4); G.next = { drive: 1 - off, x: G.los }; }
+    return true;
+  }
+  G.los = clamp(newLos, 11, 109);
+  if (autoFirst || d * (G.los - G.firstDownX) >= 0) { G.down = 1; setFirstDown(); }
+  else if (!F.def) { /* same down, longer to go */ }
   return true;
 }
 
@@ -1022,6 +1049,31 @@ function delayOfGame() {
   Sound.whistle();
   const f = { kind: 'flag', ax: G.los - d * 10, ay: MID + 6, x: G.los, y: G.ballY, t: 0, T: 0.55, z: 0, vz: 0, life: 2.5, max: 2.5 };
   toPlayCall(); G.fx.push(f);
+}
+// the ref's signal: his arms go up and the call floats over his head
+function refSignal(text) {
+  const r = G.refs && G.refs[0]; if (!r) return;
+  r.throwT = 0.5; addText(r.x, r.y, text, '#ffe14d', 14, 1.8);
+}
+// false start: a lineman flinches before the snap. Dead ball, 5 yards, same down (crowd = the road crowd got him)
+function falseStart(crowd) {
+  const d = dirOf(G.poss), ol = pick(G.O.slice(5)), who = `${G.teams[G.poss].name} #${ol.num}`;
+  ol.x += d * 0.8; addText(ol.x, ol.y, 'FALSE START', '#ffe14d', 16, 1.2);
+  G.los = clamp(G.los - d * Math.min(5, d * (G.los - ownGoal(G.poss)) / 2), 11, 109);
+  showBanner('FALSE START', `${who} • 5 yards • Replay ${ordinal(G.down)} down${crowd ? '  •  Crowd noise' : ''}`, '#ffe14d', 2.2);
+  addPbp(`False start on ${who}, 5 yards.${crowd ? ' The crowd got to them.' : ''}`);
+  Sound.whistle();
+  const f = { kind: 'flag', ax: G.los - d * 10, ay: MID + 6, x: G.los, y: G.ballY, t: 0, T: 0.55, z: 0, vz: 0, life: 2.5, max: 2.5 };
+  toPlayCall(); G.fx.push(f); refSignal('FALSE START');
+}
+// rolled at the snap: rare for anybody, more on 3rd down on the road in a loud place (crowd.js)
+function falseStartRoll() {
+  if (G.twoPt || G.mini || G.demo || G.special || G.fake || G.play.off.kneel || G.fakeSpike || G.patSide != null || (typeof Tutorial !== 'undefined' && Tutorial.active)) return false;
+  const cr = typeof Crowd !== 'undefined' ? Crowd.falseStart() : 0;
+  const base = isHumanSide(G.poss) ? 0 : 0.004;
+  if (!chance(base + cr)) return false;
+  falseStart(cr > 0 && chance(cr / (base + cr)));
+  return true;
 }
 
 // screen drag vector -> where the ball lands (pull back further = throw further)
@@ -1601,6 +1653,11 @@ function throwWindow(qb, r) {
   }
   return m;
 }
+// QB still in the pocket (tackle box, behind the line) with a free rusher on him: a pass to nobody is grounding
+function pocketPressure(qb) {
+  if (qb !== G.O[0] || G.trickPasser || G.special || dirOf(G.poss) * (qb.x - G.los) > -0.5 || Math.abs(qb.y - G.ballY) > 4.5) return false;
+  return G.D.some(df => !df.engaged && df.down <= 0 && dist(df, qb) < 2.4);
+}
 // launch it out of bounds (or into the dirt) so nobody can catch it
 function throwAway(qb) {
   const d = dirOf(G.poss), side = qb.y < MID ? -3 : FIELD_W + 3;
@@ -2008,6 +2065,7 @@ function throwTo(qb, r, pitch = false, aimed = null, style = 'normal', lead = nu
     if (xfOn(qb, 'dimes') || xfOn(qb, 'dots')) err *= 0.35;
     if (xfOn(qb, 'proreads')) err *= 0.7;
     err *= abThrowErr(qb, { pressure, onRun, tx, ty, style }); // Deadeye / Fearless
+    err *= 1 - 0.08 * Momentum.of(qb.side); // riding the momentum
     if (G.weather === 'rain' || G.weather === 'snow') err *= 1.15;
     if (mt) { if (mt.perfect) err *= 0.25; else if (mt.over) err *= 1.35; else err *= 1 + (1 - clamp(mt.v / mt.g0, 0, 1)) * 0.6; }
     if (arm.thp < 62 || err > 3.5) duck = true;
@@ -2026,7 +2084,7 @@ function throwTo(qb, r, pitch = false, aimed = null, style = 'normal', lead = nu
   ty = clamp(ty, -0.5, FIELD_W + 0.5);
   b.holder = null;
   const pk = pitch ? 0.4 : (0.6 + len * 0.1) * (style === 'bullet' ? 0.45 : style === 'lob' ? 1.9 : 1) + (style === 'lob' ? 1.5 : 0);
-  b.flight = { sx: qb.x, sy: qb.y, tx, ty, t: 0, T: Math.max(T, len / spd), peak: pk, intended: r, pitch, passer: qb, style, duck, perfect: !!(mt && mt.perfect) };
+  b.flight = { sx: qb.x, sy: qb.y, tx, ty, t: 0, T: Math.max(T, len / spd), peak: pk, intended: r, pitch, passer: qb, style, duck, perfect: !!(mt && mt.perfect), grnd: !pitch && pocketPressure(qb) };
   G.bstate = 'air'; G.intended = r;
   for (const p of G.players) { p.laneChecked = false; p.jumpTried = false; }
   G.passPlay = !pitch;
@@ -2076,6 +2134,8 @@ function resolveCatch() {
     return;
   }
   const offSide = f.passer.side; G.lastThrower = f.passer;
+  // intentional grounding: thrown from inside the pocket with a rusher on him and no receiver anywhere near it
+  if (f.grnd && !G.twoPt && !G.mini && !G.O.some(p => eligible(p) && dist(p, land) < 6.5) && chance(0.6)) throwFlag('GROUND', offSide, f.sx, f.sy, f.passer);
   if (G.thrownAway) { G.thrownAway = false; return incomplete(null, 'THROWN AWAY'); }
   let rcv = null, rd = 99, def = null, dd = 99;
   for (const p of G.players) {
@@ -2115,6 +2175,7 @@ function resolveCatch() {
   if (rcv && rd < R) {
     let pc = 0.9 + (rat(rcv, 'CTH') - 78) / 160 - Math.max(0, Math.hypot(land.x - f.sx, land.y - f.sy) - 15) * 0.006 - (rd > 0.9 ? 0.08 : 0) - Weather.catchPenalty();
     if (hands) pc += 0.15;
+    pc += 0.03 * Momentum.of(rcv.side);
     if (f.perfect) pc += 0.12; // a PERFECT meter throw is right in his hands
     if (f.cp === 'perfect') pc += 0.1; else if (f.cp === 'good') pc += 0.08; // timed catch
     pc += abCatch(rcv, def, def && dd < 1.8, f, land); // superstar abilities: route Elites, contested catches, knockouts
@@ -2122,7 +2183,7 @@ function resolveCatch() {
     if (scrToss) pc = lerp(pc, 0.97, 0.5);
     if (chance(clamp(pc, 0.25, 0.97))) {
       const backLine = rcv.x < -0.25 || rcv.x > 120.25, sideLine = rcv.y < -0.25 || rcv.y > FIELD_W + 0.25;
-      if (backLine || sideLine) { addText(clamp(rcv.x, 1, 119), clamp(rcv.y, 1, FIELD_W - 1), backLine ? 'OUT THE BACK' : 'NO FEET IN', '#fff', 15, 1); return incomplete(rcv, 'OUT OF BOUNDS'); }
+      if (Review.catchCall(rcv, f, backLine || sideLine)) { addText(clamp(rcv.x, 1, 119), clamp(rcv.y, 1, FIELD_W - 1), backLine ? 'OUT THE BACK' : 'NO FEET IN', '#fff', 15, 1); return incomplete(rcv, 'OUT OF BOUNDS'); }
       b.holder = rcv; G.bstate = 'run'; Sound.catch(); G.catchX = rcv.x;
       rcv.mouth = 'O'; rcv.mouthT = 0.4;
       stat(f.passer).comp++; G.credit = { p: rcv, kind: 'rec', passer: f.passer };
@@ -2181,6 +2242,7 @@ function checkTackles() {
     if (xfOn(df, 'unstoppable') || xfOn(df, 'reinforcement')) p += 0.1;
     if (xfOn(car, 'ankle') && (car.juke > 0 || car.spin > 0)) p -= 0.3;
     p += abTackle(car, df, front);
+    p += 0.03 * (Momentum.of(df.side) - Momentum.of(car.side));
     p = clamp(p, 0.1, 0.94);
     // one-shot breaks: Brick Wall (first sack try), Phenom (first hit), First One Free (next move), YAC 'Em Up (first hit after the catch)
     const xfBreak = (car === G.O[0] && G.bstate === 'snap' && xfFree(car, 'brickwall')) || xfFree(car, 'phenom')
@@ -2214,10 +2276,12 @@ function tackle(car, df, hitters) {
   if ((G.bstate === 'run' || stick) && !xfOn(car, 'truzz') && chance((0.022 + (hitters > 1 ? 0.02 : 0) + (stick ? 0.3 : 0) + Weather.fumbleBonus()) * tuckFumbleMul(car) * carMul(car) * (abHas(car, 'secure') ? 0.6 : 1))) {
     b.holder = null; b.x = car.x; b.y = car.y;
     b.loose = { vx: rand(-4, 4), vy: rand(-3, 3), t: 0 };
+    Review.fumbleCall(car);
     G.bstate = 'loose'; showBanner('FUMBLE!', '', '#ff9a3d', 1.0); car.down = 0.9; b.fumbler = car;
     return;
   }
   st.tkl++;
+  if (!G.special && !G.mini && !G.twoPt && chance(0.005)) { throwFlag('FACEMASK', df.side, car.x, car.y, df); car.head.rot = 0.6; car.head.vx += 600; } // grabbed the face mask
   const sack = car === G.O[0] && G.bstate === 'snap' && !G.play.off.qbRun && dirOf(G.poss) * (car.x - G.los) <= 0; // a QB draw stopped short is a run, not a sack
   if (sack) { st.sack++; showBanner('SACKED!', df.name, '#ff6040', 1.2); }
   endPlay({ type: sack ? 'sack' : 'tackle', carrier: car, x: car.x, y: car.y });
@@ -2266,8 +2330,10 @@ function endPlay(res) {
   for (const p of G.players) { p.throwKey = 0; p.engaged = null; }
   G.flagNote = null; G.pendingRunoff = 0;
   if (G.special) { const fl = G.flags; G.flags = []; return endReturn(res, fl); } // (a punt can carry a roughing-the-kicker flag)
+  const d0 = G.down;
+  if (G.flags && G.flags.length) G.rv = null; else res = Review.call(res); // close calls: the officials can miss one (rules.js)
   G.lastResult = pbpPlay(res);
-  xfAfterPlay(res, G.lastResult);
+  if (!G.reviewing) xfAfterPlay(res, G.lastResult); // (an overturned call already counted the play once)
   if (G.flags && G.flags.length) { if (G.twoPt) G.flags = []; else if (enforcePenalty(res)) return; }
   const off = G.poss, d = dirOf(off);
   const car = res.carrier;
@@ -2320,6 +2386,8 @@ function endPlay(res) {
     if (res.type !== 'oob') { G.pendingRunoff = 9; G.runFrom = G.time; }
   }
   G.next = next;
+  Momentum.afterPlay(res, d0);
+  Review.open();
 }
 
 function advanceDown(x, moved) {
@@ -2528,7 +2596,7 @@ function updateKick(dt) {
     addPbp(`${lastName(G.km.kk.name)} ${k.yds}-yard field goal is ${k.good ? 'GOOD' : k.short ? 'short' : 'no good'}.`);
     if (k.good) { G.score[s] += 3; showBanner("IT'S GOOD!", `${k.yds}-yard field goal`, '#9cff9c', 1.8); Sound.td(); G.next = { kickoff: s }; }
     else { showBanner(k.short ? 'SHORT!' : 'NO GOOD!', k.short ? `${k.yds} yards was too far` : `${k.yds}-yard try is ${k.ty < MID ? 'wide left' : 'wide right'}`, '#ff6040', 1.6); Sound.bad(); G.next = { drive: 1 - s, x: d * (G.los - (goalX(s) - d * 20)) > 0 ? goalX(s) - d * 20 : G.los }; }
-    G.runoff = 5;
+    G.runoff = 5; Momentum.kick(k.good ? 'fg' : 'fgmiss', s);
   } else { // xp
     addPbp(`${lastName(G.km.kk.name)} extra point is ${k.good ? 'good' : 'NO GOOD'}.`);
     if (k.good) { G.score[s] += 1; showBanner('EXTRA POINT GOOD', '', '#9cff9c', 1.2); Sound.catch(); }

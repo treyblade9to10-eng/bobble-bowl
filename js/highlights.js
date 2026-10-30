@@ -50,6 +50,7 @@ const Highlights = {
   tick() {
     const c = this.cur; if (!c) return;
     const ph = G.phase, film = ph === 'live' || ph === 'dead' || ph === 'kick' || ph === 'kickmeter';
+    if (ph === 'review') return; // replay review: wait for the ruling, don't film the replay
     if (!film || G.players !== c.src) return this.finalize();
     if (c.end == null && (ph === 'dead' || (ph === 'kick' && G.kick && G.kick.done))) { c.end = G.time; c.endI = c.fr.length; }
     if (c.end != null && G.time - c.end > HL_POST) return this.finalize();
@@ -92,7 +93,7 @@ const Highlights = {
     const L = s => (s || '').toUpperCase(), N = n => n ? L(lastName(n)) : '', NM = "([A-Z][\\w'-]*(?: (?:Jr\\.|Sr\\.|II|III|IV))?)", cr = G.credit, gain = lr.gain || 0;
     let ex = 0, title = '', who = '', team = c.poss, key = c.endI, m;
     const td = pts >= 6;
-    if (/PENALTY on/.test(txt)) return null; // a flag took it back (or moved it): not a highlight
+    if (/PENALTY on|OVERTURNED/.test(txt)) return null; // a flag took it back (or the replay changed it): not a highlight
     if (/BLOCKED/.test(txt)) {
       m = txt.match(new RegExp('BLOCKED by ' + NM + '!')); ex = td ? 95 : 55; title = td ? 'BLOCKED KICK TD' : 'BLOCKED KICK'; who = m ? L(m[1]) : ''; team = def;
       if (td) { const s = txt.match(new RegExp(NM + ' scoops up')); if (s) who = L(s[1]); }

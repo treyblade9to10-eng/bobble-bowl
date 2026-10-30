@@ -794,6 +794,8 @@ function nearMobileButton(e) {
   joy.addEventListener('lostpointercapture', reset);
 })();
 
+// the coach's red flag (phone + computer; Y on a keyboard)
+$('chalBtn').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); Review.tap(); });
 // mobile buttons
 document.querySelectorAll('#mbtns button').forEach(b => {
   const k = b.dataset.k;
@@ -902,7 +904,7 @@ function frame(now) {
     if (G.demo) G.phase = 'over';
     try { render(); } catch (e2) {} // keep the picture up even if the game logic tripped
     // the same thing keeps breaking for 2 seconds: skip ahead to the next play instead of hanging
-    if (errRun > 120 && G.teams && !G.demo) { errRun = 0; try { G.paused = false; for (const p of G.players) p.celly = null; G.cellyGuy = null; G.tdScorer = null; if (['live', 'dead', 'replay', 'kick'].includes(G.phase)) { G.phase = 'dead'; afterPlay(); } else toPlayCall(); } catch (e3) { console.error(e3); } }
+    if (errRun > 120 && G.teams && !G.demo) { errRun = 0; try { G.paused = false; for (const p of G.players) p.celly = null; G.cellyGuy = null; G.tdScorer = null; if (['live', 'dead', 'replay', 'kick', 'review'].includes(G.phase)) { G.phase = 'dead'; G.rv = null; afterPlay(); } else toPlayCall(); } catch (e3) { console.error(e3); } }
   }
 }
 // if the browser drops the canvas (GPU reset / low memory), redraw everything from scratch
@@ -942,6 +944,7 @@ function step(now) {
     if (G.online) Net.hostFrame(dt);
   }
   updateMobileButtons();
+  Review.ui();
   render();
   Input.endFrame();
 }
@@ -967,6 +970,7 @@ function render() {
   ctx.restore();
   if (G.teams && !G.demo) {
     if (G.phase === 'replay') safeDraw('replay', () => Replay.drawOverlay(ctx));
+    else if (G.phase === 'review') safeDraw('review', () => { Review.drawOverlay(ctx); drawBanner(ctx, G); });
     else if (Highlights.on) safeDraw('hl', () => Highlights.drawOverlay(ctx));
     else safeDraw('hud', () => { drawBanner(ctx, G); if (G.mini) drawMiniHUD(ctx, G); else { drawHUD(ctx, G); drawTicker(ctx, G); } drawKickMeter(ctx, G); });
   }

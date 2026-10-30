@@ -1026,6 +1026,10 @@ function drawHUD(g, G) {
   g.font = '800 15px "Barlow Condensed", Arial, sans-serif'; g.fillStyle = S ? S.down : '#ffd23f';
   g.fillText(G.downText(), x0 + W - 112, y0 + 35);
   if (S) { bcTrim(g, G.bcast, x0, y0, W, H); bcBadge(g, G.bcast, x0, y0, BW, H); }
+  // momentum bar under the two team cells + the road crowd meter on the big downs (rules.js)
+  const moOn = !G.mini && !G.demo && G.mo != null;
+  if (moOn) drawMomentum(g, x0 + 5, y0 + H + (G.bcast === 'XMAS' ? 7 : 1), 405);
+  if (moOn && Crowd.show()) drawCrowd(g, x0 + W - 126, y0 + H + (G.bcast === 'XMAS' ? 10 : 4), Crowd.level());
 
   // crunch time: a little tab on the right of the scorebug with the clock, timeouts and what you need
   const sit = crunchText(G);
@@ -1042,7 +1046,7 @@ function drawHUD(g, G) {
   }
   // play clock
   if (G.playClock > 0 && (G.phase === 'playcall' || G.phase === 'presnap')) {
-    const pc = Math.ceil(G.playClock), red = pc <= 5, py = y0 + H + (G.bcast === 'XMAS' ? 10 : 4); // under the Christmas lights
+    const pc = Math.ceil(G.playClock), red = pc <= 5, py = y0 + H + (G.bcast === 'XMAS' ? 15 : 10); // below the momentum bar (and the Christmas lights)
     g.fillStyle = red ? '#c0141ccc' : S ? S.bar[1] + 'e0' : '#0b0f16e0'; roundRect(g, CW / 2 - 36, py, 72, 26, 2); g.fill();
     g.fillStyle = red ? '#fff' : S ? S.down : '#ffd23f'; g.font = '900 15px "Barlow Condensed", "Arial Black", sans-serif'; g.textAlign = 'center';
     g.fillText(`:${String(pc).padStart(2, '0')}`, CW / 2, py + 18);
