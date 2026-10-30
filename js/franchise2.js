@@ -334,7 +334,7 @@ const Scout = {
   hide(pr) {
     const proj = pr.t[3], dv = Math.round(clamp((rand(-1, 1) + rand(-1, 1) + rand(-1, 1)) * 2.6, -6, 6));
     pr.proj = proj; pr.ppot = pr.pot;
-    pr.t[3] = clamp(proj + dv, 42, 92);
+    pr.t[3] = clamp(proj + dv, 40, 84); // rookies: nobody walks in as a superstar
     const pi = POTS.indexOf(pr.pot);
     if (dv >= 2 && chance(0.4) && pi < 2) pr.pot = POTS[pi + 1]; else if (dv <= -2 && chance(0.4) && pi > 0) pr.pot = POTS[pi - 1];
     pr.t[6] = Object.assign({}, pr.t[6] || {}, { pot: pr.pot });

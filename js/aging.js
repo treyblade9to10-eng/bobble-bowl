@@ -45,7 +45,9 @@ Object.assign(Season, {
     for (const id in R) for (const grp of ['off', 'def', 'bench']) (R[id][grp] || []).forEach(p => {
       if (!p) return;
       const m = p[6] = Object.assign({}, p[6] || {}); if (m.cap) return;
-      const big = this.bigYear(p), pot = m.rookie ? ({ A: 1.5, B: 0.5, C: 0 }[m.pot] || 0) : 0;
+      // a rookie who was just drafted hasn't played yet: no growth until after his first season. Potential keeps paying off while he's young
+      if (m.rookie && m.rookie > d.year) { raw.set(p, { dv: 0, big: 0, fresh: 1 }); return; }
+      const big = this.bigYear(p), pot = m.pot && (m.rookie || m.age <= 24) ? ({ A: 1.5, B: 0.5, C: 0 }[m.pot] || 0) : 0;
       const dv = ageCurve(footballAge(p[0], m.age)) + rand(-1.8, 1.8) + big + pot + (award.has(id + ':' + p[1]) ? 1.5 : 0) + (p[3] < 68 ? 0.8 : 0) - (p[3] >= 88 ? (p[3] - 87) * 0.6 : 0);
       raw.set(p, { dv, big }); if (grp !== 'bench') { sum += dv; n++; }
     });
@@ -53,8 +55,8 @@ Object.assign(Season, {
     for (const id in R) {
       for (const grp of ['off', 'def', 'bench']) (R[id][grp] || []).forEach((p, i, arr) => {
         if (!p || !raw.has(p)) return;
-        const m = p[6], fa = footballAge(p[0], m.age), from = p[3], { dv, big } = raw.get(p);
-        p[3] = clamp(Math.round(p[3] + dv - drift), 50, 99);
+        const m = p[6], fa = footballAge(p[0], m.age), from = p[3], { dv, big, fresh } = raw.get(p);
+        if (!fresh) p[3] = clamp(Math.round(p[3] + dv - drift), 50, 99);
         p[4] = clamp(Math.round(p[4] + (fa >= 29 ? -rand(0.8, 2.2) - (fa - 29) * 0.35 : fa <= 24 ? rand(0, 1.2) : rand(-1, 0.6))), 50, 99);
         m.age++;
         if (m.rookie && m.rookie < d.year) delete m.rookie;

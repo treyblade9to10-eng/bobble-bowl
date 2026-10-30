@@ -11,6 +11,12 @@ const SCHOOLS = ['Alabama', 'Ohio State', 'Georgia', 'LSU', 'Michigan', 'Texas',
 const SMALL_SCHOOLS = ['North Dakota State', 'Montana', 'Appalachian State', 'Toledo', 'Fresno State', 'James Madison', 'South Dakota State', 'Tulane', 'Memphis', 'UCF',
   'Liberty', 'Sacramento State', 'Wyoming', 'Northern Iowa', 'Coastal Carolina', 'Jackson State', 'Villanova', 'Air Force', 'Marshall', 'Kent State', 'Eastern Washington', 'Furman'];
 const DRAFT_POS = ['QB', 'QB', 'RB', 'WR', 'WR', 'WR', 'TE', 'OL', 'OL', 'OL', 'DL', 'DL', 'DL', 'LB', 'LB', 'CB', 'CB', 'S'];
+// what a rookie is rated by board rank (of 288: 7 rounds + extras). Real NFL rookie levels: the #1 pick is high 70s, late rounds 45-60
+const ROOKIE_CURVE = [[0, 77.5], [3, 75], [10, 72.5], [31, 69], [63, 65.5], [95, 61.5], [127, 58.5], [159, 56], [191, 53.5], [223, 51], [255, 48.5], [287, 46]];
+function rookieOvr(rank) {
+  const C = ROOKIE_CURVE; let i = 1; while (i < C.length - 1 && rank > C[i][0]) i++;
+  const [x0, y0] = C[i - 1], [x1, y1] = C[i]; return Math.max(42, y0 + (y1 - y0) * (rank - x0) / (x1 - x0));
+}
 const ROOKIE_SPD = { QB: [70, 90], RB: [86, 95], WR: [87, 97], TE: [78, 88], OL: [60, 72], DL: [72, 87], LB: [80, 90], CB: [89, 97], S: [86, 93] };
 
 Object.assign(Season, {
@@ -36,24 +42,32 @@ Object.assign(Season, {
   news(text) { const d = this.data; (d.news || (d.news = [])).unshift({ text, week: d.week + 1, year: d.year }); d.news.length = Math.min(d.news.length, 40); },
 
   // ---- rookie draft (runs before the next year starts): 7 rounds ----
-  // rank = where he'd go on a big board (0 = first overall), n = how many prospects. Late-round guys are mostly 45-70.
+  // rank = where he'd go on a big board (0 = first overall), n = how many prospects. Ratings follow ROOKIE_CURVE (real NFL rookie levels).
   makeProspect(rank = 0, n = 256, used) {
     const pos = pick(DRAFT_POS), k = rank / n;
-    const ovr = Math.round(clamp(83 - 36 * Math.pow(k, 0.75) + rand(-3, 3), 44, 86));
+    const ovr = Math.round(clamp(rookieOvr(rank * 288 / n) + rand(-2.5, 2.5) + (rank === 0 && chance(0.2) ? 3 : 0), 42, 83)); // once in a while a can't-miss #1
     const [s0, s1] = ROOKIE_SPD[pos];
-    const spd = Math.round(clamp(rand(s0, s1) - (ovr < 60 ? 3 : 0), 50, 99));
-    const pot = ovr >= 78 || chance(k < 0.2 ? 0.25 : 0.12) ? 'A' : chance(0.45) ? 'B' : 'C';
+    const spd = Math.round(clamp(rand(s0, s1) - (k > 0.75 ? 2 : 0), 50, 99));
+    const pot = k < 0.05 || chance(k < 0.2 ? 0.25 : 0.12) ? 'A' : chance(0.45) ? 'B' : 'C';
     let name; for (let i = 0; i < 20; i++) { name = `${pick(FIRST)} ${pick(LAST)}`; if (!used || !used.has(name)) break; }
     if (used) used.add(name);
     const t = [pos, name, 1 + Math.floor(Math.random() * 98), ovr, spd, Math.floor(Math.random() * 6), { rookie: this.data.year + 1, pot, age: chance(0.6) ? 22 : chance(0.5) ? 21 : 23 }];
     t.school = k < 0.3 ? pick(SCHOOLS) : pick(chance(0.5) ? SCHOOLS : SMALL_SCHOOLS); t.pot = pot;
     return t;
   },
+  // a real class, best first, with its file ratings scaled to rookie levels by board rank (same order as the file's ratings)
+  realClass(year) {
+    const real = typeof DRAFT_CLASSES !== 'undefined' && DRAFT_CLASSES[year]; if (!real) return null;
+    const rows = real.map((r, i) => [r, i]).sort((a, b) => b[0][3] - a[0][3] || a[1] - b[1]).map(([r]) => r);
+    const sc = 288 / (ROUNDS * TEAMS.length + 32); // same scale as makeProspect
+    const vals = rows.map((r, i) => Math.round(rookieOvr(i * sc) + (hashStr(r[1]) % 5 - 2) * 0.6 + (i === 0 && r[3] >= 87 ? 2 : 0))).sort((a, b) => b - a);
+    return rows.map((r, i) => { const t = r.slice(); t[3] = vals[i]; return t; });
+  },
   draftYear() { return 2026 + this.data.year; }, // year 1 = the 2026 season, so its draft is the 2027 draft
   // who's coming out next draft (for the season hub)
   draftPreview(n = 10) {
-    const real = typeof DRAFT_CLASSES !== 'undefined' && DRAFT_CLASSES[this.draftYear()];
-    return real ? real.slice().sort((a, b) => b[3] - a[3]).slice(0, n) : null;
+    const real = this.realClass(this.draftYear());
+    return real ? real.slice(0, n) : null;
   },
   // which roster spot a prospect would take (the weakest guy at his position), and by how much he's better
   fit(teamId, pr) {
@@ -75,13 +89,13 @@ Object.assign(Season, {
     const order = [], via = [], rd = [];
     for (let r = 1; r <= ROUNDS; r++) for (const id of base) { via.push(id); rd.push(r); order.push((P[year] && P[year][id] && P[year][id][r - 1]) || id); }
     // the next few years start with REAL college players (draftclasses.js); everyone after them is made up
-    const real = typeof DRAFT_CLASSES !== 'undefined' && DRAFT_CLASSES[year] || [];
+    const real = this.realClass(year) || [];
     const pool = real.map(r => { const t = r.slice(0, 6); t.push({ rookie: d.year + 1, pot: r[7], age: r[8] || 22, real: 1 }); t.school = r[6]; t.pot = r[7]; return t; });
     const total = order.length + 32, used = new Set(pool.map(t => t[1]));
     for (const id in d.rosters) for (const g of ['off', 'def', 'bench']) for (const p of d.rosters[id][g] || []) if (p) used.add(p[1]);
     while (pool.length < total) pool.push(this.makeProspect(pool.length, total, used));
     pool.sort((a, b) => b[3] - a[3]);
-    d.draft = { order, via, rd, rounds: ROUNDS, year, real: real.length > 0, pool: pool.map(p => ({ t: p.slice(0, 7), school: p.school, pot: p.pot })), picks: [], i: 0 };
+    d.draft = { order, via, rd, rounds: ROUNDS, year, real: real.length > 0, rv: 1, pool: pool.map(p => ({ t: p.slice(0, 7), school: p.school, pot: p.pot })), picks: [], i: 0 };
     this.save();
   },
   // an older save stopped in the middle of a 1-round draft: add rounds 2-7 and enough prospects for them
@@ -94,6 +108,19 @@ Object.assign(Season, {
     for (let k = dr.pool.length; k < total; k++) { const t = this.makeProspect(Math.round(n + (k - dr.pool.length) * (dr.order.length - n) / (total - dr.pool.length)), dr.order.length + 32, used), pr = { t: t.slice(0, 7), school: t.school, pot: t.pot };
       if (typeof Scout !== 'undefined' && dr.sp != null) { Scout.hide(pr); Scout.measure(pr); } dr.pool.push(pr); }
     this.save();
+  },
+  // saves from before v11.5: prospects were rated like vets (lots of 80s and 90s). Scale whoever's still on the board, once; drafted rookies stay.
+  rescaleDraft() {
+    const dr = this.data && this.data.draft; if (!dr || dr.rv || !dr.pool) return;
+    const base = pr => pr.proj != null ? pr.proj : pr.t[3];
+    dr.pool.slice().sort((a, b) => base(b) - base(a)).forEach((pr, r) => {
+      const dv = Math.round(rookieOvr((dr.i + r) * 288 / Math.max(dr.order.length + 32, 1))) - base(pr);
+      if (dv >= 0) return; // already at rookie level
+      pr.t[3] = clamp(pr.t[3] + dv, 40, 85);
+      for (const k of ['proj', 'est', 'cpu']) if (pr[k] != null) pr[k] = clamp(pr[k] + dv, 40, 85);
+    });
+    dr.pool.sort((a, b) => (b.est != null ? b.est : b.t[3]) - (a.est != null ? a.est : a.t[3]));
+    dr.rv = 1; this.save();
   },
   // CPU teams pick until it's your turn (or the draft is over). Returns true if it's your pick.
   draftRun() {
@@ -119,6 +146,8 @@ Object.assign(Season, {
   overLimit(id) { return Math.max(0, this.benchCount(id) - BENCH_MAX); },
 });
 
+// an old save with a draft in progress gets its board fixed as soon as it loads
+{ const _ld = Season.load; Season.load = function () { const d = _ld.call(this); if (d && d.draft) try { this.rescaleDraft(); } catch (e) {} return d; }; }
 // rookie growth, aging and big seasons: see aging.js
 // CPU trades happen as the weeks go by
 const _finishWeek = Season.finishWeek.bind(Season);
@@ -134,6 +163,7 @@ screens.push('draft'); menuScreens.push('draft');
 function openDraft() {
   if (!Season.data.draft) Season.startDraft();
   Season.upgradeDraft(); // older saves: 1-round draft in progress
+  Season.rescaleDraft(); // older saves: prospects rated too high
   if (!Season.data.draft.combineDone) return openCombine(); // scouting combine first (franchise2.js)
   renderDraft();
   show('draft');
