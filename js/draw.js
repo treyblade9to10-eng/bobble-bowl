@@ -1,5 +1,5 @@
 // ---- Rendering: field, bobbleheads, ball, effects, scorebug ----
-let CW = 1280; const CH = 720; // CW grows on wide phones so the field fills the screen
+let CW = 1280, CH = 720; // CW grows on wide phones so the field fills the screen (both get bigger while the zoomed-out world is painted)
 const PX = 24;          // pixels per yard (left/right)
 const PY = 14;          // pixels per yard (up/down) - squished = tilted camera look
 const FIELD_W = 53.33;
@@ -18,10 +18,26 @@ function starPath(g, x, y, r) {
 }
 
 const VY = 34; // screen offset so the HUD doesn't cover the play
-function sx(x) { return (x - cam.x) * PX + CW / 2; }
-function sy(y) { return (y - cam.y) * PY + CH / 2 + VY; }
-function wx(px) { return (px - CW / 2) / PX + cam.x; }
-function wy(py) { return (py - CH / 2 - VY) / PY + cam.y; }
+// CAMERA setting (pause menu): zoomed out, the world is painted at normal size on a bigger picture and shrunk onto the
+// screen in one copy (main.js renderFrame), so the field copy + player picture caches keep working.
+// viewZ = screen size / normal size. vk = scale sx/sy use: viewZ for taps + the HUD, 1 while painting the big picture.
+// uiK = name tags / meters / floating words get scaled back up by this so they stay readable
+const CAM_ZOOMS = { normal: 1, far: 0.84, farthest: 0.7 };
+let camZoom = 'normal', viewZ = 1, vk = 1, uiK = 1;
+function sx(x) { return (x - cam.x) * PX * vk + CW / 2; }
+function sy(y) { return (y - cam.y) * PY * vk + CH / 2 + VY * vk / viewZ; }
+function wx(px) { return (px - CW / 2) / (PX * vk) + cam.x; }
+function wy(py) { return (py - CH / 2 - VY * vk / viewZ) / (PY * vk) + cam.y; }
+// scale labels around (x, y) so they keep their normal screen size when zoomed out
+function uiAt(g, x, y) { if (uiK !== 1) { g.translate(x, y); g.scale(uiK, uiK); g.translate(-x, -y); } }
+// zoomed out: run f at screen size (rain, snow, night lights are on the camera, not the field). false = not zoomed out (or celly cam)
+function onScreen(g, f) {
+  const m = g.getTransform(), z = viewZ, cw = CW, ch = CH, uk = uiK;
+  if (z === 1 || vk !== 1 || Math.abs(m.a - z) > 1e-6 || Math.abs(m.d - z) > 1e-6 || m.b || m.c) return false;
+  g.save(); g.setTransform(1, 0, 0, 1, m.e, m.f); CW = Math.round(cw * z); CH = Math.round(ch * z); vk = z; uiK = 1;
+  try { f(); } finally { CW = cw; CH = ch; vk = 1; uiK = uk; g.restore(); }
+  return true;
+}
 
 // ---------- field (pre-rendered once per game) ----------
 const FIELD_PAD_X = 6, FIELD_PAD_TOP = 8, FIELD_PAD_BOT = 5;
@@ -137,12 +153,19 @@ function buildField(G) {
     cg.fillStyle = 'rgba(5,8,14,0.35)'; cg.fillRect(0, 0, 156, 72); // in the shade of the upper deck
   }
 }
-let crowdCv = null, crowdPat = null;
+let crowdCv = null, crowdPat = null, crowdZ = null;
+function crowdTile(z) { // the crowd tile shrunk for the zoomed-out camera (whole pixels so it repeats with no seams)
+  if (crowdZ && crowdZ.src === crowdCv && crowdZ.z === z) return true;
+  const c = document.createElement('canvas'); c.width = Math.round(156 * z); c.height = Math.round(72 * z);
+  const cg = c.getContext('2d'); if (!cg || !cg.drawImage || !crowdCv) return false;
+  cg.drawImage(crowdCv, 0, 0, c.width, c.height); c.pat = cg.createPattern(c, 'repeat'); c.src = crowdCv; c.z = z;
+  crowdZ = c; return !!c.pat;
+}
 
 // Chromebooks can drop canvas memory (GPU reset, low memory, waking from sleep). When that happens every pre-drawn picture
 // comes back blank, so throw them all away and draw them again
 function resetGfx() {
-  fieldKey = ''; fieldCv = null; crowdCv = null; crowdPat = null;
+  fieldKey = ''; fieldCv = null; crowdCv = null; crowdPat = null; zoomPic = null;
   if (typeof headCache !== 'undefined') headCache.clear();
   if (typeof torsoCache !== 'undefined') torsoCache.clear();
   for (const k in shadowSprites) delete shadowSprites[k];
@@ -159,7 +182,19 @@ function drawField(g, G) {
   const zoomed = cam.zoom > 1.001, edge = zoomed || wx(0) < -FIELD_PAD_X || wx(CW) > 120 + FIELD_PAD_X || wy(0) < -FIELD_PAD_TOP || wy(CH) > FIELD_W + FIELD_PAD_BOT;
   if (edge && crowdCv && g.createPattern && !crowdPat) crowdPat = g.createPattern(crowdCv, 'repeat');
   const pat = edge ? crowdPat : null;
-  if (pat) { const ox = ((-cam.x * PX) % 156 + 156) % 156, oy = ((-cam.y * PY) % 72 + 72) % 72; g.save(); g.translate(ox - 156, oy - 72); g.fillStyle = pat; g.fillRect(-CW, -CH, CW * 3 + 312, CH * 3 + 144); g.restore(); }
+  if (pat) {
+    // zoomed-out camera: filled on the screen with a shrunk tile (copies straight instead of resampling)
+    const m = g.getTransform(), z = viewZ, flat = z !== 1 && Math.abs(m.a - z) < 1e-6 && Math.abs(m.d - z) < 1e-6 && !m.b && !m.c && crowdTile(z);
+    const k = flat ? z : 1, tw = flat ? crowdZ.width : 156, th = flat ? crowdZ.height : 72, ex = flat ? m.e : 0, ey = flat ? m.f : 0;
+    const tx = ((-cam.x * PX * k) % tw + tw) % tw - tw, ty = ((-cam.y * PY * k) % th + th) % th - th;
+    // only around the field picture (it covers the rest): the zoomed-out camera always sees some of this
+    const [mx, my] = flat ? zoomMargins(z) : [0, 0]; // (the shrunk picture has some crowd around it already)
+    const x0 = ex + sx(-FIELD_PAD_X) * k - mx + 2 - tx, x1 = ex + sx(120 + FIELD_PAD_X) * k + mx - 2 - tx, y0 = ey + sy(-FIELD_PAD_TOP) * k - my + 2 - ty, y1 = ey + sy(FIELD_W + FIELD_PAD_BOT) * k + my - 2 - ty;
+    const L = -CW * k - tx, T = -CH * k - ty, R = CW * 2 * k - tx, B = CH * 2 * k - ty;
+    g.save(); if (flat) g.setTransform(1, 0, 0, 1, 0, 0); g.translate(tx, ty); g.fillStyle = flat ? crowdZ.pat : pat;
+    for (const [x, y, w, h] of [[L, T, R - L, y0 - T], [L, y1, R - L, B - y1], [L, y0, x0 - L, y1 - y0], [x1, y0, R - x1, y1 - y0]]) if (w > 0 && h > 0) g.fillRect(x, y, w, h);
+    g.restore();
+  }
   else if (edge) { g.fillStyle = '#0e1420'; g.fillRect(0, 0, CW, CH); }
   // wet games: the field picture with the snow/mud already on it (weather.js)
   fieldBlit = (typeof wxMixed === 'function' && wxMixed(G)) || fieldCv;
@@ -248,6 +283,7 @@ function kickLean(G, b) {
 
 // draw a canvas laid out like the field canvas (same padding + scale) under the current camera
 function blitWorld(g, cv) {
+  if (viewZ !== 1 && (cv === fieldCv || (typeof wxMix !== 'undefined' && cv === wxMix)) && blitShrunk(g, cv)) return;
   // draw a bit past the screen edges too, so the zoomed celly cam never runs off the painted area
   const z = cam.zoom > 1.001, mx = z ? CW * 0.75 : 40, my = z ? CH * 0.75 : 40; // 40px covers screen shake
   let srcX = (wx(-mx) + FIELD_PAD_X) * PX, srcY = (wy(-my) + FIELD_PAD_TOP) * PY;
@@ -256,6 +292,32 @@ function blitWorld(g, cv) {
   if (srcY < 0) { dy -= srcY; h += srcY; srcY = 0; }
   w = Math.min(w, cv.width - srcX); h = Math.min(h, cv.height - srcY);
   if (w > 0 && h > 0) g.drawImage(cv, srcX, srcY, w, h, dx, dy, w, h);
+}
+
+// CAMERA zoomed out: the field picture shrunk once (not every frame), with a few yards of crowd around it (the camera
+// sees past the stands), copied over straight on whole screen pixels (render() puts the camera where its corner lands
+// on one). Ground marks on wet fields get painted on it too (weather.js)
+let zoomPic = null;
+const zoomMargins = z => [Math.round(6 * PX * z), Math.round(6 * PY * z)];
+function blitShrunk(g, cv) {
+  const m = g.getTransform(), z = viewZ, [mx, my] = zoomMargins(z);
+  if (Math.abs(m.a - z) > 1e-6 || Math.abs(m.d - z) > 1e-6 || m.b || m.c) return false; // celly cam: the normal way
+  let zp = zoomPic;
+  if (!zp || zp.src !== cv || zp.z !== z || zp.ver !== cv.ver || zp.field !== cv.field) {
+    const c = zp && zp.cv || document.createElement('canvas'), w = Math.ceil(cv.width * z) + mx * 2, h = Math.ceil(cv.height * z) + my * 2;
+    if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
+    const zg = c.getContext('2d', { alpha: false }); if (!zg || !zg.drawImage) return false;
+    zg.setTransform(z, 0, 0, z, mx, my); // field picture pixels from here on
+    const pat = crowdCv && zg.createPattern ? zg.createPattern(crowdCv, 'repeat') : null;
+    zg.save(); zg.translate(FIELD_PAD_X * PX, FIELD_PAD_TOP * PY); zg.fillStyle = pat || '#0e1420'; zg.fillRect(-w / z, -h / z, w * 3 / z, h * 3 / z); zg.restore();
+    zg.drawImage(cv, 0, 0);
+    zp = zoomPic = { cv: c, g: zg, src: cv, z, ver: cv.ver, field: cv.field };
+  }
+  const X = Math.round(m.e + z * sx(-FIELD_PAD_X)) - mx, Y = Math.round(m.f + z * sy(-FIELD_PAD_TOP)) - my, SW = CW * z, SH = CH * z; // (screen)
+  let sx0 = Math.max(0, -X - 40), sy0 = Math.max(0, -Y - 40); // 40px past the edges covers screen shake
+  const w = Math.min(zp.cv.width - sx0, SW + 80 - X - sx0), h = Math.min(zp.cv.height - sy0, SH + 80 - Y - sy0);
+  if (w > 0 && h > 0) { g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.drawImage(zp.cv, sx0, sy0, w, h, X + sx0, Y + sy0, w, h); g.restore(); }
+  return true;
 }
 
 function drawLines(g, G) {
@@ -480,17 +542,18 @@ function shadowSprite(r) {
   return (shadowSprites[r] = c);
 }
 // drawing a picture tilted is ~5x slower than straight on phones, so tilted heads/jerseys get turned once per small angle step
-// and copied over straight on whole pixels. Anything zoomed or squashed draws the normal way
+// and copied over straight on whole pixels (zoomed out camera: shrunk in the same step). Anything else zoomed or squashed draws the normal way
 const rotSprites = new Map(); let rotSpriteId = 0;
 function blitRot(g, c, dx, dy, dw, dh) {
   if (G.demo) return g.drawImage(c, dx, dy, dw, dh); // (the menu demo changes teams every play: nothing would get reused)
   const m = g.getTransform(), a = m.a, b = m.b, cc = m.c, d = m.d;
-  if (Math.abs(b) < 1e-9 && Math.abs(cc) < 1e-9 || Math.abs(a * a + b * b - 1) > 1e-6 || Math.abs(cc * cc + d * d - 1) > 1e-6 || Math.abs(a * cc + b * d) > 1e-6) return g.drawImage(c, dx, dy, dw, dh);
-  const flip = a * d - b * cc < 0, q = Math.round((flip ? Math.atan2(-b, -a) : Math.atan2(b, a)) / 0.02), th = q * 0.02, co = Math.cos(th), si = Math.sin(th);
-  if (!q) { g.save(); g.setTransform(flip ? -1 : 1, 0, 0, 1, m.e, m.f); g.drawImage(c, dx, dy, dw, dh); g.restore(); return; } // tilted less than half a step: straight
+  const z = Math.abs(a * a + b * b - viewZ * viewZ) < 1e-6 ? viewZ : 1;
+  if (Math.abs(b) < 1e-9 && Math.abs(cc) < 1e-9 || Math.abs(a * a + b * b - z * z) > 1e-6 || Math.abs(cc * cc + d * d - z * z) > 1e-6 || Math.abs(a * cc + b * d) > 1e-6) return g.drawImage(c, dx, dy, dw, dh);
+  const flip = a * d - b * cc < 0, q = Math.round((flip ? Math.atan2(-b, -a) : Math.atan2(b, a)) / 0.02), th = q * 0.02, co = Math.cos(th) * z, si = Math.sin(th) * z;
+  if (!q && z === 1) { g.save(); g.setTransform(flip ? -1 : 1, 0, 0, 1, m.e, m.f); g.drawImage(c, dx, dy, dw, dh); g.restore(); return; } // tilted less than half a step: straight
   const L = flip ? [-co, -si, -si, co] : [co, si, -si, co]; // (flipped = mirrored left-right, then turned)
   if (!c.rid) c.rid = ++rotSpriteId;
-  const key = c.rid + '|' + q + (flip ? 'f' : '') + '|' + dx + '|' + dy + '|' + dw + '|' + dh;
+  const key = c.rid + '|' + q + (flip ? 'f' : '') + '|' + dx + '|' + dy + '|' + dw + '|' + dh + (z === 1 ? '' : '|' + z);
   let r = rotSprites.get(key);
   if (r) { rotSprites.delete(key); rotSprites.set(key, r); }
   else {
@@ -667,7 +730,8 @@ function drawPlayer(g, p, G, at) {
   const kp = pose ? null : kickPose(p, G, HIP); // holder / kicker / punter / fair catch
   // plain standing/running (most of the time): the player goes on whole pixels and his arms/legs come from the limb sheet
   const m0 = !at && !G.demo && !pose && !kn && !kp && p.down <= 0 && !(p.dive > 0) && !(p.spin > 0) && g.globalAlpha === 1 ? g.getTransform() : null;
-  const fast = !!m0 && m0.a === 1 && m0.b === 0 && m0.c === 0 && m0.d === 1 && m0.e === Math.round(m0.e) && m0.f === Math.round(m0.f);
+  const ms = m0 ? m0.a : 1; // (CAMERA zoomed out: the same, just shrunk)
+  const fast = !!m0 && (ms === 1 || Math.abs(ms - viewZ) < 1e-6) && m0.b === 0 && m0.c === 0 && m0.d === ms && m0.e === Math.round(m0.e) && m0.f === Math.round(m0.f);
   g.save(); g.translate(fast ? Math.round(x) : x, fast ? Math.round(y - hop) : y - hop);
   if (pose) {
     if (pose.rot) { g.translate(0, -32); g.rotate(pose.rot * dir); g.translate(0, 32); } // spin around his belly, not his feet
@@ -679,7 +743,7 @@ function drawPlayer(g, p, G, at) {
   const spinScale = p.spin > 0 ? Math.cos(p.spin * 20) : 1;
   g.scale(dir * (Math.abs(spinScale) < 0.15 ? 0.15 * Math.sign(spinScale || 1) : spinScale), 1);
 
-  const PMe = fast ? m0.e + Math.round(x) : 0, PMf = fast ? m0.f + Math.round(y - hop) : 0; // player frame on screen (fast path)
+  const PMe = fast ? m0.e + Math.round(x) * ms : 0, PMf = fast ? m0.f + Math.round(y - hop) * ms : 0; // player frame on screen (fast path)
   const kL = fast ? Math.round(k * 5) / 5 : k; // arm/leg swing in small steps so poses repeat
   const anim = fast ? Math.round(p.anim / LIMB_STEP) * LIMB_STEP : p.anim;
   const kneelLeg = kn ? (side, hx, hy, kx, ky, fx, fy) => side > 0
@@ -732,7 +796,7 @@ function drawPlayer(g, p, G, at) {
     if (!fast) paintArm(g, p, look, sl, shx, shy, ex, ey, hx, hy);
     else { // turn the arm with the body by hand so the picture copies over straight
       const T = (x, y) => [q4(x * lc - y * ls), q4(x * ls + y * lc - HIP)], [a0, a1] = T(shx, shy), [b0, b1] = T(ex, ey), [c0, c1] = T(hx, hy);
-      g.save(); g.setTransform(dir, 0, 0, 1, PMe, PMf);
+      g.save(); g.setTransform(dir * ms, 0, 0, ms, PMe, PMf);
       limbBlit(g, 'A' + look.jersey + look.trim + look.sleeve + sl + (p.gear && p.gear.band) + (p.teamGloves ? look.trim : p.gloves) + p.face.skin + '|' + a0 + '|' + a1 + '|' + b0 + '|' + b1 + '|' + c0 + '|' + c1,
         Math.min(a0, b0, c0) - 6, Math.min(a1, b1, c1) - 6, Math.max(a0, b0, c0) + 6, Math.max(a1, b1, c1) + 6,
         sg => paintArm(sg, p, look, sl, a0, a1, b0, b1, c0, c1));
@@ -781,6 +845,8 @@ function drawPlayer(g, p, G, at) {
   // labels
   const headTop = y - hop - (big ? 85 : 92);
   if (at || G.phase === 'kick' || G.phase === 'kickmeter') return;
+  const zs = uiK !== 1; if (zs) { g.save(); uiAt(g, x, headTop); } // (zoomed out: same screen size as normal)
+  const tagBox = b => tagBoxes.push(uiK === 1 ? b : { x0: x + (b.x0 - x) * uiK, x1: x + (b.x1 - x) * uiK, y0: headTop + (b.y0 - headTop) * uiK, y1: headTop + (b.y1 - headTop) * uiK });
   if (p.xf && p.xf.on && p.down <= 0) { drawXFBadge(g, p, x, headTop - (p.isHuman || carrying ? 44 : 4)); }
   else if (p.xf && G.phase === 'presnap' && !G.demo && p.down <= 0) drawXFPip(g, p, x + 24, headTop + 30);
   const showName = !p.celly && p.down <= 0 && tagFor(p, G, carrying);
@@ -794,19 +860,19 @@ function drawPlayer(g, p, G, at) {
     g.fillStyle = p.isHuman ? '#111' : '#fff'; g.fillText(label, x, ly + 1);
     if (full) { g.font = 'bold 10px Barlow, Arial, sans-serif'; g.fillStyle = '#fff'; g.strokeStyle = '#000'; g.lineWidth = 3; const r = `${p.tw2 ? '2-WAY ' : ''}${p.pos} • ${p.ovr} OVR`; g.strokeText(r, x, ly - 17); g.fillText(r, x, ly - 17); }
     if (p.xf && p.xf.on) drawXFBadge(g, p, x - w / 2 - 12, ly); // X-Factor badge sits next to his name
-    tagBoxes.push({ x0: x - w / 2 - (p.xf && p.xf.on ? 24 : 0), x1: x + w / 2, y0: ly - (full ? 24 : 10), y1: ly + 10 });
+    tagBox({ x0: x - w / 2 - (p.xf && p.xf.on ? 24 : 0), x1: x + w / 2, y0: ly - (full ? 24 : 10), y1: ly + 10 });
     ly -= 30;
   } else if (p.xf && p.xf.on && p.down <= 0) drawXFBadge(g, p, x, headTop - 4);
   if (p.hot && G.phase === 'presnap') {
     g.font = 'bold 11px Barlow, Arial, sans-serif'; g.textAlign = 'center'; const w = g.measureText(p.hot).width + 12;
     g.fillStyle = '#ffe14d'; roundRect(g, x - w / 2, ly - 8, w, 16, 8); g.fill(); g.fillStyle = '#111'; g.fillText(p.hot, x, ly + 4);
-    tagBoxes.push({ x0: x - w / 2, x1: x + w / 2, y0: ly - 8, y1: ly + 8 }); ly -= 22;
+    tagBox({ x0: x - w / 2, x1: x + w / 2, y0: ly - 8, y1: ly + 8 }); ly -= 22;
   }
   if (p.throwKey) {
     const col = ['#2f7bff', '#ff3b3b', '#2fd06b', '#ffb02e'][p.throwKey - 1];
     const tgt = G.aim && G.aim.target === p;
     const r = tgt ? 17 : 14;
-    tagBoxes.push({ x0: x - r - 2, x1: x + r + 2, y0: ly - r - 2, y1: ly + r + (p.openness != null ? 10 : 2) });
+    tagBox({ x0: x - r - 2, x1: x + r + 2, y0: ly - r - 2, y1: ly + r + (p.openness != null ? 10 : 2) });
     g.fillStyle = col; g.strokeStyle = tgt ? '#ffe14d' : '#fff'; g.lineWidth = tgt ? 4 : 2.5;
     g.beginPath(); g.arc(x, ly, r, 0, 7); g.fill(); g.stroke();
     g.fillStyle = '#fff'; g.font = '900 16px "Barlow Condensed", "Arial Black", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
@@ -819,6 +885,7 @@ function drawPlayer(g, p, G, at) {
       g.fillRect(x - 15, ly + r + 4, 30 * o, 4);
     }
   }
+  if (zs) g.restore();
 }
 
 // NAME TAGS: who gets a name over his head. KEY PLAYERS = the ball carrier, the guy the pass is going to, the player you control,
@@ -1011,6 +1078,7 @@ function drawMeter(g, G) {
   const m = G.meterV; if (!m || !G.O) return;
   const qb = curPasser ? curPasser() : G.O[0]; if (!qb) return;
   const [v, g0, g1] = m, w = 22, h = 130, x = sx(qb.x) + 48, y = sy(qb.y) - 165;
+  g.save(); uiAt(g, sx(qb.x), sy(qb.y) - 92);
   g.fillStyle = '#0c1016e8'; g.fillRect(x - 4, y - 4, w + 8, h + 8); g.strokeStyle = '#ffffff55'; g.lineWidth = 2; g.strokeRect(x - 4, y - 4, w + 8, h + 8);
   g.fillStyle = '#ffffff22'; g.fillRect(x, y, w, h);
   g.fillStyle = '#ff6a5a66'; g.fillRect(x, y, w, h * (1 - g1)); // too hard
@@ -1020,6 +1088,7 @@ function drawMeter(g, G) {
   g.fillStyle = '#fff'; g.fillRect(x - 6, y + h * (1 - v) - 2, w + 12, 4); // the needle
   g.font = 'italic 900 16px "Barlow Condensed", "Arial Black", sans-serif'; g.textAlign = 'center'; g.lineWidth = 4; g.strokeStyle = '#000';
   g.strokeText('POWER', x + w / 2, y + h + 20); g.fillStyle = '#fff'; g.fillText('POWER', x + w / 2, y + h + 20);
+  g.restore();
 }
 // catch / defense meter: a bar over where the ball lands. Press when the needle hits the green
 function drawFlightMeter(g, G) {
@@ -1028,6 +1097,7 @@ function drawFlightMeter(g, G) {
   if (off) { // hold-to-catch bar: only while you're holding
     const v = G.catchV != null ? G.catchV : catchFill(); if (!G.chold && G.catchV == null || f.intended !== me) return;
     const w = 120, h = 12, x = sx(me.x) - w / 2, y = sy(me.y) - 150;
+    g.save(); uiAt(g, sx(me.x), sy(me.y) - 92);
     g.fillStyle = '#0c1016e0'; g.fillRect(x - 4, y - 4, w + 8, h + 8); g.fillStyle = '#ffffff22'; g.fillRect(x, y, w, h);
     const cg = G.chold && G.chold.g || G.catchG || CATCH_GREEN; // shrinks when he's covered
     g.fillStyle = '#2fd15a'; g.fillRect(x + w * cg[0], y, w * (cg[1] - cg[0]), h);
@@ -1035,11 +1105,12 @@ function drawFlightMeter(g, G) {
     g.fillStyle = '#fff'; g.fillRect(x + w * v - 2, y - 5, 4, h + 10);
     g.font = 'italic 900 15px "Barlow Condensed", "Arial Black", sans-serif'; g.textAlign = 'center'; g.lineWidth = 4; g.strokeStyle = '#000';
     g.strokeText('CATCH', x + w / 2, y - 9); g.fillStyle = '#fff'; g.fillText('CATCH', x + w / 2, y - 9);
-    return;
+    g.restore(); return;
   }
   const on = defMeterOn() && me.side !== G.poss;
   if (!on || Math.hypot(me.x - f.tx, me.y - f.ty) > METER_NEAR) return; // only when the ball is coming down by your guy
   const u = clamp(f.t / f.T, 0, 1), w = 120, h = 12, x = sx(f.tx) - w / 2, y = sy(f.ty) - 78;
+  g.save(); uiAt(g, sx(f.tx), sy(f.ty) - 40);
   const done = off ? f.cp : f.dp && f.dp.res;
   g.fillStyle = '#0c1016e0'; g.fillRect(x - 4, y - 4, w + 8, h + 8);
   g.fillStyle = '#ffffff22'; g.fillRect(x, y, w, h);
@@ -1050,6 +1121,7 @@ function drawFlightMeter(g, G) {
   g.font = 'italic 900 15px "Barlow Condensed", "Arial Black", sans-serif'; g.textAlign = 'center'; g.lineWidth = 4; g.strokeStyle = '#000';
   const t = done ? (done === 'perfect' ? 'PERFECT' : done === 'good' ? 'GOOD' : 'EARLY') : off ? (ctlMobile() ? 'TAP TO CATCH' : 'SPACE TO CATCH') : (ctlMobile() ? 'TAP TO DEFEND' : 'SPACE TO DEFEND');
   g.strokeText(t, x + w / 2, y - 9); g.fillStyle = done === 'perfect' ? '#5dff7a' : '#fff'; g.fillText(t, x + w / 2, y - 9);
+  g.restore();
 }
 // drag-back throw aim
 function drawAim(g, G) {
@@ -1103,18 +1175,18 @@ function drawFx(g, G) {
     }
     else if (f.kind === 'ring') { g.strokeStyle = f.color || '#fff'; g.globalAlpha = a; g.lineWidth = 4 * a + 1; g.beginPath(); g.ellipse(sx(f.x), sy(f.y), 10 + (1 - a) * 60, 4 + (1 - a) * 22, 0, 0, 7); g.stroke(); g.globalAlpha = 1; }
     else if (f.kind === 'zzz') { g.globalAlpha = a; g.fillStyle = '#cfe3ff'; g.font = `italic 900 ${16 + (1 - a) * 14}px "Barlow Condensed", Arial, sans-serif`; g.textAlign = 'center'; g.fillText('Z', sx(f.x) + (1 - a) * 18 * (f.dx || 1), sy(f.y) - f.z - 20); g.globalAlpha = 1; }
-    else if (f.kind === 'confetti') { g.fillStyle = f.color; g.globalAlpha = a; g.fillRect(f.px, f.py, 6, 9); g.globalAlpha = 1; }
+    else if (f.kind === 'confetti') { g.fillStyle = f.color; g.globalAlpha = a; g.fillRect(f.px * vk / viewZ, f.py * vk / viewZ, 6, 9); g.globalAlpha = 1; } // (screen spots: spread over the bigger zoomed-out picture)
     else if (f.kind === 'text') {
       const pop = Math.min(1, (f.max - f.life) * 8);
       g.font = `900 ${f.size || 20}px "Barlow Condensed", "Arial Black", sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
       // keep floating words off the name tags / throw icons and off each other: nudge up until it's clear (smoothed so it doesn't jump)
-      const X = sx(f.x), Y0 = sy(f.y) - 78 - f.z, hw = g.measureText(f.text).width / 2 + 4, hh = (f.size || 20) / 2 + 3;
+      const X = sx(f.x), Y0 = sy(f.y) - 78 - f.z, hw = (g.measureText(f.text).width / 2 + 4) * uiK, hh = ((f.size || 20) / 2 + 3) * uiK;
       let Y = Y0;
       for (let k = 0; k < 8; k++) { const b = tagBoxes.find(b => X + hw > b.x0 && X - hw < b.x1 && Y + hh > b.y0 && Y - hh < b.y1); if (!b) break; Y = b.y0 - hh - 2; }
       f.lift = f.lift == null ? Y0 - Y : lerp(f.lift, Y0 - Y, 0.3);
       const ty = Y0 - f.lift; tagBoxes.push({ x0: X - hw, x1: X + hw, y0: ty - hh, y1: ty + hh });
       g.save(); g.translate(X, ty);
-      g.scale(0.5 + pop * 0.5, 0.5 + pop * 0.5);
+      g.scale((0.5 + pop * 0.5) * uiK, (0.5 + pop * 0.5) * uiK);
       g.globalAlpha = a; g.lineWidth = 6; g.strokeStyle = '#000'; g.strokeText(f.text, 0, 0); g.fillStyle = f.color || '#fff'; g.fillText(f.text, 0, 0);
       g.restore(); g.globalAlpha = 1;
     }

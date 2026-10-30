@@ -349,7 +349,7 @@ $('optPlayers').onchange = () => renderSelect(); fillSel('optUni1', UNIFORMS, 'a
 try { const o = JSON.parse(localStorage.getItem('bobbleOpts') || 'null'); if (o && !o.m100) { o.optCatchM = '1'; o.m100 = 1; o.m93 = 1; localStorage.setItem('bobbleOpts', JSON.stringify(o)); } } catch (e) {}
 try { const o = JSON.parse(localStorage.getItem('bobbleOpts') || 'null'); if (o && !o.m93) { o.optCatchM = '0'; o.optDefM = '0'; o.m93 = 1; localStorage.setItem('bobbleOpts', JSON.stringify(o)); } } catch (e) {}
 try { const o = JSON.parse(localStorage.getItem('bobbleOpts') || 'null'); if (o) for (const k in o) if ($(k)) $(k).value = o[k]; } catch (e) {}
-function saveOpts() { const o = {}; for (const k of ['optUni0', 'optUni1', 'optWeather', 'optNight', 'optBcast', 'optGame', 'optLogos', 'optQtr', 'optDiff', 'optCoach', 'optCoachMode', 'optPlayers', 'optMeter', 'optMeterSpd', 'optCatchM', 'optDefM', 'optNameTags']) o[k] = $(k).value; o.m93 = 1; o.m100 = 1; if (Sliders.changed()) o.sliders = { ...Sliders.v }; try { localStorage.setItem('bobbleOpts', JSON.stringify(o)); } catch (e) {} }
+function saveOpts() { const o = {}; for (const k of ['optUni0', 'optUni1', 'optWeather', 'optNight', 'optBcast', 'optGame', 'optLogos', 'optQtr', 'optDiff', 'optCoach', 'optCoachMode', 'optPlayers', 'optMeter', 'optMeterSpd', 'optCatchM', 'optDefM', 'optNameTags', 'optZoom']) o[k] = $(k).value; o.m93 = 1; o.m100 = 1; if (Sliders.changed()) o.sliders = { ...Sliders.v }; try { localStorage.setItem('bobbleOpts', JSON.stringify(o)); } catch (e) {} }
 buildMuSet(); // after the weather/uniform lists are filled
 $('optLogos').addEventListener('change', () => { Logo.setStyle($('optLogos').value); renderSelect(); });
 // NAME TAGS: ALL / KEY PLAYERS / OFF (draw.js reads nameTagMode every frame)
@@ -358,6 +358,14 @@ setNameTags($('optNameTags').value);
 $('optNameTags').addEventListener('change', () => setNameTags($('optNameTags').value));
 const tagsLabel = () => { $('btnTagsOpt').textContent = 'NAME TAGS: ' + { all: 'ALL', key: 'KEY PLAYERS', off: 'OFF' }[nameTagMode]; };
 $('btnTagsOpt').onclick = () => { Sound.click(); setNameTags({ all: 'key', key: 'off', off: 'all' }[nameTagMode]); saveOpts(); tagsLabel(); };
+// CAMERA: NORMAL / FAR / FARTHEST = zoom out to see more of the field (draw.js CAM_ZOOMS). Changes the view behind the pause menu right away
+const setZoom = v => { camZoom = CAM_ZOOMS[v] ? v : 'normal'; $('optZoom').value = camZoom; };
+setZoom($('optZoom').value);
+const zoomLabel = () => { $('btnZoomOpt').textContent = 'CAMERA: ' + camZoom.toUpperCase(); };
+$('btnZoomOpt').onclick = () => {
+  Sound.click(); setZoom({ normal: 'far', far: 'farthest', farthest: 'normal' }[camZoom]); saveOpts(); zoomLabel();
+  if (G.paused && G.teams && !G.demo) { render(); updateCamera(5); } // new zoom now, then put the camera where it would be (paused = it isn't moving)
+};
 $('btnSlidersOpt').onclick = () => { Sound.click(); Sliders.open(); };
 Logo.onReady(() => { if ($('select').classList.contains('show')) renderSelect(); });
 // Coach Mode (you call the plays, the CPU plays them): one saved setting shared by Quick Game, Season and the pause menu
@@ -732,9 +740,9 @@ function renderPauseXF() {
 }
 function togglePause() {
   if (!G.teams || G.phase === 'over' || G.demo || Highlights.on || $('hlMenu').classList.contains('show')) return;
-  if (G.online) { const on = !$('pause').classList.contains('show'); if (on) { $('pausePbp').innerHTML = '<div class="pbpHead">ONLINE GAME KEEPS GOING WHILE THIS IS OPEN</div>' + pbpHtml(6); show('pause'); } else show(null); return; }
+  if (G.online) { const on = !$('pause').classList.contains('show'); if (on) { zoomLabel(); $('pausePbp').innerHTML = '<div class="pbpHead">ONLINE GAME KEEPS GOING WHILE THIS IS OPEN</div>' + pbpHtml(6); show('pause'); } else show(null); return; }
   G.paused = !G.paused;
-  if (G.paused) { G.pauseFrom = $('playcall').classList.contains('show') ? 'playcall' : null; coachLabel(); tagsLabel(); $('btnCoachOpt').style.display = G.versus || G.lock || G.mini || G.challenge ? 'none' : ''; $('pausePbp').innerHTML = pbpHtml(8); renderPauseXF(); show('pause'); }
+  if (G.paused) { G.pauseFrom = $('playcall').classList.contains('show') ? 'playcall' : null; coachLabel(); tagsLabel(); zoomLabel(); $('btnCoachOpt').style.display = G.versus || G.lock || G.mini || G.challenge ? 'none' : ''; $('pausePbp').innerHTML = pbpHtml(8); renderPauseXF(); show('pause'); }
   else show(G.pauseFrom);
 }
 $('btnPause').onclick = togglePause;
@@ -968,18 +976,29 @@ function step(now) {
 }
 
 function render() {
+  // CAMERA zoomed out (pause menu): the world is drawn scaled down, sized as if the screen were bigger (draw.js CAM_ZOOMS)
+  const z = G.teams && !G.demo ? CAM_ZOOMS[camZoom] || 1 : 1, cel = cam.zoom > 1.001 && cam.focus && G.phase !== 'replay';
+  scrW = CW; scrH = CH; viewZ = vk = z; // (taps + the camera use viewZ until the next frame)
+  if (z !== 1) { CW = scrW / z; CH = scrH / z; vk = 1; uiK = lerp(1 / z, 1, cel ? clamp((cam.zoom - 1) / (1.6 / z - 1), 0, 1) : 0); }
   // draw with the camera on whole pixels: the big field picture then copies straight over instead of being resampled
   // every frame (3x cheaper on phones). Everything moves together, so nothing shifts against the field
   const camX = cam.x, camY = cam.y;
-  if (!(cam.zoom > 1.001 && cam.focus && G.phase !== 'replay')) { cam.x = (Math.round(cam.x * PX - CW / 2) + CW / 2) / PX; cam.y = Math.round(cam.y * PY) / PY; }
-  try { renderFrame(); } finally { cam.x = camX; cam.y = camY; }
+  if (!cel && z === 1) { cam.x = (Math.round(cam.x * PX - CW / 2) + CW / 2) / PX; cam.y = Math.round(cam.y * PY) / PY; }
+  else if (!cel) { // zoomed out: the shrunk field picture's corner on a whole screen pixel
+    const ax = z * PX, ay = z * PY, ox = scrW / 2, oy = scrH / 2 + VY;
+    cam.x = (Math.round(ax * (cam.x + FIELD_PAD_X) - ox) + ox) / ax - FIELD_PAD_X; cam.y = (Math.round(ay * (cam.y + FIELD_PAD_TOP) - oy) + oy) / ay - FIELD_PAD_TOP;
+  }
+  try { renderFrame(z); } finally { cam.x = camX; cam.y = camY; zoomDone(); }
 }
-function renderFrame() {
+let scrW = CW, scrH = CH;
+function zoomDone() { CW = scrW; CH = scrH; vk = viewZ; uiK = 1; } // back to screen size for the HUD
+function renderFrame(z) {
   ctx.save();
   ctx.clearRect(0, 0, CW, CH);
   if (cam.shake > 0.3) ctx.translate(Math.round(rand(-cam.shake, cam.shake)), Math.round(rand(-cam.shake, cam.shake)));
-  if (cam.zoom > 1.001 && cam.focus && G.phase !== 'replay') { // celly cam
-    const fx = sx(cam.focus.x), fy = sy(cam.focus.y) - 40, k = clamp((cam.zoom - 1) / 0.6, 0, 1);
+  if (z !== 1) ctx.scale(z, z);
+  if (cam.zoom > 1.001 && cam.focus && G.phase !== 'replay') { // celly cam (pushes in to the same size whatever the CAMERA setting)
+    const fx = sx(cam.focus.x), fy = sy(cam.focus.y) - 40, k = clamp((cam.zoom - 1) / (1.6 / viewZ - 1), 0, 1);
     ctx.translate(lerp(fx, CW / 2, k), lerp(fy, CH * (G.mode === 'mobile' ? 0.56 : 0.66), k)); ctx.scale(cam.zoom, cam.zoom); ctx.translate(-fx, -fy);
   }
   if (G.teams) {
@@ -993,6 +1012,7 @@ function renderFrame() {
     safeDraw('fx', () => { drawFx(ctx, G); drawWeather(ctx, G); });
   }
   ctx.restore();
+  zoomDone();
   if (G.teams && !G.demo) {
     if (G.phase === 'replay') safeDraw('replay', () => Replay.drawOverlay(ctx));
     else if (G.phase === 'review') safeDraw('review', () => { Review.drawOverlay(ctx); drawBanner(ctx, G); });
