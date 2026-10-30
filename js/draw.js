@@ -802,16 +802,23 @@ function drawPlayer(g, p, G, at) {
     g.fillStyle = '#ffe14d'; roundRect(g, x - w / 2, ly - 8, w, 16, 8); g.fill(); g.fillStyle = '#111'; g.fillText(p.hot, x, ly + 4);
     tagBoxes.push({ x0: x - w / 2, x1: x + w / 2, y0: ly - 8, y1: ly + 8 }); ly -= 22;
   }
+  // controller: holding LB before the snap shows which button hot-routes each receiver
+  if (Pad.hotShow && G.phase === 'presnap' && p.side === G.poss && p.slot >= 1 && p.slot <= 4 && G.O && G.O.includes(p)) { Pad.drawGlyph(g, p.slot === 1 ? 3 : p.slot - 2, x, ly, 13); ly -= 30; }
   if (p.throwKey) {
     const col = ['#2f7bff', '#ff3b3b', '#2fd06b', '#ffb02e'][p.throwKey - 1];
     const tgt = G.aim && G.aim.target === p;
     const r = tgt ? 17 : 14;
     tagBoxes.push({ x0: x - r - 2, x1: x + r + 2, y0: ly - r - 2, y1: ly + r + (p.openness != null ? 10 : 2) });
+    if (Pad.ui) { // controller: the face button that throws to him
+      if (tgt) { g.strokeStyle = '#ffe14d'; g.lineWidth = 3; g.beginPath(); g.arc(x, ly, r + 3, 0, 7); g.stroke(); }
+      Pad.drawGlyph(g, p.throwKey - 1, x, ly, (r + 1) * Pad.scale(1.35));
+    } else {
     g.fillStyle = col; g.strokeStyle = tgt ? '#ffe14d' : '#fff'; g.lineWidth = tgt ? 4 : 2.5;
     g.beginPath(); g.arc(x, ly, r, 0, 7); g.fill(); g.stroke();
     g.fillStyle = '#fff'; g.font = '900 16px "Barlow Condensed", "Arial Black", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
     if (G.mode === 'mobile') { g.beginPath(); g.moveTo(x, ly - 7); g.lineTo(x + 7, ly + 6); g.lineTo(x - 7, ly + 6); g.closePath(); g.fill(); }
     else g.fillText(p.throwKey, x, ly + 1);
+    }
     if (p.openness != null) {
       const o = clamp(p.openness / 5, 0.12, 1);
       g.fillStyle = '#000a'; g.fillRect(x - 16, ly + r + 3, 32, 6);
@@ -1256,7 +1263,8 @@ function drawHUDRest(g, G, S, x0, y0, W, H) {
     }
   }
   // hint + stamina
-  if (G.hint) {
+  if (G.padHint) Pad.drawHint(g);
+  else if (G.hint) {
     g.font = 'bold 14px Barlow, Arial, sans-serif'; const w = g.measureText(G.hint).width + 24;
     g.fillStyle = '#000000a0'; roundRect(g, CW / 2 - w / 2, CH - 34, w, 26, 2); g.fill();
     g.fillStyle = '#fff'; g.textAlign = 'center'; g.fillText(G.hint, CW / 2, CH - 20);
@@ -1343,5 +1351,9 @@ function drawKickMeter(g, G) {
   }
   const tap = G.mode === 'mobile' ? 'TAP' : G.online ? 'SPACE' : G.versus && km.side !== G.p1 ? 'ENTER' : 'SPACE';
   g.textAlign = 'center'; g.fillStyle = '#f6c31c'; g.font = 'italic 900 19px "Barlow Condensed", Arial, sans-serif';
+  if (Pad.ui && st < 2 && !(G.versus && !G.online)) { // controller: the A / cross glyph instead of SPACE
+    const t = st === 0 ? 'TO SET THE POWER' : "WHEN IT'S IN THE GREEN", w = g.measureText(t).width + 30;
+    Pad.drawGlyph(g, 0, CW / 2 - w / 2 + 11, y0 + H - 20, 11); g.textAlign = 'left'; g.fillStyle = '#f6c31c'; g.fillText(t, CW / 2 - w / 2 + 30, y0 + H - 14);
+  } else
   g.fillText(st === 0 ? `${tap} TO SET THE POWER` : st === 1 ? `${tap} WHEN IT'S IN THE GREEN` : '', CW / 2, y0 + H - 14);
 }

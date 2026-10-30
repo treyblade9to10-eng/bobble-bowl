@@ -26,7 +26,7 @@ const coachOn = () => !!G.coachMode && !G.versus && !G.online && !G.lock && !G.d
 const coachCalls = () => !!G.coachCalls && !!G.career && !G.versus && !G.online && !G.demo && !G.mini && !G.challenge && G.human >= 0;
 // kicks the human never aims: Coach Mode and every career game (rating-based, like the CPU)
 const autoKick = () => coachOn() || (!!G.career && !G.versus && !G.online && !G.mini && G.human >= 0);
-const ctlMobile = () => (G.online && G.netModes ? G.netModes[Input.ctl] : G.mode) === 'mobile';
+const ctlMobile = () => (G.online && G.netModes ? G.netModes[Input.ctl] : G.mode) === 'mobile' && !(Pad.ui && Input.cur !== 1); // a controller plays like the keyboard
 const goalX = s => (s === 0 ? 110 : 10);      // goal line this side is attacking
 const ownGoal = s => (s === 0 ? 10 : 110);    // goal line this side defends
 const fromOwn = (s, x) => dirOf(s) * (x - ownGoal(s));
@@ -900,7 +900,8 @@ function humanQBInput() {
       const r = G.O.find(o => o.throwKey === keys[G.meter.key]);
       if (G.ball.holder !== qb || !eligible(r)) G.meter = null;
       else if (!Input.held(G.meter.key)) meterThrow(qb, r, style, Input.axis());
-    } else for (const k in keys) if (Input.hit(k)) { const r = G.O.find(o => o.throwKey === keys[k]); if (eligible(r)) { if (useMeter && Input.held(k)) meterStart(qb, k, r); else throwTo(qb, r, false, null, useMeter && style === 'normal' ? 'lob' : style, Input.axis()); break; } }
+    } else if (Input.hit('KeyU') && G.ball.holder === qb) throwAway(qb); // controller RB: throw it away
+    else for (const k in keys) if (Input.hit(k)) { const r = G.O.find(o => o.throwKey === keys[k]); if (eligible(r)) { if (useMeter && Input.held(k)) meterStart(qb, k, r); else throwTo(qb, r, false, null, useMeter && style === 'normal' ? 'lob' : style, Input.axis()); break; } }
     const P = Input.pointer;
     // finger on a receiver's icon: hold for the power bar, a quick tap lobs it
     if (meterOn() && G.ball.holder === qb && !G.meter && P.down && !P.moved) {
@@ -1245,13 +1246,17 @@ function humanControl(p, dt) {
   if (Input.hit('KeyQ') && !isCarrier) { cycleHumanDef(); }
   if (isCarrier && Input.hit('KeyG') && G.bstate !== 'snap') toggleTuck(p);
   if (ctlMobile()) return mobileControl(p, dt, isCarrier);
+  if (isCarrier && Input.hit('KeyX')) { // X: QB takes off (in the pocket), slide (running)
+    if (p === curPasser() && G.bstate === 'snap' && (p === G.O[0] || humanCanThrow()) && !G.humanScramble && dirOf(p.side) * (p.x - G.los) < 0.5) qbTakeOff(p);
+    else if (canSlide(p)) { doSlide(p); return true; }
+  }
   const ax = Input.axis();
   const sprint = Input.held('ShiftLeft') && p.stamina > 0.05;
   if (sprint && ax.m > 0.1) p.stamina = Math.max(0, p.stamina - dt * 0.42); else p.stamina = Math.min(1, p.stamina + dt * 0.18);
   p.sprinting = sprint && ax.m > 0.1;
   const mul = (sprint ? sprintBoost(p) : 1) * (p.spin > 0 ? 0.8 : 1) * (p.stamina < 0.2 ? 0.9 : 1); // same top speed as the AI, sprint is your edge
   if (isCarrier) {
-    if (Input.hit('KeyE') && p.jukeCd <= 0 && G.bstate !== 'snap' && !p.tuck) doJuke(p, ax);
+    if (Input.hit('KeyE') && p.jukeCd <= 0 && G.bstate !== 'snap' && !p.tuck) doJuke(p, Input.jukeAx || ax);
     if (Input.hit('KeyF') && p.spinCd <= 0 && G.bstate !== 'snap' && !p.tuck) doSpin(p);
     if (Input.hit('KeyR') && p.stiffCd <= 0) doStiff(p);
   }
@@ -1347,6 +1352,13 @@ function qbTakeOff(qb) {
 }
 // faster guys get a bigger burst: 99 SPD ≈ +18%, 80 ≈ +11%, 65 ≈ +6%
 function sprintBoost(p) { return 1.0 + clamp((p.spdR || 80) - 50, 0, 50) * 0.002; }
+// slide / give yourself up: the play ends right there (no big hit, no fumble)
+function canSlide(p) { return G.phase === 'live' && G.ball.holder === p && p.down <= 0 && !G.mini && !trickBusy() && (G.bstate === 'run' || dirOf(p.side) * (p.x - G.los) > 0.5); }
+function doSlide(p) {
+  p.down = 1; p.downDir = dirOf(p.side); p.vx *= 0.35; p.vy *= 0.35; p.dvx = p.dvy = 0;
+  addText(p.x, p.y, 'SLIDE', '#cfe3ff', 16, 0.8); Sound.click();
+  endPlay({ type: 'tackle', carrier: p, x: p.x, y: p.y });
+}
 function doStiff(p) { p.stiff = 0.4; p.stiffCd = 1.4; Sound.tone(160, 0.12, 'sawtooth', 0.08); }
 function doJuke(p, ax) {
   if (p.tuck) return;
@@ -2234,7 +2246,7 @@ function resolveCatch() {
 
 function intercept(def) {
   const b = G.ball;
-  b.holder = def; G.bstate = 'run'; Sound.bad();
+  b.holder = def; G.bstate = 'run'; Sound.bad(); Pad.buzz('pick', def.side);
   stat(def).int++; G.tstats[G.poss].to++; G.intBy = def;
   if (G.lastThrower) { const t = stat(G.lastThrower); t.tov = (t.tov || 0) + 1; }
   showBanner('INTERCEPTED!', def.name, '#ff5050', 1.6);
@@ -2301,6 +2313,7 @@ function tackle(car, df, hitters) {
   Sound.tackle(); cam.shake = 7; G.lastTackler = df;
   const stick = df.hit > 0;
   const boom = stick || ((df.speedNow > 11 || (df.dive > 0 && df.speedNow > 10.5)) && chance(0.35));
+  Pad.buzz(boom ? 'hit' : 'tackle', car.side); if (boom) Pad.buzz('hit', df.side);
   if (boom) { cam.shake = 15; G.slowmo = 0.45; car.dizzy = 1; addText(car.x, car.y, pick(['BOOM!', 'WHAM!', 'CRUNCH!', 'POW!']), '#ff7a3d', 30, 0.9); Sound.boing(); }
   Injury.hit(car, boom ? 'boom' : car === G.O[0] && G.bstate === 'snap' ? 'sack' : 'tackle');
   car.down = 1.2; car.downDir = dirOf(df.side); car.vx = df.vx * 0.4; car.vy = df.vy * 0.4; car.mouth = 'O'; car.mouthT = 1.2;
@@ -2320,7 +2333,7 @@ function tackle(car, df, hitters) {
   st.tkl++;
   if (!G.special && !G.mini && !G.twoPt && chance(0.005)) { throwFlag('FACEMASK', df.side, car.x, car.y, df); car.head.rot = 0.6; car.head.vx += 600; } // grabbed the face mask
   const sack = car === G.O[0] && G.bstate === 'snap' && !G.play.off.qbRun && dirOf(G.poss) * (car.x - G.los) <= 0; // a QB draw stopped short is a run, not a sack
-  if (sack) { st.sack++; showBanner('SACKED!', df.name, '#ff6040', 1.2); }
+  if (sack) { st.sack++; showBanner('SACKED!', df.name, '#ff6040', 1.2); Pad.buzz('sack', car.side); Pad.buzz('sack', df.side); }
   endPlay({ type: sack ? 'sack' : 'tackle', carrier: car, x: car.x, y: car.y });
 }
 
@@ -2399,7 +2412,7 @@ function endPlay(res) {
     const gx = goalX(cs), gd = dirOf(cs); G.tdScorer = car;
     car.tdRun = { x: gd * (car.x - gx) >= 3 ? car.x : gx + gd * 3.5, y: clamp(car.y, 9, FIELD_W - 9) };
     showBanner('TOUCHDOWN!', `${car.name} • ${G.teams[cs].city} ${G.teams[cs].name}`, isHumanSide(cs) ? '#ffd23f' : '#ff6040', 2.6);
-    Sound.td(); G.crowdHype = 1.5; stat(car).td++; G.slowmo = 0.9;
+    Sound.td(); G.crowdHype = 1.5; stat(car).td++; G.slowmo = 0.9; Pad.buzz('td', cs);
     if (typeof Unlocks !== 'undefined' && isHumanSide(cs) && !G.versus && !G.mini && !G.practice) Unlocks.td();
     for (const q of G.players) if (q.side === cs) q.celebrate = 2.6;
     for (let i = 0; i < 70; i++) G.fx.push({ kind: 'confetti', px: rand(0, CW), py: rand(-200, 0), vy: rand(120, 260), vx: rand(-40, 40), z: 0, vz: 0, color: pick([G.teams[cs].c1, G.teams[cs].c2, '#fff']), life: 2.6, max: 2.6 });
@@ -2725,6 +2738,7 @@ function updateCamera(dt) {
 }
 function updateHint() {
   if (!G.teams) return;
+  if (Pad.setHint()) return; // controller: prompts with its buttons
   const km = G.km, def = km ? 1 - km.side : -1;
   if (G.versus && !G.online && G.phase === 'kickmeter' && km && (km.kind === 'fg' || km.kind === 'xp') && G.hp && G.hp[def] && !G.hp[def].off) { G.hint = `${pName(def)}: BLOCK THE KICK!  •  ${def === G.p1 ? 'WASD rush  •  SPACE jump  •  E swim' : 'ARROWS rush  •  ENTER jump  •  / swim'}`; return; }
   const ph = puntHint(); if (ph != null) { G.hint = ph; return; } // live punt: rush it / fair catch (special.js)
@@ -2748,7 +2762,7 @@ function updateHint() {
   if (G.phase === 'presnap') G.hint = humanOff ? (G.play.off.type === 'run' ? 'SPACE snap  •  Z audible  •  T timeout' : `SPACE snap  •  1-4 hot route  •  M motion${G.versus ? '' : '  •  Z audible'}  •  T timeout`) : `Q / TAB pick defender  •  V press  •  B show blitz${G.versus ? '' : '  •  Z audible'}  •  T timeout`;
   else if (G.phase === 'live') {
     const h = G.humanPlayer;
-    if (h && b.holder === h && h.side === G.human) G.hint = humanCanThrow() ? (meterOn() ? 'TAP 1-4 / click = lob  •  HOLD = power, let go in the green  •  X = QB run' : '1-4 or click a receiver to throw (SHIFT = bullet, CTRL = lob)  •  X = QB run') : 'WASD move  •  SHIFT sprint  •  E juke  •  F spin  •  R stiff arm';
+    if (h && b.holder === h && h.side === G.human) G.hint = humanCanThrow() ? (meterOn() ? 'TAP 1-4 / click = lob  •  HOLD = power, let go in the green  •  X = QB run' : '1-4 or click a receiver to throw (SHIFT = bullet, CTRL = lob)  •  X = QB run') : 'WASD move  •  SHIFT sprint  •  E juke  •  F spin  •  R stiff arm  •  X slide';
     else if (h && (h.side !== G.poss || (b.holder && b.holder.side !== G.human))) G.hint = b.flight ? 'SPACE = JUMP for the pick!  •  WASD move' : h.engaged ? 'E = SWIM MOVE past the blocker!' : 'WASD move  •  SHIFT sprint  •  SPACE dive  •  C HIT STICK  •  Q switch';
     else G.hint = catchMeterOn() ? `Steer to the ball  •  HOLD ${ctlMobile() ? 'your finger on the field' : 'SPACE'} and let go in the green to catch` : 'Steer to the ball marker to catch it!';
   } else G.hint = '';
