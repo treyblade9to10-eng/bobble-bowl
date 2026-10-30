@@ -654,12 +654,12 @@ function drawPlayer(g, p, G, at) {
   let ly = headTop;
   if (showName) {
     g.font = 'bold 13px Barlow, Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-    const full = p.isHuman || carrying, label = full ? `${p.name}` : lastName(p.name);
+    const full = p.isHuman || carrying, label = full ? `${p.name}` : lastName(p.name) + (p.tw2 && G.phase === 'presnap' ? '  ·  2-WAY' : '');
     const w = g.measureText(label).width + 14;
     g.fillStyle = p.isHuman ? (G.versus && p.ctl === 1 ? '#5ad1ff' : '#ffe14d') : '#000000c0'; roundRect(g, x - w / 2, ly - 10, w, 20, 10); g.fill();
     if (p.cap) { g.strokeStyle = '#f6c31c'; g.lineWidth = 2; g.stroke(); }
     g.fillStyle = p.isHuman ? '#111' : '#fff'; g.fillText(label, x, ly + 1);
-    if (full) { g.font = 'bold 10px Barlow, Arial, sans-serif'; g.fillStyle = '#fff'; g.strokeStyle = '#000'; g.lineWidth = 3; const r = `${p.pos} • ${p.ovr} OVR`; g.strokeText(r, x, ly - 17); g.fillText(r, x, ly - 17); }
+    if (full) { g.font = 'bold 10px Barlow, Arial, sans-serif'; g.fillStyle = '#fff'; g.strokeStyle = '#000'; g.lineWidth = 3; const r = `${p.tw2 ? '2-WAY ' : ''}${p.pos} • ${p.ovr} OVR`; g.strokeText(r, x, ly - 17); g.fillText(r, x, ly - 17); }
     if (p.xf && p.xf.on) drawXFBadge(g, p, x - w / 2 - 12, ly); // X-Factor badge sits next to his name
     tagBoxes.push({ x0: x - w / 2 - (p.xf && p.xf.on ? 24 : 0), x1: x + w / 2, y0: ly - (full ? 24 : 10), y1: ly + 10 });
     ly -= 30;
@@ -689,11 +689,11 @@ function drawPlayer(g, p, G, at) {
 }
 
 // NAME TAGS: who gets a name over his head. KEY PLAYERS = the ball carrier, the guy the pass is going to, the player you control,
-// your career player, X-Factors in the zone, and the tackler for a moment after the whistle
+// your career player, X-Factors in the zone, two-way players before the snap, and the tackler for a moment after the whistle
 function tagFor(p, G, carrying) {
   if (nameTagMode === 'off') return false;
   if (nameTagMode === 'all') return true;
-  if (p.isHuman || carrying || p.cap || (p.xf && p.xf.on)) return true;
+  if (p.isHuman || carrying || p.cap || (p.xf && p.xf.on) || (p.tw2 && G.phase === 'presnap')) return true;
   const f = G.ball && G.ball.flight;
   if (f && f.intended === p && !f.pitch && !f.kick) return true;
   return G.phase === 'dead' && p === G.lastTackler && G.deadT > 0.25;

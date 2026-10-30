@@ -1,5 +1,6 @@
 // Rosters: who is on each team as of 2026-10-29 (ESPN depth charts + injury report), with Madden NFL 27 overall + speed ratings.
 // Player tuple: [position, parody name, jersey number, overall, speed, skin tone 0-5]. k/p = kicker/punter [name, number, overall, skin]
+// Two-way players are listed once, at their main spot (Travis Huntar: CB here, also WR, see TW_REAL in twoway.js).
 // qb2/rb2 = real backup QB and RB; bench = one real backup at WR TE OL DL LB CB S off the depth chart (Oct 2026, ratings from EA's Madden 27 database).
 const TEAMS = [
   { id:"BUF", city:"Buffalo", name:"Bills", conf:"AFC", div:"East", c1:"#00338D", c2:"#C60C30", helmet:"#ffffff", mask:"#00338D",
@@ -64,7 +65,7 @@ const TEAMS = [
     bench:[["WR","Laquon Treadwel",13,68,84,4],["TE","Mo Alee-Cox",81,71,82,4],["OL","Jalen Traviz",75,70,68,4],["DL","Jaylahn Tuimaloau",91,74,80,3],["LB","Jaylon Carliez",57,69,89,4],["CB","Justin Wallee",27,70,92,4],["S","A.J. Haulcie",25,74,88,3]] },
   { id:"JAX", city:"Jacksonville", name:"Jaguars", conf:"AFC", div:"South", c1:"#006778", c2:"#D7A22A", helmet:"#101820", mask:"#101820",
     off:[["QB","Trevor Lawrance",16,84,89,0],["RB","Bhayshul Tooten",33,77,95,4],["WR","Jakobi Myers",3,82,88,4],["WR","Josh Camerun",19,68,88,4],["WR","Parker Washingtin",11,81,89,4],["OL","Ezra Clevelund",76,80,76,0],["OL","Emmanuel Pregnun",75,74,65,3],["OL","Walker Littel",72,77,65,4]],
-    def:[["DL","Josh Hines-Allun",41,89,87,4],["DL","Travon Walkur",44,80,87,5],["DL","Arik Armsted",91,76,73,4],["LB","Foye Oluokoon",23,86,87,4],["LB","Dennis Gardek",47,74,86,0],["CB","Jourdan Louis",2,82,88,4],["CB","Travis Huntar",12,84,93,4],["S","Antonio Johnstone",6,81,88,4]],
+    def:[["DL","Josh Hines-Allun",41,89,87,4],["DL","Travon Walkur",44,80,87,5],["DL","Arik Armsted",91,76,73,4],["LB","Foye Oluokoon",23,86,87,4],["LB","Dennis Gardek",47,74,86,0],["CB","Jourdan Louis",2,82,88,4],["CB","Travis Huntar",12,85,93,4],["S","Antonio Johnstone",6,81,88,4]],
     k:["Cam Littel",39,80,0], p:["Logan Cookie",9,76,0],
     qb2:["QB","Quinn Ewerz",10,63,78,0], rb2:["RB","Chris Rodrigez Jr.",24,72,89,4],
     bench:[["WR","Brian Tomas Jr.",7,80,97,4],["TE","Brenton Strenge",85,79,83,0],["OL","Robert Hainsee",73,74,63,0],["DL","DaVon Hamiltun",52,75,70,4],["LB","Ventrell Millur",51,73,83,4],["CB","Montaric Browne",1,74,87,4],["S","Eric Muray",29,74,86,4]] },

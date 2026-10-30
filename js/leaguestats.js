@@ -18,6 +18,7 @@ const LStats = {
     for (const l of Object.values(d.stats || {})) {
       const k = l.name + '|' + l.pos; let a = agg.get(k);
       if (!a) { const e = ix.find(l.t, l.name, l.pos); a = { name: l.name, pos: l.pos, t: e ? e.id : l.t, p: e ? e.p : null, g: 0 }; agg.set(k, a); }
+      if (l.tw) a.tw = l.tw; // two-way: shows up on the defense board too
       a.g += l.g || 0; for (const s of FORM_KEYS) a[s] = (a[s] || 0) + (l[s] || 0);
     }
     return [...agg.values()];
@@ -37,7 +38,7 @@ const LS_COLS = {
   pass: { keep: r => r.pass > 0 && r.pos === 'QB', sort: 'pass', cols: [['g', 'G'], ['pass', 'YDS'], ['ypg', 'Y/G', r => perG(r.pass, r.g), r => perG(r.pass, r.g).toFixed(1)], ['td', 'TD'], ['rush', 'RUSH']] },
   rush: { keep: r => r.rush > 0, sort: 'rush', cols: [['g', 'G'], ['rush', 'YDS'], ['ypg', 'Y/G', r => perG(r.rush, r.g), r => perG(r.rush, r.g).toFixed(1)], ['td', 'TD'], ['rec', 'REC YDS']] },
   rec: { keep: r => r.rec > 0, sort: 'rec', cols: [['g', 'G'], ['rec', 'YDS'], ['ypg', 'Y/G', r => perG(r.rec, r.g), r => perG(r.rec, r.g).toFixed(1)], ['td', 'TD']] },
-  def: { keep: r => FORM_DEF.includes(r.pos) && (r.tkl || r.sack || r.int || r.blk), sort: 'tkl', cols: [['g', 'G'], ['tkl', 'TKL'], ['sack', 'SACK'], ['int', 'INT'], ['blk', 'BLK']] },
+  def: { keep: r => (FORM_DEF.includes(r.pos) || FORM_DEF.includes(r.tw)) && (r.tkl || r.sack || r.int || r.blk), sort: 'tkl', cols: [['g', 'G'], ['tkl', 'TKL'], ['sack', 'SACK'], ['int', 'INT'], ['blk', 'BLK']] },
   team: { sort: 'pct', cols: [['pct', 'W-L', r => r.pct, r => recStr(r.id)], ['pf', 'PF'], ['pa', 'PA'], ['diff', 'DIFF', null, r => (r.diff > 0 ? '+' : '') + r.diff], ['ppg', 'PTS/G', null, r => r.ppg.toFixed(1)], ['ypg', 'YDS/G'], ['pass', 'PASS'], ['rush', 'RUSH'], ['sack', 'SACKS'], ['int', 'INT']] }
 };
 // little gold tags next to a player: Pro Bowl this year, Player of the Week count

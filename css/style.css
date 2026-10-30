@@ -938,6 +938,14 @@ img.badge { object-fit: contain; }
 #capBody:has(.cpWrap) { width: 100%; flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; }
 .cpCard #capCv { background: transparent; }
 .cpRow2 .tlF.cpNum input { width: 70px; }
+/* two-way players (twoway.js) */
+.cpOvr em { display: block; margin-top: 4px; font-style: italic; font-weight: 900; font-size: 15px; color: var(--text); letter-spacing: .04em; }
+.cpTwNote { max-width: none; margin-top: 4px; }
+.ccTwO { margin-left: 8px; color: var(--dim); } .ccOvr .ccTwO b { font-size: 22px; color: #fff; margin: 0 0 0 2px; }
+.ccTwScout b { color: var(--gold); font-family: var(--hd); letter-spacing: .06em; }
+.twTag { margin-left: 6px; background: var(--gold); color: #111; font-family: var(--hd); font-style: italic; font-weight: 900; font-size: 10px; padding: 1px 5px; letter-spacing: .06em; vertical-align: middle; }
+.twTag.off { background: #3a4452; color: var(--dim); }
+@media (max-height: 500px) { .cpOvr em { font-size: 11px; margin-top: 2px; } .ccOvr .ccTwO b { font-size: 17px; } }
 img.badge { object-fit: contain; }
 .tlSecSub { color: var(--dim); font-size: 11px; letter-spacing: .1em; }
 .troph.riv svg { fill: #c9ced6; stroke: #c9ced6; }

@@ -177,7 +177,7 @@ function renderHubTab() {
     if (Season.bench) Season.bench(d.team);
     const me = Season.team(d.team), R = Season.ensureRosters()[d.team], xf = new Set(teamXFactors(me).map(x => x.name));
     const row = p => { const a = p[6] && p[6].age, old = xfTooOld(p);
-      return `<div class="leadRow"><span>${p[0]} ${p[1]}${xf.has(p[1]) ? ' <b class="rsXf">X-FACTOR</b>' : ''}${typeof abFor === 'function' && abFor(p[1]).length ? ` <span class="abTag" title="${abFor(p[1]).map(a => a.name).join(', ')}">${abFor(p[1]).map(() => '<i class="abIco"></i>').join('')}</span>` : ''}${p[6] && p[6].rookie ? ' <b class="rsRk">ROOKIE</b>' : ''}</span><i class="${old ? 'oldAge' : ''}">AGE ${a || '?'}  ·  <b>${p[3]}</b></i></div>`; };
+      return `<div class="leadRow"><span>${p[0]} ${p[1]}${TwoWay.info(p) ? ` <b class="twTag">2-WAY ${TwoWay.info(p).pos}</b>` : ''}${xf.has(p[1]) ? ' <b class="rsXf">X-FACTOR</b>' : ''}${typeof abFor === 'function' && abFor(p[1]).length ? ` <span class="abTag" title="${abFor(p[1]).map(a => a.name).join(', ')}">${abFor(p[1]).map(() => '<i class="abIco"></i>').join('')}</span>` : ''}${p[6] && p[6].rookie ? ' <b class="rsRk">ROOKIE</b>' : ''}</span><i class="${old ? 'oldAge' : ''}">AGE ${a || '?'}  ·  <b>${p[3]}</b></i></div>`; };
     h = `<div class="leadHead">STARTERS</div>${me.off.concat(me.def).map(row).join('')}` + ((R.bench || []).length ? `<div class="leadHead" style="margin-top:8px">BENCH</div>${R.bench.map(row).join('')}` : '')
       + `<div class="note">Players peak in their mid 20s (QBs later, RBs sooner). Ages in red are too old to be an X-Factor.</div>`;
   } else if (hubTab === 'draft') { // who you could get: tank for a franchise QB

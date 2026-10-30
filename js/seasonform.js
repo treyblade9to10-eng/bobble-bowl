@@ -23,7 +23,7 @@ const Form = {
     const out = [], G0 = FORM_KEYS.length;
     for (const [k, a] of Object.entries(post || this.snap())) {
       const l = Season.data.stats[k], b = pre[k], g = a[G0] - (b ? b[G0] : 0); if (!l || g <= 0) continue;
-      const x = { k, t: l.t, name: l.name, pos: l.pos };
+      const x = { k, t: l.t, name: l.name, pos: l.pos, tw: l.tw };
       FORM_KEYS.forEach((s, i) => { x[s] = a[i] - (b ? b[i] : 0); });
       out.push(x);
     }
@@ -78,7 +78,8 @@ const Form = {
     const N = d.formN && d.formN.y === d.year ? d.formN : (d.formN = { y: d.year, u: 0, d: 0 }), bias = clamp((N.u - N.d) / 30, -0.6, 0.6);
     for (const x of lines) {
       const e = ix.find(x.t, x.name, x.pos); x.e = e; if (!e || (e.p[6] && e.p[6].cap)) continue;
-      const p = e.p, g = this.grade(x, p[3]); if (g == null) continue;
+      const p = e.p, g0 = this.grade(x, p[3]), g1 = x.tw ? this.grade({ ...x, pos: x.tw }, p[3]) : null; // two-way: his better side
+      const g = g1 == null ? g0 : g0 == null ? g1 : Math.max(g0, g1); if (g == null) continue;
       const f = this.fm(p);
       f.h = Math.round((f.h * FORM_DECAY + g) * 100) / 100; f.n++;
       f.s = g >= 0.6 ? Math.max(0, f.s || 0) + 1 : g <= -0.6 ? Math.min(0, f.s || 0) - 1 : 0;
@@ -113,7 +114,7 @@ const Form = {
   potw(lines, wk, won) {
     const d = Season.data, best = (list, f) => list.reduce((a, x) => { const v = f(x) + (won.has(x.t) ? 3 : 0); return !a || v > a.v ? { x, v } : a; }, null);
     const pack = b => b && b.v > 4 ? { t: b.x.e ? b.x.e.id : b.x.t, name: b.x.name, pos: b.x.pos, line: this.statLine(b.x.raw) } : null;
-    const off = best(lines.filter(x => FORM_OFF.includes(x.pos)), this.offScore), def = best(lines.filter(x => FORM_DEF.includes(x.pos)), this.defScore);
+    const off = best(lines.filter(x => FORM_OFF.includes(x.pos) || FORM_OFF.includes(x.tw)), this.offScore), def = best(lines.filter(x => FORM_DEF.includes(x.pos) || FORM_DEF.includes(x.tw)), this.defScore);
     const rookies = lines.filter(x => x.e && x.e.p[6] && x.e.p[6].rookie);
     const rook = best(rookies, x => (this.grade(x, x.e.p[3]) || 0) * 8 + (FORM_OFF.includes(x.pos) ? this.offScore(x) : this.defScore(x)) * 0.3); // how far over his usual game he went, so it isn't always a QB
     const w = { y: d.year, wk, off: pack(off), def: pack(def), rook: pack(rook) };
