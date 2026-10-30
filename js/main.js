@@ -758,7 +758,7 @@ cv.addEventListener('pointerdown', e => {
   if (activeId !== null) return;
   activeId = e.pointerId; try { cv.setPointerCapture(e.pointerId); } catch (_) {}
   const p = toCanvas(e), P = Input.pointer;
-  Object.assign(P, { down: true, x: p.x, y: p.y, x0: p.x, y0: p.y, t: 0, moved: false, aiming: false, start: performance.now() });
+  Object.assign(P, { down: true, x: p.x, y: p.y, x0: p.x, y0: p.y, t: 0, moved: false, aiming: false, noSteer: false, start: performance.now() });
   e.preventDefault();
 });
 cv.addEventListener('pointermove', e => {

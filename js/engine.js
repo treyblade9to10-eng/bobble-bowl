@@ -905,7 +905,7 @@ function humanQBInput() {
     // finger on a receiver's icon: hold for the power bar, a quick tap lobs it
     if (meterOn() && G.ball.holder === qb && !G.meter && P.down && !P.moved) {
       const best = iconAt(P.x0, P.y0);
-      if (best) meterStart(qb, null, best);
+      if (best) { meterStart(qb, null, best); P.noSteer = true; } // this finger is the pass bar: never "run to here", even if the hold gets cut off
     }
     if (G.meter && G.meter.r && !G.meter.key) {
       if (G.ball.holder !== qb || !eligible(G.meter.r)) G.meter = null; // finger can wander once the hold started: it still goes to him
@@ -1291,7 +1291,10 @@ function mobileControl(p, dt, isCarrier) {
   const onD = p.side !== G.poss || (b.holder && b.holder.side !== p.side);
   const inAir = !isCarrier && onD && b.flight && !b.flight.pitch;
   if (inAir && (Input.taps.length || Input.hit('Space'))) { flightPress(p, 'def'); doJump(p); Input.taps.length = 0; }
-  if (!isCarrier && !onD && b.flight && !b.flight.pitch && b.flight.intended === p) { catchHold(p, Input.pointer.down || Input.held('Space')); Input.taps.length = 0; }
+  if (!isCarrier && !onD && b.flight && !b.flight.pitch && b.flight.intended === p) {
+    catchHold(p, Input.pointer.down || Input.held('Space')); Input.taps.length = 0;
+    if (P.down && catchMeterOn()) P.noSteer = true; // that finger is the catch bar, not "run to here" (also after the catch until you lift it)
+  }
   if (!isCarrier && p.engaged && Input.hit('KeyE')) doSwim(p);
   if (!isCarrier && onD && Input.hit('KeyC')) doHitStick(p);
   if (p.hit > 0) return true;
@@ -1324,7 +1327,7 @@ function mobileControl(p, dt, isCarrier) {
     return true;
   }
   if (p.jump > 0 && b.flight) { steer(p, b.flight.tx, b.flight.ty, 1.08, 0.2); return true; }
-  const held = P.down && !P.aiming && P.t > 0.12;
+  const held = P.down && !P.aiming && !P.noSteer && P.t > 0.12;
   if (held) {
     const tx = wx(P.x), ty = wy(P.y);
     if (sprint) p.stamina = Math.max(0, p.stamina - dt * 0.42);
