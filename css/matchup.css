@@ -200,3 +200,6 @@
   #snGrid { padding: 6px 10px; } #snGTitle { font-size: 18px; } #snGHead { margin-bottom: 4px; }
   #snGList { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 6px 10px; }
 }
+/* BROADCAST (primetime look): 7 choices, two lines so the names fit */
+#muRow_optBcast .muC { flex-wrap: wrap; row-gap: 3px; }
+#muRow_optBcast .muC.seg button { flex: 1 1 22%; }

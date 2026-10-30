@@ -991,12 +991,15 @@ function crunchText(G) {
   return [top, who + `UP ${m}  ·  ` + (m <= 3 ? 'NO FIELD GOAL' : m <= 8 ? 'NO TOUCHDOWN' : 'KEEP IT IN FRONT'), '#4fe08a'];
 }
 function drawHUD(g, G) {
-  const W = 640, x0 = (CW - W) / 2, y0 = 6, H = 46;
-  g.fillStyle = '#0b0f16f0'; roundRect(g, x0, y0, W, H, 3); g.fill();
+  // primetime games (TNF / SNF / MNF / Christmas / Halloween, see primetime.js) get their own colors + a badge at the left end
+  const S = typeof bcStyle === 'function' ? bcStyle(G) : null, BW = S ? 64 : 0;
+  const W = 640 + BW, x0 = (CW - W) / 2, y0 = 6, H = 46, bx = x0 + BW;
+  if (S) bcBar(g, S, x0, y0, W, H); else { g.fillStyle = '#0b0f16f0'; roundRect(g, x0, y0, W, H, 3); g.fill(); }
   const cell = (t, s, x, poss) => {
     const cg = g.createLinearGradient(x, 0, x + 200, 0); cg.addColorStop(0, t.c1); cg.addColorStop(1, shade(t.c1, -0.3));
-    g.fillStyle = cg; roundRect(g, x, y0 + 4, 200, H - 8, 2); g.fill();
-    g.fillStyle = t.c2; g.fillRect(x, y0 + H - 8, 200, 4);
+    const sl = S && S.slant || 0, shape = () => { if (!sl) return roundRect(g, x, y0 + 4, 200, H - 8, 2); g.beginPath(); g.moveTo(x + sl, y0 + 4); g.lineTo(x + 200, y0 + 4); g.lineTo(x + 200 - sl, y0 + H - 4); g.lineTo(x, y0 + H - 4); g.closePath(); };
+    g.fillStyle = cg; shape(); g.fill();
+    g.save(); shape(); g.clip(); g.fillStyle = t.c2; g.fillRect(x, y0 + H - 8, 200, 4); g.restore();
     // team name sits high so the timeout bars underneath get their own space
     const ny = y0 + 18;
     g.fillStyle = textOn(t.c1); g.font = 'italic 900 23px "Barlow Condensed", "Arial Black", sans-serif'; g.textAlign = 'left'; g.textBaseline = 'middle';
@@ -1010,25 +1013,26 @@ function drawHUD(g, G) {
     if (G.timeouts) for (let i = 0; i < 3; i++) {
       const tx = x + lx + i * 20, ty = y0 + H - 16;
       g.fillStyle = '#00000059'; g.fillRect(tx - 1, ty - 1, 16, 6);
-      g.fillStyle = i < G.timeouts[side] ? '#ffd23f' : '#ffffff38'; g.fillRect(tx, ty, 14, 4);
+      g.fillStyle = i < G.timeouts[side] ? (S ? S.to : '#ffd23f') : '#ffffff38'; g.fillRect(tx, ty, 14, 4);
     }
   };
-  cell(G.teams[1], G.score[1], x0 + 5, G.poss === 1);
-  cell(G.teams[0], G.score[0], x0 + 210, G.poss === 0);
+  cell(G.teams[1], G.score[1], bx + 5, G.poss === 1);
+  cell(G.teams[0], G.score[0], bx + 210, G.poss === 0);
   g.fillStyle = '#fff'; g.textAlign = 'center'; g.font = '800 21px "Barlow Condensed", Arial, sans-serif';
   const q = G.quarter > 4 ? 'OT' : ordinal(G.quarter);
   const c = Math.max(0, Math.ceil(G.clock)), m = Math.floor(c / 60), s = String(c % 60).padStart(2, '0');
   g.fillText(`${q}   ${m}:${s}`, x0 + W - 112, y0 + 16);
-  g.font = '800 15px "Barlow Condensed", Arial, sans-serif'; g.fillStyle = '#ffd23f';
+  g.font = '800 15px "Barlow Condensed", Arial, sans-serif'; g.fillStyle = S ? S.down : '#ffd23f';
   g.fillText(G.downText(), x0 + W - 112, y0 + 35);
+  if (S) { bcTrim(g, G.bcast, x0, y0, W, H); bcBadge(g, G.bcast, x0, y0, BW, H); }
 
   // crunch time: a little tab on the right of the scorebug with the clock, timeouts and what you need
   const sit = crunchText(G);
   if (sit && !G.mini) {
     const tx = x0 + W + 6, tw = 168;
     if (tx + tw < CW - 110) {
-      g.fillStyle = '#0b0f16f0'; roundRect(g, tx, y0, tw, H, 3); g.fill();
-      g.fillStyle = '#ffd23f'; g.fillRect(tx, y0, 3, H);
+      g.fillStyle = S ? S.bar[1] + 'f0' : '#0b0f16f0'; roundRect(g, tx, y0, tw, H, 3); g.fill();
+      g.fillStyle = S ? S.acc : '#ffd23f'; g.fillRect(tx, y0, 3, H);
       g.textAlign = 'left'; g.font = '800 13px "Barlow Condensed", Arial, sans-serif'; g.fillStyle = '#9aa6b5';
       g.fillText(sit[0], tx + 12, y0 + 15);
       g.font = 'italic 900 18px "Barlow Condensed", "Arial Black", sans-serif'; g.fillStyle = sit[2] || '#fff';
@@ -1037,10 +1041,10 @@ function drawHUD(g, G) {
   }
   // play clock
   if (G.playClock > 0 && (G.phase === 'playcall' || G.phase === 'presnap')) {
-    const pc = Math.ceil(G.playClock), red = pc <= 5;
-    g.fillStyle = red ? '#c0141ccc' : '#0b0f16e0'; roundRect(g, CW / 2 - 36, y0 + H + 4, 72, 26, 2); g.fill();
-    g.fillStyle = red ? '#fff' : '#ffd23f'; g.font = '900 15px "Barlow Condensed", "Arial Black", sans-serif'; g.textAlign = 'center';
-    g.fillText(`:${String(pc).padStart(2, '0')}`, CW / 2, y0 + H + 22);
+    const pc = Math.ceil(G.playClock), red = pc <= 5, py = y0 + H + (G.bcast === 'XMAS' ? 10 : 4); // under the Christmas lights
+    g.fillStyle = red ? '#c0141ccc' : S ? S.bar[1] + 'e0' : '#0b0f16e0'; roundRect(g, CW / 2 - 36, py, 72, 26, 2); g.fill();
+    g.fillStyle = red ? '#fff' : S ? S.down : '#ffd23f'; g.font = '900 15px "Barlow Condensed", "Arial Black", sans-serif'; g.textAlign = 'center';
+    g.fillText(`:${String(pc).padStart(2, '0')}`, CW / 2, py + 18);
   }
   // your play
   if (G.play && (G.phase === 'presnap' || G.phase === 'live') && !G.demo && (!G.versus || G.online)) {

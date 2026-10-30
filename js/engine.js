@@ -73,10 +73,11 @@ function initGame(home, away, opts) {
     pstats: {}, tstats: [{ pass: 0, rush: 0, to: 0 }, { pass: 0, rush: 0, to: 0 }],
     timeouts: [3, 3], special: null, pendingRunoff: 0, twoMinQ: 0, twoMinAfterPlay: false, runFrom: 0, mini: null, scenario: opts.scenario || null,
     weather: stadiumOf(home).dome ? 'clear' : opts.weather === 'storm' ? 'rain' : opts.weather === 'fog' ? 'clear' : (opts.weather || 'clear'),
-    storm: !stadiumOf(home).dome && opts.weather === 'storm', fog: !stadiumOf(home).dome && opts.weather === 'fog', ltn: null, night: !!opts.night, stadium: stadiumOf(home), uni: opts.uni || null, pbp: [], pbpShow: null, lastResult: null,
+    storm: !stadiumOf(home).dome && opts.weather === 'storm', fog: !stadiumOf(home).dome && opts.weather === 'fog', ltn: null, night: !!opts.night || !!(typeof BCAST !== 'undefined' && BCAST[opts.bcast] && BCAST[opts.bcast].night), stadium: stadiumOf(home), uni: opts.uni || null, pbp: [], pbpShow: null, lastResult: null,
     versus: !!opts.versus, p1: opts.humanSide || 0, hd: [null, null], hp: [null, null], humanDef: null,
     career: opts.career || false, lock: !!opts.lock, callBall: 0, sitOut: false, dirt: {}, coachCalls: !!opts.coachCalls, careerSlot: opts.careerSlot || 0, coachTok: null, coachCallName: null,
     bigGame: opts.bigGame ? { year: opts.bigGame, name: bowlName(opts.bigGame) } : null,
+    bcast: typeof BCAST !== 'undefined' && BCAST[opts.bcast] && !opts.bigGame ? opts.bcast : null, // primetime TV look (primetime.js)
     coach: COACH_STYLES[opts.coach] ? opts.coach : savedCoach(), coachMode: opts.coachMode != null ? !!opts.coachMode : coachPref()
   });
   // big rivalries: the home team breaks out its rivalry set (unless someone picked uniforms on purpose)

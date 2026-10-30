@@ -291,10 +291,11 @@ const Net = {
     Input.online = true; Input.store[1] = Input.remote(); Input.use(0);
     G.online = true; G.netModes = [G.mode, hello.mode === 'mobile' ? 'mobile' : 'computer'];
     G.demo = false; G.season = false; G.challenge = null; G.mini = null; show(null);
-    const opts = { qtr: +$('optQtr').value, diff: 1, humanSide: 0, versus: true, weather: pickWeather($('optWeather').value), night: $('optNight').value === '1' };
+    const bc = typeof quickBcast === 'function' ? quickBcast() : null;
+    const opts = { qtr: +$('optQtr').value, diff: 1, humanSide: 0, versus: true, weather: typeof bcWeather === 'function' ? bcWeather(bc, pickWeather($('optWeather').value), $('optWeather').value) : pickWeather($('optWeather').value), night: $('optNight').value === '1', bcast: bc };
     newGame(mine, theirs, opts);
     if (this.relayRoom) this.relayRoom.child('host/busy').set(1); // nobody else can join now
-    this.send({ t: 'start', v: NET_VERSION, teams: G.teams, opts: { qtr: opts.qtr, weather: G.storm ? 'storm' : G.fog ? 'fog' : G.weather, night: G.night }, modes: G.netModes });
+    this.send({ t: 'start', v: NET_VERSION, teams: G.teams, opts: { qtr: opts.qtr, weather: G.storm ? 'storm' : G.fog ? 'fog' : G.weather, night: G.night, bcast: G.bcast }, modes: G.netModes });
   },
   // guest's controls arrive: world coords -> host screen coords for taps / finger
   mergeInput(m) {
@@ -402,7 +403,7 @@ const Net = {
     if (m.v !== NET_VERSION) { if (typeof onlineMsg === 'function') onlineMsg('You two are on different versions. Both of you: close the game all the way and reopen it.'); return this.reset(); }
     Input.online = true;
     G.online = true; G.netModes = m.modes; G.demo = false; G.season = false; G.challenge = null; G.mini = null; show(null);
-    initGame(m.teams[0], m.teams[1], { qtr: m.opts.qtr, diff: 1, humanSide: 1, versus: true, weather: m.opts.weather, night: m.opts.night });
+    initGame(m.teams[0], m.teams[1], { qtr: m.opts.qtr, diff: 1, humanSide: 1, versus: true, weather: m.opts.weather, night: m.opts.night, bcast: m.opts.bcast });
     G.phase = 'idle'; G.players = []; G.ball = null;
   },
   applyRoster(m) {

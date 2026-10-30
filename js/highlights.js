@@ -239,8 +239,10 @@ const Highlights = {
     g.save(); g.textBaseline = 'middle';
     // top left: HIGHLIGHTS + where we are in the reel
     g.fillStyle = '#0b0f16e6'; g.beginPath(); g.moveTo(0, 18); g.lineTo(250, 18); g.lineTo(236, 66); g.lineTo(0, 66); g.fill();
-    g.fillStyle = '#f6c31c'; g.fillRect(0, 18, 8, 48);
+    const S = typeof bcStyle === 'function' ? bcStyle(G) : null; // primetime games: the show's colors + badge
+    g.fillStyle = S ? S.acc : '#f6c31c'; g.fillRect(0, 18, 8, 48);
     g.fillStyle = '#fff'; g.font = `italic 900 32px ${HD}`; g.textAlign = 'left'; g.fillText('HIGHLIGHTS', 24, 43);
+    if (S) { bcBadge(g, G.bcast, 246, 18, 62, 48); g.textBaseline = 'middle'; }
     if (this.list.length > 1) for (let i = 0; i < this.list.length; i++) { g.fillStyle = i < this.idx ? '#f6c31c88' : i === this.idx ? '#f6c31c' : '#ffffff33'; g.fillRect(24 + i * 26, 74, 20, 6); }
     // top right: NEXT / DONE
     const B = this.btns();
@@ -256,7 +258,7 @@ const Highlights = {
     g.globalAlpha = sl;
     g.fillStyle = '#0b0f16ee'; g.beginPath(); g.moveTo(x, y); g.lineTo(x + w, y); g.lineTo(x + w - 18, y + h); g.lineTo(x, y + h); g.fill();
     g.fillStyle = t.c1 === '#000000' ? '#333' : t.c1; g.fillRect(x, y, 118, h);
-    g.fillStyle = '#f6c31c'; g.fillRect(x + 118, y, 5, h);
+    g.fillStyle = S ? S.acc : '#f6c31c'; g.fillRect(x + 118, y, 5, h);
     try { g.drawImage(Logo.canvas(t, 96), x + 15, y + 17, 88, 88); } catch (e) {}
     g.textAlign = 'left'; g.fillStyle = '#f6c31c'; g.font = `800 19px ${HD}`;
     g.fillText(potg ? 'PLAY OF THE GAME' : this.list.length > 1 ? `HIGHLIGHT ${this.idx + 1} OF ${this.list.length}` : 'HIGHLIGHT', x + 142, y + 24);

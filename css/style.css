@@ -1484,3 +1484,10 @@ span.pePos { font-family: var(--hd); font-weight: 800; letter-spacing: .06em; di
   .peRow { padding: 3px 6px; gap: 6px; } .peRow .ov { font-size: 20px; } .peRow .nm { font-size: 13px; } .peRow .nm i { font-size: 10px; }
 }
 @media (max-width: 700px) { .peL { width: 250px; } }
+/* primetime TV slot tags on the season schedule (primetime.js) */
+.bcTag { display: inline-block; font-family: var(--hd); font-style: italic; font-weight: 900; font-size: .78em; letter-spacing: .04em; line-height: 1; padding: 2px 5px 1px; margin-left: 2px; border-radius: 2px; color: #fff; vertical-align: 1px; }
+.bcTag.bcTNF { background: #4b1f9a; box-shadow: inset 0 -2px 0 #1fd6c4; }
+.bcTag.bcSNF { background: #142a57; color: #f0c75a; box-shadow: inset 0 0 0 1px #e2b43b; }
+.bcTag.bcMNF { background: #c8101d; box-shadow: inset 0 -2px 0 #ffd21a; }
+.bcTag.bcXMAS { background: #b5162a; box-shadow: inset 0 -2px 0 #2f9a55; }
+.bcTag.bcHWN { background: #1a0d24; color: #ff8a24; box-shadow: inset 0 0 0 1px #ff7a1a; }

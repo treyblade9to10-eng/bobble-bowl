@@ -262,7 +262,7 @@ for (const [side, id] of [[0, 'pHome'], [1, 'pAway']]) {
 // ---- game settings panel: grouped rows of tap targets. The hidden <select>s still hold the values (other code reads them) ----
 const MU_GROUPS = [
   ['GAME', [['optQtr', 'QUARTERS'], ['optDiff', 'CPU'], ['optPlayers', 'PLAYERS'], ['optGame', 'GAME']]],
-  ['CONDITIONS', [['optWeather', 'WEATHER'], ['optNight', 'TIME']]],
+  ['CONDITIONS', [['optWeather', 'WEATHER'], ['optNight', 'TIME'], ['optBcast', 'BROADCAST']]],
   ['CONTROLS', [['optMeter', 'PASS METER'], ['optMeterSpd', 'METER SPEED'], ['optCatchM', 'CATCH METER'], ['optDefM', 'DEFENSE METER'], ['optCoach', 'COACH'], ['optCoachMode', 'COACH MODE']]],
   ['LOOK', [['optLogos', 'LOGOS'], ['uni', 'UNIFORMS'], ['stad', 'STADIUM']]]
 ];
@@ -291,7 +291,7 @@ function buildMuSet() {
         muRows.push([id, () => { const un = v => typeof uniName === 'function' ? uniName(v) : v; b.innerHTML = id === 'uni' ? `${un($('optUni1').value)} / ${un($('optUni0').value)}<i>OPEN</i>` : `${muStadium()}<i>OPEN</i>`; }]);
       } else {
         const sl = $(id), opts = [...sl.options];
-        if (opts.length <= 4) { // segmented: every choice visible
+        if (opts.length <= 4 || sl.dataset.seg) { // segmented: every choice visible
           c.classList.add('seg');
           for (const o of opts) { const b = document.createElement('button'); b.dataset.v = o.value; b.textContent = o.text; b.onclick = () => muSetVal(id, o.value); c.appendChild(b); }
           muRows.push([id, () => c.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === sl.value))]);
@@ -320,7 +320,7 @@ function muPaint() {
   $('muRow_optPlayers').style.display = G.mode === 'mobile' ? 'none' : '';
   $('muRow_optCoachMode').style.display = two ? 'none' : '';
   for (const [, f] of muRows) f();
-  const bits = [txt('optQtr') + ' QTRS', two ? '2 PLAYERS' : 'CPU ' + txt('optDiff'), txt('optWeather') + (txt('optNight') === 'Night' ? ' NIGHT' : ''), $('optGame').value === 'bowl' ? 'BOBBLE BOWL' : ''];
+  const bits = [txt('optQtr') + ' QTRS', two ? '2 PLAYERS' : 'CPU ' + txt('optDiff'), txt('optWeather') + (txt('optNight') === 'Night' ? ' NIGHT' : ''), typeof BCAST !== 'undefined' && BCAST[$('optBcast').value] ? BCAST[$('optBcast').value].short : '', $('optGame').value === 'bowl' ? 'BOBBLE BOWL' : ''];
   $('muSetSum').textContent = bits.filter(Boolean).join('  ·  ');
   $('muStadName').textContent = muStadium();
 }
@@ -341,7 +341,7 @@ $('optPlayers').onchange = () => renderSelect(); fillSel('optUni1', UNIFORMS, 'a
 try { const o = JSON.parse(localStorage.getItem('bobbleOpts') || 'null'); if (o && !o.m100) { o.optCatchM = '1'; o.m100 = 1; o.m93 = 1; localStorage.setItem('bobbleOpts', JSON.stringify(o)); } } catch (e) {}
 try { const o = JSON.parse(localStorage.getItem('bobbleOpts') || 'null'); if (o && !o.m93) { o.optCatchM = '0'; o.optDefM = '0'; o.m93 = 1; localStorage.setItem('bobbleOpts', JSON.stringify(o)); } } catch (e) {}
 try { const o = JSON.parse(localStorage.getItem('bobbleOpts') || 'null'); if (o) for (const k in o) if ($(k)) $(k).value = o[k]; } catch (e) {}
-function saveOpts() { const o = {}; for (const k of ['optUni0', 'optUni1', 'optWeather', 'optNight', 'optGame', 'optLogos', 'optQtr', 'optDiff', 'optCoach', 'optCoachMode', 'optPlayers', 'optMeter', 'optMeterSpd', 'optCatchM', 'optDefM']) o[k] = $(k).value; o.m93 = 1; o.m100 = 1; try { localStorage.setItem('bobbleOpts', JSON.stringify(o)); } catch (e) {} }
+function saveOpts() { const o = {}; for (const k of ['optUni0', 'optUni1', 'optWeather', 'optNight', 'optBcast', 'optGame', 'optLogos', 'optQtr', 'optDiff', 'optCoach', 'optCoachMode', 'optPlayers', 'optMeter', 'optMeterSpd', 'optCatchM', 'optDefM']) o[k] = $(k).value; o.m93 = 1; o.m100 = 1; try { localStorage.setItem('bobbleOpts', JSON.stringify(o)); } catch (e) {} }
 buildMuSet(); // after the weather/uniform lists are filled
 $('optLogos').addEventListener('change', () => { Logo.setStyle($('optLogos').value); renderSelect(); });
 Logo.onReady(() => { if ($('select').classList.contains('show')) renderSelect(); });
@@ -362,8 +362,9 @@ function startGame() {
   if (G.mode === 'mobile') goFullscreen();
   saveOpts();
   G.demo = false; G.season = false; G.challenge = null; G.mini = null; show(null);
+  const bc = typeof quickBcast === 'function' ? quickBcast() : null;
   newGame(TEAMS[sel.idx[0]], TEAMS[sel.idx[1]], { qtr: +$('optQtr').value, diff: +$('optDiff').value, coach: $('optCoach').value, humanSide: sel.you,
-    weather: pickWeather($('optWeather').value), night: $('optNight').value === '1', uni: [$('optUni0').value, $('optUni1').value],
+    weather: typeof bcWeather === 'function' ? bcWeather(bc, pickWeather($('optWeather').value), $('optWeather').value) : pickWeather($('optWeather').value), night: $('optNight').value === '1', bcast: bc, uni: [$('optUni0').value, $('optUni1').value],
     versus: $('optPlayers').value === '2' && G.mode !== 'mobile', bigGame: $('optGame').value === 'bowl' ? quickBowlYear() : 0 });
   Broadcast.show();
 }
@@ -869,7 +870,7 @@ $('moBack').onclick = () => { G.mini = null; G.teams = null; openModes(); };
 // ---------- title screen background: a fake game ----------
 function demoSetup() {
   const a = pick(TEAMS); let b; do { b = pick(TEAMS); } while (b === a);
-  Object.assign(G, { teams: [a, b], human: -1, diff: 1, poss: 0, los: rand(30, 70), ballY: MID, down: 1, score: [0, 0], quarter: 1, clock: 180, demo: true, fx: [], weather: 'clear', night: false, uni: null, versus: false, xf: null,
+  Object.assign(G, { teams: [a, b], human: -1, diff: 1, poss: 0, los: rand(30, 70), ballY: MID, down: 1, score: [0, 0], quarter: 1, clock: 180, demo: true, fx: [], weather: 'clear', night: false, bcast: null, uni: null, versus: false, xf: null,
     pstats: {}, tstats: [{ pass: 0, rush: 0, to: 0 }, { pass: 0, rush: 0, to: 0 }], patSide: null, twoPt: false, next: null, paused: false, slowmo: 0, banner: null });
   setFirstDown();
   setupPlay(pick(OFF_PLAYS.filter(p => !p.custom)), pick(DEF_PLAYS));

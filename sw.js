@@ -50,6 +50,7 @@ const FILES = [
   'js/biggame.js',
   'js/careerui.js',
   'js/seasonui.js',
+  'js/primetime.js',
   'js/franchise.js',
   'js/trades.js',
   'js/ages.js',

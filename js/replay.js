@@ -57,6 +57,7 @@ const Replay = {
     g.fillStyle = (G.time * 2 % 1) < 0.6 ? '#e8401c' : '#5a1a10'; g.beginPath(); g.arc(34, 22, 8, 0, 7); g.fill();
     g.fillStyle = '#fff'; g.font = 'italic 900 28px "Barlow Condensed", Arial, sans-serif'; g.textAlign = 'left'; g.textBaseline = 'middle';
     g.fillText('REPLAY', 52, 23);
+    if (typeof bcBadge === 'function' && G.bcast) bcBadge(g, G.bcast, 148, 4, 56, 36); // primetime games: the show's badge next to REPLAY
     g.font = '800 15px "Barlow Condensed", Arial, sans-serif'; g.fillStyle = '#9aa6b5'; g.textAlign = 'right';
     g.fillText(G.mode === 'mobile' ? 'TAP TO SKIP' : 'SPACE TO SKIP', CW - 24, CH - 22);
     const L = G.pbpShow;

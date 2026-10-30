@@ -339,7 +339,7 @@ const CareerUI = {
       $('ccPlay').onclick = () => {
         const home = g.home === c.team, wx = d.phase === 'regular' && d.weather ? d.weather[d.week] : { w: pickWeather('random', d.games, d.games), night: chance(0.5) };
         G.season = true;
-        this.play(Season.team(g.home), Season.team(g.away), { humanSide: home ? 0 : 1, playoff: d.phase === 'playoffs', bigGame: d.phase === 'playoffs' && Season.isFinal() ? d.year : 0, weather: wx.w, night: wx.night, career: 'nfl' });
+        this.play(Season.team(g.home), Season.team(g.away), { humanSide: home ? 0 : 1, playoff: d.phase === 'playoffs', bigGame: d.phase === 'playoffs' && Season.isFinal() ? d.year : 0, weather: wx.w, night: wx.night, career: 'nfl', bcast: d.phase === 'regular' && typeof SeasonBC !== 'undefined' ? SeasonBC.of(d, d.week, 0) : null });
         G.season = true;
       };
       $('ccSim').onclick = () => { Sound.click(); this.simNFL(g); this.nfl(); };
