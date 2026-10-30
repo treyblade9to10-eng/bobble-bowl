@@ -32,7 +32,7 @@ function buildField(G) {
   fieldKey = key;
   const W = Math.ceil((120 + FIELD_PAD_X * 2) * PX), H = Math.ceil((FIELD_W + FIELD_PAD_TOP + FIELD_PAD_BOT) * PY);
   fieldCv = document.createElement('canvas'); fieldCv.width = W; fieldCv.height = H;
-  const g = fieldCv.getContext('2d');
+  const g = fieldCv.getContext('2d', { alpha: false }); // solid picture: copies to the screen faster
   const fx = x => (x + FIELD_PAD_X) * PX, fy = y => (y + FIELD_PAD_TOP) * PY;
   // stands
   const stad = stadiumOf(G.teams[0]);
@@ -160,9 +160,9 @@ function resetGfx() {
   if (typeof torsoCache !== 'undefined') torsoCache.clear();
   for (const k in shadowSprites) delete shadowSprites[k];
   if (typeof Logo !== 'undefined' && Logo.reset) Logo.reset();
-  if (typeof wxCv !== 'undefined') wxCv = null;
+  if (typeof wxCv !== 'undefined') { wxCv = null; wxMix = null; nightL = null; skyL = null; }
 }
-let gfxCheck = 0;
+let gfxCheck = 0, fieldBlit = null;
 function drawField(g, G) {
   tagBoxes.length = 0;
   if (++gfxCheck % 30 === 0 && fieldCv) { const fg = fieldCv.getContext('2d'); if (fg && fg.isContextLost && fg.isContextLost()) resetGfx(); }
@@ -174,7 +174,9 @@ function drawField(g, G) {
   const pat = edge ? crowdPat : null;
   if (pat) { const ox = ((-cam.x * PX) % 156 + 156) % 156, oy = ((-cam.y * PY) % 72 + 72) % 72; g.save(); g.translate(ox - 156, oy - 72); g.fillStyle = pat; g.fillRect(-CW, -CH, CW * 3 + 312, CH * 3 + 144); g.restore(); }
   else if (edge) { g.fillStyle = '#0e1420'; g.fillRect(0, 0, CW, CH); }
-  blitWorld(g, fieldCv);
+  // wet games: the field picture with the snow/mud already on it (weather.js)
+  fieldBlit = (typeof wxMixed === 'function' && wxMixed(G)) || fieldCv;
+  blitWorld(g, fieldBlit);
   // jumping fans when hyped
   if (G.crowdHype > 0.05) {
     const top = sy(-FIELD_PAD_TOP);

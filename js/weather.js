@@ -53,7 +53,7 @@ function buildWxGround(G) {
   if (typeof document === 'undefined' || !fieldCv) return;
   const W = fieldCv.width, H = fieldCv.height;
   wxCv = wxCv && wxCv.width === W && wxCv.height === H ? wxCv : document.createElement('canvas');
-  wxCv.width = W; wxCv.height = H; wxCv.owner = G.dirt; wxCv.kind = G.weather;
+  wxCv.width = W; wxCv.height = H; wxCv.owner = G.dirt; wxCv.kind = G.weather; wxCv.ver = (wxCv.ver || 0) + 1;
   const g = wxCv.getContext('2d'); g.clearRect(0, 0, W, H);
   const top = wxGy(-1.2), R = (a, b) => a + Math.random() * (b - a);
   wxCv.puddles = [];
@@ -96,18 +96,41 @@ function buildWxGround(G) {
 function groundMark(x, y, r, big) {
   if (!wxCv || wxCv.owner !== G.dirt || wxCv.kind !== G.weather) return;
   const g = wxCv.getContext('2d'), px = wxGx(x + rand(-0.25, 0.25)), py = wxGy(y + rand(-0.2, 0.2));
+  // the same mark goes straight onto the field + ground picture too (never read the ground canvas back: that copies it every time)
+  const m = wxMix && wxMix.field === fieldCv && wxMix.src === wxCv && wxMix.ver === wxCv.ver ? wxMix.getContext('2d') : null;
   if (G.weather === 'snow') {
-    g.globalCompositeOperation = 'destination-out'; g.fillStyle = `rgba(0,0,0,${big ? 0.3 : 0.16})`;
+    const a = big ? 0.3 : 0.16;
+    g.globalCompositeOperation = 'destination-out'; g.fillStyle = `rgba(0,0,0,${a})`;
     g.beginPath(); g.ellipse(px, py, r * PX * 0.5, r * PY * 0.4, 0, 0, 7); g.fill();
     g.globalCompositeOperation = 'source-over';
+    // rubbing out a bit of snow = letting that much of the grass back through
+    if (m) { m.globalAlpha = a; m.fillStyle = wxMix.pat || (wxMix.pat = m.createPattern(fieldCv, 'no-repeat')); m.beginPath(); m.ellipse(px, py, r * PX * 0.5, r * PY * 0.4, 0, 0, 7); m.fill(); m.globalAlpha = 1; }
   } else {
-    g.fillStyle = `rgba(66,46,26,${big ? 0.22 : 0.07})`;
-    g.beginPath(); g.ellipse(px, py, r * PX * 0.5, r * PY * 0.4, 0, 0, 7); g.fill();
+    for (const c of m ? [g, m] : [g]) {
+      c.fillStyle = `rgba(66,46,26,${big ? 0.22 : 0.07})`;
+      c.beginPath(); c.ellipse(px, py, r * PX * 0.5, r * PY * 0.4, 0, 0, 7); c.fill();
+    }
   }
+}
+// the field with the snow/mud already on it, as one solid picture (one big copy a frame instead of two layered ones)
+let wxMix = null;
+function wxMixed(G) {
+  if (!wet() || G.demo || !fieldCv || typeof document === 'undefined') return null;
+  if (!wxCv || wxCv.owner !== G.dirt || wxCv.kind !== G.weather) buildWxGround(G);
+  if (!wxCv) return null;
+  if (!wxMix || wxMix.field !== fieldCv || wxMix.src !== wxCv || wxMix.ver !== wxCv.ver) {
+    const c = wxMix && wxMix.width === fieldCv.width && wxMix.height === fieldCv.height ? wxMix : document.createElement('canvas');
+    if (c !== wxMix) { c.width = fieldCv.width; c.height = fieldCv.height; }
+    const g = c.getContext('2d', { alpha: false }); if (!g || !g.drawImage) return null;
+    g.drawImage(fieldCv, 0, 0); g.drawImage(wxCv, 0, 0);
+    c.field = fieldCv; c.src = wxCv; c.ver = wxCv.ver; c.pat = null; wxMix = c;
+  }
+  return wxMix;
 }
 
 function drawWeatherGround(g, G) {
   if (!wet() || G.demo) return;
+  if (fieldBlit && fieldBlit === wxMix && wxMix.src === wxCv) return; // already part of the field picture drawn this frame
   if (!wxCv || wxCv.owner !== G.dirt || wxCv.kind !== G.weather) buildWxGround(G);
   if (wxCv) blitWorld(g, wxCv);
 }
@@ -119,9 +142,7 @@ function drawWeather(g, G) {
   const t = G.time, lean = windLean();
   if (G.weather === 'rain') {
     // gloomy sky + mist rolling off the stands
-    g.fillStyle = 'rgba(20,32,48,0.18)'; g.fillRect(0, 0, CW, CH);
-    const mist = g.createLinearGradient(0, 0, 0, CH * 0.45); mist.addColorStop(0, 'rgba(170,185,205,0.32)'); mist.addColorStop(1, 'rgba(170,185,205,0)');
-    g.fillStyle = mist; g.fillRect(0, 0, CW, CH * 0.45);
+    g.drawImage(skyLayer(), 0, 0, CW, CH);
     // rings in the puddles
     if (wxCv && wxCv.puddles) for (const pd of wxCv.puddles) {
       const x = sx(pd.x), y = sy(pd.y); if (x < -pd.rx || x > CW + pd.rx) continue;
@@ -153,9 +174,7 @@ function drawWeather(g, G) {
       g.stroke();
     }
   } else if (G.weather === 'snow') {
-    g.fillStyle = 'rgba(232,240,250,0.08)'; g.fillRect(0, 0, CW, CH);
-    const fog = g.createLinearGradient(0, 0, 0, CH * 0.5); fog.addColorStop(0, 'rgba(235,242,250,0.4)'); fog.addColorStop(1, 'rgba(235,242,250,0)');
-    g.fillStyle = fog; g.fillRect(0, 0, CW, CH * 0.5);
+    g.drawImage(skyLayer(), 0, 0, CW, CH); // soft white haze + fog off the stands
     // far flakes, mid flakes, then a few big soft ones right in front of the camera
     for (const [n, r0, r1, a, sp, drift] of [[160, 1.1, 1.8, 0.75, 34, 18], [80, 2.2, 3.4, 0.9, 62, 32]]) {
       g.fillStyle = `rgba(255,255,255,${a})`; g.beginPath();
@@ -181,27 +200,59 @@ function drawWeather(g, G) {
     g.globalCompositeOperation = 'multiply'; g.fillStyle = 'rgb(150,164,210)'; g.fillRect(-CW, -CH, CW * 3, CH * 3);
     g.fillStyle = 'rgb(58,68,110)'; g.beginPath(); g.rect(-CW, -CH, CW * 3, CH * 3); g.rect(sx(-1), sy(-1.5), sx(121) - sx(-1), sy(FIELD_W + 1.5) - sy(-1.5)); g.fill('evenodd');
     g.globalCompositeOperation = 'source-over';
-    const vg = g.createRadialGradient(CW / 2, CH / 2, CH * 0.45, CW / 2, CH / 2, CW * 0.75);
-    vg.addColorStop(0, 'rgba(0,0,12,0)'); vg.addColorStop(1, 'rgba(0,0,14,0.55)');
-    g.fillStyle = vg; g.fillRect(0, 0, CW, CH);
-    g.globalCompositeOperation = 'soft-light';
-    const xs = [0.1, 0.37, 0.63, 0.9].map(f => CW * f);
-    for (const [ly, dy] of [[-30, 1], [CH + 30, -1]]) for (const lx of xs) {
-      const lg = g.createRadialGradient(lx, ly, 10, lx, ly + dy * 200, 480);
-      lg.addColorStop(0, 'rgba(255,246,215,0.55)'); lg.addColorStop(0.5, 'rgba(255,246,215,0.12)'); lg.addColorStop(1, 'rgba(255,246,215,0)');
-      g.fillStyle = lg; g.fillRect(0, 0, CW, CH);
-    }
-    g.globalCompositeOperation = 'lighter';
-    // light banks with a glow (rain and snow catch the light under them)
-    for (const lx of xs) {
-      const bl = g.createRadialGradient(lx, 4, 2, lx, 4, 70);
-      bl.addColorStop(0, 'rgba(255,255,240,0.9)'); bl.addColorStop(0.25, 'rgba(255,250,220,0.35)'); bl.addColorStop(1, 'rgba(255,250,220,0)');
-      g.fillStyle = bl; g.fillRect(lx - 70, 0, 140, 74);
-      if (wet()) { const cone = g.createLinearGradient(0, 0, 0, CH * 0.6); cone.addColorStop(0, 'rgba(255,250,225,0.13)'); cone.addColorStop(1, 'rgba(255,250,225,0)'); g.fillStyle = cone; g.beginPath(); g.moveTo(lx - 22, 0); g.lineTo(lx + 22, 0); g.lineTo(lx + 140, CH * 0.6); g.lineTo(lx - 140, CH * 0.6); g.fill(); }
-    }
+    // the vignette, light pools and light banks only depend on the screen size, so they're painted once into pictures.
+    // The pools used to be 8 full-screen soft-light gradients every frame (by far the slowest thing in the game on phones);
+    // now it's one 'screen' pass with the color tuned to light the grass the same way
+    const L = nightLayers(), xs = L.xs;
+    g.drawImage(L.vig, 0, 0, CW, CH);
+    g.globalCompositeOperation = 'screen'; g.drawImage(L.pool, 0, 0, CW, CH);
+    g.globalCompositeOperation = 'lighter'; g.drawImage(L.bank, 0, 0, CW, L.bank.height);
     g.restore();
     for (const lx of xs) { g.fillStyle = '#fffef2'; g.fillRect(lx - 26, 0, 52, 5); g.fillStyle = '#ffffffaa'; for (let k = -2; k <= 2; k++) g.fillRect(lx + k * 10 - 3, 6, 6, 3); }
   }
+}
+
+// the rain / snow sky tint + mist over the top of the screen, painted once (one copy a frame instead of two big fills)
+let skyL = null;
+function skyLayer() {
+  const key = CW + 'x' + CH + G.weather;
+  if (skyL && skyL.key === key) return skyL;
+  const c = document.createElement('canvas'); c.width = CW; c.height = CH; c.key = key;
+  const g = c.getContext('2d'), rain = G.weather === 'rain';
+  g.fillStyle = rain ? 'rgba(20,32,48,0.18)' : 'rgba(232,240,250,0.08)'; g.fillRect(0, 0, CW, CH);
+  const h = CH * (rain ? 0.45 : 0.5), m = g.createLinearGradient(0, 0, 0, h), col = rain ? '170,185,205' : '235,242,250';
+  m.addColorStop(0, `rgba(${col},${rain ? 0.32 : 0.4})`); m.addColorStop(1, `rgba(${col},0)`);
+  g.fillStyle = m; g.fillRect(0, 0, CW, h);
+  return (skyL = c);
+}
+// night lighting pictures: vignette, light pools (all the same color, so they stack into one picture) and the light banks
+let nightL = null;
+function nightLayers() {
+  const key = CW + 'x' + CH + (wet() ? 'w' : '');
+  if (nightL && nightL.key === key) return nightL;
+  const mk = h => { const c = document.createElement('canvas'); c.width = CW; c.height = h; return c; };
+  const xs = [0.1, 0.37, 0.63, 0.9].map(f => CW * f), vig = mk(CH), pool = mk(CH), bank = mk(wet() ? Math.ceil(CH * 0.6) : 74);
+  let g = vig.getContext('2d');
+  const vg = g.createRadialGradient(CW / 2, CH / 2, CH * 0.45, CW / 2, CH / 2, CW * 0.75);
+  vg.addColorStop(0, 'rgba(0,0,12,0)'); vg.addColorStop(1, 'rgba(0,0,14,0.55)');
+  g.fillStyle = vg; g.fillRect(0, 0, CW, CH);
+  // soft-light with (255,246,215) brightens dark grass by about (2s-1) x 0.3 x (1-d), which is what screen does (measured: avg 4/255 off)
+  const sc = [255, 246, 215].map(v => Math.round(255 * 0.3 * (2 * v / 255 - 1))).join(',');
+  g = pool.getContext('2d');
+  for (const [ly, dy] of [[-30, 1], [CH + 30, -1]]) for (const lx of xs) {
+    const lg = g.createRadialGradient(lx, ly, 10, lx, ly + dy * 200, 480);
+    lg.addColorStop(0, `rgba(${sc},0.55)`); lg.addColorStop(0.5, `rgba(${sc},0.12)`); lg.addColorStop(1, `rgba(${sc},0)`);
+    g.fillStyle = lg; g.fillRect(0, 0, CW, CH);
+  }
+  g = bank.getContext('2d'); g.globalCompositeOperation = 'lighter';
+  // light banks with a glow (rain and snow catch the light under them)
+  for (const lx of xs) {
+    const bl = g.createRadialGradient(lx, 4, 2, lx, 4, 70);
+    bl.addColorStop(0, 'rgba(255,255,240,0.9)'); bl.addColorStop(0.25, 'rgba(255,250,220,0.35)'); bl.addColorStop(1, 'rgba(255,250,220,0)');
+    g.fillStyle = bl; g.fillRect(lx - 70, 0, 140, 74);
+    if (wet()) { const cone = g.createLinearGradient(0, 0, 0, CH * 0.6); cone.addColorStop(0, 'rgba(255,250,225,0.13)'); cone.addColorStop(1, 'rgba(255,250,225,0)'); g.fillStyle = cone; g.beginPath(); g.moveTo(lx - 22, 0); g.lineTo(lx + 22, 0); g.lineTo(lx + 140, CH * 0.6); g.lineTo(lx - 140, CH * 0.6); g.fill(); }
+  }
+  return (nightL = { key, xs, vig, pool, bank });
 }
 
 // ---------- storms: lightning flashes + thunder ----------

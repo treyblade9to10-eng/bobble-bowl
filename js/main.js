@@ -913,7 +913,7 @@ function demoSetup() {
 // ---------- main loop ----------
 const menuScreens = ['title', 'how', 'select', 'mode', 'seasonNew', 'seasonHub', 'modes', 'miniOver', 'cap', 'trophies'];
 let last = performance.now();
-let errRun = 0, errPhase = '';
+let errRun = 0, errPhase = '', menuSkip = false;
 function frame(now) {
   requestAnimationFrame(frame); // schedule first so one bad frame can't freeze the game
   try { step(now); errRun = 0; } catch (e) {
@@ -962,14 +962,22 @@ function step(now) {
   }
   updateMobileButtons();
   Review.ui();
-  render();
+  // behind a menu the demo game is mostly covered: draw it at 30fps so the phone has time for the menu itself (the title keeps 60)
+  if (!(inMenu && !Highlights.on && !$('title').classList.contains('show') && (menuSkip = !menuSkip))) render();
   Input.endFrame();
 }
 
 function render() {
+  // draw with the camera on whole pixels: the big field picture then copies straight over instead of being resampled
+  // every frame (3x cheaper on phones). Everything moves together, so nothing shifts against the field
+  const camX = cam.x, camY = cam.y;
+  if (!(cam.zoom > 1.001 && cam.focus && G.phase !== 'replay')) { cam.x = (Math.round(cam.x * PX - CW / 2) + CW / 2) / PX; cam.y = Math.round(cam.y * PY) / PY; }
+  try { renderFrame(); } finally { cam.x = camX; cam.y = camY; }
+}
+function renderFrame() {
   ctx.save();
   ctx.clearRect(0, 0, CW, CH);
-  if (cam.shake > 0.3) ctx.translate(rand(-cam.shake, cam.shake), rand(-cam.shake, cam.shake));
+  if (cam.shake > 0.3) ctx.translate(Math.round(rand(-cam.shake, cam.shake)), Math.round(rand(-cam.shake, cam.shake)));
   if (cam.zoom > 1.001 && cam.focus && G.phase !== 'replay') { // celly cam
     const fx = sx(cam.focus.x), fy = sy(cam.focus.y) - 40, k = clamp((cam.zoom - 1) / 0.6, 0, 1);
     ctx.translate(lerp(fx, CW / 2, k), lerp(fy, CH * (G.mode === 'mobile' ? 0.56 : 0.66), k)); ctx.scale(cam.zoom, cam.zoom); ctx.translate(-fx, -fy);
