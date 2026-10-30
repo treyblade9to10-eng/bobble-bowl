@@ -1,0 +1,39 @@
+/* ---- Spooky month (October): the title screen goes Halloween. Added by primetime.js (body.spooky) ---- */
+body.spooky #title { background: radial-gradient(ellipse at 78% 18%, #ff7a1a26 0%, #0000 32%), linear-gradient(100deg, #0b0612f5 0%, #160a24e6 55%, #1a0b2a99 100%); }
+body.spooky #title > *:not(.spook) { position: relative; z-index: 2; }
+body.spooky #title .ver { position: absolute; }
+body.spooky #title .logo .l1 { color: #f1eaff; text-shadow: 0 0 18px #8f4dff99, 5px 5px 0 #00000080; }
+body.spooky #title .logo .l2 { background: linear-gradient(180deg, #ffb347 0%, #ff7a1a 55%, #c4400b 100%); -webkit-background-clip: text; background-clip: text; color: transparent;
+  text-shadow: none; filter: drop-shadow(0 0 16px #ff6a0080) drop-shadow(6px 6px 0 #00000090); }
+body.spooky #title .tag { color: #ff9a3c; }
+body.spooky #title .tag::after { content: '  ·  SPOOKY SEASON'; color: #b48cff; }
+body.spooky #title button.big { background: #ff6a00; }
+body.spooky #title button.big:hover { background: #ff8a2e; }
+body.spooky #title button.big.gold { background: #7c3aed; color: #fff; }
+body.spooky #title button.big.gold:hover { background: #9056ff; }
+body.spooky #title button:not(.big) { border-bottom: 2px solid #ff7a1a66; }
+
+.spook { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 1; }
+.spook svg { position: absolute; }
+.spook .web { width: min(22vw, 220px); height: auto; opacity: .55; top: 0; }
+.spook .web.l { left: 0; } .spook .web.r { right: 0; transform: scaleX(-1); }
+.spook .moon { right: 9%; top: 9%; width: min(13vw, 120px); height: auto; filter: drop-shadow(0 0 30px #ffd9a0aa); opacity: .9; }
+.spook .bat { width: 46px; height: auto; left: -60px; animation: batFly 14s linear infinite; }
+.spook .bat path { fill: #120818; }
+.spook .bat .w { transform-origin: 50% 60%; animation: batFlap .22s ease-in-out infinite alternate; }
+.spook .bat.b2 { width: 30px; animation-duration: 18s; animation-delay: -6s; top: 22%; }
+.spook .bat.b3 { width: 38px; animation-duration: 16s; animation-delay: -11s; top: 8%; }
+.spook .bat.b1 { top: 15%; }
+@keyframes batFly { 0% { transform: translate(0, 0); } 25% { transform: translate(28vw, 6vh); } 50% { transform: translate(55vw, -2vh); } 75% { transform: translate(82vw, 8vh); } 100% { transform: translate(112vw, 0); } }
+@keyframes batFlap { from { transform: scaleY(1); } to { transform: scaleY(.35); } }
+.spook .pk { bottom: 14px; width: min(8vw, 74px); height: auto; animation: pkGlow 2.2s ease-in-out infinite; }
+.spook .pk.l { left: 12%; } .spook .pk.r { right: 5%; width: min(10vw, 92px); animation-delay: -1s; }
+@keyframes pkGlow { 0%, 100% { filter: drop-shadow(0 0 10px #ff7a1a88); } 45% { filter: drop-shadow(0 0 22px #ffa040cc); } 55% { filter: drop-shadow(0 0 14px #ff7a1a99); } }
+.spook .fog { position: absolute; left: -50%; width: 200%; bottom: -10px; height: 26%; background: radial-gradient(ellipse at 20% 80%, #b9a3d633 0%, #0000 45%), radial-gradient(ellipse at 60% 90%, #b9a3d62e 0%, #0000 40%), radial-gradient(ellipse at 85% 75%, #b9a3d626 0%, #0000 40%);
+  animation: fogDrift 22s linear infinite alternate; }
+.spook .fog.f2 { animation-duration: 30s; animation-direction: alternate-reverse; opacity: .8; }
+@keyframes fogDrift { from { transform: translateX(0); } to { transform: translateX(22%); } }
+.spook .ghost { right: 22%; bottom: 18%; width: min(5vw, 44px); height: auto; opacity: 0; animation: ghostPeek 9s ease-in-out infinite; }
+@keyframes ghostPeek { 0%, 60%, 100% { opacity: 0; transform: translateY(16px); } 70%, 88% { opacity: .75; transform: translateY(0); } }
+@media (max-height: 500px) { .spook .moon { width: 70px; top: 6%; right: 12%; } .spook .web { width: 130px; } .spook .pk { width: 46px; bottom: 8px; } .spook .pk.r { width: 56px; } }
+body.spooky #title #btnTut { background: #ff9a3c; color: #1a0b2a; }

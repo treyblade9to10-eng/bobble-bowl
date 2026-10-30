@@ -327,8 +327,9 @@ function muPaint() {
   $('muRow_optPlayers').style.display = G.mode === 'mobile' ? 'none' : '';
   $('muRow_optCoachMode').style.display = two ? 'none' : '';
   for (const [, f] of muRows) f();
-  const bits = [txt('optQtr') + ' QTRS', two ? '2 PLAYERS' : 'CPU ' + txt('optDiff'), txt('optWeather') + (txt('optNight') === 'Night' ? ' NIGHT' : ''), typeof BCAST !== 'undefined' && BCAST[$('optBcast').value] ? BCAST[$('optBcast').value].short : '', $('optGame').value === 'bowl' ? 'BOBBLE BOWL' : ''];
+  const bits = [txt('optQtr') + ' QTRS', two ? '2 PLAYERS' : 'CPU ' + txt('optDiff'), txt('optWeather') + (txt('optNight') === 'Night' ? ' NIGHT' : ''), typeof BCAST !== 'undefined' && BCAST[quickBcast()] ? BCAST[quickBcast()].short : '', $('optGame').value === 'bowl' ? 'BOBBLE BOWL' : ''];
   $('muSetSum').textContent = bits.filter(Boolean).join('  ·  ');
+  if (typeof bcLockPaint === 'function') bcLockPaint();
   $('muStadName').textContent = muStadium();
 }
 $('muSetBtn').onclick = () => { Sound.click(); muSetShow(true); };
@@ -900,7 +901,7 @@ $('moBack').onclick = () => { G.mini = null; G.teams = null; openModes(); };
 // ---------- title screen background: a fake game ----------
 function demoSetup() {
   const a = pick(TEAMS); let b; do { b = pick(TEAMS); } while (b === a);
-  Object.assign(G, { teams: [a, b], human: -1, diff: 1, poss: 0, los: rand(30, 70), ballY: MID, down: 1, score: [0, 0], quarter: 1, clock: 180, demo: true, fx: [], weather: 'clear', night: false, bcast: null, uni: null, versus: false, xf: null,
+  Object.assign(G, { teams: [a, b], human: -1, diff: 1, poss: 0, los: rand(30, 70), ballY: MID, down: 1, score: [0, 0], quarter: 1, clock: 180, demo: true, fx: [], weather: 'clear', night: typeof spookyNow === 'function' && spookyNow(), bcast: null, uni: null, versus: false, xf: null,
     pstats: {}, tstats: [{ pass: 0, rush: 0, to: 0 }, { pass: 0, rush: 0, to: 0 }], patSide: null, twoPt: false, next: null, paused: false, slowmo: 0, banner: null, practice: null });
   setFirstDown();
   setupPlay(pick(OFF_PLAYS.filter(p => !p.custom)), pick(DEF_PLAYS));

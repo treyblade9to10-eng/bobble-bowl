@@ -1,10 +1,22 @@
 // ---- Primetime TV looks: Thursday / Sunday / Monday night, Christmas and Halloween games get their own scorebug + intro ----
 // G.bcast: null (normal Sunday afternoon) | 'TNF' | 'SNF' | 'MNF' | 'XMAS' | 'HWN'. Our own drawings, not the real networks' logos.
+// real holidays on this device's calendar: Quick Games played on the day are locked to that look; October = spooky title screen
+function thanksgivingDay(y) { const d = new Date(y, 10, 1); return 1 + (4 - d.getDay() + 7) % 7 + 21; } // 4th Thursday of November
+function holidayToday(d = new Date()) {
+  const q = (typeof location !== 'undefined' && /[?&]holiday=(\w+)/.exec(location.search)) || null; if (q) return q[1] === 'none' ? null : q[1]; // ?holiday=TGV for testing
+  const m = d.getMonth(), day = d.getDate();
+  if (m === 9 && day === 31) return 'HWN';
+  if (m === 10 && day === thanksgivingDay(d.getFullYear())) return 'TGV';
+  if (m === 11 && day === 25) return 'XMAS';
+  return null;
+}
+function spookyNow(d = new Date()) { if (typeof location !== 'undefined' && /[?&]spooky=1/.test(location.search)) return true; return d.getMonth() === 9; }
 const BCAST = {
   TNF: { name: 'THURSDAY NIGHT FOOTBALL', short: 'TNF', night: true, bar: ['#2c1156', '#150a2c'], acc: '#1fd6c4', acc2: '#8e52ff', down: '#3fe6d5', to: '#1fd6c4', slant: 9 },
   SNF: { name: 'SUNDAY NIGHT FOOTBALL', short: 'SNF', night: true, bar: ['#142a57', '#0a1631'], acc: '#e2b43b', acc2: '#e2b43b', down: '#f0c75a', to: '#e2b43b', frame: '#e2b43b' },
   MNF: { name: 'MONDAY NIGHT FOOTBALL', short: 'MNF', night: true, bar: ['#191919', '#060606'], acc: '#e01e2b', acc2: '#ffd21a', down: '#ffd21a', to: '#ffd21a', slant: 7 },
   XMAS: { name: 'CHRISTMAS DAY FOOTBALL', tagline: 'DECEMBER 25  ·  HOLIDAY SHOWDOWN', short: 'XMAS', bar: ['#0f4a2a', '#062413'], acc: '#d6202e', acc2: '#f3d36b', down: '#f3d36b', to: '#f3d36b' },
+  TGV: { name: 'THANKSGIVING DAY FOOTBALL', tagline: `NOVEMBER ${thanksgivingDay(new Date().getFullYear())}  ·  TURKEY DAY`, short: 'THANKSGIVING', bar: ['#5a3214', '#2a160a'], acc: '#e8862a', acc2: '#f2c14e', down: '#f2c14e', to: '#e8862a' },
   HWN: { name: 'HALLOWEEN NIGHT FOOTBALL', tagline: 'OCTOBER 31  ·  TRICK OR TREAT', short: 'HALLOWEEN', night: true, bar: ['#1c0b2b', '#07030c'], acc: '#ff7a1a', acc2: '#8f4dff', down: '#ffa34a', to: '#ff7a1a' }
 };
 function bcStyle(G) { return (G && G.bcast && BCAST[G.bcast]) || null; }
@@ -80,6 +92,32 @@ const BcIcon = {
     g.fillStyle = '#ff7a1a'; g.fillRect(-s * 0.25, -s * 0.2, s * 0.15, s * 0.15); g.fillRect(s * 0.1, -s * 0.2, s * 0.15, s * 0.15);
     g.restore();
   },
+  leaf(g, x, y, r, col, rot = 0) { // a maple-ish fall leaf
+    g.save(); g.translate(x, y); g.rotate(rot); g.fillStyle = col; g.beginPath();
+    const P = [[0, -1], [0.22, -0.55], [0.62, -0.72], [0.48, -0.3], [0.95, -0.1], [0.5, 0.12], [0.62, 0.5], [0.12, 0.32], [0, 0.62], [-0.12, 0.32], [-0.62, 0.5], [-0.5, 0.12], [-0.95, -0.1], [-0.48, -0.3], [-0.62, -0.72], [-0.22, -0.55]];
+    P.forEach(([a, b], i) => i ? g.lineTo(a * r, b * r) : g.moveTo(a * r, b * r)); g.closePath(); g.fill();
+    g.strokeStyle = '#00000040'; g.lineWidth = Math.max(0.8, r * 0.08); g.beginPath(); g.moveTo(0, r * 0.95); g.lineTo(0, -r * 0.5); g.stroke();
+    g.restore();
+  },
+  turkey(g, x, y, r) {
+    g.save(); g.translate(x, y);
+    const F = ['#c8321e', '#e8862a', '#f2c14e', '#e8862a', '#c8321e', '#8a4a1c', '#c8321e'];
+    F.forEach((c, i) => { const a = Math.PI + (i + 0.5) * Math.PI / F.length; g.fillStyle = c; g.beginPath(); g.ellipse(Math.cos(a) * r * 0.62, Math.sin(a) * r * 0.62 + r * 0.15, r * 0.24, r * 0.58, a + Math.PI / 2, 0, 7); g.fill(); });
+    g.fillStyle = '#6b3a17'; g.beginPath(); g.ellipse(0, r * 0.32, r * 0.5, r * 0.55, 0, 0, 7); g.fill();
+    g.fillStyle = '#8a4f22'; g.beginPath(); g.arc(0, -r * 0.12, r * 0.28, 0, 7); g.fill();
+    g.fillStyle = '#fff'; g.beginPath(); g.arc(-r * 0.1, -r * 0.18, r * 0.07, 0, 7); g.arc(r * 0.1, -r * 0.18, r * 0.07, 0, 7); g.fill();
+    g.fillStyle = '#111'; g.beginPath(); g.arc(-r * 0.1, -r * 0.17, r * 0.035, 0, 7); g.arc(r * 0.1, -r * 0.17, r * 0.035, 0, 7); g.fill();
+    g.fillStyle = '#f2c14e'; g.beginPath(); g.moveTo(-r * 0.07, -r * 0.08); g.lineTo(r * 0.07, -r * 0.08); g.lineTo(0, r * 0.04); g.closePath(); g.fill();
+    g.fillStyle = '#d42a2a'; g.beginPath(); g.ellipse(r * 0.05, r * 0.06, r * 0.05, r * 0.12, 0, 0, 7); g.fill();
+    g.restore();
+  },
+  drumstick(g, x, y, r) {
+    g.save(); g.translate(x, y); g.rotate(-0.6);
+    g.fillStyle = '#f3ead8'; g.fillRect(r * 0.35, -r * 0.14, r * 0.7, r * 0.28); g.beginPath(); g.arc(r * 1.05, -r * 0.16, r * 0.18, 0, 7); g.arc(r * 1.05, r * 0.16, r * 0.18, 0, 7); g.fill();
+    const dg = g.createRadialGradient(-r * 0.25, -r * 0.2, r * 0.1, 0, 0, r * 0.8); dg.addColorStop(0, '#e19a4c'); dg.addColorStop(1, '#8a4a1c');
+    g.fillStyle = dg; g.beginPath(); g.ellipse(-r * 0.1, 0, r * 0.62, r * 0.48, 0, 0, 7); g.fill();
+    g.restore();
+  },
   wreath(g, x, y, r) {
     g.save(); g.translate(x, y);
     g.strokeStyle = '#1f7a3a'; g.lineWidth = r * 0.42; g.beginPath(); g.arc(0, 0, r * 0.75, 0, 7); g.stroke();
@@ -142,6 +180,11 @@ function bcBadge(g, code, x, y, w, h) {
     for (let i = -h; i < w; i += 13) { g.beginPath(); g.moveTo(x + i, y + h); g.lineTo(x + i + h, y); g.stroke(); } g.restore();
     BcIcon.wreath(g, x + w / 2, y + h * 0.3, h * 0.2);
     word('DEC 25', h * 0.3, '#fff', y + h * 0.8);
+  } else if (code === 'TGV') {
+    bg.addColorStop(0, '#8a4a1c'); bg.addColorStop(1, '#3d200c'); g.fillStyle = bg; g.fillRect(x, y, w, h);
+    BcIcon.turkey(g, x + w / 2, y + h * 0.36, h * 0.3);
+    word('NOV ' + thanksgivingDay(new Date().getFullYear()), h * 0.3, '#f2c14e', y + h * 0.82);
+    g.fillStyle = S.acc; g.fillRect(x, y + h - 2, w, 2);
   } else if (code === 'HWN') {
     const hb = g.createLinearGradient(x, y, x, y + h); hb.addColorStop(0, '#2a0f3d'); hb.addColorStop(1, '#0b0410'); g.fillStyle = hb; g.fillRect(x, y, w, h);
     BcIcon.lantern(g, x + w / 2, y + h * 0.38, h * 0.25, G.time || 0);
@@ -157,6 +200,7 @@ function bcCellDeco(g, code, x, y0) { if (code === 'XMAS') BcIcon.hat(g, x + 13,
 function bcPoss(g, code, x, y) {
   if (code === 'XMAS') { BcIcon.ornament(g, x, y + 1, 6.5); return true; }
   if (code === 'HWN') { BcIcon.lantern(g, x, y + 1, 7.5, (G.time || 0) + 1.3); return true; }
+  if (code === 'TGV') { BcIcon.drumstick(g, x, y + 1, 8); return true; }
   return false;
 }
 function bcPip(g, code, tx, ty, on) {
@@ -165,6 +209,7 @@ function bcPip(g, code, tx, ty, on) {
     if (on) { g.save(); g.beginPath(); g.rect(tx, ty, 14, 4); g.clip(); g.fillStyle = '#d6202e'; for (let i = -4; i < 14; i += 5) { g.beginPath(); g.moveTo(tx + i, ty + 4); g.lineTo(tx + i + 3, ty); g.lineTo(tx + i + 5, ty); g.lineTo(tx + i + 2, ty + 4); g.fill(); } g.restore(); }
     return true;
   }
+  if (code === 'TGV') { BcIcon.leaf(g, tx + 7, ty + 1.5, 5, on ? ['#c8321e', '#e8862a', '#f2c14e'][Math.round(tx / 20) % 3] : '#ffffff30', 0.3); return true; }
   if (code === 'HWN') {
     g.save(); g.globalAlpha = on ? 1 : 0.25; g.beginPath(); g.moveTo(tx + 1, ty + 5); g.lineTo(tx + 13, ty + 5); g.lineTo(tx + 7, ty - 4); g.closePath(); g.clip();
     g.fillStyle = '#ffd23f'; g.fillRect(tx, ty + 2, 14, 4); g.fillStyle = '#ff7a1a'; g.fillRect(tx, ty - 1.5, 14, 3.6); g.fillStyle = '#fff6e0'; g.fillRect(tx, ty - 5, 14, 3.6);
@@ -185,6 +230,16 @@ function bcTrim(g, code, x0, y0, W, H) {
   if (code === 'SNF') { g.strokeStyle = S.frame; g.lineWidth = 1.5; roundRect(g, x0 + 0.75, y0 + 0.75, W - 1.5, H - 1.5, 3); g.stroke(); }
   else if (code === 'TNF') { const lg = g.createLinearGradient(x0, 0, x0 + W, 0); lg.addColorStop(0, S.acc2); lg.addColorStop(1, S.acc); g.fillStyle = lg; g.fillRect(x0, y0 + H - 2, W, 3); }
   else if (code === 'MNF') { g.fillStyle = S.acc; g.fillRect(x0, y0 + H - 3, W, 3); g.fillStyle = S.acc2; g.fillRect(x0, y0 + H, W, 1.5); }
+  else if (code === 'TGV') {
+    // a garland of fall leaves along the bottom + a few leaves drifting down past the scorebug
+    g.fillStyle = S.acc2; g.fillRect(x0 + BADGE_W, y0 + H - 2, W - BADGE_W, 2);
+    const LC = ['#c8321e', '#e8862a', '#f2c14e', '#a5521b'];
+    let i = 0; for (let x = x0 + BADGE_W + 10; x < x0 + W - 6; x += 22, i++) BcIcon.leaf(g, x, y0 + H + 2.5, 5, LC[i % 4], (i % 3 - 1) * 0.5 + Math.sin(t * 1.2 + i) * 0.08);
+    for (let k = 0; k < 3; k++) {
+      const u = ((t * 0.12 + k / 3) % 1), lx = x0 + W - 40 - k * 70 + Math.sin(t * 1.5 + k * 2) * 10, ly = y0 + H + 4 + u * 40;
+      g.globalAlpha = Math.min(1, (1 - u) * 2); BcIcon.leaf(g, lx, ly, 4.5, LC[k], t * 2 + k); g.globalAlpha = 1;
+    }
+  }
   else if (code === 'HWN') {
     // orange goo along the bottom (slow drips), a cobweb + spider in the corner, flapping bats, a ghost peeking out
     g.fillStyle = S.acc; g.fillRect(x0, y0 + H - 2, W, 2.5);
@@ -227,23 +282,23 @@ function bcTrim(g, code, x0, y0, W, H) {
 // ---------- Season: tag the real-feeling TV slots (1 Thursday, 1 Sunday night, 1 Monday night a week + holidays) ----------
 // Tags are stored on the schedule the first time they're needed, so old saved seasons get them too. Deterministic (no Math.random).
 const SeasonBC = {
-  weeks(n) { return { hw: n >= 6 ? Math.round(n * 7 / 17) : -1, cw: n >= 6 ? n - 2 : -1 }; }, // Halloween ~ week 8 of 17, Christmas the next-to-last week
+  weeks(n) { return { hw: n >= 6 ? Math.round(n * 7 / 17) : -1, tw: n >= 8 ? Math.round(n * 11 / 17) : -1, cw: n >= 6 ? n - 2 : -1 }; }, // Halloween ~ week 8 of 17, Thanksgiving ~ week 12, Christmas the next-to-last week
   ensure(d) {
-    if (!d || !d.weeks || d.bcv === 1) return;
-    const n = d.weeks.length, { hw, cw } = this.weeks(n), seen = {}, byId = id => TEAMS.find(t => t.id === id);
+    if (!d || !d.weeks || d.bcv === 2) return;
+    const n = d.weeks.length, { hw, tw, cw } = this.weeks(n), seen = {}, byId = id => TEAMS.find(t => t.id === id);
     const ovr = id => { try { return Season.ovr(id); } catch (e) { return 75; } };
     d.weeks.forEach((wk, w) => {
-      const slots = w === cw ? ['XMAS', 'XMAS', 'SNF', 'MNF'] : w === hw ? ['SNF', 'MNF', 'HWN'] : ['SNF', 'MNF', 'TNF'];
+      const slots = w === cw ? ['XMAS', 'XMAS', 'SNF', 'MNF'] : w === hw ? ['SNF', 'MNF', 'HWN'] : w === tw && tw !== cw && tw !== hw ? ['TGV', 'TGV', 'TGV', 'SNF', 'MNF'] : ['SNF', 'MNF', 'TNF'];
       const sc = wk.map((m, i) => {
         if (!m || !m.home || !m.away) return [-1e9, i];
-        const riv = isRivalry(byId(m.home), byId(m.away)) ? 5 : 0, mine = i === 0 ? 3 : 0;
+        const riv = isRivalry(byId(m.home), byId(m.away)) ? 5 : 0, mine = i === 0 ? 3 : 0, turkey = w === tw && (m.home === 'DET' || m.home === 'DAL') ? 30 : 0; // Detroit + Dallas always host on Thanksgiving
         const rep = ((seen[m.home] || 0) + (seen[m.away] || 0)) * 3.5, noise = (hashStr(`${d.year || 1}:${w}:${m.home}${m.away}`) % 1000) / 1000 * 7;
-        return [ovr(m.home) + ovr(m.away) + riv + mine + noise - rep, i];
+        return [ovr(m.home) + ovr(m.away) + riv + mine + turkey + noise - rep, i];
       }).sort((a, b) => b[0] - a[0]);
       for (const m of wk) if (m) delete m.bc;
       slots.forEach((s, k) => { const e = sc[k]; if (!e || e[0] < -1e8) return; const m = wk[e[1]]; m.bc = s; seen[m.home] = (seen[m.home] || 0) + 1; seen[m.away] = (seen[m.away] || 0) + 1; });
     });
-    d.bcv = 1;
+    d.bcv = 2;
     try { Season.save(); } catch (e) {}
   },
   // tag of one game (gi = index in the week, 0 = yours)
@@ -267,4 +322,26 @@ const SeasonBC = {
 }; }
 
 // Quick Game / online: the BROADCAST setting (AUTO and SUNDAY = the normal look)
-function quickBcast() { const v = $('optBcast') && $('optBcast').value; return BCAST[v] ? v : null; }
+function quickBcast() { const h = holidayToday(); if (h && BCAST[h]) return h; const v = $('optBcast') && $('optBcast').value; return BCAST[v] ? v : null; }
+// on a real holiday the BROADCAST setting is locked to it (settings panel shows why)
+function bcLockPaint() {
+  const h = holidayToday(), row = $('muRow_optBcast'); if (!row) return;
+  row.classList.toggle('bcLocked', !!(h && BCAST[h]));
+  row.querySelectorAll('button').forEach(b => { b.disabled = !!(h && BCAST[h]); if (h && BCAST[h]) b.classList.toggle('on', b.dataset.v === h); });
+  let n = row.querySelector('.bcLockNote');
+  if (h && BCAST[h]) { if (!n) { n = document.createElement('div'); n.className = 'bcLockNote'; row.querySelector('.muC').appendChild(n); } n.textContent = `IT'S ${BCAST[h].short === 'XMAS' ? 'CHRISTMAS' : BCAST[h].short} TODAY  ·  EVERY QUICK GAME IS A ${BCAST[h].short === 'XMAS' ? 'CHRISTMAS' : BCAST[h].short} GAME`; }
+  else if (n) n.remove();
+}
+
+// ---------- spooky month: Halloween title screen (cobwebs, moon, bats, fog, jack-o'-lanterns, a ghost) ----------
+if (spookyNow()) {
+  document.body.classList.add('spooky');
+  const bat = c => `<svg class="bat ${c}" viewBox="-11 -6 22 10"><g class="w"><path d="M0-2.5L1-4.3 1.8-2.2 5-4.6 10-3 8.6-1.2 7.2.3 5.6-.6 4 1.3 2.4.4 0 2.6-2.4.4-4 1.3-5.6-.6-7.2.3-8.6-1.2-10-3-5-4.6-1.8-2.2-1-4.3Z"/></g></svg>`;
+  const web = c => `<svg class="web ${c}" viewBox="0 0 100 100"><g fill="none" stroke="#e8e0ff" stroke-width=".7">${[0, 22, 45, 68, 90].map(a => { const r = a * Math.PI / 180; return `<line x1="0" y1="0" x2="${(Math.cos(r) * 100).toFixed(1)}" y2="${(Math.sin(r) * 100).toFixed(1)}"/>`; }).join('')}${[22, 40, 58, 76, 94].map(k => `<path d="M${k} 0 Q${(k * 0.85).toFixed(1)} ${(k * 0.35).toFixed(1)} ${(k * 0.7).toFixed(1)} ${(k * 0.7).toFixed(1)} Q${(k * 0.35).toFixed(1)} ${(k * 0.85).toFixed(1)} 0 ${k}"/>`).join('')}</g><line x1="58" y1="0" x2="58" y2="62" stroke="#e8e0ff" stroke-width=".5"/><circle cx="58" cy="65" r="3.2" fill="#e8e0ff"/></svg>`;
+  const pk = c => `<svg class="pk ${c}" viewBox="-30 -34 60 62"><path d="M-2-22q2-10 9-9-4 4-4 9z" fill="#3c8a2e"/><ellipse cx="-12" cy="0" rx="16" ry="21" fill="#c4500b"/><ellipse cx="12" cy="0" rx="16" ry="21" fill="#c4500b"/><ellipse cx="0" cy="0" rx="17" ry="22" fill="#ff8a1f"/><path d="M-15-2h9l-4.5-9zM15-2h-9l4.5-9zM-3 3h6l-3 5zM-17 8l6 6 5-4 6 6 6-6 5 4 6-6-6 11h-22z" fill="#ffe27a"/></svg>`;
+  const el = document.createElement('div'); el.className = 'spook';
+  el.innerHTML = web('l') + web('r') + `<svg class="moon" viewBox="0 0 100 100"><defs><radialGradient id="mg" cx="40%" cy="40%"><stop offset="0" stop-color="#fff6dc"/><stop offset="1" stop-color="#f2cf8a"/></radialGradient></defs><circle cx="50" cy="50" r="46" fill="url(#mg)"/><circle cx="34" cy="38" r="7" fill="#e3bd76" opacity=".6"/><circle cx="62" cy="62" r="10" fill="#e3bd76" opacity=".5"/><circle cx="66" cy="30" r="4" fill="#e3bd76" opacity=".6"/></svg>`
+    + bat('b1') + bat('b2') + bat('b3') + '<div class="fog"></div><div class="fog f2"></div>' + pk('l') + pk('r')
+    + `<svg class="ghost" viewBox="-12 -12 24 28"><path d="M-10 0a10 10 0 0 1 20 0v14l-3.3-3-3.3 3-3.4-3-3.3 3-3.4-3-3.3 3z" fill="#f2eefc"/><ellipse cx="-3.5" cy="-1" rx="1.7" ry="2.5" fill="#1b0f2a"/><ellipse cx="3.5" cy="-1" rx="1.7" ry="2.5" fill="#1b0f2a"/><ellipse cx="0" cy="5" rx="1.6" ry="2.2" fill="#1b0f2a"/></svg>`;
+  $('title').prepend(el);
+}

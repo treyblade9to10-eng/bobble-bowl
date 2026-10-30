@@ -1,5 +1,5 @@
 // ---- Offline support: network first (so updates show up right away), saved copy when there's no signal ----
-const CACHE = 'bobble-v11.0';
+const CACHE = 'bobble-v11.1';
 const FILES = [
   './',
   'index.html',
@@ -8,7 +8,7 @@ const FILES = [
   'css/matchup.css',
   'css/highlights.css',
   'css/practice.css',
-  'css/franchisehub.css',
+  'css/franchisehub.css', 'css/spooky.css',
   'css/franchise3.css',
   'manifest.webmanifest',
   'icons/icon-192.png',

@@ -1535,3 +1535,8 @@ span.pePos { font-family: var(--hd); font-weight: 800; letter-spacing: .06em; di
 #chalLeft { display: block; font-style: normal; font-weight: 800; font-size: 13px; color: var(--dim); letter-spacing: .08em; margin-top: 3px; }
 #chalBar { position: absolute; left: 0; bottom: 0; height: 3px; background: var(--red); width: 100%; }
 body.mobile #chalBtn { top: 50px; width: 170px; font-size: 21px; padding: 10px 12px 13px 10px; }
+.bcTag.bcTGV { background: #6b3a17; color: #f2c14e; box-shadow: inset 0 -2px 0 #e8862a; }
+/* BROADCAST locked on a real holiday (primetime.js bcLockPaint) */
+.bcLocked .muC button:disabled { opacity: .35; cursor: default; }
+.bcLocked .muC button.on:disabled { opacity: 1; }
+.bcLockNote { flex-basis: 100%; font-family: var(--hd); font-weight: 800; font-size: 12px; letter-spacing: .08em; color: #ff9a3c; margin-top: 4px; }
