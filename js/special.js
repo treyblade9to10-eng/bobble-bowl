@@ -397,8 +397,11 @@ function fgBlocked(by) {
   G.special = 'fgblock'; G.phase = 'live'; G.bstate = 'loose'; G.play.t = 0;
   b.holder = null; b.flight = null; b.hold = 0; b.snap = 0; b.z = 1.4; b.x = by.x - d * 0.7; b.y = lerp(b.y, by.y, 0.7); // off his hands
   const k = G.O[0]; k.vx = d * 3; // he still swings through
-  b.loose = { vx: -d * rand(3, 8), vy: rand(-3, 3) + Math.sign(b.y - by.y) * 2, t: 0 };
+  const fwd = chance(0.35); // a low kick off a hand at the line: usually back toward the holder, sometimes it pops forward past the line
+  blkLoose(b, fwd ? d * rand(3, 9) : -d * rand(4, 11), rand(-4, 4) + Math.sign(b.y - by.y) * 1.5);
   for (const p of G.players) { p.engaged = null; p.kneel = 0; p.kpose = null; }
+  G.O[1].stun = 0.45; // the holder is still down on a knee
+  blkCollide(by, k);
   blockedBy(by, km.kind);
   addPbp(`${lastName(km.kk.name)}'s ${km.kind === 'xp' ? 'extra point' : `${km.yds}-yard field goal`} is BLOCKED by ${lastName(by.name)}!`, 'Special teams!');
 }
@@ -418,14 +421,58 @@ function blockedBy(by, kind) {
 function fgScoop(p) {
   const b = G.ball;
   b.loose = null; b.holder = p; G.bstate = 'run'; G.blk.flip = true; Sound.catch();
+  p.vx *= 0.35; p.vy *= 0.35; // he has to stop and scoop it
   addText(p.x, p.y, 'SCOOP!', '#ffd23f', 22, 0.9);
   if (isHumanSide(p.side)) setHD(p.side, p);
 }
-// somebody gets to a blocked kick on the ground: the other team scoops it, the kicking team just falls on it
+// the guy who blocked it usually runs right through the kicker (and often goes down too)
+function blkCollide(by, kp) {
+  if (dist(by, kp) < 3 && chance(0.45)) { kp.down = rand(0.6, 1); kp.downDir = dirOf(by.side); kp.kickT = null; }
+  else kp.stun = 0.3; // follow-through: a beat before he can react
+  if (chance(0.75)) { by.down = rand(0.6, 1.1); by.downDir = dirOf(by.side); } // he laid out to get a hand on it
+  for (const p of G.players) if (p !== by && p.side === by.side && dist(p, kp) < 3.5 && p.down <= 0) p.stun = Math.max(p.stun, rand(0.25, 0.55)); // the rest of the rush was flying in: they overrun it
+}
+// a blocked kick is a live ball that bounces around (a football takes crazy hops): both teams scramble for it
+function blkLoose(b, vx, vy, vz = rand(2.5, 5.5)) { b.loose = { vx, vy, vz, t: 0, blk: true }; b.z = Math.max(b.z || 0, 0.8); }
+function blkBounce(dt) {
+  const b = G.ball, l = b.loose;
+  l.t += dt; b.x += l.vx * dt; b.y += l.vy * dt;
+  l.vz -= 20 * dt; b.z = Math.max(0, b.z + l.vz * dt);
+  if (b.z <= 0 && l.vz < 0) {
+    if (l.vz < -2.5) { // it hits the turf and kicks off in a new direction
+      l.vz = -l.vz * 0.5; const sp = Math.hypot(l.vx, l.vy) * 0.75, a = Math.atan2(l.vy, l.vx) + rand(-1, 1);
+      l.vx = Math.cos(a) * sp; l.vy = Math.sin(a) * sp;
+    } else l.vz = 0;
+  }
+  if (b.z <= 0.01) { const f = Math.exp(-1.8 * dt); l.vx *= f; l.vy *= f; } // rolling
+  b.spin = (b.spin || 0) + dt * 14;
+  if (b.y < 0 || b.y > FIELD_W || b.x < 0 || b.x > 120) { b.loose = null; return endPlay({ type: 'oob', carrier: null, x: clamp(b.x, 0, 120), y: clamp(b.y, 0, FIELD_W), blkOut: true }); }
+  if (l.t > 7) { b.loose = null; return endPlay({ type: 'oob', carrier: null, x: b.x, y: b.y, blkOut: true }); } // nobody gets it: dead where it lies
+  if (l.t < 0.3 || b.z > 0.8) return;
+  for (const p of G.players) {
+    if (p.down > 0 || p.stun > 0 || (p.scoopT || 0) > G.play.t || dist(p, b) > (p.dive > 0 ? 1.3 : 0.9)) continue;
+    const sp = Math.hypot(l.vx, l.vy) + Math.abs(l.vz) * 0.4;
+    if (chance(clamp(0.68 - sp * 0.06 - b.z * 0.35 - (p.speedNow || 0) * 0.02 + (rat(p, 'CTH') - 70) / 300, 0.2, 0.85))) return blkTouch(p); // a bouncing ball at a dead sprint is hard to pick up
+    p.scoopT = G.play.t + 0.45; // it squirts right off his hands
+    const a = rand(0, Math.PI * 2), k = rand(2, 5);
+    l.vx = l.vx * 0.3 + Math.cos(a) * k + (p.vx || 0) * 0.3; l.vy = l.vy * 0.3 + Math.sin(a) * k + (p.vy || 0) * 0.3; l.vz = rand(1.5, 3.5);
+    addText(p.x, p.y, 'SQUIRTS LOOSE!', '#ffd23f', 14, 0.6);
+    return;
+  }
+}
+// somebody comes up with a blocked kick: the defense can always scoop and score. The kicking team can pick it up and run
+// with it behind the line (short of the line to gain on 4th down = turnover on downs); past the line it's dead (defense ball).
 function blkTouch(p) {
   if (p.side !== G.blk.side) return fgScoop(p);
-  const b = G.ball;
+  const b = G.ball, d = dirOf(G.blk.side);
   b.loose = null; b.holder = p; b.fumbler = null; Sound.catch();
+  if (G.blk.kind !== 'xp' && d * (b.x - G.los) < 0) { // behind the line: he can run with it
+    G.bstate = 'run'; G.blk.adv = true; G.credit = { p, kind: 'rush' };
+    addText(p.x, p.y, 'PICKED UP!', '#9cff9c', 20, 0.9);
+    if (isHumanSide(p.side)) setHD(p.side, p);
+    return;
+  }
+  if (G.blk.kind !== 'xp') G.blk.past = true; // touched past the line: like a punt, the defense gets it there
   showBanner('RECOVERED!', p.name, isHumanSide(p.side) ? '#9cff9c' : '#fff', 1.1);
   endPlay({ type: 'fumble', carrier: p, x: p.x, y: p.y });
 }
@@ -434,6 +481,24 @@ function endBlocked(res) {
   let x = res.x != null ? res.x : G.ball.x;
   G.special = null; G.blk = null; G.poss = s; // (a punt has the return team "on offense" until now)
   if (B.kind === 'xp') { G.clock = B.clock; G.patSide = null; } // a try never runs the clock
+  G.blkEnd = null;
+  if (res.blkOut) { // rolled out of bounds (or died) with nobody on it
+    if (B.kind === 'xp') { G.next = { kickoff: s }; return; }
+    if (dirOf(s) * (x - ownGoal(s)) <= 0) { G.score[1 - s] += 2; G.blkEnd = 'safety'; showBanner('SAFETY!', '+2', isHumanSide(s) ? '#ff6040' : '#9cff9c', 1.8); addPbp('The blocked kick goes out of the end zone. Safety!'); G.next = { kickoff: s, from: 20 }; return; }
+    G.blkEnd = 'def'; showBanner('TURNOVER!', `${G.teams[1 - s].name} ball`, '#ff9a3d', 1.4);
+    G.next = { drive: 1 - s, x: clamp(x, 11, 109) }; return;
+  }
+  if (res.type === 'td' && cs === s && B.kind !== 'xp') { // the kicking team picked it up and took it all the way
+    G.score[s] += 6; G.deadT = isHumanSide(s) ? 3.8 : 2.5; car.down = 0; car.dive = 0; G.blkEnd = 'kickTD';
+    if (isHumanSide(s) && !coachOn()) G.cellyGuy = car; else Celly.cpu(car);
+    showBanner('TOUCHDOWN!', `${car.name} • ${G.teams[s].name}`, isHumanSide(s) ? '#ffd23f' : '#ff6040', 2.6); Sound.td(); stat(car).td++;
+    addPbp(`${lastName(car.name)} picks up the blocked kick and runs it in!`, 'Touchdown!');
+    G.next = { pat: s }; return;
+  }
+  if (B.past && cs === s) { // the kicking team touched it past the line: defense ball right there
+    G.blkEnd = 'def'; showBanner('TURNOVER!', `${G.teams[1 - s].name} ball`, '#ff9a3d', 1.4);
+    G.next = { drive: 1 - s, x: clamp(x, 11, 109) }; return;
+  }
   if (res.type === 'td' && cs !== s) {
     G.score[cs] += B.kind === 'xp' ? 2 : 6; G.deadT = isHumanSide(cs) ? 3.8 : 2.5;
     car.down = 0; car.dive = 0;
@@ -446,18 +511,20 @@ function endBlocked(res) {
   }
   if (B.kind === 'xp') { G.next = { kickoff: s }; return; }
   if (cs !== s) { // defense ball where he went down
+    G.blkEnd = res.type === 'td' ? 'defTD' : 'def';
     const cd = dirOf(cs);
     if (cd * (x - ownGoal(cs)) <= 0) x = ownGoal(cs) + cd * 20;
     showBanner('TURNOVER!', `${G.teams[cs].name} ball`, '#ff9a3d', 1.4);
     G.next = { drive: cs, x: clamp(x, 11, 109) }; return;
   }
   if (dirOf(s) * (x - ownGoal(s)) <= 0) { // fell on a blocked punt in his own end zone
-    G.score[1 - s] += 2; showBanner('SAFETY!', '+2', isHumanSide(s) ? '#ff6040' : '#9cff9c', 1.8); addPbp('Blocked punt is recovered in the end zone. Safety!');
+    G.score[1 - s] += 2; G.blkEnd = 'safety'; showBanner('SAFETY!', '+2', isHumanSide(s) ? '#ff6040' : '#9cff9c', 1.8); addPbp('Blocked punt is recovered in the end zone. Safety!');
     G.next = { kickoff: s, from: 20 }; return;
   }
-  if (B.flip) { G.next = { drive: s, x: clamp(x, 11, 109) }; return; } // got it back after the defense had it: new set of downs
+  if (B.flip) { G.blkEnd = 'kick1st'; G.next = { drive: s, x: clamp(x, 11, 109) }; return; } // got it back after the defense had it: new set of downs
   G.ballY = clamp(res.y != null ? res.y : G.ballY, 20, FIELD_W - 20);
-  G.next = advanceDown(x, true); // kicking team falls on it: on 4th down that's a turnover on downs
+  G.next = advanceDown(x, true); // kicking team keeps it: past the line to gain = first down, short of it on 4th down = turnover on downs
+  G.blkEnd = G.down === 1 ? 'kick1st' : 'tod';
 }
 
 // ======== live punts ========
@@ -641,8 +708,9 @@ function puntBlocked(by) {
   G.blk = { kind: 'punt', side: s, clock: G.clock, flip: false };
   G.special = 'fgblock'; G.phase = 'live'; G.bstate = 'loose'; G.play.t = 0;
   b.holder = null; b.flight = null; b.snap = 0; b.z = 1; b.x = P.x + d * 0.9; b.y = lerp(P.y, by.y, 0.5);
-  b.loose = { vx: (chance(0.4) ? d * rand(1, 4) : -d * rand(2, 6)), vy: rand(-3, 3) + Math.sign(b.y - by.y) * 2, t: 0 };
+  blkLoose(b, chance(0.5) ? d * rand(2, 8) : -d * rand(3, 10), rand(-5, 5) + Math.sign(b.y - by.y) * 1.5, rand(4, 7)); // off the foot and a hand: it pops up, back toward his own end zone or forward
   for (const p of G.players) p.engaged = null;
+  blkCollide(by, P);
   blockedBy(by, 'punt');
   addPbp(`${lastName(km.kk.name)}'s punt is BLOCKED by ${lastName(by.name)}!`, 'Special teams!');
 }
