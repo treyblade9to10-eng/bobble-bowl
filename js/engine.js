@@ -2590,7 +2590,7 @@ function launchKick() {
     k.short = km.power < km.need;
     k.good = !k.short && Math.abs(km.aim) <= km.tol;
     // the flight only shows the result decided above: zEnd = height when it gets to the posts
-    const clear = bar + 0.9 + 4.5 * clamp((km.power - km.need) / 0.5, 0, 1); // more leg = clears the bar by more
+    const clear = bar + 1.5 + 4 * clamp((km.power - km.need) / 0.5, 0, 1); // more leg = clears the bar by more
     if (k.short && f < 0.9) { k.land = G.los - d * 7 + d * Math.max(10, km.power * range); k.ty = MID + km.aim * 6; k.zEnd = 0; } // dies in front
     else {
       k.land = goalX(s) + d * 10;
