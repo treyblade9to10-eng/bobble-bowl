@@ -98,15 +98,16 @@ function groundMark(x, y, r, big) {
   const g = wxCv.getContext('2d'), px = wxGx(x + rand(-0.25, 0.25)), py = wxGy(y + rand(-0.2, 0.2));
   // the same mark goes straight onto the field + ground picture too (never read the ground canvas back: that copies it every time)
   const m = wxMix && wxMix.field === fieldCv && wxMix.src === wxCv && wxMix.ver === wxCv.ver ? wxMix.getContext('2d') : null;
+  const zm = m && zoomPic && zoomPic.src === wxMix ? zoomPic.g : null; // the zoomed-out camera's shrunk copy (draw.js)
   if (G.weather === 'snow') {
     const a = big ? 0.3 : 0.16;
     g.globalCompositeOperation = 'destination-out'; g.fillStyle = `rgba(0,0,0,${a})`;
     g.beginPath(); g.ellipse(px, py, r * PX * 0.5, r * PY * 0.4, 0, 0, 7); g.fill();
     g.globalCompositeOperation = 'source-over';
     // rubbing out a bit of snow = letting that much of the grass back through
-    if (m) { m.globalAlpha = a; m.fillStyle = wxMix.pat || (wxMix.pat = m.createPattern(fieldCv, 'no-repeat')); m.beginPath(); m.ellipse(px, py, r * PX * 0.5, r * PY * 0.4, 0, 0, 7); m.fill(); m.globalAlpha = 1; }
+    for (const c of [m, zm]) if (c) { c.globalAlpha = a; c.fillStyle = wxMix.pat || (wxMix.pat = m.createPattern(fieldCv, 'no-repeat')); c.beginPath(); c.ellipse(px, py, r * PX * 0.5, r * PY * 0.4, 0, 0, 7); c.fill(); c.globalAlpha = 1; }
   } else {
-    for (const c of m ? [g, m] : [g]) {
+    for (const c of [g, m, zm]) if (c) {
       c.fillStyle = `rgba(66,46,26,${big ? 0.22 : 0.07})`;
       c.beginPath(); c.ellipse(px, py, r * PX * 0.5, r * PY * 0.4, 0, 0, 7); c.fill();
     }
@@ -139,6 +140,7 @@ function drawWeatherGround(g, G) {
 function windLean() { return G.wind ? G.wind.dir * Math.min(1, G.wind.mph / 14) : 0.35; }
 function drawWeather(g, G) {
   if (G.demo) return;
+  if (onScreen(g, () => drawWeather(g, G))) return; // (CAMERA zoomed out: still screen size)
   const t = G.time, lean = windLean();
   if (G.weather === 'rain') {
     // gloomy sky + mist rolling off the stands

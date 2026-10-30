@@ -338,7 +338,7 @@ function fgHumanRush(p, dt, L) {
     if (!(G.lock && lockedGuy())) {
       const rush = G.D.filter(q => q.assign.type === 'rush');
       if (Input.hit('KeyQ') || Input.hit('Tab')) { G.humanDef = rush[(rush.indexOf(p) + 1) % rush.length]; updateHuman(); }
-      for (const c of Input.taps) { let best = null, bd = 55; for (const q of rush) { const dd = Math.hypot(sx(q.x) - c.x, sy(q.y) - 30 - c.y); if (dd < bd) { bd = dd; best = q; } } if (best) { G.humanDef = best; updateHuman(); } }
+      for (const c of Input.taps) { let best = null, bd = 55; for (const q of rush) { const dd = Math.hypot(sx(q.x) - c.x, sy(q.y) - 30 * viewZ - c.y); if (dd < bd) { bd = dd; best = q; } } if (best) { G.humanDef = best; updateHuman(); } }
     }
     p.dvx = p.dvy = 0; return true;
   }
@@ -619,7 +619,7 @@ function puntPick() {
   const list = [G.O[1]].concat(G.O.filter(q => q.pr === 'rush' || q.pr === 'hold'));
   let pick = null;
   if (Input.hit('KeyQ') || Input.hit('Tab')) pick = list[(list.indexOf(G.humanDef) + 1) % list.length];
-  for (const c of Input.taps) { let bd = 55; for (const q of list) { const dd = Math.hypot(sx(q.x) - c.x, sy(q.y) - 30 - c.y); if (dd < bd) { bd = dd; pick = q; } } }
+  for (const c of Input.taps) { let bd = 55; for (const q of list) { const dd = Math.hypot(sx(q.x) - c.x, sy(q.y) - 30 * viewZ - c.y); if (dd < bd) { bd = dd; pick = q; } } }
   if (pick && pick !== G.humanDef) { G.humanDef = pick; if (pick.pr === 'hold') pick.pr = 'rush'; Sound.click(); updateHuman(); } // you go after the punter
 }
 // gunner: the jammer in his face holds him up for a moment, then he's gone
@@ -736,7 +736,7 @@ function puntRetInput(p) {
   const f = G.ball && G.ball.flight;
   if (!f || f.kick !== 'punt' || f.intended !== p || G.fair) return;
   let go = Input.hit('KeyC') || Input.hit('Space');
-  if (!go && ctlMobile()) for (const c of Input.taps) if (Math.hypot(sx(p.x) - c.x, sy(p.y) - 40 - c.y) < 70) go = true;
+  if (!go && ctlMobile()) for (const c of Input.taps) if (Math.hypot(sx(p.x) - c.x, sy(p.y) - 40 * viewZ - c.y) < 70) go = true;
   if (!go) return;
   callFair(p); if (ctlMobile()) Input.taps.length = 0;
 }

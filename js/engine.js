@@ -763,7 +763,7 @@ function presnapInput(dt) {
     let tapped = false;
     for (const c of Input.taps) { // tap a receiver = hot route, tap anywhere else = snap
       let best = null, bd = 50;
-      for (const r of G.O) if (r.slot >= 1 && r.slot <= 4) { const dd = Math.hypot(sx(r.x) - c.x, sy(r.y) - 35 - c.y); if (dd < bd) { bd = dd; best = r; } }
+      for (const r of G.O) if (r.slot >= 1 && r.slot <= 4) { const dd = Math.hypot(sx(r.x) - c.x, sy(r.y) - 35 * viewZ - c.y); if (dd < bd) { bd = dd; best = r; } }
       if (best && G.play.off.type === 'pass') { hotRoute(best.slot); tapped = true; }
     }
     if (Input.hit('Space') || (Input.taps.length && !tapped)) snap();
@@ -776,7 +776,7 @@ function presnapInput(dt) {
     for (const c of Input.taps) { // mobile: tap a defender to take him
       if (G.lock && lockedGuy()) break;
       let best = null, bd = 55;
-      for (const d of G.D) { const dd = Math.hypot(sx(d.x) - c.x, sy(d.y) - 30 - c.y); if (dd < bd) { bd = dd; best = d; } }
+      for (const d of G.D) { const dd = Math.hypot(sx(d.x) - c.x, sy(d.y) - 30 * viewZ - c.y); if (dd < bd) { bd = dd; best = d; } }
       if (best && best !== G.humanDef) { G.humanDef = best; Sound.click(); updateHuman(); G.snapTimer = Math.max(G.snapTimer, 0.9); }
     }
     if (G.snapTimer <= 0) snap();
@@ -1100,7 +1100,7 @@ function openness(r) {
 // which receiver's throw icon is under this screen point
 function iconAt(x, y) {
   let best = null, bd = 60;
-  for (const r of G.O) if (r.throwKey) { const dd = Math.min(Math.hypot(sx(r.x) - x, sy(r.y) - 40 - y), Math.hypot(sx(r.x) - x, sy(r.y) - 120 - y)); if (dd < bd) { bd = dd; best = r; } }
+  for (const r of G.O) if (r.throwKey) { const dd = Math.min(Math.hypot(sx(r.x) - x, sy(r.y) - 40 * viewZ - y), Math.hypot(sx(r.x) - x, sy(r.y) - 28 - 92 * viewZ - y)); if (dd < bd) { bd = dd; best = r; } } // (the icon is over his head: lower when zoomed out)
   return best;
 }
 function humanCanThrow() {
@@ -2712,7 +2712,7 @@ function updateCamera(dt) {
     if (b && b.holder) tx = b.holder.x + dirOf(b.holder.side) * 6;
     else if (b) tx = b.x;
   }
-  const half = CW / 2 / PX;
+  const half = CW / 2 / (PX * viewZ); // (CAMERA zoomed out = sees more)
   const kicking = G.phase === 'kick' || G.phase === 'kickmeter';
   if (G.phase === 'kickmeter' && G.km && G.km.kind !== 'punt') { // show the posts while you aim, but keep the kick spot + the rush in view
     const d = dirOf(G.poss), keep = G.los + d * (half - 14); // the kicker (~10 yards back) stays on screen
@@ -2729,11 +2729,12 @@ function updateCamera(dt) {
   cam.x = lerp(cam.x, tx, 1 - Math.exp(-dt * 4));
   let ty = MID;
   if (b && (G.phase === 'live' || G.phase === 'dead')) ty = lerp(MID, b.holder ? b.holder.y : b.y, 0.4);
-  cam.y = lerp(cam.y, clamp(ty, MID - 6, MID + 6), 1 - Math.exp(-dt * 3));
+  const yr = Math.max(0, 6 - (1 / viewZ - 1) * 15), yc = MID + (1 - viewZ) * 6; // zoomed out: the whole width is in view, so hold still (a bit low = less sky past the stands)
+  cam.y = lerp(cam.y, clamp(ty, yc - yr, yc + yr), 1 - Math.exp(-dt * 3));
   // celly cam: push in on the guy celebrating
   const cg = G.phase === 'dead' ? G.players.find(p => p.celly) : null;
   if (cg) cam.focus = { x: cg.x + (cg.celly.type === 'bowl' ? (cg.face.dir || 1) * 3.5 : 0), y: cg.y };
-  cam.zoom = lerp(cam.zoom || 1, cg ? 1.6 : 1, 1 - Math.exp(-dt * (cg ? 3 : 6)));
+  cam.zoom = lerp(cam.zoom || 1, cg ? 1.6 / viewZ : 1, 1 - Math.exp(-dt * (cg ? 3 : 6))); // (same push-in size whatever the CAMERA setting)
   if (!cg && cam.zoom < 1.01) cam.zoom = 1;
 }
 function updateHint() {
