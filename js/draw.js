@@ -894,8 +894,9 @@ function drawFlightMeter(g, G) {
     const v = G.catchV != null ? G.catchV : catchFill(); if (!G.chold && G.catchV == null || f.intended !== me) return;
     const w = 120, h = 12, x = sx(me.x) - w / 2, y = sy(me.y) - 150;
     g.fillStyle = '#0c1016e0'; g.fillRect(x - 4, y - 4, w + 8, h + 8); g.fillStyle = '#ffffff22'; g.fillRect(x, y, w, h);
-    g.fillStyle = '#2fd15a'; g.fillRect(x + w * CATCH_GREEN[0], y, w * (CATCH_GREEN[1] - CATCH_GREEN[0]), h);
-    const inG = v >= CATCH_GREEN[0] && v <= CATCH_GREEN[1]; g.fillStyle = inG ? '#7dff98' : v > CATCH_GREEN[1] ? '#ff6a5a' : '#f6c31c'; g.fillRect(x, y + 3, w * v, h - 6);
+    const cg = G.chold && G.chold.g || G.catchG || CATCH_GREEN; // shrinks when he's covered
+    g.fillStyle = '#2fd15a'; g.fillRect(x + w * cg[0], y, w * (cg[1] - cg[0]), h);
+    const inG = v >= cg[0] && v <= cg[1]; g.fillStyle = inG ? '#7dff98' : v > cg[1] ? '#ff6a5a' : '#f6c31c'; g.fillRect(x, y + 3, w * v, h - 6);
     g.fillStyle = '#fff'; g.fillRect(x + w * v - 2, y - 5, 4, h + 10);
     g.font = 'italic 900 15px "Barlow Condensed", "Arial Black", sans-serif'; g.textAlign = 'center'; g.lineWidth = 4; g.strokeStyle = '#000';
     g.strokeText('CATCH', x + w / 2, y - 9); g.fillStyle = '#fff'; g.fillText('CATCH', x + w / 2, y - 9);
@@ -907,7 +908,8 @@ function drawFlightMeter(g, G) {
   const done = off ? f.cp : f.dp && f.dp.res;
   g.fillStyle = '#0c1016e0'; g.fillRect(x - 4, y - 4, w + 8, h + 8);
   g.fillStyle = '#ffffff22'; g.fillRect(x, y, w, h);
-  g.fillStyle = '#2fd15a'; g.fillRect(x + w * CATCH_WIN[0], y, w * (CATCH_WIN[1] - CATCH_WIN[0]), h);
+  const dw = done ? (f.dw || CATCH_WIN) : defWin(me, f); // window size depends on how close you are
+  g.fillStyle = '#2fd15a'; g.fillRect(x + w * dw[0], y, w * (dw[1] - dw[0]), h);
   g.fillStyle = off ? '#f6c31c' : '#7fd3ff'; g.fillRect(x, y, w * u, h * 0.35);
   g.fillStyle = '#fff'; g.fillRect(x + w * u - 2, y - 5, 4, h + 10);
   g.font = 'italic 900 15px "Barlow Condensed", "Arial Black", sans-serif'; g.textAlign = 'center'; g.lineWidth = 4; g.strokeStyle = '#000';

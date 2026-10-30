@@ -482,7 +482,7 @@ const Net = {
       rf: (G.refs || []).map(r => [r2(r.x), r2(r.y), r.face, r2(r.anim || 0), r.moving, r2(r.throwT || 0)]),
       hp: [idx(G.hp && G.hp[0]), idx(G.hp && G.hp[1])], hd: [idx(G.hd && G.hd[0]), idx(G.hd && G.hd[1])],
       km: G.km && (G.phase === 'kickmeter' || G.phase === 'kick') ? { kind: G.km.kind, stage: G.km.stage, power: G.km.power, aim: G.km.aim, side: G.km.side, need: G.km.need, tol: G.km.tol, yds: G.km.yds, kk: G.km.kk, cpuT: G.km.cpuT != null ? 1 : null, wait: G.km.wait, needle: G.km.needle, wind: G.wind } : null,
-      aim: G.aim, mv: G.meterV ? G.meterV.map(r2) : null, cv: G.chold ? r2(catchFill()) : null, cg: idx(G.cellyGuy), hy: Math.round(G.crowdHype * 100) / 100, sh: Math.round(cam.shake), sm: G.slowmo > 0 ? 1 : 0, flg: (G.flags || []).length,
+      aim: G.aim, mv: G.meterV ? G.meterV.map(r2) : null, cv: G.chold ? r2(catchFill()) : null, cgw: G.chold && G.chold.g ? G.chold.g.map(r2) : null, cg: idx(G.cellyGuy), hy: Math.round(G.crowdHype * 100) / 100, sh: Math.round(cam.shake), sm: G.slowmo > 0 ? 1 : 0, flg: (G.flags || []).length,
       mo: Math.round(G.mo || 0), cw: G.rvWin ? [G.rvWin.side, r2(G.rvWin.t)] : 0, chl: G.chalLeft, rvs: G.phase === 'review' ? G.rvShow : 0, // momentum, challenge window, review overlay
       deaf: this.held && performance.now() - this.rxT > LINK_DEAD ? 1 : undefined // host hears nothing from the guest at all
     };
@@ -578,7 +578,7 @@ const Net = {
     const P = G.players, relay = this.onRelay;
     Object.assign(G, { phase: s.ph === 'replay' ? 'dead' : s.ph, score: s.sc, quarter: s.q, clock: s.cl, down: s.dn, los: s.los, firstDownX: s.fdx, goalToGo: s.gtg, ballY: s.by, poss: s.poss,
       timeouts: s.to, pendingRunoff: s.pr, playClock: s.pc, special: s.sp, patSide: s.pat, twoPt: s.two, bstate: s.bs, koPending: s.kp, kickoffSide: s.ks, showTarget: s.st, aim: s.aim,
-      crowdHype: s.hy, km: s.km, meterV: s.mv || null, catchV: s.cv != null ? s.cv : null, flags: new Array(s.flg).fill({}),
+      crowdHype: s.hy, km: s.km, meterV: s.mv || null, catchV: s.cv != null ? s.cv : null, catchG: s.cgw || null, flags: new Array(s.flg).fill({}),
       mo: s.mo || 0, rvWin: s.cw ? { side: s.cw[0], t: s.cw[1] } : null, chalLeft: s.chl || [2, 2], rvShow: s.rvs || null });
     if (s.sh > cam.shake) cam.shake = s.sh;
     if (s.sm) G.slowmo = 0.05;

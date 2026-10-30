@@ -905,7 +905,7 @@ function humanQBInput() {
       if (best) meterStart(qb, null, best);
     }
     if (G.meter && G.meter.r && !G.meter.key) {
-      if (P.moved || G.ball.holder !== qb || !eligible(G.meter.r)) G.meter = null; // slid off the icon: cancel
+      if (G.ball.holder !== qb || !eligible(G.meter.r)) G.meter = null; // finger can wander once the hold started: it still goes to him
       else if (!P.down) { meterThrow(qb, G.meter.r, style); Input.taps.length = 0; }
       else Input.taps.length = 0;
     }
@@ -1980,25 +1980,50 @@ function meterThrow(qb, r, style, lead) {
 // catch meter: HOLD Space / your finger while the ball is coming, the bar fills; let go in the green (or still be in it when the ball gets there) = PERFECT CATCH
 const CATCH_FILL = 0.7, CATCH_GREEN = [0.72, 0.92];
 const catchFill = () => G.chold ? Math.min(1, (G.time - G.chold.t0) / CATCH_FILL) : 0;
+// how covered the catch is: 0 = wide open, 1 = a defender right on him / on the spot (within ~1 yd)
+function coverageAt(rcv, f) {
+  if (!rcv || !f || !G.players) return 0;
+  const left = clamp(f.T - f.t, 0, 0.6); let d = 99;
+  for (const q of G.players) {
+    if (q.side === rcv.side || q.down > 0 || q.engaged) continue;
+    const px = q.x + (q.vx || 0) * left, py = q.y + (q.vy || 0) * left; // where he'll be when the ball gets there
+    d = Math.min(d, Math.hypot(px - f.tx, py - f.ty), Math.hypot(q.x - rcv.x, q.y - rcv.y));
+  }
+  const s = clamp((5 - d) / 4, 0, 1); return s * s * (3 - 2 * s);
+}
+// catch meter green: wide open = big, blanketed = tiny; good hands help a little
+function catchGreen(p, f) {
+  const w = clamp(0.30 - 0.20 * coverageAt(p, f) + (rat(p, 'CTH') - 80) * 0.0015, 0.08, 0.34);
+  return [0.82 - w / 2, Math.min(0.99, 0.82 + w / 2)];
+}
 function catchHold(p, held) {
   const f = G.ball && G.ball.flight;
   if (!f || f.pitch || f.kick || f.intended !== p || f.cp || !catchMeterOn()) { G.chold = null; return; }
   if (held && !G.chold) G.chold = { t0: G.time };
-  else if (!held && G.chold) catchLock(f);
+  if (G.chold) G.chold.g = catchGreen(p, f);
+  if (!held && G.chold) catchLock(f);
 }
 function catchLock(f) {
-  const v = catchFill(), p = f.intended; G.chold = null;
-  f.cp = v >= CATCH_GREEN[0] && v <= CATCH_GREEN[1] ? 'perfect' : v >= 0.45 ? 'good' : 'early';
+  const v = catchFill(), p = f.intended, cg = G.chold && G.chold.g || catchGreen(p, f); G.chold = null;
+  f.cp = v >= cg[0] && v <= cg[1] ? 'perfect' : v >= 0.45 ? 'good' : 'early';
   addText(p.x, p.y - 1.5, f.cp === 'perfect' ? 'PERFECT CATCH' : f.cp === 'good' ? 'GOOD CATCH' : 'TOO EARLY', f.cp === 'perfect' ? '#5dff7a' : f.cp === 'good' ? '#fff' : '#ff8a8a', 15, 0.8);
 }
 // defense meter: press when the ball gets there. Window = last part of the flight
 const CATCH_WIN = [0.78, 0.96];
+// defense meter window, the other way round: right in his hip pocket = big window, trailing way behind = small
+function defWin(p, f) {
+  const left = clamp(f.T - f.t, 0, 0.6), r = f.intended;
+  const d = Math.min(Math.hypot(p.x + (p.vx || 0) * left - f.tx, p.y + (p.vy || 0) * left - f.ty), r ? Math.hypot(p.x - r.x, p.y - r.y) : 99);
+  const s = clamp((5 - d) / 4, 0, 1), w = clamp(0.10 + 0.14 * s * s * (3 - 2 * s) + (rat(p, 'COV') - 75) * 0.0015, 0.08, 0.26);
+  return [0.87 - w / 2, Math.min(0.99, 0.87 + w / 2)];
+}
 function flightPress(p, kind) {
   const f = G.ball && G.ball.flight; if (!f || f.pitch || f.kick) return;
   if (kind === 'catch' ? (!catchMeterOn() || f.intended !== p || f.cp) : (!defMeterOn() || f.dp)) return;
   if (Math.hypot(p.x - f.tx, p.y - f.ty) > METER_NEAR) return; // too far from the ball to matter
-  const u = f.t / f.T, res = u >= CATCH_WIN[0] && u <= CATCH_WIN[1] ? 'perfect' : u >= 0.62 && u <= 1 ? 'good' : 'early';
-  if (kind === 'catch') f.cp = res; else f.dp = { p, res };
+  const W = kind === 'catch' ? CATCH_WIN : defWin(p, f);
+  const u = f.t / f.T, res = u >= W[0] && u <= W[1] ? 'perfect' : u >= 0.62 && u <= 1 ? 'good' : 'early';
+  if (kind === 'catch') f.cp = res; else { f.dp = { p, res }; f.dw = W; }
   if (res !== 'early') addText(p.x, p.y - 1.5, res === 'perfect' ? (kind === 'catch' ? 'PERFECT CATCH' : 'PERFECT READ') : 'GOOD TIMING', res === 'perfect' ? '#5dff7a' : '#fff', 15, 0.8);
   else addText(p.x, p.y - 1.5, 'TOO EARLY', '#ff8a8a', 14, 0.7);
 }

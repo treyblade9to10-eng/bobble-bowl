@@ -777,6 +777,7 @@ const endPointer = e => {
 };
 cv.addEventListener('pointerup', endPointer);
 cv.addEventListener('pointercancel', endPointer);
+cv.addEventListener('lostpointercapture', endPointer); // a missed pointerup can't leave the field stuck "held"
 cv.addEventListener('contextmenu', e => e.preventDefault());
 
 // a tap that just misses a mobile button shouldn't count as "tap the field" (that would snap the ball)
