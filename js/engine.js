@@ -541,7 +541,7 @@ function setupPlay(offPlay, defPlay, preview) {
   G.ball = { x: L, y: by, z: 0, holder: preview ? null : O[0], flight: null, loose: null };
   if (!preview) G.ball.holder = O[offPlay.directSnap || 0];
   else G.ball.holder = O[6]; // center holds it while we pick
-  G.motion = null; G.press = !!G.cpuPress; G.cpuPress = false; G.showBlitz = false;
+  G.motion = null; G.xfSpent = new Set(); G.press = !!G.cpuPress; G.cpuPress = false; G.showBlitz = false;
   G.cpuMotion = (!preview && !isHumanSide(o) && G.human >= 0 && offPlay.type === 'pass' && !offPlay.chain && chance(0.3)) ? 1.0 : null;
   G.bstate = 'snap'; G.meter = null; G.meterV = null; G.chold = null; G.qbScramble = false; G.humanScramble = false; G.aim = null; G.fake = null; G.special = null; G.qbThink = 0; G.handedOff = false; G.intended = null;
   G.trickI = 0; G.decoy = null; G.trickPasser = null; G.trickT = 0; G.trickMinT = 0; G.bite = false; G.pumped = false; G.pumpAt = null; G.rpoKeep = false; G.lastPasser = null; G.latDone = false; G.catchT = null;
@@ -581,6 +581,10 @@ function snapMotion() {
     p.route = { pts: G.play.off.mroute.map(([dd, oo]) => { const x = p.x + d * dd; return { x: d > 0 ? Math.min(x, deepX) : Math.max(x, deepX), y: clamp(p.y + dir * oo, 1.2, FIELD_W - 1.2) }; }), end: G.play.off.mend || 'go', i: 0 };
     p.hy = p.y; p.motionMan = true;
   } else if (m && m.p.route) { const sh = m.p.y - m.p.hy; for (const pt of m.p.route.pts) pt.y = clamp(pt.y + sh, 1.2, FIELD_W - 1.2); m.p.hy = m.p.y; }
+  for (const df of G.D) if (xfOn(df, 'bottleneck')) { // Bottleneck: wins the jam on the closest receiver, press or not
+    let r = null, rd = 6; for (const o of G.O) if (o.slot >= 2 && dist(o, df) < rd) { rd = dist(o, df); r = o; }
+    if (r) { r.stun = 0.6; addText(r.x, r.y, 'BOTTLENECK', '#ff8a1a', 14, 0.7); }
+  }
   if (G.press) for (const df of G.D) { // press coverage: jam the receiver at the line
     if (df.slot < 5 || df.slot > 6) continue;
     const r = G.O[df.slot - 3];
@@ -1284,9 +1288,9 @@ function doHitStick(p) {
 }
 function doSwim(p) {
   if (p.swimCd > 0 || !p.engaged) return;
-  p.swimCd = 1.2;
+  const rel = xfOn(p, 'relentless'); p.swimCd = rel ? 0.4 : 1.2; // Relentless: rush moves are free
   const bl = p.engaged;
-  if (chance(clamp(0.45 + (rat(p, 'PRS') - rat(bl, 'PBK')) / 90, 0.2, 0.8))) {
+  if (chance(clamp(0.45 + (rat(p, 'PRS') - rat(bl, 'PBK')) / 90 + (rel ? 0.2 : 0), 0.2, 0.9))) {
     unlink(bl, p); p.shedCd = 0.8; bl.stun = 0.7; bl.head.vx += 250;
     addText(p.x, p.y, 'SWIM MOVE!', '#ff8a8a', 18, 0.7); Sound.juke();
   } else addText(p.x, p.y, 'STUFFED', '#ccc', 14, 0.6);
@@ -1725,6 +1729,8 @@ function resolveBlocks(dt) {
     if (bl.role === 'screenblock') rate *= 1.8;
     if (df.isHuman && withSide(df.side, () => Input.axis().m) > 0.3) rate *= 1.7;
     if (xfOn(df, 'unstoppable')) rate *= 2.6;
+    if (passPro && (xfOn(df, 'relentless') || xfOn(df, 'dualthreat'))) rate *= 2.2;
+    if (!passPro && xfOn(df, 'reinforcement')) rate *= 2.4;
     if (G.bstate === 'run') rate *= big ? 1.4 : 1.5; // receivers can hold a stalk block long enough to spring a sweep or screen
     df.shed += rate * dt;
     // the defender pushes slowly toward where he wants to go
@@ -1866,7 +1872,7 @@ function qbArm(qb) {
   const wear = qb.side != null && qb === G.O[0] ? Injury.wear(qb.side) : 0; // a beat-up QB loses a little zip and touch
   let thp = (qb.thp || rat(qb, 'THP')) - wear * 0.04, acc = (qb.tha || rat(qb, 'THA')) - wear * 0.08; // thp = throw power, tha = throw accuracy (created players have their own)
   if (G.O && qb !== G.O[0] && qb.pos !== 'QB') { thp = Math.min(thp, 70); acc = Math.min(acc, 55); } // trick play: a RB / WR throwing it
-  return { thp, acc, range: 18 + thp * 0.52, accF: Math.pow(clamp((100 - acc) / 30, 0, 4), 1.3) };
+  return { thp, acc, range: 18 + thp * 0.52 + (xfOn(qb, 'bazooka') ? 12 : 0), accF: Math.pow(clamp((100 - acc) / 30, 0, 4), 1.3) };
 }
 function throwTo(qb, r, pitch = false, aimed = null, style = 'normal', lead = null, mt = null) {
   const b = G.ball;
@@ -1902,15 +1908,19 @@ function throwTo(qb, r, pitch = false, aimed = null, style = 'normal', lead = nu
       len = Math.hypot(tx - qb.x, ty - qb.y); duck = true;
       addText(qb.x, qb.y - 2, 'NOT ENOUGH ARM', '#ff8a8a', 15, 0.9);
     }
-    let pressure = false; for (const df of G.D) if (!df.engaged && dist(df, qb) < 2.4) pressure = true;
+    let pressure = false; for (const df of G.D) if ((!df.engaged || xfOn(df, 'fearmonger')) && dist(df, qb) < (df.engaged ? 3.2 : 2.4)) pressure = true;
+    if (xfOn(qb, 'proreads')) pressure = false; // Pro Reads: ignores the rush
     const elite = clamp((arm.acc - 80) / 12, 0, 1); // 92+ accuracy = elite, 80 and under = normal
     let err = (lerp(0.55, 0.28, elite) + arm.accF) * (0.42 + len / 20);
     if (len > reach * 0.75) err *= 1 + (len / reach - 0.75) * 2; // straining for distance
     if (pressure) err += 0.6 * (1 - elite * 0.5) + arm.accF * 0.45;
-    if (qb.speedNow > 4) err += (0.3 + arm.accF * 0.3) * Math.min(1, qb.speedNow / 8);
+    const onRun = qb.speedNow > 4;
+    if (onRun && !xfOn(qb, 'rungun')) err += (0.3 + arm.accF * 0.3) * Math.min(1, qb.speedNow / 8);
+    if (onRun && xfOn(qb, 'rungun')) err *= 0.35; // Run & Gun: dots on the move
     if (aimed) err *= lerp(0.45, 0.85, clamp(arm.accF / 2.5, 0, 1)); // you aimed it, but a bad QB still sprays it
     if (style === 'bullet') err *= 1.15; else if (style === 'lob') err *= 0.9;
-    if (qb.xf && qb.xf.on && qb.xf.kind === 'dimes') err *= 0.35;
+    if (xfOn(qb, 'dimes') || xfOn(qb, 'dots')) err *= 0.35;
+    if (xfOn(qb, 'proreads')) err *= 0.7;
     if (G.weather === 'rain' || G.weather === 'snow') err *= 1.15;
     if (mt) { if (mt.perfect) err *= 0.25; else if (mt.over) err *= 1.35; else err *= 1 + (1 - clamp(mt.v / mt.g0, 0, 1)) * 0.6; }
     if (arm.thp < 62 || err > 3.5) duck = true;
@@ -1953,7 +1963,7 @@ function updateFlight(dt) {
       const jumping = p.jump > 0, reach = jumping ? 1.4 : 0.5, high = jumping ? 3.6 : 2.0;
       if (b.z > high || Math.hypot(p.x - b.x, p.y - b.y) > reach) continue;
       p.laneChecked = true;
-      const pInt = clamp((jumping ? (p.isHuman ? 0.7 : 0.3) : p.isHuman ? 0.45 : 0.28) + (rat(p, 'CTH') - 80) / 200 + (p.isHuman ? 0.05 : 0) + (xfOn(p, 'lurker') ? 0.1 : 0), 0.15, 0.9); // CPU: fewer picks, more tips (players said too many INTs)
+      const pInt = clamp((jumping ? (p.isHuman ? 0.7 : 0.3) : p.isHuman ? 0.45 : 0.28) + (rat(p, 'CTH') - 80) / 200 + (p.isHuman ? 0.05 : 0) + (xfOn(p, 'lurker') || xfOn(p, 'shutdown') ? 0.1 : 0), 0.15, 0.9); // CPU: fewer picks, more tips (players said too many INTs)
       b.flight = null; G.showTarget = false;
       if (chance(pInt)) { addText(p.x, p.y, jumping ? 'SKY HIGH!' : 'PICKED!', '#7fd3ff', 22, 0.9); return intercept(p); }
       return incomplete(p, 'TIPPED!');
@@ -1997,14 +2007,18 @@ function resolveCatch() {
     if (chance(0.6)) return incomplete(jumper, 'SWATTED!');
   }
   const dpr = f.dp && f.dp.p === def ? f.dp.res : null;
-  const humanDefBonus = (def && def.isHuman ? 0.15 : 0) + (xfOn(def, 'lurker') ? 0.2 : 0) + (dpr === 'perfect' ? 0.15 : dpr === 'good' ? 0.06 : 0);
+  const humanDefBonus = (def && def.isHuman ? 0.15 : 0) + (xfOn(def, 'lurker') || xfOn(def, 'shutdown') ? 0.2 : 0) + (dpr === 'perfect' ? 0.15 : dpr === 'good' ? 0.06 : 0);
   const R = 1.45;
   const hands = (xfOn(rcv, 'hands') || f.cp === 'perfect') && rd < 1.6; // a "Double Me" guy (or a PERFECT catch) usually wins the 50-50 ball
+  // Universal Coverage / Dual Threat: any defender with this ability close to the catch knocks it loose
+  for (const q of G.players) if (q.side !== f.passer.side && q.down <= 0 && rcv && rd < R && dist(q, land) < (xfOn(q, 'univ') ? 1.7 : 1.2) && (xfOn(q, 'univ') || xfOn(q, 'dualthreat'))
+    && chance((xfOn(q, 'univ') ? 0.8 : 0.45) * (hands ? 0.5 : 1))) return incomplete(q, 'KNOCKED LOOSE!');
+  const tight = xfOn(def, 'shutdown') ? 0.35 : 0; // Shutdown: plays the ball from farther away
   if (def && dd < 0.5 && dd < rd - 0.3 && !(hands && chance(0.7))) { // ball hits the defender right in the body: 7 out of 10 get picked
     if (chance(def.isHuman ? 0.55 : 0.13)) return intercept(def);
     return incomplete(def, 'BROKEN UP!');
   }
-  if (def && dd < 1.25 && dd < rd - 0.25 && !(hands && chance(0.7))) { // defender has inside position
+  if (def && dd < 1.25 + tight && dd < rd - 0.25 + tight && !(hands && chance(0.7))) { // defender has inside position
     const pInt = clamp((def.isHuman ? 0.08 : 0.04) + (rat(def, 'COV') - 75) / 160 + humanDefBonus + (G.diff === 3 && !def.isHuman ? 0.06 : 0) - (rd < 1 ? 0.08 : 0), 0.03, 0.6);
     if (chance(pInt)) return intercept(def);
     return incomplete(def, 'BROKEN UP!');
@@ -2074,8 +2088,13 @@ function checkTackles() {
     if (car.pos === 'OL' || car.pos === 'DL') p += 0.2;
     if (car.side === G.human && !G.versus) p += [-0.08, 0, 0.06, 0.13][G.diff];
     if (xfOn(car, 'freight')) p -= 0.25;
-    if (xfOn(df, 'unstoppable')) p += 0.1;
+    if (xfOn(df, 'unstoppable') || xfOn(df, 'reinforcement')) p += 0.1;
+    if (xfOn(car, 'ankle') && (car.juke > 0 || car.spin > 0)) p -= 0.3;
     p = clamp(p, 0.1, 0.94);
+    // one-shot breaks: Brick Wall (first sack try), Phenom (first hit), First One Free (next move), YAC 'Em Up (first hit after the catch)
+    const xfBreak = (car === G.O[0] && G.bstate === 'snap' && xfFree(car, 'brickwall')) || xfFree(car, 'phenom')
+      || ((car.juke > 0 || car.spin > 0) && xfFree(car, 'firstfree')) || (G.bstate === 'run' && G.credit && G.credit.kind === 'rec' && xfFree(car, 'yac'));
+    if (xfBreak) p = 0;
     if (chance(p)) return tackle(car, df, hitters);
     if (df.hit > 0) { df.hit = 0; df.down = 1.1; df.downDir = car.x > df.x ? 1 : -1; addText(df.x, df.y, 'WHIFF!', '#ccc', 18, 0.8); continue; }
     // broken tackle
@@ -2101,7 +2120,7 @@ function tackle(car, df, hitters) {
   const st = stat(df);
   // fumble?
   df.hit = 0;
-  if ((G.bstate === 'run' || stick) && chance((0.022 + (hitters > 1 ? 0.02 : 0) + (stick ? 0.3 : 0) + Weather.fumbleBonus()) * tuckFumbleMul(car) * carMul(car))) {
+  if ((G.bstate === 'run' || stick) && !xfOn(car, 'truzz') && chance((0.022 + (hitters > 1 ? 0.02 : 0) + (stick ? 0.3 : 0) + Weather.fumbleBonus()) * tuckFumbleMul(car) * carMul(car))) {
     b.holder = null; b.x = car.x; b.y = car.y;
     b.loose = { vx: rand(-4, 4), vy: rand(-3, 3), t: 0 };
     G.bstate = 'loose'; showBanner('FUMBLE!', '', '#ff9a3d', 1.0); car.down = 0.9; b.fumbler = car;
