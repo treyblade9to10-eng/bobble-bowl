@@ -25,6 +25,7 @@ const FILES = [
   'js/pbp.js',
   'js/replay.js',
   'js/xfactor.js',
+  'js/abilities.js',
   'js/colleges.js',
   'js/career.js',
   'js/ratings.js',

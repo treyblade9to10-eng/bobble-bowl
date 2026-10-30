@@ -136,6 +136,45 @@ function xfAfterPlay(res, r) {
   }
 }
 
+// what he still needs to get in the zone (same numbers as xfAfterPlay)
+function xfNeed(x) {
+  if (x.on) return `${Math.max(1, XF_PLAYS - x.plays)} PLAYS LEFT`;
+  const r = Math.max(0.01, 1 - x.zone), n = (v, one, many) => { const k = Math.ceil(r / v - 1e-6); return `${k} ${k === 1 ? one : many}`; };
+  switch (x.fam) {
+    case 'qb': return r <= 0.6 ? '1 TD OR DEEP BALL' : n(0.34, 'COMPLETION', 'COMPLETIONS');
+    case 'rb': return r <= 0.4 ? '1 RUN OF 6+' : r <= 0.7 ? '1 RUN OF 15+' : n(0.4, 'RUN OF 6+', 'RUNS OF 6+');
+    case 'rec': return r <= 0.4 ? '1 CATCH' : r <= 0.7 ? '1 CATCH OF 15+' : n(0.4, 'CATCH', 'CATCHES');
+    case 'rush': return r <= 0.25 ? '1 TACKLE' : r <= 0.5 ? '1 STOP FOR LOSS' : r <= 0.9 ? '1 SACK' : '1 SACK + 1 TACKLE';
+    default: return r <= 0.2 ? '1 TACKLE' : r <= 0.5 ? '1 PASS BREAKUP' : '1 PICK OR 2 BREAKUPS';
+  }
+}
+// the X-Factors in this game for one team (starters + anybody on the field now), hottest first
+function xfTeamList(side) {
+  if (!G.xf || !G.teams || !G.teams[side]) return [];
+  const t = G.teams[side], here = new Set(t.off.concat(t.def).map(p => p[1]).concat((G.players || []).filter(p => p.side === side).map(p => p.name)));
+  return Object.keys(G.xf).filter(k => k.startsWith(side + ':') && here.has(G.xf[k].name)).map(k => G.xf[k])
+    .sort((a, b) => (b.on - a.on) || (b.zone - a.zone));
+}
+// fill height of a diamond so the orange AREA matches the zone (a diamond is thin at the tips)
+const xfFillH = z => z <= 0.5 ? Math.sqrt(z / 2) : 1 - Math.sqrt((1 - z) / 2);
+// one chip: diamond that fills up + name + what it takes
+function xfChip(x, col, big) {
+  const z = x.on ? 100 : Math.round(xfFillH(clamp(x.zone, 0, 1)) * 100);
+  return `<div class="xfc${x.on ? ' on' : ''}" style="--tc:${col}" title="${XF_TYPES[x.kind].name}: ${XF_TYPES[x.kind].desc}">
+    <i class="xfd"><u style="height:${z}%"></u></i><span><b>${lastName(x.name)}${big ? ` <em>${XF_TYPES[x.kind].name}</em>` : ''}</b><s>${xfNeed(x)}</s></span></div>`;
+}
+
+// tiny diamond near an X-Factor before the snap: how full his zone is (the big badge takes over when he's ON)
+function drawXFPip(g, p, x, y) {
+  const z = clamp(p.xf.zone, 0, 1), r = 7;
+  g.save(); g.translate(x, y);
+  g.beginPath(); g.moveTo(0, -r); g.lineTo(r, 0); g.lineTo(0, r); g.lineTo(-r, 0); g.closePath();
+  g.fillStyle = '#111c'; g.fill();
+  if (z > 0) { g.save(); g.clip(); g.fillStyle = '#ff8a1a'; const h = 2 * r * xfFillH(z); g.fillRect(-r, r - h, 2 * r, h); g.restore(); }
+  g.strokeStyle = '#ff8a1a'; g.lineWidth = 1.5; g.stroke();
+  g.restore();
+}
+
 // glow + badge for a player who's in the zone (drawn under / over the bobblehead)
 function drawXFRing(g, p, x, y) {
   if (!p.xf || !p.xf.on) return;

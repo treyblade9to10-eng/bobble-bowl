@@ -414,11 +414,12 @@ function makePlayer(side, isOff, slot, tuple) {
     anim: (h % 100) / 10, speedNow: 0, stamina: 1, down: 0, downDir: 1, stun: 0, spin: 0, juke: 0, jukeCd: 0, spinCd: 0,
     dive: 0, tackleCd: 0, engaged: null, shed: 0, shedCd: 0, mouth: '', mouthT: 0, isHuman: false, throwKey: 0, openness: null,
     role: 'idle', route: null, assign: null, aiIdle: 0,
-    xf: (G.xf && G.xf[side + ':' + name]) || null, dirt: (G.dirt && G.dirt[side + ':' + name]) || 0, slip: 0, slipCd: 0,
+    xf: (G.xf && G.xf[side + ':' + name]) || null, ab: abFor(name), dirt: (G.dirt && G.dirt[side + ':' + name]) || 0, slip: 0, slipCd: 0,
     cap: !!(ex && ex.cap), thp: ex && ex.thp || null, tha: ex && ex.tha || null, gloves: ex && ex.gloves || null, teamGloves: !!(ex && ex.teamGloves),
     rt: ex && ex.r ? Ratings.clean(ex.r, ovr0, spdR) : null // specific ratings (ratings.js), offsets from OVR
   };
   if (pl.rt) pl.acc *= accMul(pl);
+  if (abHas(pl, 'cuts')) pl.acc *= 1.12; // Route Technician / Human Joystick
   return typeof Gear !== 'undefined' && !(ex && ex.cap) ? Gear.apply(pl, G.teams && G.teams[side]) : pl; // Gear Locker picks
 }
 
@@ -581,6 +582,7 @@ function snapMotion() {
     p.route = { pts: G.play.off.mroute.map(([dd, oo]) => { const x = p.x + d * dd; return { x: d > 0 ? Math.min(x, deepX) : Math.max(x, deepX), y: clamp(p.y + dir * oo, 1.2, FIELD_W - 1.2) }; }), end: G.play.off.mend || 'go', i: 0 };
     p.hy = p.y; p.motionMan = true;
   } else if (m && m.p.route) { const sh = m.p.y - m.p.hy; for (const pt of m.p.route.pts) pt.y = clamp(pt.y + sh, 1.2, FIELD_W - 1.2); m.p.hy = m.p.y; }
+  for (const p of G.players) if (abHas(p, 'quick')) p.qj = 0.5; // Quick Jump: a faster first step
   for (const df of G.D) if (xfOn(df, 'bottleneck')) { // Bottleneck: wins the jam on the closest receiver, press or not
     let r = null, rd = 6; for (const o of G.O) if (o.slot >= 2 && dist(o, df) < rd) { rd = dist(o, df); r = o; }
     if (r) { r.stun = 0.6; addText(r.x, r.y, 'BOTTLENECK', '#ff8a1a', 14, 0.7); }
@@ -1288,9 +1290,9 @@ function doHitStick(p) {
 }
 function doSwim(p) {
   if (p.swimCd > 0 || !p.engaged) return;
-  const rel = xfOn(p, 'relentless'); p.swimCd = rel ? 0.4 : 1.2; // Relentless: rush moves are free
+  const rel = xfOn(p, 'relentless'), sw = abHas(p, 'swim'); p.swimCd = rel ? 0.4 : sw ? 0.9 : 1.2; // Relentless: rush moves are free
   const bl = p.engaged;
-  if (chance(clamp(0.45 + (rat(p, 'PRS') - rat(bl, 'PBK')) / 90 + (rel ? 0.2 : 0), 0.2, 0.9))) {
+  if (chance(clamp(0.45 + (rat(p, 'PRS') - rat(bl, 'PBK')) / 90 + (rel ? 0.2 : 0) + (sw ? 0.1 : 0), 0.2, 0.9))) {
     unlink(bl, p); p.shedCd = 0.8; bl.stun = 0.7; bl.head.vx += 250;
     addText(p.x, p.y, 'SWIM MOVE!', '#ff8a8a', 18, 0.7); Sound.juke();
   } else addText(p.x, p.y, 'STUFFED', '#ccc', 14, 0.6);
@@ -1731,6 +1733,7 @@ function resolveBlocks(dt) {
     if (xfOn(df, 'unstoppable')) rate *= 2.6;
     if (passPro && (xfOn(df, 'relentless') || xfOn(df, 'dualthreat'))) rate *= 2.2;
     if (!passPro && xfOn(df, 'reinforcement')) rate *= 2.4;
+    rate *= abShed(df, bl, passPro);
     if (G.bstate === 'run') rate *= big ? 1.4 : 1.5; // receivers can hold a stalk block long enough to spring a sweep or screen
     df.shed += rate * dt;
     // the defender pushes slowly toward where he wants to go
@@ -1771,7 +1774,8 @@ function applyMove(p, dt) {
   } else {
     ax = p.dvx - p.vx; ay = p.dvy - p.vy;
     if (cutSlip(p, dt)) return;
-    const m = Math.hypot(ax, ay), maxA = p.acc * dt * (p.juke > 0 ? 0.25 : 1);
+    if (p.qj > 0) p.qj -= dt;
+    const m = Math.hypot(ax, ay), maxA = p.acc * dt * (p.juke > 0 ? 0.25 : 1) * (p.qj > 0 ? 1.5 : 1);
     if (m > maxA) { ax *= maxA / m; ay *= maxA / m; }
     p.vx += ax; p.vy += ay;
   }
@@ -1880,7 +1884,7 @@ function throwTo(qb, r, pitch = false, aimed = null, style = 'normal', lead = nu
   const sMul = style === 'bullet' ? 1.3 : style === 'lob' ? 0.72 : 1;
   // meter power: weak = a slower ball (defenders close), too hard = faster but wilder
   const mMul = !mt || pitch ? 1 : mt.perfect ? 1.05 : mt.over ? 1.15 : lerp(0.78, 1, clamp(mt.v / mt.g0, 0, 1));
-  const spd = (pitch ? 20 : Math.max(11, 19 + (arm.thp - 70) * 0.16)) * GAME_SPEED * (pitch ? 1 : sMul * mMul); // pitches are short and quick
+  const spd = (pitch ? 20 : Math.max(11, 19 + (arm.thp - 70) * 0.16) * (abHas(qb, 'gun') ? 1.05 : 1)) * GAME_SPEED * (pitch ? 1 : sMul * mMul); // pitches are short and quick
   let tx = r.x, ty = r.y, T = 0.3;
   const sitting = r.route && r.route.end === 'sit' && r.route.i >= r.route.pts.length;
   if (aimed) {
@@ -1908,7 +1912,7 @@ function throwTo(qb, r, pitch = false, aimed = null, style = 'normal', lead = nu
       len = Math.hypot(tx - qb.x, ty - qb.y); duck = true;
       addText(qb.x, qb.y - 2, 'NOT ENOUGH ARM', '#ff8a8a', 15, 0.9);
     }
-    let pressure = false; for (const df of G.D) if ((!df.engaged || xfOn(df, 'fearmonger')) && dist(df, qb) < (df.engaged ? 3.2 : 2.4)) pressure = true;
+    let pressure = false; for (const df of G.D) if ((!df.engaged || xfOn(df, 'fearmonger')) && dist(df, qb) < (df.engaged ? 3.2 : 2.4) + (abHas(df, 'reach') ? 0.4 : 0)) pressure = true;
     if (xfOn(qb, 'proreads')) pressure = false; // Pro Reads: ignores the rush
     const elite = clamp((arm.acc - 80) / 12, 0, 1); // 92+ accuracy = elite, 80 and under = normal
     let err = (lerp(0.55, 0.28, elite) + arm.accF) * (0.42 + len / 20);
@@ -1921,6 +1925,7 @@ function throwTo(qb, r, pitch = false, aimed = null, style = 'normal', lead = nu
     if (style === 'bullet') err *= 1.15; else if (style === 'lob') err *= 0.9;
     if (xfOn(qb, 'dimes') || xfOn(qb, 'dots')) err *= 0.35;
     if (xfOn(qb, 'proreads')) err *= 0.7;
+    err *= abThrowErr(qb, { pressure, onRun, tx, ty, style }); // Deadeye / Fearless
     if (G.weather === 'rain' || G.weather === 'snow') err *= 1.15;
     if (mt) { if (mt.perfect) err *= 0.25; else if (mt.over) err *= 1.35; else err *= 1 + (1 - clamp(mt.v / mt.g0, 0, 1)) * 0.6; }
     if (arm.thp < 62 || err > 3.5) duck = true;
@@ -1963,7 +1968,7 @@ function updateFlight(dt) {
       const jumping = p.jump > 0, reach = jumping ? 1.4 : 0.5, high = jumping ? 3.6 : 2.0;
       if (b.z > high || Math.hypot(p.x - b.x, p.y - b.y) > reach) continue;
       p.laneChecked = true;
-      const pInt = clamp((jumping ? (p.isHuman ? 0.7 : 0.3) : p.isHuman ? 0.45 : 0.28) + (rat(p, 'CTH') - 80) / 200 + (p.isHuman ? 0.05 : 0) + (xfOn(p, 'lurker') || xfOn(p, 'shutdown') ? 0.1 : 0), 0.15, 0.9); // CPU: fewer picks, more tips (players said too many INTs)
+      const pInt = clamp((jumping ? (p.isHuman ? 0.7 : 0.3) : p.isHuman ? 0.45 : 0.28) + (rat(p, 'CTH') - 80) / 200 + (p.isHuman ? 0.05 : 0) + (xfOn(p, 'lurker') || xfOn(p, 'shutdown') ? 0.1 : 0) + (abHas(p, 'lurker') && p.assign && p.assign.type === 'zone' ? 0.06 : 0), 0.15, 0.9); // CPU: fewer picks, more tips (players said too many INTs)
       b.flight = null; G.showTarget = false;
       if (chance(pInt)) { addText(p.x, p.y, jumping ? 'SKY HIGH!' : 'PICKED!', '#7fd3ff', 22, 0.9); return intercept(p); }
       return incomplete(p, 'TIPPED!');
@@ -2013,13 +2018,13 @@ function resolveCatch() {
   // Universal Coverage / Dual Threat: any defender with this ability close to the catch knocks it loose
   for (const q of G.players) if (q.side !== f.passer.side && q.down <= 0 && rcv && rd < R && dist(q, land) < (xfOn(q, 'univ') ? 1.7 : 1.2) && (xfOn(q, 'univ') || xfOn(q, 'dualthreat'))
     && chance((xfOn(q, 'univ') ? 0.8 : 0.45) * (hands ? 0.5 : 1))) return incomplete(q, 'KNOCKED LOOSE!');
-  const tight = xfOn(def, 'shutdown') ? 0.35 : 0; // Shutdown: plays the ball from farther away
+  const tight = (xfOn(def, 'shutdown') ? 0.35 : 0) + (abHas(def, 'shade') && def.assign && def.assign.type === 'man' ? 0.12 : 0); // Shutdown: plays the ball from farther away
   if (def && dd < 0.5 && dd < rd - 0.3 && !(hands && chance(0.7))) { // ball hits the defender right in the body: 7 out of 10 get picked
     if (chance(def.isHuman ? 0.55 : 0.13)) return intercept(def);
     return incomplete(def, 'BROKEN UP!');
   }
   if (def && dd < 1.25 + tight && dd < rd - 0.25 + tight && !(hands && chance(0.7))) { // defender has inside position
-    const pInt = clamp((def.isHuman ? 0.08 : 0.04) + (rat(def, 'COV') - 75) / 160 + humanDefBonus + (G.diff === 3 && !def.isHuman ? 0.06 : 0) - (rd < 1 ? 0.08 : 0), 0.03, 0.6);
+    const pInt = clamp((def.isHuman ? 0.08 : 0.04) + (rat(def, 'COV') - 75) / 160 + humanDefBonus + (abHas(def, 'lurker') && def.assign && def.assign.type === 'zone' ? 0.04 : 0) + (G.diff === 3 && !def.isHuman ? 0.06 : 0) - (rd < 1 ? 0.08 : 0), 0.03, 0.6);
     if (chance(pInt)) return intercept(def);
     return incomplete(def, 'BROKEN UP!');
   }
@@ -2029,6 +2034,7 @@ function resolveCatch() {
     if (hands) pc += 0.15;
     if (f.perfect) pc += 0.12; // a PERFECT meter throw is right in his hands
     if (f.cp === 'perfect') pc += 0.1; else if (f.cp === 'good') pc += 0.08; // timed catch
+    pc += abCatch(rcv, def, def && dd < 1.8, f, land); // superstar abilities: route Elites, contested catches, knockouts
     if (def && dd < 1.8) { pc -= (hands ? 0.08 : 0.24) - (rat(rcv, 'CTH') - rat(def, 'COV')) / 150; if (chance((def.isHuman ? 0.03 : 0.015) + humanDefBonus * 0.5)) return intercept(def); }
     if (chance(clamp(pc, 0.25, 0.97))) {
       const backLine = rcv.x < -0.25 || rcv.x > 120.25, sideLine = rcv.y < -0.25 || rcv.y > FIELD_W + 0.25;
@@ -2090,11 +2096,12 @@ function checkTackles() {
     if (xfOn(car, 'freight')) p -= 0.25;
     if (xfOn(df, 'unstoppable') || xfOn(df, 'reinforcement')) p += 0.1;
     if (xfOn(car, 'ankle') && (car.juke > 0 || car.spin > 0)) p -= 0.3;
+    p += abTackle(car, df, front);
     p = clamp(p, 0.1, 0.94);
     // one-shot breaks: Brick Wall (first sack try), Phenom (first hit), First One Free (next move), YAC 'Em Up (first hit after the catch)
     const xfBreak = (car === G.O[0] && G.bstate === 'snap' && xfFree(car, 'brickwall')) || xfFree(car, 'phenom')
       || ((car.juke > 0 || car.spin > 0) && xfFree(car, 'firstfree')) || (G.bstate === 'run' && G.credit && G.credit.kind === 'rec' && xfFree(car, 'yac'));
-    if (xfBreak) p = 0;
+    if (xfBreak || (car === G.O[0] && G.bstate === 'snap' && car.pos === 'QB' && abFree(car, 'extender') && chance(0.4))) p = 0; // Extender: sometimes shakes the first sack try
     if (chance(p)) return tackle(car, df, hitters);
     if (df.hit > 0) { df.hit = 0; df.down = 1.1; df.downDir = car.x > df.x ? 1 : -1; addText(df.x, df.y, 'WHIFF!', '#ccc', 18, 0.8); continue; }
     // broken tackle
@@ -2120,7 +2127,7 @@ function tackle(car, df, hitters) {
   const st = stat(df);
   // fumble?
   df.hit = 0;
-  if ((G.bstate === 'run' || stick) && !xfOn(car, 'truzz') && chance((0.022 + (hitters > 1 ? 0.02 : 0) + (stick ? 0.3 : 0) + Weather.fumbleBonus()) * tuckFumbleMul(car) * carMul(car))) {
+  if ((G.bstate === 'run' || stick) && !xfOn(car, 'truzz') && chance((0.022 + (hitters > 1 ? 0.02 : 0) + (stick ? 0.3 : 0) + Weather.fumbleBonus()) * tuckFumbleMul(car) * carMul(car) * (abHas(car, 'secure') ? 0.6 : 1))) {
     b.holder = null; b.x = car.x; b.y = car.y;
     b.loose = { vx: rand(-4, 4), vy: rand(-3, 3), t: 0 };
     G.bstate = 'loose'; showBanner('FUMBLE!', '', '#ff9a3d', 1.0); car.down = 0.9; b.fumbler = car;
@@ -2321,7 +2328,7 @@ function doKick(kind) {
   setupPlay(OFF_PLAYS[2], DEF_PLAYS[0], true);
   const kk = kickerOf(s, kind);
   const kicker = G.O[0];
-  Object.assign(kicker, { name: kk.name, num: kk.num, ovr: kk.ovr, pos: kind === 'punt' ? 'P' : 'K', cap: false, xf: null, rt: null });
+  Object.assign(kicker, { name: kk.name, num: kk.num, ovr: kk.ovr, pos: kind === 'punt' ? 'P' : 'K', cap: false, xf: null, ab: null, rt: null });
   if (kk.skin != null) kicker.face.skin = kk.skin;
   const live = fgSetup(kind); // live play: snap, hold, the line blocks, the defense rushes (special.js)
   const yds = kind === 'xp' ? 33 : kind === 'fg' ? Math.round(Math.abs(goalX(s) - G.los) + 17) : 0;
@@ -2329,6 +2336,7 @@ function doKick(kind) {
   G.km = { kind, yds, kk, stage: 0, t: 0, power: 0, aim: 0, side: s,
            rateP: 0.7 + (90 - ovr) * 0.015, rateA: 0.6 + (90 - ovr) * 0.015,
            need: kind === 'punt' ? 0 : yds / fgRange(pw), tol: kind === 'punt' ? 0.35 : Math.min(0.45, fgTol(yds, ovr) * (kind === 'xp' ? 1.6 : 1.35)), live };
+  if (yds >= 45 && abFor(kk.name).some(a => a.fx === 'zen')) { G.km.rateP *= 0.85; G.km.rateA *= 0.85; G.km.tol *= 1.1; } // Zen Kicker
   G.playClock = 0;
   if (isHumanSide(s) && !G.demo && !G.sitOut && !autoKick()) { G.phase = 'kickmeter'; G.km.wait = 0.35; return; } // setting the power snaps it
   // computer kicks: roll the dice using the kicker's rating

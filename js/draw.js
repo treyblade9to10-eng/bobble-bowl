@@ -646,6 +646,7 @@ function drawPlayer(g, p, G, at) {
   const headTop = y - hop - (big ? 85 : 92);
   if (at || G.phase === 'kick' || G.phase === 'kickmeter') return;
   if (p.xf && p.xf.on && p.down <= 0) { drawXFBadge(g, p, x, headTop - (p.isHuman || carrying ? 44 : 4)); }
+  else if (p.xf && G.phase === 'presnap' && !G.demo && p.down <= 0) drawXFPip(g, p, x + 24, headTop + 30);
   const showName = !p.celly && (p.isHuman || carrying || p.cap || (G.phase === 'presnap' && p.off && p.slot <= 4 && p.side === G.human));
   let ly = headTop;
   if (showName && p.down <= 0) {

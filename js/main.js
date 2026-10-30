@@ -405,7 +405,7 @@ function onPlayCall(c) {
   const ci = pcList.findIndex(p => p.key === pcCoach), nSpec = pcList.filter(p => p.special).length;
   if (ci > nSpec) pcList.splice(nSpec, 0, pcList.splice(ci, 1)[0]);
   pcOff = humanOff; pcPage = 0;
-  renderCards();
+  renderCards(); renderPcXF(c);
   show('playcall');
   // 2-player: hide the cards until the right player is looking
   const cover = $('pcCover');
@@ -437,6 +437,7 @@ function renderCards() {
   const cols = Math.max(2, Math.ceil(list.length / 2));
   box.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
   box.style.width = `min(${cols * 200}px, calc(100vw - 20px))`;
+  $('pcTop').style.width = box.style.width;
   list.forEach((p, j) => {
     const i = idx[j];
     const el = document.createElement('div');
@@ -480,6 +481,14 @@ function renderCards() {
   const tip = document.createElement('span'); tip.className = 'pgtip';
   tip.textContent = G.mode === 'mobile' ? '' : `1-${Math.min(PER_PAGE, list.length) % 10 || 0} to pick     ← → pages` + [...hint.querySelectorAll('.tool')].map(b => b.textContent === 'KNEEL' ? '     K kneel' : b.textContent === 'SPIKE' ? '     X spike' : '').join('');
   hint.appendChild(tip);
+}
+// X-Factors on both sides of the header: zone meter + what it takes (yours on the left)
+function renderPcXF(c) {
+  const me = c.side != null ? c.side : G.human >= 0 ? G.human : 0, max = G.mode === 'mobile' ? 2 : 3, big = G.mode !== 'mobile';
+  [me, 1 - me].forEach((s, j) => {
+    const L = (c.mode === 'off' || c.mode === 'def') && !(G.online && Net.role === 'guest') ? xfTeamList(s) : [], col = G.teams[s] ? G.teams[s].c1 : '#888';
+    $('pcXF' + j).innerHTML = L.slice(0, max).map(x => xfChip(x, col, big)).join('') + (L.length > max ? `<div class="xfc more">+${L.length - max}</div>` : '');
+  });
 }
 G.hooks.onPlayCall = c => { if (G.demo) return; if (G.online && Net.role === 'host') return Net.onPlayCall(c); onPlayCall(c); };
 G.hooks.onClockOut = () => { if ($('playcall').classList.contains('show')) show(null); };
@@ -699,11 +708,16 @@ $('btnAgain').onclick = () => { const c = G.challenge; show(null); if (c) runCha
 $('btnNewTeams').onclick = () => { if (G.online) { Net.leave(); G.teams = null; G.online = false; show('title'); return; } const c = G.challenge; G.teams = null; G.challenge = null; if (c) openModes(); else { renderSelect(); show('select'); } };
 
 // ---------- pause ----------
+// pause menu: every X-Factor in the game, both teams
+function renderPauseXF() {
+  const me = G.human >= 0 ? G.human : 0, cols = [me, 1 - me].map(s => [s, xfTeamList(s)]).filter(([, L]) => L.length);
+  $('pauseXF').innerHTML = !cols.length || G.mini || (G.online && Net.role === 'guest') ? '' : cols.map(([s, L]) => `<div class="pxCol"><div class="pbpHead">${G.teams[s].name} X-FACTORS</div>${L.map(x => xfChip(x, G.teams[s].c1, true)).join('')}</div>`).join('');
+}
 function togglePause() {
   if (!G.teams || G.phase === 'over' || G.demo || Highlights.on || $('hlMenu').classList.contains('show')) return;
   if (G.online) { const on = !$('pause').classList.contains('show'); if (on) { $('pausePbp').innerHTML = '<div class="pbpHead">ONLINE GAME KEEPS GOING WHILE THIS IS OPEN</div>' + pbpHtml(6); show('pause'); } else show(null); return; }
   G.paused = !G.paused;
-  if (G.paused) { G.pauseFrom = $('playcall').classList.contains('show') ? 'playcall' : null; coachLabel(); $('btnCoachOpt').style.display = G.versus || G.lock || G.mini || G.challenge ? 'none' : ''; $('pausePbp').innerHTML = pbpHtml(8); show('pause'); }
+  if (G.paused) { G.pauseFrom = $('playcall').classList.contains('show') ? 'playcall' : null; coachLabel(); $('btnCoachOpt').style.display = G.versus || G.lock || G.mini || G.challenge ? 'none' : ''; $('pausePbp').innerHTML = pbpHtml(8); renderPauseXF(); show('pause'); }
   else show(G.pauseFrom);
 }
 $('btnPause').onclick = togglePause;
