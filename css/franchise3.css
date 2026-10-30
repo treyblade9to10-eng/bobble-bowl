@@ -1,0 +1,117 @@
+/* ---- Bobble Feed, weekly recap, owner + job security, new job, ring ceremony, locker room (js/feed.js, weekrecap.js, owner.js, holdouts.js) ---- */
+/* feed */
+.fdBar { display: flex; gap: 4px; margin-bottom: 6px; position: sticky; top: -8px; z-index: 1; background: var(--panel); padding: 2px 0 4px; }
+.fdBar button { margin: 0; padding: 3px 10px; font-size: 12px; background: var(--panel2); color: var(--dim); clip-path: none; }
+.fdBar button.on { background: var(--gold); color: #111; }
+.fdBar #fdWk { margin-left: auto; }
+.fdPost { display: flex; gap: 8px; padding: 6px 2px 5px; border-bottom: 1px solid var(--line); }
+.fdAv { flex: 0 0 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: var(--hd); font-weight: 900; font-size: 11px; letter-spacing: .02em; box-shadow: inset 0 0 0 2px #ffffff30; }
+.fdB { flex: 1; min-width: 0; }
+.fdH { display: flex; align-items: center; gap: 4px; font-size: 12.5px; white-space: nowrap; overflow: hidden; }
+.fdH b { font-weight: 700; overflow: hidden; text-overflow: ellipsis; }
+.fdH i { font-style: normal; color: var(--dim); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; }
+.fdVer { width: 13px; height: 13px; flex-shrink: 0; }
+.fdTx { font-size: 13px; line-height: 1.35; margin: 1px 0 3px; overflow-wrap: anywhere; }
+.fdTx u { text-decoration: none; color: var(--gold); }
+.fdF { display: flex; gap: 18px; color: var(--dim); font-size: 11px; font-variant-numeric: tabular-nums; }
+.fdF span { display: inline-flex; align-items: center; gap: 4px; }
+.fdF svg { width: 13px; height: 13px; }
+
+/* weekly recap */
+#wkRecap { padding: 12px 14px 8px; }
+.wrHead { display: flex; align-items: baseline; justify-content: center; gap: 14px; flex-shrink: 0; }
+.wrHead b { font-family: var(--hd); font-style: italic; font-weight: 900; font-size: 34px; line-height: 1; text-transform: uppercase; text-shadow: 2px 2px 0 #0008; }
+.wrHead span { font-family: var(--hd); font-weight: 800; font-size: 13px; letter-spacing: .2em; color: var(--gold); }
+#wrBody { width: min(1150px, 100%); flex: 0 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.wrGrid { display: flex; gap: 10px; margin-top: 8px; flex: 0 1 auto; min-height: 0; align-items: flex-start; }
+.wrCol { flex: 1 1 0; min-width: 0; max-height: 100%; align-self: stretch; background: var(--panel); padding: 7px 10px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.wrCol.wrPrCol { flex: 0.8 1 0; }
+.wrGap { margin-top: 9px; }
+.wrScore { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 6px 8px; border-bottom: 4px solid #0006; }
+.wrScore span { font-family: var(--hd); font-style: italic; font-weight: 900; font-size: 18px; text-shadow: 1px 1px 0 #0008; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wrScore span:first-child { text-align: right; }
+.wrScore b { font-family: var(--hd); font-style: italic; font-weight: 900; font-size: 34px; line-height: 1; text-shadow: 2px 2px 0 #0008; }
+.wrScore .rcRes { font-style: normal; }
+.wrPlay { display: flex; gap: 8px; align-items: flex-start; padding: 4px 0; border-bottom: 1px solid var(--line); font-size: 13px; line-height: 1.3; }
+.wrPlay b { flex: 0 0 22px; height: 22px; display: flex; align-items: center; justify-content: center; background: var(--gold); color: #111; font-family: var(--hd); font-style: italic; font-weight: 900; font-size: 15px; }
+.wrPr { display: flex; align-items: center; gap: 6px; padding: 2px 0; border-bottom: 1px solid var(--line); font-size: 12.5px; }
+.wrPr b { flex: 0 0 20px; font-family: var(--hd); font-weight: 900; color: var(--gold); text-align: right; }
+.wrPr span { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wrPr i { font-style: normal; color: var(--dim); font-size: 11px; }
+.wrPr .fhMv { flex: 0 0 34px; text-align: right; margin: 0; white-space: nowrap; } .wrPr i { flex-shrink: 0; }
+.wrPr.me { background: #f6c31c1c; } .wrPr.me span { color: var(--gold); font-weight: 700; }
+.wrBtns { display: flex; gap: 8px; align-items: center; margin-top: 8px; flex-shrink: 0; }
+.wrBtns button { margin: 0; }
+#wrOff { padding: 6px 14px; font-size: 13px; background: var(--panel); color: var(--dim); }
+
+/* owner card + season verdict */
+.owSec { display: flex; align-items: baseline; gap: 8px; }
+.owSec span { font-family: var(--hd); font-weight: 800; letter-spacing: .1em; font-size: 11px; color: var(--dim); white-space: nowrap; }
+.owSec b { font-family: var(--hd); font-style: italic; font-weight: 900; font-size: 24px; line-height: 1; }
+.owSec .fhTag { margin: 0 0 0 auto; }
+.owBar { height: 6px; } .owBar u { transition: width .3s; }
+.fhCard.fhOwn { border-top-color: #ffffff30; }
+.fhOwn .fhRow > span:first-child { white-space: normal; }
+.owTi { margin: 0; }
+.owMsg { margin: 8px auto 0; max-width: 520px; padding: 6px 10px; font-size: 13px; line-height: 1.35; background: #0b0f16d0; border-left: 4px solid var(--gold); text-align: left; }
+.owMsg b { color: var(--gold); font-family: var(--hd); letter-spacing: .06em; }
+.owMsg.fired, .owMsg.hot { border-left-color: #ff6b6b; } .owMsg.fired b, .owMsg.hot b { color: #ff8a8a; }
+.owMsg.ext b { color: #4fe08a; } .owMsg.ext { border-left-color: #4fe08a; }
+#seasonHub.owOver #shSched { max-height: 150px; }
+.fhCard.fhHold { border-top-color: #ff6b6b; }
+.fhHold .fhBtn:disabled { opacity: .5; cursor: default; }
+.fhHold .fhRow > span:first-child { white-space: normal; }
+
+/* new job */
+#jobs { justify-content: flex-start; padding-top: 16px; }
+#jbNote { color: var(--dim); font-size: 14px; margin: -6px 0 12px; text-align: center; }
+#jbCards { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+.jbCard { width: 250px; background: linear-gradient(170deg, color-mix(in srgb, var(--c1) 45%, var(--panel)) 0%, var(--panel) 65%); border-top: 4px solid var(--c2); padding: 10px 12px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.jbLogo .badge { width: 58px; height: 64px; object-fit: contain; display: block; }
+.jbTeam { font-family: var(--hd); font-style: italic; font-weight: 900; font-size: 26px; line-height: 1; text-transform: uppercase; }
+.jbTeam i { display: block; font-size: 14px; font-weight: 800; letter-spacing: .1em; color: var(--dim); font-style: normal; }
+.jbInfo { font-size: 13px; } .jbInfo b { color: var(--gold); }
+.jbGo { margin: 6px 0 0; background: var(--gold); color: #111; }
+#jbBack { margin-top: 12px; }
+
+/* ring ceremony */
+#ringCer { background: radial-gradient(ellipse at 30% 50%, #2a2312 0%, #0c1016 60%); }
+.rgWrap { display: flex; align-items: center; justify-content: center; gap: 36px; width: min(1050px, 100%); }
+.rgArt { position: relative; flex: 0 0 auto; width: min(340px, 42vw, 70vh); animation: rgIn .9s cubic-bezier(.2, 1.4, .4, 1) both; }
+.rgSvg { width: 100%; display: block; filter: drop-shadow(0 10px 24px #000c); }
+.rgLogo { position: absolute; left: 50%; top: 40%; width: 24%; transform: translate(-50%, -50%); }
+.rgLogo .badge { width: 100%; height: auto; display: block; filter: drop-shadow(0 2px 3px #0009); }
+.rgShine { animation: rgShine 3.4s ease-in-out 1s infinite; transform: translateX(-60px); }
+@keyframes rgIn { from { transform: scale(.4) rotate(-12deg); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes rgShine { 0% { transform: translateX(-60px); } 55%, 100% { transform: translateX(300px); } }
+.rgInfo { max-width: 520px; }
+.rgTag { font-family: var(--hd); font-weight: 800; letter-spacing: .22em; color: var(--gold); font-size: 14px; }
+.rgTeam { font-family: var(--hd); font-style: italic; font-weight: 900; font-size: 52px; line-height: 1; text-transform: uppercase; -webkit-text-stroke: 1px #fff; text-shadow: 3px 3px 0 #0008; margin: 4px 0; }
+.rgBowl { font-family: var(--hd); font-style: italic; font-weight: 900; font-size: 30px; text-transform: uppercase; color: #fff; }
+.rgLine { font-size: 15px; margin-top: 6px; color: var(--text); } .rgLine b { color: var(--gold); }
+.rgInfo button { margin: 14px 0 0; }
+
+@media (max-height: 500px) {
+  .fdPost { gap: 6px; padding: 4px 1px 3px; } .fdAv { flex-basis: 24px; height: 24px; font-size: 9px; }
+  .fdH { font-size: 11.5px; } .fdH i { font-size: 10.5px; } .fdTx { font-size: 12px; } .fdF { font-size: 10px; gap: 14px; } .fdF svg { width: 11px; height: 11px; }
+  .fdBar button { padding: 2px 8px; font-size: 11px; }
+  #wkRecap { padding: 6px 10px 6px; }
+  .wrHead b { font-size: 22px; } .wrHead span { font-size: 11px; }
+  .wrGrid { gap: 6px; margin-top: 4px; } .wrCol { padding: 5px 7px; }
+  .wrScore { padding: 3px 6px; gap: 6px; } .wrScore span { font-size: 14px; } .wrScore b { font-size: 24px; }
+  .wrPlay { font-size: 11.5px; padding: 3px 0; gap: 6px; } .wrPlay b { flex-basis: 18px; height: 18px; font-size: 13px; }
+  .wrPr { font-size: 11px; padding: 1px 0; } .wrGap { margin-top: 5px; }
+  .wrBtns { margin-top: 5px; } .wrBtns button.big { font-size: 19px; padding: 6px 26px; } #wrOff { padding: 5px 10px; font-size: 11px; }
+  .owSec b { font-size: 19px; } .owMsg { font-size: 11px; padding: 4px 8px; margin-top: 5px; }
+  #jobs { padding-top: 6px; } #jobs h2 { font-size: 28px; margin-bottom: 10px; } #jbNote { font-size: 12px; margin-bottom: 6px; }
+  .jbCard { width: 220px; padding: 6px 10px; } .jbLogo .badge { width: 40px; height: 44px; } .jbTeam { font-size: 21px; } .jbInfo { font-size: 12px; } #jbBack { margin-top: 6px; padding: 6px 18px; }
+  .rgWrap { gap: 18px; } .rgTeam { font-size: 32px; } .rgBowl { font-size: 20px; } .rgTag { font-size: 11px; } .rgLine { font-size: 13px; margin-top: 3px; } .rgInfo button { margin-top: 8px; }
+}
+/* phones: the hub's tab row never gets squeezed by a tall tab (it has overflow-x, so flexbox would shrink it) */
+@media (max-height: 560px) {
+  #seasonHub #shTabs { flex-shrink: 0; }
+  #seasonHub.owOver #shNext { min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; } /* season over + the owner's verdict: scrolls inside instead of running into the buttons */
+  #seasonHub.owOver #shNext { flex: 1 1 auto; } #seasonHub.owOver #shSched { flex: 0 1 46px; }
+  #seasonHub.owOver #shNext .mu { font-size: 18px; } #seasonHub.owOver #shNext .row button { font-size: 15px; padding: 5px 14px; margin-top: 4px; }
+  #seasonHub.owOver #shNext .awards { display: none; } /* still on ALL AWARDS: the verdict + the next button need the room */
+}
