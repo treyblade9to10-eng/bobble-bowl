@@ -52,7 +52,10 @@ function pbpPlay(res) {
 // little ticker under the scoreboard for the latest line
 function drawTicker(g, G) {
   const L = G.pbpShow; if (!L || G.demo || G.mini) return;
-  const age = G.time - L.t; if (age > 5 || G.phase === 'live' || G.phase === 'replay') return;
+  // the play-call cards cover the top of the screen, and a big banner is the same news: wait, then show the line for its full time
+  const t0 = L.st != null ? L.st : L.t;
+  if ((G.banner && G.banner.t < G.banner.dur) || $('playcall').classList.contains('show')) { if (G.time - t0 < 5) L.st = Math.max(t0, G.time - 0.2); return; }
+  const age = G.time - t0; if (age > 5 || G.phase === 'live' || G.phase === 'replay') return;
   const a = Math.min(1, age * 5, (5 - age) * 2);
   g.save(); g.globalAlpha = a;
   g.font = '600 17px "Barlow Condensed", Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';

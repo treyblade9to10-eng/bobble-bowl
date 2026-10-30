@@ -12,7 +12,7 @@ function backupQB(team) {
 
 const Injury = {
   reset() { G.qbWear = [0, 0]; G.qbHurt = [null, null]; },
-  on() { return !G.demo && !G.mini && !G.online && !G.challenge; },
+  on() { return !G.demo && !G.mini && !G.online && !G.challenge && !G.practice; },
   wear(side) { return (G.qbWear && G.qbWear[side]) || 0; },
   // the QB got hit: kind = 'sack' | 'tackle' | 'boom'
   hit(qb, kind) {
@@ -24,7 +24,7 @@ const Injury = {
     if (before < 55 && G.qbWear[s] >= 55) { addText(qb.x, qb.y - 3, 'QB IS BANGED UP', '#ffb35c', 16, 1.4); addPbp(`${qb.name} is slow to get up.`); }
     if (qb.cap || G.qbHurt[s]) return; // your career player shakes it off; only one QB injury per team per game
     const w = G.qbWear[s], p = w < 50 ? 0 : 0.003 + (w - 50) * 0.0008 + (kind === 'boom' ? 0.01 : 0); // only a QB who's taken a beating can get hurt
-    if (chance(p)) this.hurt(s, qb);
+    if (chance(p * Sliders.mul('inj'))) this.hurt(s, qb);
   },
   hurt(s, qb) {
     const t = G.teams[s], b = backupQB(t);

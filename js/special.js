@@ -132,7 +132,7 @@ function catchKick(f) {
     rt.fair = 0; Sound.catch(); addPbp(`${lastName(rt.name)} calls for a fair catch.`);
     return endPlay({ type: 'kickdead', x: rt.x, why: 'FAIR CATCH' });
   }
-  if (chance(0.02)) { b.loose = { vx: rand(-2, 2), vy: rand(-2, 2), t: 0 }; b.x = rt.x; b.y = rt.y; G.bstate = 'loose'; addText(rt.x, rt.y, 'MUFFED IT!', '#ff6040', 22, 1); return; }
+  if (chance(0.02 * Sliders.mul('fum'))) { b.loose = { vx: rand(-2, 2), vy: rand(-2, 2), t: 0 }; b.x = rt.x; b.y = rt.y; G.bstate = 'loose'; addText(rt.x, rt.y, 'MUFFED IT!', '#ff6040', 22, 1); return; }
   b.holder = rt; G.bstate = 'run'; G.credit = null; G.retStart = rt.x;
   Sound.catch(); addText(rt.x, rt.y, 'RETURN!', '#9cff9c', 18, 0.8);
   if (isHumanSide(rt.side)) setHD(rt.side, rt);
@@ -763,7 +763,7 @@ function kickerHit(L, kp) {
     if (p.side === kp.side || p.down > 0 || p.roughChk || p.speedNow < 2.5 || dist(p, kp) > 0.9) continue;
     p.roughChk = true;
     const hard = p.speedNow > 5.5 || p.dive > 0;
-    if (p !== L.hot && !chance(hard ? 0.035 : 0.03)) continue;
+    if (p !== L.hot ? !chance((hard ? 0.035 : 0.03) * Sliders.mul('pen')) : !Sliders.call('pen')) continue;
     L.flag = hard ? 'ROUGHK' : 'RIK';
     throwFlag(L.flag, p.side, kp.x, kp.y, p);
     if (hard) { kp.down = 1.1; kp.downDir = dirOf(p.side); kp.dizzy = 1; kp.kickT = null; Sound.tackle(); cam.shake = 7; }

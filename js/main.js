@@ -262,9 +262,9 @@ for (const [side, id] of [[0, 'pHome'], [1, 'pAway']]) {
 // ---- game settings panel: grouped rows of tap targets. The hidden <select>s still hold the values (other code reads them) ----
 const MU_GROUPS = [
   ['GAME', [['optQtr', 'QUARTERS'], ['optDiff', 'CPU'], ['optPlayers', 'PLAYERS'], ['optGame', 'GAME']]],
-  ['CONDITIONS', [['optWeather', 'WEATHER'], ['optNight', 'TIME'], ['optBcast', 'BROADCAST']]],
+  ['CONDITIONS', [['optWeather', 'WEATHER'], ['optNight', 'TIME'], ['optBcast', 'BROADCAST'], ['sliders', 'SLIDERS']]],
   ['CONTROLS', [['optMeter', 'PASS METER'], ['optMeterSpd', 'METER SPEED'], ['optCatchM', 'CATCH METER'], ['optDefM', 'DEFENSE METER'], ['optCoach', 'COACH'], ['optCoachMode', 'COACH MODE']]],
-  ['LOOK', [['optLogos', 'LOGOS'], ['uni', 'UNIFORMS'], ['stad', 'STADIUM']]]
+  ['LOOK', [['optLogos', 'LOGOS'], ['optNameTags', 'NAME TAGS'], ['uni', 'UNIFORMS'], ['stad', 'STADIUM']]]
 ];
 const muRows = []; // [select id, paint fn]
 function muSetShow(on) { $('muSet').classList.toggle('show', on); if (on) muPaint(); }
@@ -284,7 +284,12 @@ function buildMuSet() {
       const row = document.createElement('div'); row.className = 'muRow'; row.id = 'muRow_' + id;
       row.innerHTML = `<span class="muL">${label}</span><div class="muC"></div>`;
       const c = row.querySelector('.muC');
-      if (id === 'uni' || id === 'stad') { // these open their own rooms
+      if (id === 'sliders') { // SLIDERS panel (sliders.js)
+        const b = document.createElement('button'); b.className = 'muGo'; b.id = 'muSlGo';
+        b.onclick = () => { Sound.click(); Sliders.open(() => muPaint()); };
+        c.appendChild(b);
+        muRows.push([id, () => { const n = SLIDER_DEFS.filter(d => Sliders.val(d[0]) !== 50).length; b.innerHTML = `${n ? `CUSTOM: ${n} CHANGED` : 'DEFAULT'}<i>OPEN</i>`; }]);
+      } else if (id === 'uni' || id === 'stad') { // these open their own rooms
         const b = document.createElement('button'); b.className = 'muGo'; b.id = id === 'uni' ? 'muUniGo' : 'muStadGo';
         b.onclick = id === 'uni' ? () => { Sound.click(); muSetShow(false); Locker.open(); } : muOpenStadium;
         c.appendChild(b);
@@ -341,9 +346,16 @@ $('optPlayers').onchange = () => renderSelect(); fillSel('optUni1', UNIFORMS, 'a
 try { const o = JSON.parse(localStorage.getItem('bobbleOpts') || 'null'); if (o && !o.m100) { o.optCatchM = '1'; o.m100 = 1; o.m93 = 1; localStorage.setItem('bobbleOpts', JSON.stringify(o)); } } catch (e) {}
 try { const o = JSON.parse(localStorage.getItem('bobbleOpts') || 'null'); if (o && !o.m93) { o.optCatchM = '0'; o.optDefM = '0'; o.m93 = 1; localStorage.setItem('bobbleOpts', JSON.stringify(o)); } } catch (e) {}
 try { const o = JSON.parse(localStorage.getItem('bobbleOpts') || 'null'); if (o) for (const k in o) if ($(k)) $(k).value = o[k]; } catch (e) {}
-function saveOpts() { const o = {}; for (const k of ['optUni0', 'optUni1', 'optWeather', 'optNight', 'optBcast', 'optGame', 'optLogos', 'optQtr', 'optDiff', 'optCoach', 'optCoachMode', 'optPlayers', 'optMeter', 'optMeterSpd', 'optCatchM', 'optDefM']) o[k] = $(k).value; o.m93 = 1; o.m100 = 1; try { localStorage.setItem('bobbleOpts', JSON.stringify(o)); } catch (e) {} }
+function saveOpts() { const o = {}; for (const k of ['optUni0', 'optUni1', 'optWeather', 'optNight', 'optBcast', 'optGame', 'optLogos', 'optQtr', 'optDiff', 'optCoach', 'optCoachMode', 'optPlayers', 'optMeter', 'optMeterSpd', 'optCatchM', 'optDefM', 'optNameTags']) o[k] = $(k).value; o.m93 = 1; o.m100 = 1; if (Sliders.changed()) o.sliders = { ...Sliders.v }; try { localStorage.setItem('bobbleOpts', JSON.stringify(o)); } catch (e) {} }
 buildMuSet(); // after the weather/uniform lists are filled
 $('optLogos').addEventListener('change', () => { Logo.setStyle($('optLogos').value); renderSelect(); });
+// NAME TAGS: ALL / KEY PLAYERS / OFF (draw.js reads nameTagMode every frame)
+const setNameTags = v => { nameTagMode = ['all', 'key', 'off'].includes(v) ? v : 'key'; $('optNameTags').value = nameTagMode; };
+setNameTags($('optNameTags').value);
+$('optNameTags').addEventListener('change', () => setNameTags($('optNameTags').value));
+const tagsLabel = () => { $('btnTagsOpt').textContent = 'NAME TAGS: ' + { all: 'ALL', key: 'KEY PLAYERS', off: 'OFF' }[nameTagMode]; };
+$('btnTagsOpt').onclick = () => { Sound.click(); setNameTags({ all: 'key', key: 'off', off: 'all' }[nameTagMode]); saveOpts(); tagsLabel(); };
+$('btnSlidersOpt').onclick = () => { Sound.click(); Sliders.open(); };
 Logo.onReady(() => { if ($('select').classList.contains('show')) renderSelect(); });
 // Coach Mode (you call the plays, the CPU plays them): one saved setting shared by Quick Game, Season and the pause menu
 function setCoachMode(on) {
@@ -386,7 +398,7 @@ function onPlayCall(c) {
   } else {
     $('pcHead').innerHTML = `${who}${humanOff ? 'OFFENSE' : 'DEFENSE'} <span class="pcsub">${G.downText()}</span>`;
     pcList = typeof Playbook !== 'undefined' ? Playbook.list(humanOff) : humanOff ? OFF_PLAYS.slice() : DEF_PLAYS.slice(); // your playbook (js/playbook.js)
-    if (humanOff && !c.twoPt) {
+    if (humanOff && !c.twoPt && !G.practice) { // (practice: plays only, no kicks)
       const sp = [];
       if (c.fourth) sp.push(SPECIAL_PLAYS[0]);
       if (c.fourth) sp.push(FAKE_PLAYS[0]);
@@ -718,7 +730,7 @@ function togglePause() {
   if (!G.teams || G.phase === 'over' || G.demo || Highlights.on || $('hlMenu').classList.contains('show')) return;
   if (G.online) { const on = !$('pause').classList.contains('show'); if (on) { $('pausePbp').innerHTML = '<div class="pbpHead">ONLINE GAME KEEPS GOING WHILE THIS IS OPEN</div>' + pbpHtml(6); show('pause'); } else show(null); return; }
   G.paused = !G.paused;
-  if (G.paused) { G.pauseFrom = $('playcall').classList.contains('show') ? 'playcall' : null; coachLabel(); $('btnCoachOpt').style.display = G.versus || G.lock || G.mini || G.challenge ? 'none' : ''; $('pausePbp').innerHTML = pbpHtml(8); renderPauseXF(); show('pause'); }
+  if (G.paused) { G.pauseFrom = $('playcall').classList.contains('show') ? 'playcall' : null; coachLabel(); tagsLabel(); $('btnCoachOpt').style.display = G.versus || G.lock || G.mini || G.challenge ? 'none' : ''; $('pausePbp').innerHTML = pbpHtml(8); renderPauseXF(); show('pause'); }
   else show(G.pauseFrom);
 }
 $('btnPause').onclick = togglePause;
@@ -887,7 +899,7 @@ $('moBack').onclick = () => { G.mini = null; G.teams = null; openModes(); };
 function demoSetup() {
   const a = pick(TEAMS); let b; do { b = pick(TEAMS); } while (b === a);
   Object.assign(G, { teams: [a, b], human: -1, diff: 1, poss: 0, los: rand(30, 70), ballY: MID, down: 1, score: [0, 0], quarter: 1, clock: 180, demo: true, fx: [], weather: 'clear', night: false, bcast: null, uni: null, versus: false, xf: null,
-    pstats: {}, tstats: [{ pass: 0, rush: 0, to: 0 }, { pass: 0, rush: 0, to: 0 }], patSide: null, twoPt: false, next: null, paused: false, slowmo: 0, banner: null });
+    pstats: {}, tstats: [{ pass: 0, rush: 0, to: 0 }, { pass: 0, rush: 0, to: 0 }], patSide: null, twoPt: false, next: null, paused: false, slowmo: 0, banner: null, practice: null });
   setFirstDown();
   setupPlay(pick(OFF_PLAYS.filter(p => !p.custom)), pick(DEF_PLAYS));
   snap();

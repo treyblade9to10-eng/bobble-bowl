@@ -35,7 +35,7 @@ const hlUnrle = o => o.flatMap(([v, n]) => Array(n).fill(v));
 const hlR2 = v => Math.round(v * 100) / 100;
 
 const Highlights = {
-  clips: [], cur: null, pbpRef: null, gw: null, on: false,
+  clips: [], cur: null, pbpRef: null, gw: null, on: false, rec: false,
   // a new game = a new play-by-play list
   reset() { this.clips = []; this.cur = null; this.gw = null; this.pbpRef = G.pbp; this.teams = G.teams; },
   // the snap (Replay.begin calls this): start filming the play
@@ -200,13 +200,18 @@ const Highlights = {
     G.refs.forEach((r, ri) => { const R = k => D.r[ri * 6 + k]; r.x = at(R(0), 1); r.y = at(R(1), 1); r.face = R(2)[i]; r.anim = at(R(3), 1); r.moving = !!R(4)[i]; r.throwT = at(R(5), 1); });
     cam.x = at(D.c[0], 1); cam.y = at(D.c[1], 1);
   },
+  // SAVE CLIP (clips.js): how long the clip runs from frame u0, and the earliest start that fits in maxSec
+  runTime(u0) { const c = this.list[this.idx]; let u = u0, t = 0; while (u < c.n - 1 && t < 60) { u += HL_RATE * this.speed(u) / 30; t += 1 / 30; } return t; },
+  recStart(maxSec) { const c = this.list[this.idx]; let u0 = 0; while (u0 < c.key && this.runTime(u0) > maxSec) u0 += 5; return Math.min(u0, Math.max(0, c.n - 2)); },
   // play speed: real time, then slow motion through the big moment
   speed(u) { const t = (u - this.list[this.idx].key) / HL_RATE, ramp = v => 1 - Math.min(1, Math.max(0, v)) * 0.6; return t < 0 ? ramp((t + 0.75) / 0.25) : ramp((0.55 - t) / 0.2); }, // 0.4x from 0.5s before to 0.35s after
   update(dt) {
     dt = Math.min(dt, 0.05);
     const P = Input.pressed, taps = Input.taps.splice(0), c = this.list[this.idx];
-    let next = P.Space || P.Enter || P.ArrowRight || P.KeyN, stop = P.Escape || P.Backspace;
-    for (const t of taps) { const B = this.btns(); if (B.done.hit(t)) stop = true; else next = true; }
+    let next = P.Space || P.Enter || P.ArrowRight || P.KeyN, stop = P.Escape || P.Backspace, save = P.KeyS;
+    for (const t of taps) { const B = this.btns(); if (B.done.hit(t)) stop = true; else if (B.save.hit(t)) save = true; else next = true; }
+    if (this.rec) next = stop = save = false; // filming a clip: it plays through on its own (CANCEL is on the bar up top)
+    if (save) { const th = this.saved.then; this.saved.then = null; this.stop(); return Clips.highlight(c, th); }
     if (stop) return this.stop();
     if (next) return this.advance();
     const sp = this.speed(this.u);
@@ -231,7 +236,7 @@ const Highlights = {
   btns() {
     const mob = G.mode === 'mobile', w = mob ? 150 : 128, h = mob ? 60 : 50, y = CH - 34 - h, x = CW - w - 30; // bottom right, by your thumb
     const box = (x, y) => ({ x, y, w, h, hit: t => t.x >= x - 10 && t.x <= x + w + 10 && t.y >= y - 10 && t.y <= y + h + 10 });
-    return { done: box(x, y), next: box(x - w - 12, y), w, h };
+    return { done: box(x, y), next: box(x - w - 12, y), save: box(24, 96), w, h }; // SAVE CLIP: top left, under HIGHLIGHTS
   },
   drawOverlay(g) {
     const c = this.list[this.idx]; if (!c) return;
@@ -252,8 +257,12 @@ const Highlights = {
       g.fillStyle = gold ? '#111' : '#fff'; g.textAlign = 'center'; g.font = `italic 900 ${mob ? 28 : 24}px ${HD}`; g.fillText(label, b.x + b.w / 2, b.y + b.h / 2 + (mob ? 1 : -4));
       if (!mob) { g.font = `800 12px ${HD}`; g.fillStyle = gold ? '#111a' : '#9aa6b5'; g.fillText(key, b.x + b.w / 2, b.y + b.h - 8); }
     };
-    if (this.list.length > 1) btn(B.next, this.idx + 1 < this.list.length ? 'NEXT' : 'END', mob ? '' : 'SPACE');
-    btn(B.done, 'DONE', 'ESC', true);
+    if (this.rec) { g.fillStyle = '#ffffffb0'; g.font = `italic 900 26px ${HD}`; g.textAlign = 'right'; g.fillText('BOBBLE BOWL', CW - 30, 42); } // filming: no buttons, a little watermark
+    else {
+      if (this.list.length > 1) btn(B.next, this.idx + 1 < this.list.length ? 'NEXT' : 'END', mob ? '' : 'SPACE');
+      btn(B.done, 'DONE', 'ESC', true);
+      btn(B.save, 'SAVE CLIP', 'S');
+    }
     // lower third: slides in, team color + gold edge, big italic caps
     const sl = 1 - Math.pow(1 - Math.min(1, this.age / 0.35), 3), w = Math.min(CW - 80, 860), h = 122, x = 40 - (1 - sl) * (w + 60), y = CH - h - 34;
     g.globalAlpha = sl;

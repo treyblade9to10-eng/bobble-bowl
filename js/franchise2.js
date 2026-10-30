@@ -51,7 +51,7 @@ Object.assign(Season, {
     for (const id in R) for (const p of this.injList(id)) if (--p[6].inj <= 0) { back.add(p); this.healed(id, p, wk); }
     for (const id of teams) {
       if (!R[id]) continue;
-      for (const side of ['off', 'def']) for (const p of R[id][side].slice()) if (p && !back.has(p) && !(p[6] && p[6].cap) && chance(INJ_RATE)) this.injure(id, p, injWeeks(), null, wk);
+      for (const side of ['off', 'def']) for (const p of R[id][side].slice()) if (p && !back.has(p) && !(p[6] && p[6].cap) && chance(INJ_RATE * Sliders.mul('inj'))) this.injure(id, p, injWeeks(), null, wk);
     }
     // a QB who got hurt in the game you played misses real time too
     if (G.season && G.phase === 'over' && G.teams && G.qbHurt) G.qbHurt.forEach((nm, s) => {

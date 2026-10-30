@@ -17,7 +17,7 @@ const Replay = {
       cam: [cam.x, cam.y], time: G.time
     });
   },
-  want() { return this.enabled && !G.demo && !G.online && !G.mini && G.lastResult && G.lastResult.big && this.frames.length > 40; },
+  want() { return this.enabled && !G.demo && !G.online && !G.mini && !G.practice && G.lastResult && G.lastResult.big && this.frames.length > 40; },
   start() {
     this.rec = false; this.on = true; this.hold = 0.6;
     this.save = this.frames[this.frames.length - 1];
@@ -37,8 +37,12 @@ const Replay = {
     fr.refs.forEach((a, i) => { const r = G.refs && G.refs[i]; if (r) [r.x, r.y, r.face, r.anim, r.moving, r.throwT] = a; });
     cam.x = fr.cam[0]; cam.y = fr.cam[1];
   },
+  // SAVE CLIP button in the top bar (clips.js films the replay from the start)
+  saveBox() { const mob = G.mode === 'mobile', w = mob ? 170 : 150; return { x: 160, y: 4, w, h: 36 }; }, // next to REPLAY (the pause / sound buttons sit top right)
   update(dt) {
-    const skip = Input.hit('Space', 'Enter', 'Escape') || Input.taps.length > 0;
+    const sb = this.saveBox(), hitSave = Input.taps.some(t => t.x > sb.x - 12 && t.x < sb.x + sb.w + 12 && t.y < sb.y + sb.h + 16);
+    if (!this.recClip && (hitSave || Input.hit('KeyS'))) { Input.taps.length = 0; Clips.replay(); }
+    const skip = !this.recClip && (Input.hit('Space', 'Enter', 'Escape') || Input.taps.length > 0);
     this.t += dt * 60 * 0.55;
     G.time += dt * 0.55;
     if (this.t >= this.frames.length - 1) { this.t = this.frames.length - 1; this.hold -= dt; }
@@ -47,6 +51,7 @@ const Replay = {
   },
   finish() {
     this.on = false;
+    if (this.recClip) { this.recClip = false; Clips.stop(); }
     this.apply(this.save); G.cellyGuy = null;
     for (const p of G.players) { p.celly = null; p.engaged = null; }
     G.phase = 'dead'; G.deadT = 0; cam.zoom = 1; cam.focus = null;
@@ -59,7 +64,11 @@ const Replay = {
     g.fillText('REPLAY', 52, 23);
     if (typeof bcBadge === 'function' && G.bcast) bcBadge(g, G.bcast, 148, 4, 56, 36); // primetime games: the show's badge next to REPLAY
     g.font = '800 15px "Barlow Condensed", Arial, sans-serif'; g.fillStyle = '#9aa6b5'; g.textAlign = 'right';
-    g.fillText(G.mode === 'mobile' ? 'TAP TO SKIP' : 'SPACE TO SKIP', CW - 24, CH - 22);
+    g.fillText(this.recClip ? 'BOBBLE BOWL' : G.mode === 'mobile' ? 'TAP TO SKIP' : 'SPACE TO SKIP', CW - 24, CH - 22);
+    if (!this.recClip && typeof Clips !== 'undefined') { // SAVE CLIP
+      const b = this.saveBox(); g.fillStyle = '#1c2430'; g.beginPath(); g.moveTo(b.x + 8, b.y); g.lineTo(b.x + b.w, b.y); g.lineTo(b.x + b.w - 8, b.y + b.h); g.lineTo(b.x, b.y + b.h); g.fill();
+      g.fillStyle = '#fff'; g.textAlign = 'center'; g.font = 'italic 900 20px "Barlow Condensed", Arial, sans-serif'; g.fillText(G.mode === 'mobile' ? 'SAVE CLIP' : 'SAVE CLIP  (S)', b.x + b.w / 2, b.y + b.h / 2 + 1);
+    }
     const L = G.pbpShow;
     if (L) { g.textAlign = 'left'; g.fillStyle = '#fff'; g.font = '600 18px "Barlow Condensed", Arial, sans-serif'; g.fillText(L.text.length > 100 ? L.text.slice(0, 97) + '...' : L.text, 24, CH - 22); }
   }

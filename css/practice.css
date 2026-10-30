@@ -1,0 +1,109 @@
+/* ---- Practice mode setup (same look as the matchup / new season screens), the after-play panel, the SLIDERS panel, the SAVE CLIP bar ---- */
+#practice.screen { justify-content: center; padding: 14px max(18px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left)); overflow: hidden;
+  background: radial-gradient(ellipse at 50% 45%, #0c1016de, #0c1016f7 75%); }
+#prTop { display: flex; flex-direction: column; align-items: center; margin-bottom: 14px; font-family: var(--hd); line-height: 1; }
+#prTop span { font-weight: 800; font-size: 13px; letter-spacing: .34em; color: var(--dim); padding-left: .34em; }
+#prTop b { font-style: italic; font-weight: 900; font-size: 34px; letter-spacing: .02em; position: relative; padding-bottom: 7px; }
+#prTop b::after { content: ''; position: absolute; left: 50%; bottom: 0; width: 44px; height: 3px; margin-left: -22px; background: var(--gold); transform: skewX(-20deg); }
+#prRow { display: grid; grid-template-columns: minmax(0, 440px) minmax(0, 500px); justify-content: center; align-items: stretch; gap: 24px; width: 100%; flex: 0 1 520px; min-height: 0; }
+#prTeams { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+.prTeam { flex: 1 1 0; min-height: 0; }
+.prTB { flex: 1; min-height: 0; display: flex; align-items: center; gap: 16px; padding: 8px 58px; }
+.prLogo { flex: none; height: min(110px, 15vh); display: flex; align-items: center; }
+.prLogo .badge { height: 100%; width: auto; max-width: 120px; object-fit: contain; filter: drop-shadow(0 4px 6px #0009); }
+.prTN { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; text-align: left; }
+.prTN .muCity { margin: 0; font-size: 14px; } .prTN .muName { font-size: 40px; padding: 0; }
+.prOv { margin-top: 6px; padding: 3px 10px; background: #000000b8; color: #fff; font-family: var(--hd); font-weight: 800; font-size: 13px; letter-spacing: .1em; white-space: nowrap; }
+.prOv b { font-style: italic; font-weight: 900; font-size: 22px; color: var(--gold); letter-spacing: 0; }
+.prOv i { font-style: normal; color: var(--dim); margin-left: 8px; letter-spacing: .04em; }
+#prOpts { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: #141a23f2; clip-path: polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 20px 100%, 0 calc(100% - 20px)); }
+#prHead { display: flex; align-items: center; padding: 6px 24px; background: #000000a6; border-bottom: 2px solid var(--gold); }
+#prHead b { font-family: var(--hd); font-weight: 800; font-size: 15px; letter-spacing: .26em; color: #fff; }
+#prSl { margin: 0 0 0 auto; padding: 5px 16px; font-size: 13px; letter-spacing: .14em; background: #ffffff1f; }
+#prSl:hover { background: var(--gold); color: #111; }
+#prSet { padding: 10px 22px 2px; }
+#prSet .muL { width: 100px; } #prSet .muRow { padding: 4px 0; } #prSet .muC { min-height: 38px; } #prSet .muC button { font-size: 15px; }
+#prSet .muC .muStep { width: 44px; }
+#prSum { margin: 8px 22px 0; padding: 8px 12px; font-size: 13px; line-height: 1.4; color: var(--dim); background: #0000004d; border-left: 3px solid var(--gold); }
+#prSum b { color: var(--text); font-family: var(--hd); font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+#prGo { margin-top: auto; display: flex; align-items: stretch; gap: 10px; padding: 12px 22px 18px; }
+#prGo .muBack { flex: none; margin: 0; padding: 0 26px; font-size: 16px; background: var(--panel2); }
+#prGo .muBack:hover { background: #2a3544; }
+#prStart { flex: 1; margin: 0; font-size: 32px; padding: 12px 20px; white-space: nowrap; }
+
+/* after each practice play: the result + what next */
+#prPanel { display: none; position: absolute; left: 50%; bottom: max(14px, env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 9; width: min(860px, calc(100vw - 24px));
+  background: #0c1016ee; border-left: 6px solid var(--dim); padding: 10px 16px 12px; }
+#prPanel.show { display: block; }
+#prPanel.good { border-left-color: #4fe08a; } #prPanel.bad { border-left-color: #ff6040; } #prPanel.ok { border-left-color: var(--gold); } #prPanel.flag { border-left-color: #ffe14d; }
+.prRes { display: flex; align-items: center; gap: 12px; }
+#prHeadL { font-family: var(--hd); font-style: italic; font-weight: 900; font-size: 34px; line-height: 1; text-transform: uppercase; }
+#prPanel.good #prHeadL { color: #4fe08a; } #prPanel.bad #prHeadL { color: #ff8a6a; } #prPanel.ok #prHeadL, #prPanel.flag #prHeadL { color: var(--gold); }
+#prTag { font-family: var(--hd); font-weight: 800; font-size: 13px; letter-spacing: .18em; padding: 3px 9px; background: #ffffff1f; }
+#prLine { margin-top: 4px; font-size: 15px; color: #dfe5ec; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#prTally { margin-top: 3px; font-family: var(--hd); font-weight: 800; font-size: 13px; letter-spacing: .1em; color: var(--dim); }
+.prBtns { display: flex; gap: 8px; margin-top: 10px; }
+.prBtns button { margin: 0; flex: 1 1 0; min-width: 0; padding: 9px 8px; font-size: 16px; white-space: nowrap; display: flex; flex-direction: column; align-items: center; line-height: 1.1; }
+.prBtns button.big { flex: 1.4 1 0; font-size: 22px; padding: 8px 10px; }
+.prBtns button i { font-style: normal; font-size: 10px; letter-spacing: .16em; opacity: .6; margin-top: 2px; }
+body.mobile .prBtns button i { display: none; }
+
+/* SLIDERS panel */
+#slPanel { display: none; position: absolute; inset: 0; z-index: 30; background: #0c1016; flex-direction: column; align-items: center;
+  padding: 14px max(22px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(22px, env(safe-area-inset-left)); }
+#slPanel.show { display: flex; }
+#slHead { display: flex; align-items: center; gap: 14px; width: 100%; max-width: 1060px; margin-bottom: 12px; padding-right: 56px; }
+#slHead b { font-family: var(--hd); font-style: italic; font-weight: 900; font-size: 32px; letter-spacing: .02em; }
+#slHead span { font-family: var(--hd); font-weight: 800; font-size: 13px; letter-spacing: .16em; color: var(--dim); text-transform: uppercase; }
+#slReset { margin: 0 0 0 auto; font-size: 14px; padding: 8px 18px; }
+#slDone { margin: 0; font-size: 22px; padding: 8px 34px; }
+#slBody { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 36px; width: 100%; max-width: 1060px; overflow-y: auto; align-content: start; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
+.slGrp:last-child { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 0 36px; }
+.slGrp:last-child .muGh { grid-column: 1 / -1; }
+.slRow { display: flex; align-items: center; gap: 12px; padding: 4px 0; }
+.slL { width: 150px; flex: none; display: flex; flex-direction: column; font-family: var(--hd); font-weight: 800; font-size: 15px; letter-spacing: .08em; color: var(--text); line-height: 1.1; }
+.slL i { font-style: normal; font-family: var(--bd); font-weight: 500; font-size: 11px; letter-spacing: 0; color: var(--dim); margin-top: 2px; }
+.slV { width: 34px; flex: none; text-align: right; font-family: var(--hd); font-weight: 800; font-size: 20px; color: var(--dim); }
+.slV.mod { color: var(--gold); }
+.slRow input[type=range] { flex: 1; min-width: 0; height: 36px; margin: 0; background: transparent; -webkit-appearance: none; appearance: none; border: 0; padding: 0; outline: none; box-shadow: none; touch-action: pan-x; cursor: pointer; }
+.slRow input[type=range]::-webkit-slider-runnable-track { height: 8px; background: linear-gradient(90deg, var(--gold) var(--p, 50%), #ffffff26 var(--p, 50%)); }
+.slRow input[type=range]::-moz-range-track { height: 8px; background: linear-gradient(90deg, var(--gold) var(--p, 50%), #ffffff26 var(--p, 50%)); }
+.slRow input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 26px; margin-top: -9px; background: #fff; border: 2px solid #111; transform: skewX(-12deg); }
+.slRow input[type=range]::-moz-range-thumb { width: 16px; height: 24px; background: #fff; border: 2px solid #111; border-radius: 0; }
+
+/* SAVE CLIP bar (HTML, so it never ends up in the video) */
+#clipUI { display: none; position: absolute; top: max(10px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); z-index: 40; align-items: center; gap: 12px;
+  background: #0c1016f2; border-left: 4px solid var(--gold); padding: 6px 8px 6px 14px; font-family: var(--hd); max-width: calc(100vw - 24px); }
+#clipUI.show { display: flex; }
+#clipUI b { font-weight: 800; font-size: 16px; letter-spacing: .12em; white-space: nowrap; }
+#clipUI .ciMsg { letter-spacing: .04em; white-space: normal; font-size: 15px; }
+#clipUI button { margin: 0; padding: 7px 16px; font-size: 14px; }
+#clipUI button.gold { background: var(--gold); color: #111; }
+.ciDot { width: 10px; height: 10px; border-radius: 50%; background: #e8401c; animation: ciBlink 1s steps(2) infinite; }
+@keyframes ciBlink { 50% { opacity: .25; } }
+.ciBar { width: 140px; height: 6px; background: #ffffff26; } .ciBar i { display: block; height: 100%; width: 0; background: var(--gold); }
+#ciPct, .ciInfo { font-weight: 800; font-size: 13px; letter-spacing: .1em; color: var(--dim); white-space: nowrap; }
+
+@media (max-height: 500px) {
+  #practice.screen { padding: 8px max(10px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left)); }
+  #prTop { display: none; }
+  #prRow { flex: 1 1 auto; gap: 10px; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); }
+  #prTeams { gap: 8px; }
+  .prTB { padding: 2px 44px; gap: 10px; } .prLogo { height: min(64px, 17vh); }
+  .prTN .muCity { font-size: 11px; } .prTN .muName { font-size: 26px; } .prOv { margin-top: 3px; font-size: 11px; padding: 2px 8px; } .prOv b { font-size: 17px; }
+  .prTeam .muArr { width: 38px; height: 64px; top: calc(50% - 20px); }
+  #prOpts { clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 14px 100%, 0 calc(100% - 14px)); }
+  #prHead { padding: 3px 58px 3px 16px; } #prHead b { font-size: 13px; } #prSl { padding: 4px 12px; font-size: 11px; }
+  #prSet { padding: 4px 12px 0; } #prSet .muL { width: 70px; } #prSet .muRow { padding: 1px 0; } #prSet .muC { min-height: 30px; } #prSet .muC button { font-size: 12px; }
+  #prSet .muC .muStep { width: 34px; } #prSet .muV { font-size: 13px; }
+  #prSum { margin: 4px 12px 0; padding: 3px 8px; font-size: 11px; line-height: 1.3; }
+  #prGo { padding: 6px 12px 8px; gap: 8px; } #prGo .muBack { font-size: 14px; padding: 0 18px; } #prStart { font-size: 24px; padding: 8px 12px; }
+  #prPanel { padding: 6px 12px 8px; bottom: max(8px, env(safe-area-inset-bottom)); } #prHeadL { font-size: 26px; } #prLine { font-size: 13px; margin-top: 2px; } #prTally { font-size: 11px; }
+  .prBtns { margin-top: 6px; gap: 6px; } .prBtns button { padding: 7px 6px; font-size: 14px; } .prBtns button.big { font-size: 18px; padding: 6px 8px; }
+  #slPanel { padding: 8px max(12px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); }
+  #slHead { margin-bottom: 4px; gap: 10px; } #slHead b { font-size: 22px; } #slHead span { font-size: 11px; } #slReset { font-size: 12px; padding: 6px 12px; } #slDone { font-size: 17px; padding: 6px 26px; }
+  #slBody { gap: 4px 18px; } .slGrp:last-child { gap: 0 18px; }
+  .slRow { padding: 0; gap: 8px; } .slL { width: 112px; font-size: 12px; } .slL i { font-size: 9.5px; } .slV { font-size: 16px; width: 28px; }
+  .slRow input[type=range] { height: 28px; }
+  #clipUI { padding: 4px 6px 4px 10px; gap: 8px; } #clipUI b { font-size: 13px; } #clipUI button { padding: 6px 12px; font-size: 12px; } .ciBar { width: 90px; }
+}
