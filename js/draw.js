@@ -7,6 +7,8 @@ const MID_Y = FIELD_W / 2;
 const cam = { x: 60, y: FIELD_W / 2, shake: 0, zoom: 1 };
 const SKIN = ['#f6d3b3', '#e8b48f', '#c98e62', '#a26a42', '#7a4a2a', '#5a3620'];
 const OUT = '#14110f'; // cartoon outline color
+let nameTagMode = 'key'; // NAME TAGS setting: 'all' | 'key' (players that matter on this play) | 'off'
+const tagBoxes = []; // name tags / throw icons drawn this frame (screen boxes), so floating words can stay off them
 
 // 5-point star as a shape (font star glyphs show up as boxes on some phones)
 function starPath(g, x, y, r) {
@@ -162,6 +164,7 @@ function resetGfx() {
 }
 let gfxCheck = 0;
 function drawField(g, G) {
+  tagBoxes.length = 0;
   if (++gfxCheck % 30 === 0 && fieldCv) { const fg = fieldCv.getContext('2d'); if (fg && fg.isContextLost && fg.isContextLost()) resetGfx(); }
   buildField(G);
   // past the edges of the field = more fans (scrolls with the camera)
@@ -645,27 +648,30 @@ function drawPlayer(g, p, G, at) {
   // labels
   const headTop = y - hop - (big ? 85 : 92);
   if (at || G.phase === 'kick' || G.phase === 'kickmeter') return;
-  if (p.xf && p.xf.on && p.down <= 0) { drawXFBadge(g, p, x, headTop - (p.isHuman || carrying ? 44 : 4)); }
-  const showName = !p.celly && (p.isHuman || carrying || p.cap || (G.phase === 'presnap' && p.off && p.slot <= 4 && p.side === G.human));
+  const showName = !p.celly && p.down <= 0 && tagFor(p, G, carrying);
   let ly = headTop;
-  if (showName && p.down <= 0) {
+  if (showName) {
     g.font = 'bold 13px Barlow, Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-    const label = (p.isHuman || carrying) ? `${p.name}` : lastName(p.name);
+    const full = p.isHuman || carrying, label = full ? `${p.name}` : lastName(p.name);
     const w = g.measureText(label).width + 14;
     g.fillStyle = p.isHuman ? (G.versus && p.ctl === 1 ? '#5ad1ff' : '#ffe14d') : '#000000c0'; roundRect(g, x - w / 2, ly - 10, w, 20, 10); g.fill();
     if (p.cap) { g.strokeStyle = '#f6c31c'; g.lineWidth = 2; g.stroke(); }
     g.fillStyle = p.isHuman ? '#111' : '#fff'; g.fillText(label, x, ly + 1);
-    if (p.isHuman || carrying) { g.font = 'bold 10px Barlow, Arial, sans-serif'; g.fillStyle = '#fff'; g.strokeStyle = '#000'; g.lineWidth = 3; const r = `${p.pos} • ${p.ovr} OVR`; g.strokeText(r, x, ly - 17); g.fillText(r, x, ly - 17); }
+    if (full) { g.font = 'bold 10px Barlow, Arial, sans-serif'; g.fillStyle = '#fff'; g.strokeStyle = '#000'; g.lineWidth = 3; const r = `${p.pos} • ${p.ovr} OVR`; g.strokeText(r, x, ly - 17); g.fillText(r, x, ly - 17); }
+    if (p.xf && p.xf.on) drawXFBadge(g, p, x - w / 2 - 12, ly); // X-Factor badge sits next to his name
+    tagBoxes.push({ x0: x - w / 2 - (p.xf && p.xf.on ? 24 : 0), x1: x + w / 2, y0: ly - (full ? 24 : 10), y1: ly + 10 });
     ly -= 30;
-  }
+  } else if (p.xf && p.xf.on && p.down <= 0) drawXFBadge(g, p, x, headTop - 4);
   if (p.hot && G.phase === 'presnap') {
     g.font = 'bold 11px Barlow, Arial, sans-serif'; g.textAlign = 'center'; const w = g.measureText(p.hot).width + 12;
-    g.fillStyle = '#ffe14d'; roundRect(g, x - w / 2, ly - 8, w, 16, 8); g.fill(); g.fillStyle = '#111'; g.fillText(p.hot, x, ly + 4); ly -= 22;
+    g.fillStyle = '#ffe14d'; roundRect(g, x - w / 2, ly - 8, w, 16, 8); g.fill(); g.fillStyle = '#111'; g.fillText(p.hot, x, ly + 4);
+    tagBoxes.push({ x0: x - w / 2, x1: x + w / 2, y0: ly - 8, y1: ly + 8 }); ly -= 22;
   }
   if (p.throwKey) {
     const col = ['#2f7bff', '#ff3b3b', '#2fd06b', '#ffb02e'][p.throwKey - 1];
     const tgt = G.aim && G.aim.target === p;
     const r = tgt ? 17 : 14;
+    tagBoxes.push({ x0: x - r - 2, x1: x + r + 2, y0: ly - r - 2, y1: ly + r + (p.openness != null ? 10 : 2) });
     g.fillStyle = col; g.strokeStyle = tgt ? '#ffe14d' : '#fff'; g.lineWidth = tgt ? 4 : 2.5;
     g.beginPath(); g.arc(x, ly, r, 0, 7); g.fill(); g.stroke();
     g.fillStyle = '#fff'; g.font = '900 16px "Barlow Condensed", "Arial Black", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
@@ -678,6 +684,17 @@ function drawPlayer(g, p, G, at) {
       g.fillRect(x - 15, ly + r + 4, 30 * o, 4);
     }
   }
+}
+
+// NAME TAGS: who gets a name over his head. KEY PLAYERS = the ball carrier, the guy the pass is going to, the player you control,
+// your career player, X-Factors in the zone, and the tackler for a moment after the whistle
+function tagFor(p, G, carrying) {
+  if (nameTagMode === 'off') return false;
+  if (nameTagMode === 'all') return true;
+  if (p.isHuman || carrying || p.cap || (p.xf && p.xf.on)) return true;
+  const f = G.ball && G.ball.flight;
+  if (f && f.intended === p && !f.pitch && !f.kick) return true;
+  return G.phase === 'dead' && p === G.lastTackler && G.deadT > 0.25;
 }
 
 // heads are the most expensive thing on screen, so each look gets drawn once and reused as a picture (big speedup on Chromebooks)
@@ -950,8 +967,15 @@ function drawFx(g, G) {
     else if (f.kind === 'confetti') { g.fillStyle = f.color; g.globalAlpha = a; g.fillRect(f.px, f.py, 6, 9); g.globalAlpha = 1; }
     else if (f.kind === 'text') {
       const pop = Math.min(1, (f.max - f.life) * 8);
-      g.save(); g.translate(sx(f.x), sy(f.y) - 78 - f.z); // above the name tags g.scale(0.5 + pop * 0.5, 0.5 + pop * 0.5);
       g.font = `900 ${f.size || 20}px "Barlow Condensed", "Arial Black", sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
+      // keep floating words off the name tags / throw icons and off each other: nudge up until it's clear (smoothed so it doesn't jump)
+      const X = sx(f.x), Y0 = sy(f.y) - 78 - f.z, hw = g.measureText(f.text).width / 2 + 4, hh = (f.size || 20) / 2 + 3;
+      let Y = Y0;
+      for (let k = 0; k < 8; k++) { const b = tagBoxes.find(b => X + hw > b.x0 && X - hw < b.x1 && Y + hh > b.y0 && Y - hh < b.y1); if (!b) break; Y = b.y0 - hh - 2; }
+      f.lift = f.lift == null ? Y0 - Y : lerp(f.lift, Y0 - Y, 0.3);
+      const ty = Y0 - f.lift; tagBoxes.push({ x0: X - hw, x1: X + hw, y0: ty - hh, y1: ty + hh });
+      g.save(); g.translate(X, ty);
+      g.scale(0.5 + pop * 0.5, 0.5 + pop * 0.5);
       g.globalAlpha = a; g.lineWidth = 6; g.strokeStyle = '#000'; g.strokeText(f.text, 0, 0); g.fillStyle = f.color || '#fff'; g.fillText(f.text, 0, 0);
       g.restore(); g.globalAlpha = 1;
     }

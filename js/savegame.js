@@ -4,7 +4,7 @@ const SaveGame = {
   FIELDS: ['human', 'diff', 'playoff', 'qtrLen', 'score', 'quarter', 'clock', 'poss', 'los', 'ballY', 'down', 'firstDownX', 'goalToGo', 'timeouts', 'patSide', 'twoPt',
     'weather', 'night', 'storm', 'fog', 'uni', 'dirt', 'bigGame', 'rivalryMatch', 'versus', 'p1', 'pstats', 'tstats', 'xf', 'twoMinQ', 'firstPoss', 'lastOffKey', 'lastDefKey', 'lastOffKeys', 'lastDefKeys', 'kickFrom', 'career', 'lock', 'rivalry', 'tend', 'qbWear', 'qbHurt'],
   save() {
-    if (G.demo || G.mini || G.challenge || G.online || !G.teams || G.phase === 'over' || G.human < 0) return;
+    if (G.demo || G.mini || G.challenge || G.practice || G.online || !G.teams || G.phase === 'over' || G.human < 0) return;
     const d = { v: 1, at: Date.now(), teams: G.teams, pbp: (G.pbp || []).slice(-40), ko: G.koPending ? G.kickoffSide : null,
       season: G.season ? (Season.data && Season.data.week) + ':' + (Season.data && Season.data.phase) : null };
     for (const k of this.FIELDS) d[k] = G[k];

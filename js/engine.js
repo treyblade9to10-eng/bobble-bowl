@@ -75,7 +75,7 @@ function initGame(home, away, opts) {
     weather: stadiumOf(home).dome ? 'clear' : opts.weather === 'storm' ? 'rain' : opts.weather === 'fog' ? 'clear' : (opts.weather || 'clear'),
     storm: !stadiumOf(home).dome && opts.weather === 'storm', fog: !stadiumOf(home).dome && opts.weather === 'fog', ltn: null, night: !!opts.night, stadium: stadiumOf(home), uni: opts.uni || null, pbp: [], pbpShow: null, lastResult: null,
     versus: !!opts.versus, p1: opts.humanSide || 0, hd: [null, null], hp: [null, null], humanDef: null,
-    career: opts.career || false, lock: !!opts.lock, callBall: 0, sitOut: false, dirt: {}, coachCalls: !!opts.coachCalls, careerSlot: opts.careerSlot || 0, coachTok: null, coachCallName: null,
+    career: opts.career || false, practice: opts.practice || null, lock: !!opts.lock, callBall: 0, sitOut: false, dirt: {}, coachCalls: !!opts.coachCalls, careerSlot: opts.careerSlot || 0, coachTok: null, coachCallName: null,
     bigGame: opts.bigGame ? { year: opts.bigGame, name: bowlName(opts.bigGame) } : null,
     coach: COACH_STYLES[opts.coach] ? opts.coach : savedCoach(), coachMode: opts.coachMode != null ? !!opts.coachMode : coachPref()
   });
@@ -401,7 +401,8 @@ function makePlayer(side, isOff, slot, tuple) {
   const big = pos === 'OL' || pos === 'DL';
   const spdR = spd0 || POS_SPD[pos] || 80;
   // Madden speed matters: 99 SPD ≈ 12 yd/s, 85 ≈ 9.4, 70 ≈ 6.7
-  const yps = Math.max(4.8, 2.6 + (spdR - 50) * 0.16) * GAME_SPEED;
+  const gap = Sliders.mul('spd'); // SPEED GAP slider: stretch / squeeze speeds around 80
+  const yps = Math.max(4.8, 2.6 + ((gap === 1 ? spdR : 80 + (spdR - 80) * gap) - 50) * 0.16) * GAME_SPEED;
   const skill = isOff && (pos === 'WR' || pos === 'TE' || pos === 'RB');
   const cpuMul = cpu && !G.versus ? (skill ? (G.career ? [0.92, 1.0, 1.03, 1.06] : [0.88, 0.96, 1.0, 1.04]) : [0.95, 1.0, 1.03, 1.06])[G.diff] : 1; // career: no speed handicap for CPU skill guys (games were too easy)
   const pl = {
@@ -645,7 +646,7 @@ function snap() {
   G.credit = null; G.lastTackler = null; G.intBy = null; G.breakup = null; G.lastResult = null;
   if (typeof Replay !== 'undefined') Replay.begin();
   if (G.fake) { showBanner(G.fake === 'punt' ? 'FAKE PUNT!' : 'FAKE FIELD GOAL!', '', '#7fd3ff', 1.3); G.crowdHype = 1; }
-  if (!G.twoPt && chance(0.012)) { const dl = pick(G.D.slice(0, 3)); throwFlag('OFFSIDE', dl.side, dl.x, dl.y, dl); }
+  if (!G.twoPt && chance(0.012 * Sliders.mul('pen'))) { const dl = pick(G.D.slice(0, 3)); throwFlag('OFFSIDE', dl.side, dl.x, dl.y, dl); }
   G.ball.holder = G.O[G.play.off.directSnap || 0]; G.bstate = 'snap';
   G.trickSeen = G.trickSeen || [0, 0, 0, 0]; G.trickSeen[G.poss + 2]++; if (G.play.off.trick) G.trickSeen[G.poss]++; // trick plays / all snaps
   snapMotion();
@@ -910,7 +911,7 @@ function checkFouls() {
   if (G.throwT != null && pl.t - G.throwT < 1.0 && b.holder !== qb && qb.down <= 0) {
     for (const df of G.D) {
       if (df.engaged || df.down > 0 || df.side === off || dist(df, qb) > 0.9 || df.speedNow < 4) continue;
-      if ((df.isHuman && df.humanDriven) || (!df.rtpChecked && !df.isHuman && chance(0.03))) {
+      if ((df.isHuman && df.humanDriven && Sliders.call('pen')) || (!df.rtpChecked && !df.isHuman && chance(0.03 * Sliders.mul('pen')))) {
         throwFlag('RTP', df.side, qb.x, qb.y, df);
         qb.down = 1.1; qb.downDir = dirOf(df.side); qb.dizzy = 1; df.down = 0.6; Sound.tackle(); cam.shake = 8;
       }
@@ -929,7 +930,7 @@ function checkFouls() {
       const target = land && f.intended === r && f.t / f.T > 0.3;
       const catchable = target && dist(r, land) < 3;
       const playingBall = h.jump > 0 && land && dist(h, land) <= dist(r, land) + 0.5;
-      if (catchable && !playingBall) {
+      if (catchable && !playingBall && Sliders.call('pen')) {
         const x = dirOf(off) * (r.x - G.los) > 0 ? r.x : G.los;
         throwFlag('DPI', h.side, x, r.y, h);
         r.down = 0.9; r.downDir = dirOf(h.side); r.dizzy = 1; h.dive = 0; h.down = 0.5; Sound.tackle();
@@ -943,7 +944,7 @@ function checkFouls() {
   // random holding on run plays
   if (pl.off.type === 'run' && !pl.holdRolled && pl.t > 0.7) {
     pl.holdRolled = true;
-    if (chance(0.025)) { const ol = pick(G.O.slice(5)); throwFlag('HOLD', off, ol.x, ol.y, ol); }
+    if (chance(0.025 * Sliders.mul('pen'))) { const ol = pick(G.O.slice(5)); throwFlag('HOLD', off, ol.x, ol.y, ol); }
   }
 }
 
@@ -1731,6 +1732,7 @@ function resolveBlocks(dt) {
     if (xfOn(df, 'unstoppable')) rate *= 2.6;
     if (passPro && (xfOn(df, 'relentless') || xfOn(df, 'dualthreat'))) rate *= 2.2;
     if (!passPro && xfOn(df, 'reinforcement')) rate *= 2.4;
+    if (passPro) rate *= Sliders.side(df.side, 'cpuRush'); else rate *= Sliders.side(bl.side, 'cpuRunBlk'); // PASS RUSH / RUN BLOCKING sliders
     if (G.bstate === 'run') rate *= big ? 1.4 : 1.5; // receivers can hold a stalk block long enough to spring a sweep or screen
     df.shed += rate * dt;
     // the defender pushes slowly toward where he wants to go
@@ -1922,6 +1924,7 @@ function throwTo(qb, r, pitch = false, aimed = null, style = 'normal', lead = nu
     if (xfOn(qb, 'dimes') || xfOn(qb, 'dots')) err *= 0.35;
     if (xfOn(qb, 'proreads')) err *= 0.7;
     if (G.weather === 'rain' || G.weather === 'snow') err *= 1.15;
+    err *= Sliders.side(qb.side, 'cpuAcc', 'humAcc'); // QB ACCURACY sliders
     if (mt) { if (mt.perfect) err *= 0.25; else if (mt.over) err *= 1.35; else err *= 1 + (1 - clamp(mt.v / mt.g0, 0, 1)) * 0.6; }
     if (arm.thp < 62 || err > 3.5) duck = true;
     if (mt && mt.perfect) duck = false;
@@ -1965,7 +1968,7 @@ function updateFlight(dt) {
       p.laneChecked = true;
       const pInt = clamp((jumping ? (p.isHuman ? 0.7 : 0.3) : p.isHuman ? 0.45 : 0.28) + (rat(p, 'CTH') - 80) / 200 + (p.isHuman ? 0.05 : 0) + (xfOn(p, 'lurker') || xfOn(p, 'shutdown') ? 0.1 : 0), 0.15, 0.9); // CPU: fewer picks, more tips (players said too many INTs)
       b.flight = null; G.showTarget = false;
-      if (chance(pInt)) { addText(p.x, p.y, jumping ? 'SKY HIGH!' : 'PICKED!', '#7fd3ff', 22, 0.9); return intercept(p); }
+      if (chance(pInt * Sliders.side(p.side, 'cpuInt'))) { addText(p.x, p.y, jumping ? 'SKY HIGH!' : 'PICKED!', '#7fd3ff', 22, 0.9); return intercept(p); }
       return incomplete(p, 'TIPPED!');
     }
   }
@@ -1976,7 +1979,7 @@ function resolveCatch() {
   const b = G.ball, f = b.flight, land = { x: f.tx, y: f.ty };
   b.flight = null; G.showTarget = false;
   if (f.pitch) {
-    if ((f.trick && !f.shovel) || f.lateral) if (chance(f.lateral ? 0.05 : 0.03)) { // trick pitches are risky: sometimes it hits the turf
+    if ((f.trick && !f.shovel) || f.lateral) if (chance((f.lateral ? 0.05 : 0.03) * Sliders.mul('fum'))) { // trick pitches are risky: sometimes it hits the turf
       b.x = f.tx; b.y = f.ty; b.loose = { vx: rand(-3, 3), vy: rand(-3, 3), t: 0 }; G.bstate = 'loose'; G.credit = null;
       showBanner('FUMBLE!', 'Bad pitch', '#ff9a3d', 1.0); return;
     }
@@ -2003,7 +2006,7 @@ function resolveCatch() {
     const jd = dist(jumper, land);
     const dpj = f.dp && f.dp.p === jumper ? f.dp.res : null; // a well-timed jump wins more often
     const pInt = clamp((jumper.isHuman ? 0.62 : 0.3) + (rat(jumper, 'CTH') - 75) / 90 - (rd < jd ? 0.25 : 0) - jd * 0.12 + (dpj === 'perfect' ? 0.2 : dpj === 'good' ? 0.08 : 0), 0.1, 0.9);
-    if (chance(pInt)) return intercept(jumper);
+    if (chance(pInt * Sliders.side(jumper.side, 'cpuInt'))) return intercept(jumper);
     if (chance(0.6)) return incomplete(jumper, 'SWATTED!');
   }
   const dpr = f.dp && f.dp.p === def ? f.dp.res : null;
@@ -2015,21 +2018,21 @@ function resolveCatch() {
     && chance((xfOn(q, 'univ') ? 0.8 : 0.45) * (hands ? 0.5 : 1))) return incomplete(q, 'KNOCKED LOOSE!');
   const tight = xfOn(def, 'shutdown') ? 0.35 : 0; // Shutdown: plays the ball from farther away
   if (def && dd < 0.5 && dd < rd - 0.3 && !(hands && chance(0.7))) { // ball hits the defender right in the body: 7 out of 10 get picked
-    if (chance(def.isHuman ? 0.55 : 0.13)) return intercept(def);
+    if (chance((def.isHuman ? 0.55 : 0.13) * Sliders.side(def.side, 'cpuInt'))) return intercept(def);
     return incomplete(def, 'BROKEN UP!');
   }
   if (def && dd < 1.25 + tight && dd < rd - 0.25 + tight && !(hands && chance(0.7))) { // defender has inside position
     const pInt = clamp((def.isHuman ? 0.08 : 0.04) + (rat(def, 'COV') - 75) / 160 + humanDefBonus + (G.diff === 3 && !def.isHuman ? 0.06 : 0) - (rd < 1 ? 0.08 : 0), 0.03, 0.6);
-    if (chance(pInt)) return intercept(def);
+    if (chance(pInt * Sliders.side(def.side, 'cpuInt'))) return intercept(def);
     return incomplete(def, 'BROKEN UP!');
   }
-  if (rcv && rd < R && def && dd < 0.8 && def.jump <= 0 && chance(0.015)) { throwFlag('DPI', def.side, land.x, land.y, def); return incomplete(def, 'INTERFERENCE!'); }
+  if (rcv && rd < R && def && dd < 0.8 && def.jump <= 0 && chance(0.015 * Sliders.mul('pen'))) { throwFlag('DPI', def.side, land.x, land.y, def); return incomplete(def, 'INTERFERENCE!'); }
   if (rcv && rd < R) {
     let pc = 0.9 + (rat(rcv, 'CTH') - 78) / 160 - Math.max(0, Math.hypot(land.x - f.sx, land.y - f.sy) - 15) * 0.006 - (rd > 0.9 ? 0.08 : 0) - Weather.catchPenalty();
     if (hands) pc += 0.15;
     if (f.perfect) pc += 0.12; // a PERFECT meter throw is right in his hands
     if (f.cp === 'perfect') pc += 0.1; else if (f.cp === 'good') pc += 0.08; // timed catch
-    if (def && dd < 1.8) { pc -= (hands ? 0.08 : 0.24) - (rat(rcv, 'CTH') - rat(def, 'COV')) / 150; if (chance((def.isHuman ? 0.03 : 0.015) + humanDefBonus * 0.5)) return intercept(def); }
+    if (def && dd < 1.8) { pc -= (hands ? 0.08 : 0.24) - (rat(rcv, 'CTH') - rat(def, 'COV')) / 150; if (chance(((def.isHuman ? 0.03 : 0.015) + humanDefBonus * 0.5) * Sliders.side(def.side, 'cpuInt'))) return intercept(def); }
     if (chance(clamp(pc, 0.25, 0.97))) {
       const backLine = rcv.x < -0.25 || rcv.x > 120.25, sideLine = rcv.y < -0.25 || rcv.y > FIELD_W + 0.25;
       if (backLine || sideLine) { addText(clamp(rcv.x, 1, 119), clamp(rcv.y, 1, FIELD_W - 1), backLine ? 'OUT THE BACK' : 'NO FEET IN', '#fff', 15, 1); return incomplete(rcv, 'OUT OF BOUNDS'); }
@@ -2042,7 +2045,7 @@ function resolveCatch() {
     }
     return incomplete(rcv, 'DROPPED!');
   }
-  if (def && dd < 1.0) return chance(0.1) ? intercept(def) : incomplete(def, 'BROKEN UP!');
+  if (def && dd < 1.0) return chance(0.1 * Sliders.side(def.side, 'cpuInt')) ? intercept(def) : incomplete(def, 'BROKEN UP!');
   incomplete(null, 'INCOMPLETE');
 }
 
@@ -2091,6 +2094,8 @@ function checkTackles() {
     if (xfOn(df, 'unstoppable') || xfOn(df, 'reinforcement')) p += 0.1;
     if (xfOn(car, 'ankle') && (car.juke > 0 || car.spin > 0)) p -= 0.3;
     p = clamp(p, 0.1, 0.94);
+    const tm = Sliders.side(df.side, 'cpuTkl', 'humTkl'); // TACKLING sliders
+    if (tm !== 1) p = clamp(p * tm, 0.05, 0.98);
     // one-shot breaks: Brick Wall (first sack try), Phenom (first hit), First One Free (next move), YAC 'Em Up (first hit after the catch)
     const xfBreak = (car === G.O[0] && G.bstate === 'snap' && xfFree(car, 'brickwall')) || xfFree(car, 'phenom')
       || ((car.juke > 0 || car.spin > 0) && xfFree(car, 'firstfree')) || (G.bstate === 'run' && G.credit && G.credit.kind === 'rec' && xfFree(car, 'yac'));
@@ -2120,7 +2125,7 @@ function tackle(car, df, hitters) {
   const st = stat(df);
   // fumble?
   df.hit = 0;
-  if ((G.bstate === 'run' || stick) && !xfOn(car, 'truzz') && chance((0.022 + (hitters > 1 ? 0.02 : 0) + (stick ? 0.3 : 0) + Weather.fumbleBonus()) * tuckFumbleMul(car) * carMul(car))) {
+  if ((G.bstate === 'run' || stick) && !xfOn(car, 'truzz') && chance((0.022 + (hitters > 1 ? 0.02 : 0) + (stick ? 0.3 : 0) + Weather.fumbleBonus()) * tuckFumbleMul(car) * carMul(car) * Sliders.mul('fum'))) {
     b.holder = null; b.x = car.x; b.y = car.y;
     b.loose = { vx: rand(-4, 4), vy: rand(-3, 3), t: 0 };
     G.bstate = 'loose'; showBanner('FUMBLE!', '', '#ff9a3d', 1.0); car.down = 0.9; b.fumbler = car;
@@ -2205,7 +2210,7 @@ function endPlay(res) {
     car.tdRun = { x: gd * (car.x - gx) >= 3 ? car.x : gx + gd * 3.5, y: clamp(car.y, 9, FIELD_W - 9) };
     showBanner('TOUCHDOWN!', `${car.name} • ${G.teams[cs].city} ${G.teams[cs].name}`, isHumanSide(cs) ? '#ffd23f' : '#ff6040', 2.6);
     Sound.td(); G.crowdHype = 1.5; stat(car).td++; G.slowmo = 0.9;
-    if (typeof Unlocks !== 'undefined' && isHumanSide(cs) && !G.versus && !G.mini) Unlocks.td();
+    if (typeof Unlocks !== 'undefined' && isHumanSide(cs) && !G.versus && !G.mini && !G.practice) Unlocks.td();
     for (const q of G.players) if (q.side === cs) q.celebrate = 2.6;
     for (let i = 0; i < 70; i++) G.fx.push({ kind: 'confetti', px: rand(0, CW), py: rand(-200, 0), vy: rand(120, 260), vx: rand(-40, 40), z: 0, vz: 0, color: pick([G.teams[cs].c1, G.teams[cs].c2, '#fff']), life: 2.6, max: 2.6 });
     if (G.credit && G.credit.passer && cs === off) stat(G.credit.passer).td++;
@@ -2258,6 +2263,7 @@ function afterPlay() {
   for (const p of G.players) { if (p.celly) Celly.end(p); p.tdRun = null; p.cellyNext = null; }
   G.cellyGuy = null; G.tdScorer = null;
   G.runoff = 0;
+  if (G.practice && typeof Practice !== 'undefined') return Practice.afterPlay(n); // practice: back to the same spot
   if (G.twoMinAfterPlay) { G.pendingRunoff = 0; if (G.quarter === G.twoMinQ || G.clock <= 0) G.twoMinAfterPlay = false; else twoMinWarning(); }
   if (G.mini && typeof miniAfterPlay === 'function') return miniAfterPlay();
   // overtime is sudden death

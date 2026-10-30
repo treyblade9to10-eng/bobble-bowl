@@ -26,6 +26,7 @@
 <link rel="stylesheet" href="css/stadium.css">
 <link rel="stylesheet" href="css/matchup.css">
 <link rel="stylesheet" href="css/highlights.css">
+<link rel="stylesheet" href="css/practice.css">
 <link rel="stylesheet" href="css/franchisehub.css">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#0c1016">
@@ -51,6 +52,7 @@
     </div>
     <div class="row">
       <button class="big" id="btnModes">CHALLENGES</button>
+      <button class="big" id="btnPractice">PRACTICE</button>
       <button class="big" id="btnCap">CAREER</button>
       <button class="big gold" id="btnOnline">ONLINE</button>
     </div>
@@ -128,6 +130,7 @@
         <label>Weather <select id="optWeather"></select></label>
         <label>Time <select id="optNight"><option value="0">Day</option><option value="1">Night</option></select></label>
         <label>Game <select id="optGame"><option value="reg">Regular</option><option value="bowl">Bobble Bowl</option></select></label>
+        <label>Name tags <select id="optNameTags"><option value="all">All</option><option value="key" selected>Key Players</option><option value="off">Off</option></select></label>
         <label>Logos <select id="optLogos"><option value="real">Real</option><option value="cartoon">Cartoon</option></select></label>
         <label>Pass meter <select id="optMeter"><option value="1">On</option><option value="0">Off</option></select></label>
         <label>Meter speed <select id="optMeterSpd"><option value="normal">Normal</option><option value="slow">Slow</option><option value="fast">Fast</option></select></label>
@@ -346,6 +349,7 @@
     <h2>Paused</h2>
     <button class="big" id="btnResume">RESUME</button>
     <div class="row"><button id="btnReplayOpt">INSTANT REPLAYS: ON</button><button id="btnCoachOpt">COACH MODE: OFF</button><button id="btnQuit">QUIT GAME</button></div>
+    <div class="row"><button id="btnTagsOpt">NAME TAGS: KEY PLAYERS</button><button id="btnSlidersOpt">SLIDERS</button></div>
     <div id="pausePbp"></div>
   </div>
 
@@ -406,12 +410,14 @@
 <script src="js/colleges.js"></script>
 <script src="js/career.js"></script>
 <script src="js/ratings.js"></script>
+<script src="js/sliders.js"></script>
 <script src="js/engine.js"></script>
 <script src="js/customteams.js"></script>
 <script src="js/injury.js"></script>
 <script src="js/celly.js"></script>
 <script src="js/special.js"></script>
 <script src="js/highlights.js"></script>
+<script src="js/clips.js"></script>
 <script src="js/season.js"></script>
 <script src="js/modes.js"></script>
 <script src="js/savegame.js"></script>
@@ -419,6 +425,7 @@
 <script src="js/lib/peerjs.min.js"></script>
 <script src="js/net.js"></script>
 <script src="js/main.js"></script>
+<script src="js/practice.js"></script>
 <script src="js/draftchamps.js"></script>
 <script src="js/locker.js"></script>
 <script src="js/gear.js"></script>
