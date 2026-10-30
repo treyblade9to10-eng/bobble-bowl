@@ -441,7 +441,7 @@ const Net = {
     R.pads = [m.ax ? { x: m.ax[0], y: m.ax[1], m: m.ax[2] } : null, m.ax ? { x: m.ax[0], y: m.ax[1], m: m.ax[2] } : null];
     const P = R.pointer, wasDown = P.down;
     P.down = !!m.p[0]; P.wx = m.p[1]; P.wy = m.p[2]; P.wx0 = m.p[3]; P.wy0 = m.p[4]; P.t = m.p[5]; P.moved = !!m.p[6];
-    if (!P.down || !wasDown) P.aiming = false;
+    if (!P.down || !wasDown) P.aiming = P.noSteer = false;
   },
   // key presses, taps and throws come on the safe lane so they never get lost
   mergeOneShots(m) {

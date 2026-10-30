@@ -905,7 +905,7 @@ function humanQBInput() {
     // finger on a receiver's icon: hold for the power bar, a quick tap lobs it
     if (meterOn() && G.ball.holder === qb && !G.meter && P.down && !P.moved) {
       const best = iconAt(P.x0, P.y0);
-      if (best) meterStart(qb, null, best);
+      if (best) { meterStart(qb, null, best); P.noSteer = true; } // this finger is the pass bar: never "run to here", even if the hold gets cut off
     }
     if (G.meter && G.meter.r && !G.meter.key) {
       if (G.ball.holder !== qb || !eligible(G.meter.r)) G.meter = null; // finger can wander once the hold started: it still goes to him
@@ -1286,12 +1286,16 @@ function mobileControl(p, dt, isCarrier) {
   if (qbHolding && !G.humanScramble) { // QB moves himself in the pocket unless you slide him with the stick; you aim + throw on the field
     const st = Input.stick;
     if (st.m > 0.15 && isFinite(st.x) && isFinite(st.y)) { p.dvx = st.x * p.spd * 0.75; p.dvy = st.y * p.spd * 0.75; return true; }
+    if (G.meter) { p.dvx = 0; p.dvy = 0; return true; } // charging a throw: he plants his feet (only the stick moves him)
     return false;
   }
   const onD = p.side !== G.poss || (b.holder && b.holder.side !== p.side);
   const inAir = !isCarrier && onD && b.flight && !b.flight.pitch;
   if (inAir && (Input.taps.length || Input.hit('Space'))) { flightPress(p, 'def'); doJump(p); Input.taps.length = 0; }
-  if (!isCarrier && !onD && b.flight && !b.flight.pitch && b.flight.intended === p) { catchHold(p, Input.pointer.down || Input.held('Space')); Input.taps.length = 0; }
+  if (!isCarrier && !onD && b.flight && !b.flight.pitch && b.flight.intended === p) {
+    catchHold(p, Input.pointer.down || Input.held('Space')); Input.taps.length = 0;
+    if (P.down && catchMeterOn()) P.noSteer = true; // that finger is the catch bar, not "run to here" (also after the catch until you lift it)
+  }
   if (!isCarrier && p.engaged && Input.hit('KeyE')) doSwim(p);
   if (!isCarrier && onD && Input.hit('KeyC')) doHitStick(p);
   if (p.hit > 0) return true;
@@ -1324,7 +1328,7 @@ function mobileControl(p, dt, isCarrier) {
     return true;
   }
   if (p.jump > 0 && b.flight) { steer(p, b.flight.tx, b.flight.ty, 1.08, 0.2); return true; }
-  const held = P.down && !P.aiming && P.t > 0.12;
+  const held = P.down && !P.aiming && !P.noSteer && P.t > 0.12;
   if (held) {
     const tx = wx(P.x), ty = wy(P.y);
     if (sprint) p.stamina = Math.max(0, p.stamina - dt * 0.42);
@@ -2582,12 +2586,27 @@ function launchKick() {
     if (k.oob) { const f = (k.ty < 0 ? -G.ballY : FIELD_W - G.ballY) / (k.ty - G.ballY); k.land = G.los + d * dist * f; k.ty = clamp(k.ty, -1, FIELD_W + 1); }
     k.shank = shank; k.T = 1.4 + km.power * 1.4; k.peak = 8 + km.power * 10;
   } else {
-    const range = fgRange(km.kk.kp);
+    const range = fgRange(km.kk.kp), f = km.power / km.need, half = 3.08, bar = 3.33; // posts: same size as draw.js GPOST
     k.short = km.power < km.need;
     k.good = !k.short && Math.abs(km.aim) <= km.tol;
-    if (k.short) { k.land = G.los - d * 7 + d * Math.max(10, km.power * range); k.ty = MID + km.aim * 6; }
-    else { k.land = goalX(s) + d * 10; k.ty = MID + (k.good ? (km.aim / km.tol) * 2.6 : Math.sign(km.aim || 1) * (3.6 + Math.abs(km.aim) * 4)); }
+    // the flight only shows the result decided above: zEnd = height when it gets to the posts
+    const clear = bar + 0.9 + 4.5 * clamp((km.power - km.need) / 0.5, 0, 1); // more leg = clears the bar by more
+    if (k.short && f < 0.9) { k.land = G.los - d * 7 + d * Math.max(10, km.power * range); k.ty = MID + km.aim * 6; k.zEnd = 0; } // dies in front
+    else {
+      k.land = goalX(s) + d * 10;
+      if (k.short) { // just short: under the bar, or off the crossbar
+        k.ty = MID + km.aim * 6;
+        if (f >= 0.97 && Math.abs(k.ty - MID) < half - 0.3) { k.hit = 'bar'; k.zEnd = bar - 0.05; } else k.zEnd = 0.8 + (f - 0.9) * 22;
+      } else if (k.good) { k.ty = MID + (km.aim / km.tol) * 2.6; k.zEnd = clear; }
+      else { // wide: barely wide doinks off the upright
+        const over = Math.abs(km.aim) - km.tol;
+        k.hit = over < km.tol * 0.25 ? 'post' : null;
+        k.ty = MID + Math.sign(km.aim || 1) * (k.hit ? half : half + 0.6 + over * 5); k.zEnd = clear;
+      }
+    }
     k.T = 1.25 + km.yds / 60; k.peak = 7 + km.power * 5;
+    // one arc that lands past the posts: k.up = how far along it the posts are (k.T = time to the posts)
+    if (k.zEnd > 0) { k.peak = Math.max(k.peak, k.zEnd / 0.95); k.up = (1 + Math.sqrt(1 - k.zEnd / k.peak)) / 2; }
   }
   k.sx = G.ball.x; k.sy = G.ball.y;
   G.kick = k; G.phase = 'kick';
@@ -2599,7 +2618,7 @@ function launchKick() {
 // after the posts: the ball sails on into the net, drops and skips
 function kickCarry(k, b, dt) {
   const c = k.carry; if (!c) return;
-  b.x += c.vx * dt; b.y += c.vy * dt; c.vz -= 30 * dt; b.z = Math.max(0, (b.z || 3.5) + c.vz * dt); b.spin = (b.spin || 0) + dt * 14;
+  b.x += c.vx * dt; b.y += c.vy * dt; c.vz -= (c.g || 30) * dt; b.z = Math.max(0, (b.z || 0) + c.vz * dt); b.spin = (b.spin || 0) + dt * 14;
   if (b.z <= 0) { if (Math.abs(c.vz) > 4) { c.vz = -c.vz * 0.35; b.z = 0.01; } else c.vz = 0; c.vx *= 0.9; c.vy *= 0.9; }
 }
 function updateKick(dt) {
@@ -2608,11 +2627,16 @@ function updateKick(dt) {
   if (k.done && k.carry) { kickCarry(k, b, dt); k.wait -= dt; if (k.wait <= 0) afterPlay(); return; } // past the posts: keep it flying
   const u = Math.min(1, k.t / k.T);
   b.x = lerp(k.sx, k.land, u); b.y = lerp(k.sy, k.ty, u);
-  b.z = k.peak * 4 * u * (1 - u) + (k.kind !== 'punt' && !k.short ? u * 3.5 : 0); b.spin = (b.spin || 0) + dt * 14;
+  const ua = u * (k.up || 1); // how far along the whole arc
+  b.z = k.peak * 4 * ua * (1 - ua); b.spin = (b.spin || 0) + dt * 14;
   if (u < 1) return;
   if (k.done) { if (k.carry) kickCarry(k, b, dt); k.wait -= dt; if (k.wait <= 0) afterPlay(); return; }
-  if (k.kind !== 'punt' && !k.short) { // field goals keep flying through (or past) the uprights instead of freezing at the bar
-    k.carry = { vx: (k.land - k.sx) / k.T, vy: (k.ty - k.sy) / k.T, vz: (-4 * k.peak + 3.5) / k.T * 0.35 };
+  if (k.kind !== 'punt' && k.up) { // field goals keep flying through (or past, or under) the uprights on the same arc
+    const w = k.up / k.T, c = k.carry = { vx: (k.land - k.sx) / k.T, vy: (k.ty - k.sy) / k.T, vz: 4 * k.peak * (1 - 2 * k.up) * w, g: 8 * k.peak * w * w };
+    if (k.hit) { // doink: bounces back off the upright (out wide) or the crossbar
+      c.vx *= -0.18; c.vz = k.hit === 'bar' ? 5 : 2; c.g = 30; c.vy = k.hit === 'post' ? Math.sign(k.ty - MID) * 3 : c.vy * 0.3;
+      Sound.tone(1250, 0.16, 'sine', 0.16, -500); cam.shake = Math.max(cam.shake, 3); addText(k.land, k.ty, 'DOINK!', '#ffd400', 22, 1.1);
+    }
     b.x = k.land; b.y = k.ty; kickCarry(k, b, 0);
   }
   k.done = true; k.wait = 1.7;
@@ -2630,7 +2654,7 @@ function updateKick(dt) {
     if (G.mini) { k.wait = 1.4; G.miniKick = k.good; showBanner(k.good ? "IT'S GOOD!" : k.short ? 'SHORT!' : 'NO GOOD!', `${k.yds} yards`, k.good ? '#9cff9c' : '#ff6040', 1.3); (k.good ? Sound.td() : Sound.bad()); return; }
     addPbp(`${lastName(G.km.kk.name)} ${k.yds}-yard field goal is ${k.good ? 'GOOD' : k.short ? 'short' : 'no good'}.`);
     if (k.good) { G.score[s] += 3; showBanner("IT'S GOOD!", `${k.yds}-yard field goal`, '#9cff9c', 1.8); Sound.td(); G.next = { kickoff: s }; }
-    else { showBanner(k.short ? 'SHORT!' : 'NO GOOD!', k.short ? `${k.yds} yards was too far` : `${k.yds}-yard try is ${k.ty < MID ? 'wide left' : 'wide right'}`, '#ff6040', 1.6); Sound.bad(); G.next = { drive: 1 - s, x: d * (G.los - (goalX(s) - d * 20)) > 0 ? goalX(s) - d * 20 : G.los }; }
+    else { showBanner(k.short ? 'SHORT!' : 'NO GOOD!', k.short ? (k.hit ? `${k.yds} yards, off the crossbar` : `${k.yds} yards was too far`) : k.hit ? `${k.yds}-yard try hits the upright` : `${k.yds}-yard try is ${k.ty < MID ? 'wide left' : 'wide right'}`, '#ff6040', 1.6); Sound.bad(); G.next = { drive: 1 - s, x: d * (G.los - (goalX(s) - d * 20)) > 0 ? goalX(s) - d * 20 : G.los }; }
     G.runoff = 5; Momentum.kick(k.good ? 'fg' : 'fgmiss', s);
   } else { // xp
     addPbp(`${lastName(G.km.kk.name)} extra point is ${k.good ? 'good' : 'NO GOOD'}.`);
@@ -2681,9 +2705,14 @@ function updateCamera(dt) {
     const d = dirOf(G.poss), keep = G.los + d * (half - 14); // the kicker (~10 yards back) stays on screen
     tx = lerp(G.los, goalX(G.poss) + d * 10, 0.6); tx = d > 0 ? Math.min(tx, keep) : Math.max(tx, keep);
   }
+  const kk = G.kick || G.km, fgk = G.phase === 'kick' && kk && (kk.kind === 'fg' || kk.kind === 'xp') && b;
+  if (fgk) { // field goal in the air: frame the ball and the posts, then hold with the posts in view while it sails through
+    const d = dirOf(kk.side), ex = d > 0 ? 120 : 0;
+    tx = lerp(b.x, ex, 0.5); tx = d > 0 ? Math.min(tx, ex - half * 0.3) : Math.max(tx, ex + half * 0.3);
+  }
   const cel = G.phase === 'dead' ? G.players.find(p => p.celly) : null;
   if (cel) tx = cel.x; // follow the celebration (the Lambeau Leap goes right into the stands)
-  tx = clamp(tx, half - (kicking || cel ? 9 : 5), (kicking || cel ? 129 : 125) - half);
+  tx = fgk ? clamp(tx, half * 0.3, 120 - half * 0.3) : clamp(tx, half - (kicking || cel ? 9 : 5), (kicking || cel ? 129 : 125) - half);
   cam.x = lerp(cam.x, tx, 1 - Math.exp(-dt * 4));
   let ty = MID;
   if (b && (G.phase === 'live' || G.phase === 'dead')) ty = lerp(MID, b.holder ? b.holder.y : b.y, 0.4);
