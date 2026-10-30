@@ -90,12 +90,10 @@ Object.assign(Season, {
   if (this.data.phase !== 'done') this.injuryWeek(ids, wk);
   this.save();
 }; }
-// everybody heals over the offseason; future picks you traded come due
+// everybody heals over the offseason (traded future picks live in the pick table: trades.js)
 { const _ny = Season.nextYear; Season.nextYear = function () {
-  const fo = this.data.futureOwe || {};
   this.healAll();
   const ch = _ny.call(this);
-  this.data.pickOwner = Object.assign({}, fo);
   this.save();
   return ch;
 }; }
@@ -326,7 +324,7 @@ const Scout = {
   hide(pr) {
     const proj = pr.t[3], dv = Math.round(clamp((rand(-1, 1) + rand(-1, 1) + rand(-1, 1)) * 2.6, -6, 6));
     pr.proj = proj; pr.ppot = pr.pot;
-    pr.t[3] = clamp(proj + dv, 55, 92);
+    pr.t[3] = clamp(proj + dv, 42, 92);
     const pi = POTS.indexOf(pr.pot);
     if (dv >= 2 && chance(0.4) && pi < 2) pr.pot = POTS[pi + 1]; else if (dv <= -2 && chance(0.4) && pi > 0) pr.pot = POTS[pi - 1];
     pr.t[6] = Object.assign({}, pr.t[6] || {}, { pot: pr.pot });
@@ -378,16 +376,17 @@ $('cbGo').onclick = () => { Season.data.draft.combineDone = 1; Season.save(); So
 // ================= draft-day trades =================
 const DraftDay = {
   // what a pick is worth: same scale as trades.js, the top 10 cost extra on draft day
-  slotVal(n) { return Season.value([0, 0, 0, Math.round(83 - n * 0.32)]) * 1.15 * (1 + Math.max(0, 10 - n) * 0.04); },
-  futVal(id) { const dr = Season.data.draft, s = (dr.via || dr.order).indexOf(id) + 1 || 16; return this.slotVal(Math.round((s + 16) / 2)) * 0.85; },
-  ownsFuture(id) { return !(Season.data.futureOwe || {})[id]; },
-  futName(id) { return `${tName(id)} ${Season.data.draft.year + 1} 1st`; },
+  slotVal(n) { return Season.pickCurve(n) * (1 + Math.max(0, 10 - n) * 0.04); },
+  // a team's picks in next year's draft (1st and 2nd round) it could throw in
+  futures(id) { const y = Season.data.draft.year + 1; return Season.picksOf(id).filter(pk => pk.y === y && pk.r <= 2); },
+  fut(pk, forId) { return { kind: 'fut', pk, v: Season.pickValue(pk, forId) * 0.95, txt: Season.pickName(pk) }; },
+  slot(j) { return { kind: 'slot', j, v: this.slotVal(j + 1), txt: `${draftSlot(Season.data.draft, j)} (#${j + 1})` }; },
   pLabel(p) { return `${p[0]} ${lastName(p[1])} (${p[3]})`; },
   // the cheapest package of yours a team would take for pick k
   upDeal(k) {
     const d = Season.data, dr = d.draft, me = d.team, other = dr.order[k], need = this.slotVal(k + 1), A = [];
-    dr.order.forEach((o, j) => { if (o === me && j > k) A.push({ kind: 'slot', j, v: this.slotVal(j + 1), txt: `#${j + 1}` }); });
-    if (this.ownsFuture(me)) A.push({ kind: 'fut', v: this.futVal(me), txt: `your ${dr.year + 1} 1st` });
+    dr.order.forEach((o, j) => { if (o === me && j > k && A.length < 8) A.push(this.slot(j)); });
+    this.futures(me).forEach(pk => A.push(this.fut(pk, other)));
     Season.assets(me).filter(a => a.p && !Season.rosterProblem(me, other, [a.key], []))
       .map(a => ({ kind: 'p', key: a.key, name: a.p[1], starter: a.starter, v: Season.worth(other, a, true) * (Season.hurt(a.p) ? 0.6 : 1), txt: this.pLabel(a.p) }))
       .sort((a, b) => b.v - a.v).slice(0, 10).forEach(x => A.push(x));
@@ -413,8 +412,8 @@ const DraftDay = {
       if (list.length >= 2) break;
       if (list.some(o => o.team === T) || !chance(0.75)) continue;
       const owe = give - this.slotVal(j + 1), ex = [];
-      if (this.ownsFuture(T)) ex.push({ kind: 'fut', v: this.futVal(T), txt: this.futName(T) });
-      dr.order.forEach((o, j2) => { if (o === T && j2 > j) ex.push({ kind: 'slot', j: j2, v: this.slotVal(j2 + 1), txt: `#${j2 + 1}` }); });
+      this.futures(T).forEach(pk => ex.push(this.fut(pk, me)));
+      dr.order.forEach((o, j2) => { if (o === T && j2 > j) ex.push(this.slot(j2)); });
       Season.assets(T).filter(a => a.p && !Season.hurt(a.p) && !Season.rosterProblem(me, T, [], [a.key]))
         .forEach(a => ex.push({ kind: 'p', name: a.p[1], v: Season.worth(me, a, true), txt: this.pLabel(a.p) }));
       let best = null; for (const e of ex) if (e.v >= owe * 0.9 && e.v <= owe * 2.2 + 40 && (!best || e.v < best.v)) best = e;
@@ -435,11 +434,12 @@ const DraftDay = {
     }
     return null;
   },
+  // this year's slots change hands in the order (and the pick table), future picks in the pick table
+  setSlot(j, to) { const dr = Season.data.draft; dr.order[j] = to; if (dr.via && dr.rd) Season.movePick({ y: dr.year, from: dr.via[j], r: dr.rd[j] }, to); },
   send(list, from, to) {
-    const d = Season.data, dr = d.draft;
     for (const a of list) {
-      if (a.kind === 'slot') dr.order[a.j] = to;
-      else if (a.kind === 'fut') (d.futureOwe || (d.futureOwe = {}))[from] = to;
+      if (a.kind === 'slot') this.setSlot(a.j, to);
+      else if (a.kind === 'fut') Season.movePick(a.pk, to);
       else this.movePlayer(from, to, a.name);
     }
   },
@@ -450,14 +450,14 @@ const DraftDay = {
   },
   tradeUp(k) {
     const d = Season.data, dr = d.draft, me = d.team, deal = this.upDeal(k); if (!deal) return;
-    this.send(deal.list, me, deal.team); dr.order[k] = me; delete dr.offers[k];
-    const gave = deal.list.map(a => a.txt.replace('your ', '')).join(', ');
+    this.send(deal.list, me, deal.team); this.setSlot(k, me); delete dr.offers[k];
+    const gave = deal.list.map(a => a.txt).join(', ');
     this.log(deal.team, `Pick #${k + 1}`, gave, `DRAFT TRADE: the ${tName(me)} move up to #${k + 1}, sending ${gave} to the ${tName(deal.team)}`);
     Season.save();
   },
   tradeDown(n) {
     const d = Season.data, dr = d.draft, me = d.team, k = dr.i, o = (dr.offers[k] || [])[n]; if (!o || dr.order[o.j] !== o.team) return;
-    dr.order[k] = o.team; dr.order[o.j] = me;
+    this.setSlot(k, o.team); this.setSlot(o.j, me);
     this.send([o.extra], o.team, me); delete dr.offers[k];
     const got = `#${o.j + 1}, ${o.extra.txt}`;
     this.log(o.team, got, `Pick #${k + 1}`, `DRAFT TRADE: the ${tName(o.team)} move up to #${k + 1}. The ${tName(me)} get ${got}`);
@@ -469,7 +469,7 @@ const DraftDay = {
 function draftDesk(myTurn, over) {
   if (over) return '';
   const d = Season.data, dr = d.draft, me = d.team;
-  let h = `<div class="dkBtns">${myTurn ? '' : '<button id="dkNext">NEXT PICK</button>'}<button id="dkComb">COMBINE${dr.sp ? `  ·  ${dr.sp} PTS` : ''}</button></div>`;
+  let h = `<div class="dkBtns">${myTurn ? '' : '<button id="dkNext">NEXT PICK</button>'}<button id="dkComb">COMBINE${dr.sp ? `  ·  ${dr.sp} PTS` : ''}</button>${dr.order.indexOf(me, dr.i) >= 0 ? '<button id="dkAuto">AUTO DRAFT REST</button>' : ''}</div>`;
   if (myTurn) {
     const offers = DraftDay.downOffers();
     h += `<div class="leadHead">TRADE DOWN</div>` + (offers.length ? offers.map((o, n) => `<div class="dkRow"><div><b>${tName(o.team)}</b> want #${dr.i + 1}<i>You get #${o.j + 1} + ${o.extra.txt}</i></div><button data-dn="${n}">ACCEPT</button></div>`).join('')
@@ -486,6 +486,10 @@ function draftDesk(myTurn, over) {
 function wireDraftDesk() {
   const nx = $('dkNext'); if (nx) nx.onclick = () => { Sound.click(); Season.draftOne(); renderDraft(); };
   const cb = $('dkComb'); if (cb) cb.onclick = () => { Sound.click(); renderCombine(); show('combine'); };
+  // your picks get made for you (best player for your team), the CPU picks the rest
+  const au = $('dkAuto'); if (au) au.onclick = () => { Sound.click(); const dr = Season.data.draft;
+    while (dr.i < dr.order.length) { if (dr.order[dr.i] === Season.data.team) Season.draftPick(Season.data.team, Season.myAutoPick(), true); else Season.draftRun(); }
+    Season.save(); renderDraft(); };
   // first tap asks, second tap makes the deal
   const sure = (b, go) => b.onclick = () => { if (!b.dataset.sure) { b.dataset.sure = 1; b.textContent = 'SURE?'; Sound.click(); return; } Sound.td(); go(); renderDraft(); };
   document.querySelectorAll('.dkRow button[data-up]').forEach(b => sure(b, () => DraftDay.tradeUp(+b.dataset.up)));

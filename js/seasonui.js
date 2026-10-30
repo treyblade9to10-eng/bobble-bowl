@@ -181,10 +181,10 @@ function renderHubTab() {
     h = `<div class="leadHead">STARTERS</div>${me.off.concat(me.def).map(row).join('')}` + ((R.bench || []).length ? `<div class="leadHead" style="margin-top:8px">BENCH</div>${R.bench.map(row).join('')}` : '')
       + `<div class="note">Players peak in their mid 20s (QBs later, RBs sooner). Ages in red are too old to be an X-Factor.</div>`;
   } else if (hubTab === 'draft') { // who you could get: tank for a franchise QB
-    const slot = Season.pickSlot(d.team), prev = Season.draftPreview(12), yr = Season.draftYear();
-    const owns = Season.picksOf ? Season.picksOf(d.team) : [d.team];
-    h = `<div class="leadHead">${yr} DRAFT  ·  ${owns.includes(d.team) ? `YOUR PICK IS PROJECTED #${slot}` : 'YOU TRADED YOUR PICK'}</div>
-      <div class="note">Worst record picks first. The champion picks last.</div>`
+    const prev = Season.draftPreview(12), yr = Season.draftYear();
+    const mine = Season.picksOf(d.team).filter(pk => pk.y === yr), firsts = mine.filter(pk => pk.r === 1);
+    h = `<div class="leadHead">${yr} DRAFT  ·  ${firsts.length ? firsts.map(pk => `1ST ROUND: PROJECTED #${Season.pickNum(pk)}${pk.from !== d.team ? ` (VIA ${pk.from})` : ''}`).join('  ·  ') : 'YOU TRADED YOUR 1ST ROUND PICK'}</div>
+      <div class="note">7 rounds. Worst record picks first, the champion picks last. You have ${mine.length} pick${mine.length === 1 ? '' : 's'} this year: ${mine.map(pk => 'R' + pk.r).join(', ') || 'none'}.</div>`
       + (prev ? prev.map((r, i) => `<div class="leadRow"><span>${i + 1}. ${r[0]} ${r[1]} <i>${r[6]}</i></span><i>POT ${r[7]}  ·  <b>${r[3]}</b></i></div>`).join('')
         : '<div class="note">Scouts haven\'t seen this class yet. It\'ll be a brand-new group of prospects.</div>');
   } else if (hubTab === 'news') {
@@ -240,4 +240,3 @@ function renderOffseason(changes) {
 $('osGo').onclick = () => renderHub();
 
 // ---- trades: see trades.js ----
-$('trBack').onclick = () => renderHub();
