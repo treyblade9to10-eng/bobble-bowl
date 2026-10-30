@@ -52,6 +52,7 @@ const Broadcast = {
     const head = G.bigGame ? G.bigGame.name.toUpperCase() : S ? S.name : G.rivalryMatch || G.rivalry ? 'RIVALRY GAME' : G.night ? "TONIGHT'S MATCHUP" : "TODAY'S MATCHUP";
     if (S) { bcBadge(g, G.bcast, 116, 6, 72, 52); g.textAlign = 'left'; g.fillStyle = '#fff'; g.font = 'italic 900 30px "Barlow Condensed", Arial, sans-serif'; }
     g.fillText(head, S ? 204 : 120, 34);
+    if (S && S.tagline && !(G.rivalryMatch || G.rivalry)) { const hw = g.measureText(head).width; g.font = '800 18px "Barlow Condensed", Arial, sans-serif'; g.fillStyle = S.down; g.fillText(S.tagline, 222 + hw, 35); g.font = 'italic 900 30px "Barlow Condensed", Arial, sans-serif'; }
     if (S && (G.rivalryMatch || G.rivalry)) { const hw = g.measureText(head).width; g.font = '800 18px "Barlow Condensed", Arial, sans-serif'; g.fillStyle = '#ff8a5c'; g.fillText('RIVALRY GAME', 222 + hw, 35); }
     if (this.label && !G.bigGame) { g.textAlign = 'right'; g.fillStyle = S ? S.down : '#f6c31c'; g.font = '800 22px "Barlow Condensed", Arial, sans-serif'; g.fillText(this.label.toUpperCase(), W - 30, 34); }
     // each team: logo, name, rating, player in uniform

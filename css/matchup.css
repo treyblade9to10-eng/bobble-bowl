@@ -203,3 +203,13 @@
 /* BROADCAST (primetime look): 7 choices, two lines so the names fit */
 #muRow_optBcast .muC { flex-wrap: wrap; row-gap: 3px; }
 #muRow_optBcast .muC.seg button { flex: 1 1 22%; }
+
+/* computer: up / down arrows that match the keys (W / S = away, arrow keys = home), stacked on the outside edge of each card */
+body:not(.mobile) #select .muArr { height: 64px; flex-direction: column; gap: 1px; }
+body:not(.mobile) #select .muArr svg { transform: rotate(90deg); width: 24px; height: 24px; }
+body:not(.mobile) #select .muArr.l { top: calc(50% - 68px); }
+body:not(.mobile) #select .muArr.r { top: calc(50% + 4px); }
+body:not(.mobile) #select #pAway .muArr { left: 0; right: auto; }
+body:not(.mobile) #select #pHome .muArr { right: 0; left: auto; }
+body:not(.mobile) #select .muArr::after { content: attr(data-key); font-family: var(--hd); font-weight: 800; font-size: 13px; color: #ffffffb0; line-height: 1; }
+body:not(.mobile) #select .muArr:hover::after { color: var(--gold); }

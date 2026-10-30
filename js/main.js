@@ -184,6 +184,8 @@ function moveTeam(side, d) {
   sel.idx[side] = i; Sound.click(); renderSelect(side);
 }
 document.querySelectorAll('#select .muArr').forEach(b => b.onclick = e => { e.stopPropagation(); moveTeam(+b.dataset.side, +b.dataset.d); });
+// key labels for the computer arrows: away = W / S, home = arrow keys (up = previous team, down = next)
+document.querySelectorAll('#select .muArr').forEach(b => { b.dataset.key = b.dataset.side === '1' ? (b.dataset.d === '-1' ? 'W' : 'S') : (b.dataset.d === '-1' ? '\u2191' : '\u2193'); });
 $('btnSwap').onclick = () => { sel.you = 1 - sel.you; Sound.click(); renderSelect(); };
 // card body: tap = team grid, swipe left/right = next/previous team, mouse wheel scrolls teams
 document.querySelectorAll('#select .muBody').forEach(el => {
