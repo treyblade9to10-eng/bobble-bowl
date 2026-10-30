@@ -1007,7 +1007,7 @@ $('onGo').onclick = () => {
   if (code.length !== 4) { $('onStatus').textContent = 'Codes are 4 letters/numbers.'; return; }
   if (typeof Peer === 'undefined') { $('onStatus').textContent = "Online play couldn't load. Check your internet and refresh."; return; }
   Sound.click(); if (G.mode === 'mobile') goFullscreen();
-  $('onStatus').textContent = 'Connecting...';
+  $('onStatus').textContent = 'CONNECTING...';
   Net.join(code, st => { $('onStatus').textContent = st; });
 };
 $('onCodeIn').addEventListener('keydown', e => { if (e.code === 'Enter') $('onGo').onclick(); e.stopPropagation(); });
