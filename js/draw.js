@@ -452,6 +452,32 @@ function shadowSprite(r) {
   g.fillStyle = shg; g.beginPath(); g.arc(m, m, m, 0, 7); g.fill();
   return (shadowSprites[r] = c);
 }
+// drawing a picture tilted is ~5x slower than straight on phones, so tilted heads/jerseys get turned once per small angle step
+// and copied over straight on whole pixels. Anything zoomed or squashed draws the normal way
+const rotSprites = new Map(); let rotSpriteId = 0;
+function blitRot(g, c, dx, dy, dw, dh) {
+  const m = g.getTransform(), a = m.a, b = m.b, cc = m.c, d = m.d;
+  if (Math.abs(b) < 1e-9 && Math.abs(cc) < 1e-9 || Math.abs(a * a + b * b - 1) > 1e-6 || Math.abs(cc * cc + d * d - 1) > 1e-6 || Math.abs(a * cc + b * d) > 1e-6) return g.drawImage(c, dx, dy, dw, dh);
+  const flip = a * d - b * cc < 0, q = Math.round((flip ? Math.atan2(-b, -a) : Math.atan2(b, a)) / 0.02), th = q * 0.02, co = Math.cos(th), si = Math.sin(th);
+  if (!q) { g.save(); g.setTransform(flip ? -1 : 1, 0, 0, 1, m.e, m.f); g.drawImage(c, dx, dy, dw, dh); g.restore(); return; } // tilted less than half a step: straight
+  const L = flip ? [-co, -si, -si, co] : [co, si, -si, co]; // (flipped = mirrored left-right, then turned)
+  if (!c.rid) c.rid = ++rotSpriteId;
+  const key = c.rid + '|' + q + (flip ? 'f' : '') + '|' + dx + '|' + dy + '|' + dw + '|' + dh;
+  let r = rotSprites.get(key);
+  if (r) { rotSprites.delete(key); rotSprites.set(key, r); }
+  else {
+    let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+    for (const [px, py] of [[dx, dy], [dx + dw, dy], [dx, dy + dh], [dx + dw, dy + dh]]) { const X = L[0] * px + L[2] * py, Y = L[1] * px + L[3] * py; x0 = Math.min(x0, X); x1 = Math.max(x1, X); y0 = Math.min(y0, Y); y1 = Math.max(y1, Y); }
+    const ox = Math.floor(x0) - 1, oy = Math.floor(y0) - 1;
+    r = document.createElement('canvas'); r.width = Math.ceil(x1) + 1 - ox; r.height = Math.ceil(y1) + 1 - oy; r.ox = ox; r.oy = oy;
+    const rg = r.getContext('2d');
+    if (!rg || !rg.setTransform) return g.drawImage(c, dx, dy, dw, dh);
+    rg.setTransform(L[0], L[1], L[2], L[3], -ox, -oy); rg.drawImage(c, dx, dy, dw, dh);
+    if (rotSprites.size > 800) { let n = 80; for (const k of rotSprites.keys()) { rotSprites.delete(k); if (!--n) break; } } // keep graphics memory small: drop the oldest
+    rotSprites.set(key, r);
+  }
+  g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.drawImage(r, Math.round(m.e) + r.ox, Math.round(m.f) + r.oy); g.restore();
+}
 // ---- kick poses (fields set in special.js): kickT = leg swing clock, kpose 'hold' (FG holder) / 'pc' (punter wants the snap), fair = fair catch wave ----
 // kicking leg angle from straight down (+ = forward): cock it back, whip through the ball at KICK_HIT, follow through high
 function kickSwingAng(t, punt) {
@@ -501,6 +527,66 @@ function kickPose(p, G, HIP) {
   if (p.fair) return { arm: (front, shx, shy) => front ? { ex: shx + 10, ey: shy - 12, hx: shx + 18 + Math.sin(G.time * 14) * 3, hy: shy - 26 } : null }; // waving for a fair catch
   return null;
 }
+// arms and legs: the lines for one pose are painted once into a big sheet and copied from there after that
+// (16 players x 4 limbs x ~6 lines a frame was the slowest thing on phones). Only for straight-up players at normal zoom
+const LIMB_STEP = Math.PI * 2 / 48, limbCache = new Map();
+const q4 = v => Math.round(v * 4) / 4;
+function limbBlit(g, key, x0, y0, x1, y1, paint) {
+  let c = limbCache.get(key);
+  if (c) { limbCache.delete(key); limbCache.set(key, c); } // (most recently used last)
+  else {
+    const X0 = Math.floor(x0), Y0 = Math.floor(y0), w = Math.ceil(x1) - X0, h = Math.ceil(y1) - Y0;
+    c = document.createElement('canvas'); c.width = w; c.height = h; c.X0 = X0; c.Y0 = Y0;
+    const sg = c.getContext('2d');
+    if (!sg || !sg.translate) return paint(g);
+    sg.translate(-X0, -Y0); paint(sg);
+    if (limbCache.size > 5000) { let n = 500; for (const k of limbCache.keys()) { limbCache.delete(k); if (!--n) break; } } // keep graphics memory small: drop the oldest
+    limbCache.set(key, c);
+  }
+  g.drawImage(c, c.X0, c.Y0);
+}
+function paintLeg(g, p, look, ck, hx, hy, kx, ky, fxp, fyp) {
+  g.strokeStyle = OUT; g.lineWidth = 10; g.lineCap = 'round';
+  g.beginPath(); g.moveTo(hx, hy); g.lineTo(kx, ky); g.lineTo(fxp, fyp - 2); g.stroke();
+  g.strokeStyle = look.pants; g.lineWidth = 7;
+  g.beginPath(); g.moveTo(hx, hy); g.lineTo(kx, ky); g.stroke();
+  // pants stripes: single, or a classic double/triple on throwbacks
+  const ps = look.pstripe == null ? 1 : look.pstripe;
+  if (ps) {
+    g.strokeStyle = look.trim; g.lineWidth = ps > 1 ? 1.1 : 1.7;
+    g.beginPath();
+    for (let i = 0; i < ps; i++) { const o = -2.2 + i * 1.8; g.moveTo(hx + o, hy + 1); g.lineTo(kx + o, ky - 1); }
+    g.stroke();
+  }
+  dirtSpots(g, p, 3, Math.min(hx, kx) - 3, Math.min(hy, ky), Math.abs(kx - hx) + 6, Math.abs(ky - hy), 1);
+  g.strokeStyle = look.sock; g.lineWidth = 6.5;
+  g.beginPath(); g.moveTo(kx, ky); g.lineTo(fxp, fyp - 2); g.stroke();
+  if (look.sockBand) { // stripes around the top of the sock
+    const bands = look.sockBand;
+    g.strokeStyle = look.trim; g.lineWidth = bands > 1 ? 1.1 : 1.8;
+    for (let i = 0; i < bands; i++) { const u = 0.22 + i * 0.14, bx = lerp(kx, fxp, u), by = lerp(ky, fyp - 2, u); g.beginPath(); g.moveTo(bx - 3.2, by); g.lineTo(bx + 3.2, by); g.stroke(); }
+  }
+  g.fillStyle = '#ffffff30'; g.beginPath(); g.arc(kx + 1, ky - 1, 2.2, 0, 7); g.fill(); // knee shine
+  g.fillStyle = ck; g.strokeStyle = OUT; g.lineWidth = 1.2; g.beginPath(); g.ellipse(fxp + 3, fyp - 1, 6, 3.6, 0, 0, 7); g.fill(); g.stroke();
+  g.fillStyle = look.trim === ck ? look.jersey : look.trim; g.fillRect(fxp - 0.5, fyp - 3, 5, 1.6);
+  g.fillStyle = '#ffffff40'; g.fillRect(fxp + 1, fyp - 4, 4, 1);
+}
+function paintArm(g, p, look, sl, shx, shy, ex, ey, hx, hy) {
+  g.strokeStyle = OUT; g.lineWidth = 9.5; g.lineCap = 'round';
+  g.beginPath(); g.moveTo(shx, shy); g.lineTo(ex, ey); g.lineTo(hx, hy); g.stroke();
+  g.strokeStyle = look.jersey; g.lineWidth = 6.5;
+  g.beginPath(); g.moveTo(shx, shy); g.lineTo(ex, ey); g.stroke();
+  if (look.sleeve) { // sleeve stripes near the cuff
+    const n = look.sleeve, w = n > 2 ? 0.07 : 0.1;
+    g.strokeStyle = look.trim; g.lineWidth = 6.5; g.lineCap = 'butt';
+    for (let i = 0; i < n; i++) { const u = 0.58 + i * (w + 0.07); g.beginPath(); g.moveTo(lerp(shx, ex, u), lerp(shy, ey, u)); g.lineTo(lerp(shx, ex, u + w), lerp(shy, ey, u + w)); g.stroke(); }
+    g.lineCap = 'round';
+  }
+  g.strokeStyle = sl || SKIN[p.face.skin]; g.beginPath(); g.moveTo(ex, ey); g.lineTo(hx, hy); g.stroke();
+  if (p.gear && p.gear.band === 'on') { g.strokeStyle = sl === '#f2f2f2' ? look.trim : '#f4f4f4'; g.lineCap = 'butt'; g.beginPath(); g.moveTo(lerp(ex, hx, 0.12), lerp(ey, hy, 0.12)); g.lineTo(lerp(ex, hx, 0.3), lerp(ey, hy, 0.3)); g.stroke(); g.lineCap = 'round'; }
+  g.fillStyle = p.teamGloves ? look.trim : p.gloves || '#f2f2f2'; g.strokeStyle = OUT; g.lineWidth = 2;
+  g.beginPath(); g.arc(hx, hy, 3.8, 0, 7); g.fill(); g.stroke();
+}
 function drawPlayer(g, p, G, at) {
   const x = at ? at.x : sx(p.x), y = at ? at.y : sy(p.y);
   if (!at && (x < -80 - CW * 0.4 || x > CW * 1.4 + 80 || y < -40 || y > CH + 140)) return; // a bit wide so the zoomed celly cam never loses anyone
@@ -547,7 +633,14 @@ function drawPlayer(g, p, G, at) {
       g.beginPath(); g.moveTo(sx0, sy0); g.lineTo(sx0 - ux * len, sy0 - uy * len); g.stroke();
     }
   }
-  g.save(); g.translate(x, y - hop);
+  // victory formation: the QB drops to one knee (front knee up, back knee on the grass)
+  const kn = p.kneel > 0 ? ease(Math.min(1, p.kneel / 0.3)) : 0;
+  const W = big ? 30 : 24, TH = big ? 24 : 22, HIP = (big ? 17 : 18) - kn * 9.5;
+  const kp = pose ? null : kickPose(p, G, HIP); // holder / kicker / punter / fair catch
+  // plain standing/running (most of the time): the player goes on whole pixels and his arms/legs come from the limb sheet
+  const m0 = !at && !pose && !kn && !kp && p.down <= 0 && !(p.dive > 0) && !(p.spin > 0) && g.globalAlpha === 1 ? g.getTransform() : null;
+  const fast = !!m0 && m0.a === 1 && m0.b === 0 && m0.c === 0 && m0.d === 1 && m0.e === Math.round(m0.e) && m0.f === Math.round(m0.f);
+  g.save(); g.translate(fast ? Math.round(x) : x, fast ? Math.round(y - hop) : y - hop);
   if (pose) {
     if (pose.rot) { g.translate(0, -32); g.rotate(pose.rot * dir); g.translate(0, 32); } // spin around his belly, not his feet
     if (pose.lie) { g.translate(0, -6); g.rotate(pose.lie * dir); }
@@ -558,50 +651,33 @@ function drawPlayer(g, p, G, at) {
   const spinScale = p.spin > 0 ? Math.cos(p.spin * 20) : 1;
   g.scale(dir * (Math.abs(spinScale) < 0.15 ? 0.15 * Math.sign(spinScale || 1) : spinScale), 1);
 
-  // victory formation: the QB drops to one knee (front knee up, back knee on the grass)
-  const kn = p.kneel > 0 ? ease(Math.min(1, p.kneel / 0.3)) : 0;
-  const W = big ? 30 : 24, TH = big ? 24 : 22, HIP = (big ? 17 : 18) - kn * 9.5;
-  const kp = pose ? null : kickPose(p, G, HIP); // holder / kicker / punter / fair catch
+  const PMe = fast ? m0.e + Math.round(x) : 0, PMf = fast ? m0.f + Math.round(y - hop) : 0; // player frame on screen (fast path)
+  const kL = fast ? Math.round(k * 5) / 5 : k; // arm/leg swing in small steps so poses repeat
+  const anim = fast ? Math.round(p.anim / LIMB_STEP) * LIMB_STEP : p.anim;
   const kneelLeg = kn ? (side, hx, hy, kx, ky, fx, fy) => side > 0
     ? { kx: lerp(kx, hx + 10, kn), ky: lerp(ky, hy - 2, kn), fx: lerp(fx, hx + 11, kn), fy: lerp(fy, 0, kn) }      // front leg: thigh flat, shin straight down
     : { kx: lerp(kx, hx - 1, kn), ky: lerp(ky, -1, kn), fx: lerp(fx, hx - 13, kn), fy: lerp(fy, -2, kn) } : null; // back leg: knee on the grass, shin flat behind
   const legPose = kneelLeg || (pose && pose.leg) || (kp && kp.leg) || null;
-  const lean = (p.down > 0 ? 0 : k * 0.18) + (p.engaged ? 0.25 : 0) + kn * 0.12 + (kp && kp.lean || 0);
+  let lean = (p.down > 0 ? 0 : k * 0.18) + (p.engaged ? 0.25 : 0) + kn * 0.12 + (kp && kp.lean || 0);
+  if (fast) lean = Math.round(lean / 0.02) * 0.02; // same steps as the turned jersey picture
   const lc = Math.cos(lean), ls = Math.sin(lean), toT = (x, y) => ({ x: x * lc + (y + HIP) * ls, y: -x * ls + (y + HIP) * lc }); // feet coords -> torso coords
 
   // legs (two segments) + cleats
+  const gc = p.gear && p.gear.cleats, ck = gc && gc !== 'auto' ? (gc === 'team' ? look.jersey : GEAR_COL[gc]) : textOn(look.pants) === '#111' ? '#f2f2f2' : '#151515';
+  const dk = p.dirt >= 0.04 ? Math.round(p.dirt * 20) : 0, dirtKey = dk ? dk + p.name + G.weather : '';
   const leg = (side, ph) => {
-    const s = Math.sin(p.anim + ph) * k, lift = Math.max(0, Math.cos(p.anim + ph)) * k * 5;
+    const s = Math.sin(anim + ph) * kL, lift = Math.max(0, Math.cos(anim + ph)) * kL * 5;
     const hx = side * (W * 0.18), hy = -HIP;
     let kx = hx + s * 7 + 2, ky = -HIP * 0.48 - lift * 0.6;
     let fxp = hx + s * 12, fyp = -lift;
     const lp = legPose && legPose(side, hx, hy, kx, ky, fxp, fyp); // kneeling / Heisman: the pose places this leg
     if (lp) ({ kx, ky, fx: fxp, fy: fyp } = lp);
-    g.strokeStyle = OUT; g.lineWidth = 10; g.lineCap = 'round';
-    g.beginPath(); g.moveTo(hx, hy); g.lineTo(kx, ky); g.lineTo(fxp, fyp - 2); g.stroke();
-    g.strokeStyle = look.pants; g.lineWidth = 7;
-    g.beginPath(); g.moveTo(hx, hy); g.lineTo(kx, ky); g.stroke();
-    // pants stripes: single, or a classic double/triple on throwbacks
-    const ps = look.pstripe == null ? 1 : look.pstripe;
-    if (ps) {
-      g.strokeStyle = look.trim; g.lineWidth = ps > 1 ? 1.1 : 1.7;
-      g.beginPath();
-      for (let i = 0; i < ps; i++) { const o = -2.2 + i * 1.8; g.moveTo(hx + o, hy + 1); g.lineTo(kx + o, ky - 1); }
-      g.stroke();
-    }
-    dirtSpots(g, p, 3, Math.min(hx, kx) - 3, Math.min(hy, ky), Math.abs(kx - hx) + 6, Math.abs(ky - hy), 1);
-    g.strokeStyle = look.sock; g.lineWidth = 6.5;
-    g.beginPath(); g.moveTo(kx, ky); g.lineTo(fxp, fyp - 2); g.stroke();
-    if (look.sockBand) { // stripes around the top of the sock
-      const bands = look.sockBand;
-      g.strokeStyle = look.trim; g.lineWidth = bands > 1 ? 1.1 : 1.8;
-      for (let i = 0; i < bands; i++) { const u = 0.22 + i * 0.14, bx = lerp(kx, fxp, u), by = lerp(ky, fyp - 2, u); g.beginPath(); g.moveTo(bx - 3.2, by); g.lineTo(bx + 3.2, by); g.stroke(); }
-    }
-    g.fillStyle = '#ffffff30'; g.beginPath(); g.arc(kx + 1, ky - 1, 2.2, 0, 7); g.fill(); // knee shine
-    const gc = p.gear && p.gear.cleats, ck = gc && gc !== 'auto' ? (gc === 'team' ? look.jersey : GEAR_COL[gc]) : textOn(look.pants) === '#111' ? '#f2f2f2' : '#151515';
-    g.fillStyle = ck; g.strokeStyle = OUT; g.lineWidth = 1.2; g.beginPath(); g.ellipse(fxp + 3, fyp - 1, 6, 3.6, 0, 0, 7); g.fill(); g.stroke();
-    g.fillStyle = look.trim === ck ? look.jersey : look.trim; g.fillRect(fxp - 0.5, fyp - 3, 5, 1.6);
-    g.fillStyle = '#ffffff40'; g.fillRect(fxp + 1, fyp - 4, 4, 1);
+    if (!fast) return paintLeg(g, p, look, ck, hx, hy, kx, ky, fxp, fyp);
+    kx = q4(kx); ky = q4(ky); fxp = q4(fxp); fyp = q4(fyp);
+    const pd = dk ? 12 : 6;
+    limbBlit(g, 'L' + look.pants + look.trim + look.pstripe + look.sock + look.sockBand + ck + dirtKey + '|' + hx + '|' + hy + '|' + kx + '|' + ky + '|' + fxp + '|' + fyp,
+      Math.min(hx, kx, fxp) - pd, Math.min(hy, ky) - pd, Math.max(hx, kx, fxp + 5) + pd, Math.max(ky, fyp + 4) + 2,
+      sg => paintLeg(sg, p, look, ck, hx, hy, kx, ky, fxp, fyp));
   };
   leg(-1, Math.PI); leg(1, 0);
 
@@ -611,7 +687,7 @@ function drawPlayer(g, p, G, at) {
   roundRect(g, -W * 0.42, -4, W * 0.84, 9, 4); g.fill(); g.stroke();
   dirtSpots(g, p, 3, -W * 0.36, -2, W * 0.72, 6, 1);
   // back arm (behind torso)
-  const sw = Math.sin(p.anim) * k;
+  const sw = Math.sin(anim) * kL;
   const arm = (front) => {
     const shx = front ? W * 0.3 : -W * 0.22, shy = -TH + 5;
     let ex, ey, hx, hy;
@@ -624,21 +700,16 @@ function drawPlayer(g, p, G, at) {
     else if (p.stiff > 0 && front) { ex = shx + 9; ey = shy + 1; hx = shx + 19; hy = shy; }
     else if (p.engaged && front) { ex = shx + 8; ey = shy + 4; hx = shx + 15; hy = shy + 2; }
     else { const s = (front ? -sw : sw); ex = shx + s * 7; ey = shy + 9; hx = shx + s * 12 + 2; hy = shy + 16; }
-    g.strokeStyle = OUT; g.lineWidth = 9.5; g.lineCap = 'round';
-    g.beginPath(); g.moveTo(shx, shy); g.lineTo(ex, ey); g.lineTo(hx, hy); g.stroke();
-    g.strokeStyle = look.jersey; g.lineWidth = 6.5;
-    g.beginPath(); g.moveTo(shx, shy); g.lineTo(ex, ey); g.stroke();
-    if (look.sleeve) { // sleeve stripes near the cuff
-      const n = look.sleeve, w = n > 2 ? 0.07 : 0.1;
-      g.strokeStyle = look.trim; g.lineWidth = 6.5; g.lineCap = 'butt';
-      for (let i = 0; i < n; i++) { const u = 0.58 + i * (w + 0.07); g.beginPath(); g.moveTo(lerp(shx, ex, u), lerp(shy, ey, u)); g.lineTo(lerp(shx, ex, u + w), lerp(shy, ey, u + w)); g.stroke(); }
-      g.lineCap = 'round';
-    }
     const sl = p.gear && p.gear.sleeve && p.gear.sleeve !== 'none' ? (p.gear.sleeve === 'team' ? shade(look.jersey, -0.08) : GEAR_COL[p.gear.sleeve]) : null;
-    g.strokeStyle = sl || SKIN[p.face.skin]; g.beginPath(); g.moveTo(ex, ey); g.lineTo(hx, hy); g.stroke();
-    if (p.gear && p.gear.band === 'on') { g.strokeStyle = sl === '#f2f2f2' ? look.trim : '#f4f4f4'; g.lineCap = 'butt'; g.beginPath(); g.moveTo(lerp(ex, hx, 0.12), lerp(ey, hy, 0.12)); g.lineTo(lerp(ex, hx, 0.3), lerp(ey, hy, 0.3)); g.stroke(); g.lineCap = 'round'; }
-    g.fillStyle = p.teamGloves ? look.trim : p.gloves || '#f2f2f2'; g.strokeStyle = OUT; g.lineWidth = 2;
-    g.beginPath(); g.arc(hx, hy, 3.8, 0, 7); g.fill(); g.stroke();
+    if (!fast) paintArm(g, p, look, sl, shx, shy, ex, ey, hx, hy);
+    else { // turn the arm with the body by hand so the picture copies over straight
+      const T = (x, y) => [q4(x * lc - y * ls), q4(x * ls + y * lc - HIP)], [a0, a1] = T(shx, shy), [b0, b1] = T(ex, ey), [c0, c1] = T(hx, hy);
+      g.save(); g.setTransform(dir, 0, 0, 1, PMe, PMf);
+      limbBlit(g, 'A' + look.jersey + look.trim + look.sleeve + sl + (p.gear && p.gear.band) + (p.teamGloves ? look.trim : p.gloves) + p.face.skin + '|' + a0 + '|' + a1 + '|' + b0 + '|' + b1 + '|' + c0 + '|' + c1,
+        Math.min(a0, b0, c0) - 6, Math.min(a1, b1, c1) - 6, Math.max(a0, b0, c0) + 6, Math.max(a1, b1, c1) + 6,
+        sg => paintArm(sg, p, look, sl, a0, a1, b0, b1, c0, c1));
+      g.restore();
+    }
     return { hx, hy };
   };
   arm(false);
@@ -653,7 +724,7 @@ function drawPlayer(g, p, G, at) {
       if (tg2 && tg2.save) { tg2.scale(S, S); tg2.translate(BX, BY); drawTorso(tg2, p, G, look, W, TH, big, dir); if (torsoCache.size > 160) torsoCache.clear(); torsoCache.set(key, c); }
       else { c = null; drawTorso(g, p, G, look, W, TH, big, dir); }
     }
-    if (c) g.drawImage(c, -c.BX, -c.BY, c.BX * 2, c.BY + 6);
+    if (c) blitRot(g, c, -c.BX, -c.BY, c.BX * 2, c.BY + 6);
   }
   // front arm + ball
   if (kp && kp.ball) kp.ball(g, toT, lean); // the holder's ball goes under his hand
@@ -750,7 +821,7 @@ function drawHead(g, R, team, p, look) {
     if (headCache.size > 160) headCache.clear(); // keep graphics memory small (Chromebooks)
     headCache.set(key, c);
   }
-  g.drawImage(c, -c.B, -c.B, c.B * 2, c.B * 2);
+  blitRot(g, c, -c.B, -c.B, c.B * 2, c.B * 2);
 }
 function drawHeadRaw(g, R, team, p, look) {
   const face = p.face;
