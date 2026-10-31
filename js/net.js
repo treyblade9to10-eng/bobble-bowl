@@ -3,11 +3,13 @@
 // Connection is peer-to-peer (WebRTC through PeerJS) when the two networks allow it. No chat, no lobby: only someone with your code can join.
 // Two lanes: a "safe" one (in order, nothing lost) for one-time things like play calls, banners and sounds,
 // and a "fast" one for the constant position updates, so one lost packet can't freeze everything behind it.
-// The guest plays the updates back ~0.1s behind and slides players smoothly between them.
-const NET_VERSION = 4;
+// The guest plays the updates back ~0.1s behind and slides players smoothly between them, except its own guy:
+// he moves on the guest's screen right away and the host goes with where he is (predict / adopt).
+const NET_VERSION = 5;
 const NET_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 const NET_KEYS = ['Space', 'ShiftLeft', 'ControlLeft', 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyE', 'KeyF', 'KeyR', 'KeyQ', 'Tab', 'KeyC',
   'Digit1', 'Digit2', 'Digit3', 'Digit4', 'Numpad1', 'Numpad2', 'Numpad3', 'Numpad4', 'KeyT', 'KeyX', 'KeyM', 'KeyV', 'KeyB', 'Enter', 'Escape', 'KeyY', 'KeyG', 'KeyU'];
+const MOVE_KEYS = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ShiftLeft'];
 const PSTAT = ['x', 'y', 'vx', 'vy', 'anim', 'speedNow', 'down', 'downDir', 'dive', 'jump', 'spin', 'stiff', 'throwAnim', 'celebrate', 'dizzy', 'hit', 'stamina', 'juke'];
 
 // Backup route (relay): when a direct connection can't get through (phone data, school Wi-Fi, two different houses),
@@ -22,6 +24,7 @@ const RELAY_HZ = 25;
 const RELAY_WAIT = 2500; // guest: direct line not up this long after the game was found -> relay
 const LINK_DEAD = 2000;  // nothing at all from the other side this long on a direct game -> switch it to the relay
 const HOLD_AFTER = 1500; // host: no controls from the guest this long -> pause the game until they're back
+const STALE_IN = 900;    // host: guest's controls this old (they come at least every 0.5s) -> treat them as let go
 const GIVE_UP = 30000;   // nothing at all this long -> the game is over
 const CODE_LIFE = 30 * 60000; // an unused host code goes away after 30 minutes
 const Relay = {
@@ -41,7 +44,8 @@ const Relay = {
   // a fake "connection" with the same send/on/close as a PeerJS one: push onto our list, read + delete theirs (in order, nothing lost).
   // Everything sent in one frame goes out as one write, and what we read gets deleted in batches.
   lane(room, outKey, inKey) {
-    const L = { open: true, hs: {}, relay: true, q: [], bytes: 0, outB: 0, writes: 0,
+    const L = { open: true, hs: {}, relay: true, q: [], bytes: 0, outB: 0, writes: 0, pend: [],
+      backed() { const n = this.pend.length; return n > 8 || (n > 2 && performance.now() - this.pend[0] > 350); }, // the database is behind taking our writes (slow / stalled line)
       on(ev, fn) { (this.hs[ev] = this.hs[ev] || []).push(fn); if (ev === 'open') setTimeout(() => { if (L.open) fn(); }, 0); },
       emit(ev, x) { for (const f of this.hs[ev] || []) f(x); } };
     const outRef = room.child(outKey), inRef = room.child(inKey);
@@ -56,7 +60,7 @@ const Relay = {
     L.send = m => {
       if (!L.open) return;
       L.q.push(JSON.stringify(m, Relay.rnd));
-      if (L.q.length === 1) Promise.resolve().then(() => { const q = L.q; L.q = []; if (!L.open || !q.length) return; const v = q.length === 1 ? q[0] : '[' + q.join(',') + ']'; L.outB += v.length; L.writes++; outRef.push(v); });
+      if (L.q.length === 1) Promise.resolve().then(() => { const q = L.q; L.q = []; if (!L.open || !q.length) return; const v = q.length === 1 ? q[0] : '[' + q.join(',') + ']'; L.outB += v.length; L.writes++; L.pend.push(performance.now()); const ok = () => L.pend.shift(); outRef.push(v).then(ok, ok); });
     };
     L.close = () => { if (!L.open) return; L.open = false; inRef.off('child_added', cb); setTimeout(() => L.emit('close'), 0); };
     return L;
@@ -245,6 +249,7 @@ const Net = {
           // the direct line is just about to open: give it a little longer
           const pc = this.conn && this.conn.peerConnection, st = pc && pc.iceConnectionState;
           if ((st === 'connected' || st === 'completed') && !wait.more) { wait.more = 1; waitT = setTimeout(wait, 1500); return; }
+          if (st === 'checking' && !wait.chk) { wait.chk = 1; waitT = setTimeout(wait, 1500); return; } // still trying routes (slow phone / network): direct is much smoother, worth a moment more
           this.toRelay();
         };
         waitT = setTimeout(wait, noDirect ? 0 : RELAY_WAIT);
@@ -310,7 +315,7 @@ const Net = {
     for (const f of this.relayOffs.splice(0)) try { f(); } catch (e) {}
     if (room) try { if (role === 'host') room.remove(); else for (const k of ['guest', 'g2h']) room.child(k).remove(); } catch (e) {}
     Object.assign(this, { peer: null, conn: null, fast: null, fastOk: false, seq: 0, lastSeq: -1, inSeq: 0, lastIn: -1, buf: [], off: null, jit: 0.02, role: null, ready: false, last: null, rosterRef: null, bannerRef: null, pbpRef: null, routeKey: '', picks: {}, pendingCall: null, sounds: [], out: { pressed: [], taps: [] }, relayPrev: null, relayBase: null,
-      rroom: null, rdb: null, startMsg: null, callMsgs: [], overMsg: null, rSent: {}, rIds: 0, rCache: {}, held: false, heldPause: false, waitWas: null, swapping: false, rtt: null, onStatus: null, directOut: null, expT: null, inKey: '' });
+      rroom: null, rdb: null, startMsg: null, callMsgs: [], overMsg: null, rSent: {}, rIds: 0, rCache: {}, held: false, heldPause: false, waitWas: null, swapping: false, rtt: null, onStatus: null, directOut: null, expT: null, inKey: '', gRep: null, gOff: null, ga: false, pr: null, prOff: 0, meT: null });
     G.online = false; Input.online = false; Input.use(0); Input.store[1] = null;
   },
   lost(link) {
@@ -331,7 +336,7 @@ const Net = {
     if (this.role === 'guest') {
       if (now - this.pingT > 1000) { this.pingT = now; this.send({ t: 'pg', c: Math.round(now), r: this.rtt }); }
       if (!this.onRelay && playing && (quiet > LINK_DEAD || (this.last && this.last.deaf))) this.toRelay(); // the line is down, or only works one way
-      const away = playing && now - this.snapRxT > HOLD_AFTER; // no game updates: the host switched apps or the line is down
+      const away = playing && now - this.snapRxT > HOLD_AFTER * (this.onRelay ? 1.5 : 1); // no game updates: the host switched apps or the line is down
       if (away) {
         if (!this.held) { this.held = true; this.waitWas = $('onWait').style.display === 'block' ? $('onWait').textContent : null; }
         onlineWait(quiet > LINK_DEAD ? 'Reconnecting to your friend...' : 'Waiting for your friend...');
@@ -339,7 +344,7 @@ const Net = {
     } else {
       const pc = this.pendingCall;
       if (pc && G.phase === 'playcall' && this.picks[1] == null && pc.reqs.some(r => r.side === 1) && now - (this.callT || 0) > 2000) { this.callT = now; for (const m of this.callMsgs) this.send(m); }
-      const hold = playing && now - this.inT > HOLD_AFTER;
+      const hold = playing && now - this.inT > HOLD_AFTER * (this.onRelay ? 1.5 : 1); // (the relay hiccups more: a bit more slack)
       if (hold) {
         if (!this.held) { // clear the guest's controls so nobody keeps running, and freeze the game
           this.held = true; this.waitWas = $('onWait').style.display === 'block' ? $('onWait').textContent : null;
@@ -451,10 +456,16 @@ const Net = {
     if (this.relayRoom) this.relayRoom.child('host/busy').set(1); // nobody else can join now
     this.send(this.startMsg = { t: 'start', v: NET_VERSION, teams: G.teams, opts: { qtr: opts.qtr, weather: G.storm ? 'storm' : G.fog ? 'fog' : G.weather, night: G.night, bcast: G.bcast }, modes: G.netModes });
   },
+  // after the engine used the guest's one-shot inputs (this frame / first catch-up step), clear them
+  usedOneShots() {
+    const R = Input.store[1];
+    if (R) { R.pressed = {}; R.taps = []; R.release = null; if (Input.cur === 1) Input.use(0); }
+  },
   // guest's controls arrive: world coords -> host screen coords for taps / finger
   mergeInput(m) {
     const R = Input.store[1]; if (!R) return;
     if (m.n != null) { if (m.n <= this.lastIn) return; this.lastIn = m.n; } // fast lane: skip old ones that arrive late
+    if (m.me) this.takeRep(m.me); else this.gRep = null;
     R.down = {}; for (const k of m.held || []) R.down[k] = true;
     this.mergeOneShots(m);
     R.stick.x = m.st[0]; R.stick.y = m.st[1]; R.stick.m = m.st[2];
@@ -472,16 +483,64 @@ const Net = {
   },
   hostFrame(dt) {
     if (!this.ready || !G.teams) return;
-    // after the engine used the guest's one-shot inputs this frame, clear them
-    const R = Input.store[1];
-    if (R) { R.pressed = {}; R.taps = []; R.release = null; if (Input.cur === 1) Input.use(0); }
+    this.usedOneShots();
+    this.adopt(dt);
     this.snapT -= dt;
-    if (this.snapT <= 0) { this.snapT = Math.max(0, this.snapT + (this.held ? 0.25 : this.onRelay ? 1 / RELAY_HZ : 1 / NET_HZ)); this.sendSnap(); } // carry the leftover so 60fps really gives 50 a second
+    if (this.snapT <= 0) {
+      this.snapT = Math.max(0, this.snapT + (this.held ? 0.25 : this.onRelay ? 1 / RELAY_HZ : 1 / NET_HZ)); // carry the leftover so 60fps really gives 50 a second
+      // relay line backed up: skip this one so old updates never pile up (the next one goes out when it clears)
+      if (!(this.onRelay && this.fast && this.fast.backed && this.fast.backed())) this.sendSnap();
+    }
   },
+  // the guest moves its own guy on its own screen and tells us where he is. We use that spot while he's free
+  // (not blocked / down / diving...), as long as it's somewhere he could really have run to: never faster than
+  // his top speed, never far from where our game has him. Tackles, catches and the ball stay ours.
+  gRep: null, ga: false,
+  adopt(dt) {
+    const p = G.hp && G.hp[1], r = this.gRep, b = G.ball, now = performance.now();
+    let ok = !!(p && r && b && G.phase === 'live' && !G.paused && p.isHuman && G.players[r.i] === p && now - r.t < (this.onRelay ? 700 : 300) && this.free(p) && !(p.stun > 0));
+    if (ok) {
+      const age = this.repAge(r, now), tx = r.x + r.vx * age, ty = r.y + r.vy * age;
+      const d = Math.hypot(tx - p.x, ty - p.y);
+      // (his controls just got through after a hiccup: our game ran him without them, so his spot wins if he could have got there)
+      const lim = this.ga ? 3 : 1.5 + Math.hypot(p.vx, p.vy) * 0.6 + (r.gap > 300 ? Math.min(8, p.spd * r.gap / 1000) : 0);
+      if (d > lim) ok = false; // too far from our spot: ours wins, the guest slides back to it
+      else {
+        const k = d < 0.6 ? 1 : 1 - Math.exp(-dt * 14); // (a big first step glides over)
+        p.x += (tx - p.x) * k; p.y += (ty - p.y) * k; p.vx = r.vx; p.vy = r.vy; p.dvx = r.vx; p.dvy = r.vy;
+        if (b.holder === p) { b.x = p.x; b.y = p.y; }
+        r.used = true;
+      }
+    }
+    this.ga = ok;
+  },
+  // how old a report is, on the guest's clock (so uneven arrival times don't make his guy stutter here)
+  repAge(r, now) { return clamp((now - this.gOff - r.gt) / 1000, 0, 0.25); },
+  // the guest's report: clamp it to what his legs could do since the last one
+  gOff: null,
+  takeRep(me) {
+    const P = G.players || [], p = P[me[0]], now = performance.now(); if (!p) { this.gRep = null; return; }
+    const lag = now - me[5]; this.gOff = this.gOff == null || lag < this.gOff ? lag : this.gOff + 0.02; // our clock - theirs (fastest arrival)
+    const vmax = (p.spd || 7) * sprintBoost(p) * 1.15 + 0.5;
+    let vx = me[3], vy = me[4]; const v = Math.hypot(vx, vy); if (v > vmax) { vx *= vmax / v; vy *= vmax / v; }
+    let x = me[1], y = me[2], gap = 0; const q = this.gRep;
+    if (q && q.i === me[0] && now - q.t < 3000) {
+      gap = q.used ? now - q.t : Math.max(now - q.t, q.gap || 0); // (a burst after a hiccup: keep the gap until one gets used)
+      const span = clamp((me[5] - q.gt) / 1000, 0, (now - q.t) / 1000 + 0.25), dx = x - q.x, dy = y - q.y, dd = Math.hypot(dx, dy), lim = vmax * span + 0.3;
+      if (dd > lim) { x = q.x + dx * lim / dd; y = q.y + dy * lim / dd; }
+    }
+    if (!isFinite(x) || !isFinite(y) || !isFinite(vx) || !isFinite(vy)) { this.gRep = null; return; }
+    this.gRep = { i: me[0], x, y, vx, vy, t: now, gt: me[5], gap };
+  },
+  // free to run: nothing else (a block, a hit, a dive, the ground) is moving him
+  free(p) { return !(p.down > 0) && !(p.dive > 0) && !p.engaged && !(p.hit > 0) && !(p.jump > 0) && !(p.juke > 0) && !p.celly && !(p.kneel > 0); },
   // convert the guest's finger (sent in field coords) into this screen's coords right before the engine runs
   prepRemote() {
     const R = Input.store[1]; if (!R) return;
     const P = R.pointer;
+    // the guest's controls stopped coming in (line hiccup): let go of them so his guy doesn't keep running
+    // the same way on an old stick; the CPU helps him until they're back
+    if (G.phase === 'live' && performance.now() - this.inT > STALE_IN) { for (const k of MOVE_KEYS) R.down[k] = false; R.stick.x = R.stick.y = R.stick.m = 0; R.pads = [null, null]; }
     if (P.wx != null) { P.x = sx(P.wx); P.y = sy(P.wy); P.x0 = sx(P.wx0); P.y0 = sy(P.wy0); }
     for (const t of R.taps) if (t.wx != null) { t.x = sx(t.wx); t.y = sy(t.wy); }
   },
@@ -504,6 +563,9 @@ const Net = {
       km: G.km && (G.phase === 'kickmeter' || G.phase === 'kick') ? { kind: G.km.kind, stage: G.km.stage, power: G.km.power, aim: G.km.aim, side: G.km.side, need: G.km.need, tol: G.km.tol, yds: G.km.yds, kk: G.km.kk, cpuT: G.km.cpuT != null ? 1 : null, wait: G.km.wait, needle: G.km.needle, wind: G.wind } : null,
       aim: G.aim, mv: G.meterV ? G.meterV.map(r2) : null, cv: G.chold ? r2(catchFill()) : null, cgw: G.chold && G.chold.g ? G.chold.g.map(r2) : null, cg: idx(G.cellyGuy), hy: Math.round(G.crowdHype * 100) / 100, sh: Math.round(cam.shake), sm: G.slowmo > 0 ? 1 : 0, flg: (G.flags || []).length,
       mo: Math.round(G.mo || 0), cw: G.rvWin ? [G.rvWin.side, r2(G.rvWin.t)] : 0, chl: G.chalLeft, rvs: G.phase === 'review' ? G.rvShow : 0, // momentum, challenge window, review overlay
+      // for the guest moving its own guy: are we using its spot, his speed / burst, QB took off, game paused
+      gt: this.gRep && G.hp && G.players[this.gRep.i] === G.hp[1] ? Math.round(this.gRep.gt + this.repAge(this.gRep, performance.now()) * 1000) : 0, // the guest's clock for this spot
+      ga: this.ga ? 1 : 0, gs: G.hp && G.hp[1] ? [r2(G.hp[1].spd || 0), r2(G.hp[1].acc || 0)] : 0, hs: G.humanScramble ? 1 : 0, pz: G.paused ? 1 : 0,
       deaf: this.held && performance.now() - this.rxT > LINK_DEAD ? 1 : undefined // host hears nothing from the guest at all
     };
     // one-time stuff goes on the safe lane
@@ -646,6 +708,7 @@ const Net = {
     G.time += dt;
     if (G.slowmo > 0) G.slowmo -= dt;
     this.playback();
+    this.predict(dt);
     if (this.onRelay) { // the relay doesn't send leg swing / running speed: work them out here like the engine does
       for (const p of G.players) { p.speedNow = Math.hypot(p.vx, p.vy); p.anim += Math.min(p.speedNow, 12) * dt * 1.45; }
       for (const r of G.refs || []) r.anim += (r.moving || 0) * dt * 1.5;
@@ -655,6 +718,7 @@ const Net = {
   },
   // draw the game a little in the past and slide between the two updates around that moment
   playback() {
+    this.meT = null;
     const B = this.buf; if (!B.length || this.off == null) return;
     const delay = clamp((this.onRelay ? 0.06 : 0.03) + this.jit * 1.4, this.onRelay ? 0.07 : 0.035, 0.3);
     const rt = performance.now() / 1000 + this.off - delay;
@@ -671,7 +735,10 @@ const Net = {
       if (p === me) { // newest spot + his speed * how old it is, eased so it never snaps
         const L = B[B.length - 1].p[i]; if (!L) continue;
         const ahead = clamp(now - B[B.length - 1].tm, 0, this.onRelay ? 0.2 : 0.12), tx = L[0] + L[2] * ahead, ty = L[1] + L[3] * ahead;
-        if (Math.hypot(tx - p.x, ty - p.y) > 5) { p.x = tx; p.y = ty; } else { p.x = lerp(p.x, tx, 0.45); p.y = lerp(p.y, ty, 0.45); }
+        this.meT = [tx, ty, p];
+        if (this.pr && this.pr.p === p) continue; // you're moving him yourself (predict)
+        const k = this.prOff > 0 ? 0.12 : 0.45; // just let go of him: glide back to the host's spot instead of jumping
+        if (Math.hypot(tx - p.x, ty - p.y) > (this.prOff > 0 ? 12 : 5)) { p.x = tx; p.y = ty; } else { p.x = lerp(p.x, tx, k); p.y = lerp(p.y, ty, k); }
         continue;
       }
       if (pc) { const far = Math.hypot(pc[0] - pa[0], pc[1] - pa[1]) > 5; p.x = far ? pc[0] : lerp(pa[0], pc[0], u); p.y = far ? pc[1] : lerp(pa[1], pc[1], u); }
@@ -687,6 +754,66 @@ const Net = {
     }
     (G.refs || []).forEach((r, i) => { const ra = a.rf[i], rc = c && c.rf[i]; if (ra) { r.x = rc ? lerp(ra[0], rc[0], u) : ra[0]; r.y = rc ? lerp(ra[1], rc[1], u) : ra[1]; } });
   },
+  // your own guy moves on your screen the moment you push the stick (same speeds + burst as the host's game)
+  // instead of a round trip later. The host uses that spot (adopt); when it can't (blocked, hit, tackled,
+  // or too far off) he eases back to where the host has him.
+  pr: null, prOff: 0, meT: null,
+  predict(dt) {
+    this.prOff = Math.max(0, this.prOff - dt);
+    const s = this.last, p = G.humanPlayer, b = G.ball, T = this.meT, now = performance.now(), age = now - this.snapRxT;
+    const dv = s && p && b && T && T[2] === p && G.phase === 'live' && !s.pz && s.gs && this.free(p) ? this.myVel(p, s) : null;
+    if (!dv) { if (this.pr) { this.pr = null; this.prOff = 0.3; } return; }
+    let q = this.pr;
+    if (!q || q.p !== p) q = this.pr = { p, x: p.x, y: p.y, vx: p.vx || 0, vy: p.vy || 0, t: now, t0: now, rcT: now, cT: 0, ox: 0, oy: 0, h: [], sn: -1 }; // start from where he's drawn
+    q.t = now;
+    // no updates for a while (line hiccup): he waits with everybody else instead of running off on his own
+    if (age > (this.onRelay ? 1200 : 500)) { q.vx = q.vy = 0; p.x = q.x; p.y = q.y; p.vx = p.vy = 0; return; }
+    // same as applyMove: speed changes at most his burst per second
+    let ax = dv[0] - q.vx, ay = dv[1] - q.vy; const m = Math.hypot(ax, ay), maxA = s.gs[1] * dt;
+    if (m > maxA) { ax *= maxA / m; ay *= maxA / m; }
+    q.vx += ax; q.vy += ay; q.x += q.vx * dt; q.y += q.vy * dt;
+    if (b.holder !== p) { q.y = clamp(q.y, -2, FIELD_W + 2); q.x = clamp(q.x, -3, 123); }
+    q.h.push([now, q.x, q.y]); while (q.h.length > 150) q.h.shift();
+    // check against the host: each update says where it had him and for which moment on our clock. If that's off from
+    // where we had him then (bumped, blocked a moment, not taken), move our spot by the difference and slide the picture over.
+    // (after a fix, wait for updates that already know about it, or we'd fix the same thing twice)
+    const sa = s.ps && s.ps[G.players.indexOf(p)];
+    if (s.n !== q.sn && s.gt && sa && s.gt >= q.cT) {
+      q.sn = s.n;
+      let k = q.h.length - 1; while (k > 0 && q.h[k][0] > s.gt) k--;
+      const H = q.h[k];
+      if (H && Math.abs(H[0] - s.gt) < 40) {
+        q.rcT = now;
+        const ex = sa[0] - H[1], ey = sa[1] - H[2], e = Math.hypot(ex, ey);
+        if (e > 0.35) {
+          q.x += ex; q.y += ey; q.cT = now;
+          if (e < 12) { q.ox -= ex; q.oy -= ey; } else q.ox = q.oy = 0;
+        }
+      }
+    }
+    // never heard back about our spots (our updates aren't getting through): ease over to where the host has him
+    if (now - q.rcT > Math.max(1000, (this.rtt || 0) + 500) && age < 300) { const kk = 1 - Math.exp(-dt * 4); q.x += (T[0] - q.x) * kk; q.y += (T[1] - q.y) * kk; }
+    const dk = Math.exp(-dt * 10); q.ox *= dk; q.oy *= dk;
+    p.x = q.x + q.ox; p.y = q.y + q.oy; p.vx = q.vx; p.vy = q.vy;
+    if (Math.abs(q.vx) > 1.6 || (Math.abs(q.vx) > 0.6 && Math.abs(q.vx) > Math.abs(q.vy))) p.face.dir = Math.sign(q.vx);
+    if (b.holder === p) { b.x = p.x; b.y = p.y; }
+  },
+  // the speed you're asking for, worked out like humanControl / mobileControl do on the host (null = the host's AI moves him)
+  myVel(p, s) {
+    const b = G.ball, car = b.holder === p, off = G.play && G.play.off;
+    if (off && off.chain && G.bstate === 'snap') return null; // trick play: the handoffs run themselves
+    const spd = s.gs[0], boost = sprintBoost(p), spin = p.spin > 0 ? 0.8 : 1;
+    if (G.netModes && G.netModes[G.human] === 'mobile') {
+      const st = Input.stick; if (!(st.m > 0.15) || !isFinite(st.x) || !isFinite(st.y)) return null;
+      if (car && p === G.O[0] && G.bstate === 'snap' && !s.hs) return [st.x * spd * 0.75, st.y * spd * 0.75]; // QB sliding in the pocket
+      const mul = (st.m > 0.9 && p.stamina > 0.05 ? boost : 1) * spin;
+      return [st.x * spd * mul, st.y * spd * mul];
+    }
+    const ax = Input.axis();
+    if (ax.m < 0.1) return car && G.bstate !== 'snap' && !s.hs ? [0, 0] : null; // ball carrier with no keys: he stops
+    const mul = (Input.held('ShiftLeft') && p.stamina > 0.05 ? boost : 1) * spin * (p.stamina < 0.2 ? 0.9 : 1);
+    return [ax.x * spd * mul * ax.m, ax.y * spd * mul * ax.m];
+  },
   guestSend(dt) {
     for (const c in Input.pressed) if (NET_KEYS.includes(c)) this.out.pressed.push(c);
     for (const t of Input.taps) this.out.taps.push([wx(t.x), wy(t.y)]);
@@ -700,9 +827,12 @@ const Net = {
     this.sendT -= dt;
     if (this.sendT > 0) return;
     const m = { held: NET_KEYS.filter(c => Input.down[c]), st: [r2(Input.stick.x), r2(Input.stick.y), r2(Input.stick.m)], ax: Input.pads[0] ? [r2(ax.x), r2(ax.y), r2(ax.m)] : null, p: ptr };
+    const q = this.pr; // where you have your guy (see predict)
+    if (q) m.me = [G.players.indexOf(q.p), r2(q.x), r2(q.y), r2(q.vx), r2(q.vy), Math.round(q.t)];
     if (this.onRelay) { // relay: only when something changed (and twice a second so the host knows we're here)
+      if (this.conn && this.conn.backed && this.conn.backed()) return; // line backed up: wait, then send the newest
       const k = JSON.stringify(m), now = performance.now();
-      if (k === this.inKey && now - this.inSentT < 500) return;
+      if (!q && k === this.inKey && now - this.inSentT < 500) return;
       this.inKey = k; this.inSentT = now;
     }
     this.sendT = this.onRelay ? 1 / RELAY_HZ : 0; // direct: your controls go out every frame

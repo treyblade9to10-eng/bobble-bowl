@@ -847,7 +847,9 @@ function updateMobileButtons() {
   if (G.phase === 'presnap' && !G.demo) st = 'presnap';
   const coach = coachOn(); // Coach Mode: no stick or move buttons, just AUDIBLE / TIMEOUT before the snap
   if (coach && st !== 'presnap') st = '';
-  const joyOn = (G.phase === 'live' || fgRushing()) && !G.demo && !!h; // stays up the whole play so your thumb never loses it (+ rushing a field goal)
+  // stays up the whole play so your thumb never loses it (+ rushing a field goal). Online guest: up before the snap too,
+  // the snap reaches you a moment late and a thumb that lands before the stick shows up would miss it
+  const joyOn = (G.phase === 'live' || fgRushing() || (G.online && Net.role === 'guest' && G.phase === 'presnap')) && !G.demo && !!h;
   $('joy').classList.toggle('on', !!joyOn);
   if (!joyOn && Input.stick.m) { Input.stick.x = Input.stick.y = Input.stick.m = 0; $('joyKnob').style.left = $('joyKnob').style.top = ''; }
   const side = G.poss === G.human ? 'off' : 'def';
@@ -944,7 +946,7 @@ cv.addEventListener('contextrestored', () => resetGfx());
 function stepUpdate(raw) {
   const n = Math.min(6, Math.max(1, Math.ceil(raw / (1 / 60) - 0.05))), h = raw / n;
   for (let i = 0; i < n; i++) {
-    if (i === 1) { Input.pressed = {}; Input.taps.length = 0; Input.release = null; }
+    if (i === 1) { Input.pressed = {}; Input.taps.length = 0; Input.release = null; if (G.online) Net.usedOneShots(); }
     update(h);
   }
 }
@@ -968,9 +970,9 @@ function step(now) {
   } else {
     if (G.demo) G.demo = false;
     if (G.online) Net.prepRemote();
-    if (G.online) update(dt); else stepUpdate(raw);
+    stepUpdate(raw);
     if (G.sitOut && !G.paused && ['presnap', 'live', 'dead'].includes(G.phase)) update(dt); // Player Lock: plays without your guy go by at double speed
-    if (G.online) Net.hostFrame(dt);
+    if (G.online) Net.hostFrame(raw);
   }
   updateMobileButtons();
   Review.ui();
