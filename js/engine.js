@@ -1292,6 +1292,12 @@ function mobileControl(p, dt, isCarrier) {
     const st = Input.stick;
     if (st.m > 0.15 && isFinite(st.x) && isFinite(st.y)) { p.dvx = st.x * p.spd * 0.75; p.dvy = st.y * p.spd * 0.75; return true; }
     if (G.meter) { p.dvx = 0; p.dvy = 0; return true; } // charging a throw: he plants his feet (only the stick moves him)
+    // hold to steer slides him too, like every other player (not a finger that started on a receiver's icon: that one throws).
+    // The finger keeps him behind the line so a hold that just misses an icon can't take away the pass (RUN / the stick for that)
+    if (P.down && !P.aiming && !P.noSteer && P.t > 0.12 && !iconAt(P.x0, P.y0)) {
+      const d = dirOf(p.side), lim = G.los - d, tx = d > 0 ? Math.min(wx(P.x), lim) : Math.max(wx(P.x), lim);
+      steer(p, tx, wy(P.y), 0.75, 0.4); return true;
+    }
     return false;
   }
   const onD = p.side !== G.poss || (b.holder && b.holder.side !== p.side);

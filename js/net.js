@@ -466,6 +466,7 @@ const Net = {
     const R = Input.store[1]; if (!R) return;
     if (m.n != null) { if (m.n <= this.lastIn) return; this.lastIn = m.n; } // fast lane: skip old ones that arrive late
     if (m.me) this.takeRep(m.me); else this.gRep = null;
+    if (m.md != null && G.netModes) G.netModes[1] = m.md ? 'mobile' : 'computer'; // picked up / put down a controller mid-game
     R.down = {}; for (const k of m.held || []) R.down[k] = true;
     this.mergeOneShots(m);
     R.stick.x = m.st[0]; R.stick.y = m.st[1]; R.stick.m = m.st[2];
@@ -826,7 +827,9 @@ const Net = {
     }
     this.sendT -= dt;
     if (this.sendT > 0) return;
-    const m = { held: NET_KEYS.filter(c => Input.down[c]), st: [r2(Input.stick.x), r2(Input.stick.y), r2(Input.stick.m)], ax: Input.pads[0] ? [r2(ax.x), r2(ax.y), r2(ax.m)] : null, p: ptr };
+    // how you're playing right now: a controller plays like the keyboard even in Mobile mode (the host only knew the mode you joined with)
+    const md = Pad.ui ? 'computer' : G.mode; if (G.netModes) G.netModes[G.human] = md;
+    const m = { held: NET_KEYS.filter(c => Input.down[c]), st: [r2(Input.stick.x), r2(Input.stick.y), r2(Input.stick.m)], ax: Input.pads[0] ? [r2(ax.x), r2(ax.y), r2(ax.m)] : null, p: ptr, md: md === 'mobile' ? 1 : 0 };
     const q = this.pr; // where you have your guy (see predict)
     if (q) m.me = [G.players.indexOf(q.p), r2(q.x), r2(q.y), r2(q.vx), r2(q.vy), Math.round(q.t)];
     if (this.onRelay) { // relay: only when something changed (and twice a second so the host knows we're here)
