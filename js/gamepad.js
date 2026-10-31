@@ -66,6 +66,7 @@ const Pad = {
       if (ids[i]) this.toast(i, padType(pads[i]), true);
       else { this.toast(i, this.type, false); this.letGo(i); if (G.teams && !G.demo && !G.paused && !G.online && G.phase !== 'over' && !document.querySelector('.screen.show')) togglePause(); } // pad died mid-play: pause
     }
+    if (ids[0] !== this.ids[0] || ids[1] !== this.ids[1]) setTimeout(() => { if ($('select').classList.contains('show') && typeof renderSelect === 'function') renderSelect(); }, 0); // PLAYERS shows up with 2 pads
     this.ids = ids;
     const pc = $('padCtl'); if (pc && pc.classList.contains('show') && !$(pc.dataset.from || 'how').classList.contains('show')) pc.classList.remove('show'); // its menu closed under it
     if (!pads.length) { if (this.on) { this.on = false; document.body.classList.remove('pad'); this.setUI(false); } return; }
@@ -376,7 +377,7 @@ const Pad = {
   toast(i, t, on) {
     const el = $('padToast'); if (!el) return;
     el.innerHTML = `<svg viewBox="0 0 48 32"><path d="M14 5h20c6 0 9 4 11 12l2 8c1 4-2 6-5 4l-6-6H12l-6 6c-3 2-6 0-5-4l2-8C5 9 8 5 14 5z"/><circle cx="14" cy="14" r="3"/><circle cx="34" cy="11" r="1.8"/><circle cx="38" cy="15" r="1.8"/><circle cx="30" cy="15" r="1.8"/><circle cx="34" cy="19" r="1.8"/></svg>`
-      + `<span><b>${t === 'ps' ? 'PLAYSTATION' : 'XBOX'} CONTROLLER ${on ? 'CONNECTED' : 'DISCONNECTED'}</b><i>${on ? (i ? 'Player 2 in a 2-player game' : 'Controls: pause menu or How to Play') : 'Plug it back in or press a button'}</i></span>`;
+      + `<span><b>${t === 'ps' ? 'PLAYSTATION' : 'XBOX'} CONTROLLER ${on ? 'CONNECTED' : 'DISCONNECTED'}</b><i>${on ? (i ? 'Player 2: SETTINGS, then PLAYERS: 2 Players or Co-op' : 'Controls: pause menu or How to Play') : 'Plug it back in or press a button'}</i></span>`;
     el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
     clearTimeout(this.toastT); this.toastT = setTimeout(() => el.classList.remove('show'), 3200);
   },

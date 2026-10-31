@@ -40,7 +40,7 @@ const coachOn = () => !!G.coachMode && !G.versus && !G.coop && !G.online && !G.l
 const coachCalls = () => !!G.coachCalls && !!G.career && !G.versus && !G.online && !G.demo && !G.mini && !G.challenge && G.human >= 0;
 // kicks the human never aims: Coach Mode and every career game (rating-based, like the CPU)
 const autoKick = () => coachOn() || (!!G.career && !G.versus && !G.online && !G.mini && G.human >= 0);
-const ctlMobile = () => (G.online && G.netModes ? G.netModes[Input.ctl] : G.mode) === 'mobile' && !(Pad.ui && Input.cur !== 1); // a controller plays like the keyboard
+const ctlMobile = () => (G.online && G.netModes ? G.netModes[Input.ctl] : G.mode) === 'mobile' && !(Pad.ui && (Input.cur !== 1 || (!G.online && Pad.ids[1]))); // a controller plays like the keyboard (2nd one too when it's player 2 on this device)
 const goalX = s => (s === 0 ? 110 : 10);      // goal line this side is attacking
 const ownGoal = s => (s === 0 ? 10 : 110);    // goal line this side defends
 const fromOwn = (s, x) => dirOf(s) * (x - ownGoal(s));

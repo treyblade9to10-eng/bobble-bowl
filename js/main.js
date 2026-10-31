@@ -132,6 +132,8 @@ $('btnHowBack').onclick = () => show('title');
 $('btnMute').onclick = () => { Sound.muted = !Sound.muted; $('btnMute').classList.toggle('off', Sound.muted); };
 
 // ---------- team select: AWAY (left) vs HOME (right), arrows to scroll ----------
+// 2 players on one device: computer mode (keyboard / controllers), or any device with two controllers plugged in
+const localMulti = () => G.mode !== 'mobile' || !!(typeof Pad !== 'undefined' && Pad.ids[0] && Pad.ids[1]);
 function teamOvr(t) { const all = t.off.concat(t.def); return Math.round(all.reduce((a, p) => a + p[3], 0) / all.length); }
 const sel = { idx: [TEAMS.findIndex(t => t.id === 'KC'), TEAMS.findIndex(t => t.id === 'PHI')], you: 0 }; // idx[0] = home, idx[1] = away
 try { const saved = JSON.parse(localStorage.getItem('bobbleSel') || 'null'); if (saved) Object.assign(sel, saved); } catch (e) {}
@@ -166,7 +168,7 @@ function muCard(t) {
 }
 function renderSelect(bumpSide) {
   if (typeof renderUniBtns === 'function') setTimeout(renderUniBtns, 0);
-  const two = $('optPlayers').value === '2' && G.mode !== 'mobile', coop = $('optPlayers').value === 'coop' && G.mode !== 'mobile';
+  const two = $('optPlayers').value === '2' && localMulti(), coop = $('optPlayers').value === 'coop' && localMulti();
   for (const [side, id] of [[0, 'pHome'], [1, 'pAway']]) {
     const t = TEAMS[sel.idx[side]], card = $(id), el = card.querySelector('.muBody');
     el.innerHTML = muCard(t);
@@ -327,8 +329,8 @@ function muStadium() {
 // one summary line on the SETTINGS button, so you can see the setup without opening the panel
 function muPaint() {
   const txt = id => { const s = $(id); return s.options[s.selectedIndex] ? s.options[s.selectedIndex].text : ''; };
-  const two = $('optPlayers').value === '2' && G.mode !== 'mobile', coop = $('optPlayers').value === 'coop' && G.mode !== 'mobile';
-  $('muRow_optPlayers').style.display = G.mode === 'mobile' ? 'none' : '';
+  const two = $('optPlayers').value === '2' && localMulti(), coop = $('optPlayers').value === 'coop' && localMulti();
+  $('muRow_optPlayers').style.display = localMulti() ? '' : 'none';
   $('muRow_optCoachMode').style.display = two || coop ? 'none' : '';
   for (const [, f] of muRows) f();
   const bits = [txt('optQtr') + ' QTRS', two ? '2 PLAYERS' : (coop ? 'CO-OP  ·  ' : '') + 'CPU ' + txt('optDiff'), txt('optWeather') + (txt('optNight') === 'Night' ? ' NIGHT' : ''), typeof BCAST !== 'undefined' && BCAST[quickBcast()] ? BCAST[quickBcast()].short : '', $('optGame').value === 'bowl' ? 'BOBBLE BOWL' : ''];
@@ -392,7 +394,7 @@ function startGame() {
   const bc = typeof quickBcast === 'function' ? quickBcast() : null;
   newGame(TEAMS[sel.idx[0]], TEAMS[sel.idx[1]], { qtr: +$('optQtr').value, diff: +$('optDiff').value, coach: $('optCoach').value, humanSide: sel.you,
     weather: typeof bcWeather === 'function' ? bcWeather(bc, pickWeather($('optWeather').value), $('optWeather').value) : pickWeather($('optWeather').value), night: $('optNight').value === '1', bcast: bc, uni: [$('optUni0').value, $('optUni1').value],
-    versus: $('optPlayers').value === '2' && G.mode !== 'mobile', coop: $('optPlayers').value === 'coop' && G.mode !== 'mobile', bigGame: $('optGame').value === 'bowl' ? quickBowlYear() : 0 });
+    versus: $('optPlayers').value === '2' && localMulti(), coop: $('optPlayers').value === 'coop' && localMulti(), bigGame: $('optGame').value === 'bowl' ? quickBowlYear() : 0 });
   Broadcast.show();
 }
 
