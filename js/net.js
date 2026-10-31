@@ -337,6 +337,8 @@ const Net = {
         onlineWait(quiet > LINK_DEAD ? 'Reconnecting to your friend...' : 'Waiting for your friend...');
       } else if (this.held) { this.held = false; if (/^(Reconnecting to your friend|Waiting for your friend)/.test($('onWait').textContent)) onlineWait(this.waitWas); }
     } else {
+      const pc = this.pendingCall;
+      if (pc && G.phase === 'playcall' && this.picks[1] == null && pc.reqs.some(r => r.side === 1) && now - (this.callT || 0) > 2000) { this.callT = now; for (const m of this.callMsgs) this.send(m); }
       const hold = playing && now - this.inT > HOLD_AFTER;
       if (hold) {
         if (!this.held) { // clear the guest's controls so nobody keeps running, and freeze the game
@@ -540,7 +542,7 @@ const Net = {
     const id = this.callId, side = c.side != null ? c.side : G.poss;
     const reqs = [{ ...c, side }];
     if (c.mode === 'off') reqs.push({ ...withSide(1 - side, playCallCtx), side: 1 - side });
-    this.pendingCall = { id, reqs };
+    this.pendingCall = { id, reqs }; this.callT = performance.now();
     this.callMsgs = [];
     for (const r of reqs) {
       if (r.side === 0) onPlayCall({ ...r, id });
@@ -625,7 +627,9 @@ const Net = {
     G.refs = s.rf.map((r, i) => ({ x: oldRefs[i] ? oldRefs[i].x : r[0], y: oldRefs[i] ? oldRefs[i].y : r[1], face: r[2], anim: relay && oldRefs[i] ? oldRefs[i].anim : r[3], moving: r[4], throwT: r[5] }));
     G.hp = s.hp.map(i => P[i] || null); G.humanPlayer = G.hp[G.human]; G.humanDef = P[s.hd[G.human]] || null;
     G.cellyGuy = P[s.cg] || null;
-    if (G.phase !== 'playcall' && $('playcall').classList.contains('show')) { show(null); onlineWait(null); }
+    // close a call screen only once the host's game has been in 'playcall' and moved on (updates can arrive after the call itself)
+    if (G.phase === 'playcall') this.sawPC = true;
+    else if (this.sawPC && $('playcall').classList.contains('show')) { show(null); onlineWait(null); }
   },
   // one-time things from the safe lane: effects, sounds, banners, play-by-play, planned routes
   applyEvents(s) {
@@ -705,10 +709,15 @@ const Net = {
     m.t = 'in'; m.n = ++this.inSeq;
     this.send(m, true);
   },
+  gCallId: null, gPick: null, sawPC: false,
   showCall(m) {
     const c = m.ctx;
-    if (c.mode === 'close') { onlineWait(null); return show(null); }
-    if (c.mode === 'wait') return onlineWait('Your opponent is picking a play...');
+    if (c.mode === 'close') { this.gCallId = null; onlineWait(null); return show(null); }
+    if (c.mode === 'wait') { if (c.id !== this.gCallId) { this.gCallId = c.id; this.gPick = null; this.sawPC = false; } return onlineWait('Your opponent is picking a play...'); }
+    if (c.id != null && c.id === this.gCallId) { // the host sent this call again (it hasn't got our pick)
+      if (this.gPick && this.gPick.id === c.id) return this.send(this.gPick); // our pick got lost: send it again
+      if ($('playcall').classList.contains('show')) return;
+    } else { this.gCallId = c.id; this.gPick = null; this.sawPC = false; }
     onlineWait(null);
     onPlayCall(c);
   },

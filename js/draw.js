@@ -1286,7 +1286,7 @@ function drawHUDBase(g, G, S, x0, y0, W, H, bx) {
     if (lx > 10) g.drawImage(Logo.canvas(t, 64), x + 4, y0 + 6, 34, 34);
     if (S) bcCellDeco(g, G.bcast, x, y0);
     g.fillText(t.id, x + lx, ny);
-    if (G.versus) { const tg = G.online ? (G.teams.indexOf(t) === G.human ? 'YOU' : 'OPP') : G.teams.indexOf(t) === G.p1 ? 'P1' : 'P2'; g.font = '800 12px "Barlow Condensed", Arial, sans-serif'; g.fillStyle = tg === 'P1' || tg === 'YOU' ? '#ffe14d' : '#5ad1ff'; g.fillText(tg, x + lx, y0 + 9); g.font = 'italic 900 23px "Barlow Condensed", "Arial Black", sans-serif'; g.fillStyle = textOn(t.c1); }
+    if (G.versus && !G.online) { const tg = G.teams.indexOf(t) === G.p1 ? 'P1' : 'P2'; g.font = '800 12px "Barlow Condensed", Arial, sans-serif'; g.fillStyle = tg === 'P1' || tg === 'YOU' ? '#ffe14d' : '#5ad1ff'; g.fillText(tg, x + lx, y0 + 9); g.font = 'italic 900 23px "Barlow Condensed", "Arial Black", sans-serif'; g.fillStyle = textOn(t.c1); }
     if (poss && !(S && bcPoss(g, G.bcast, x + lx + g.measureText(t.id).width + 16, ny))) drawFootball(g, x + lx + g.measureText(t.id).width + 16, ny, 0.9);
     g.font = 'italic 900 36px "Barlow Condensed", "Arial Black", sans-serif'; g.textAlign = 'right'; g.fillText(s, x + 192, y0 + H / 2 + 1);
     const side = G.teams.indexOf(t);

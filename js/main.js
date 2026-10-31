@@ -397,7 +397,7 @@ let pcList = [];
 function onPlayCall(c) {
   const humanOff = c.mode === 'off';
   pcCtx = c;
-  const who = G.versus ? `<span class="vsTag p${c.side === G.p1 ? 1 : 2}">${pName(c.side)}</span>` : '';
+  const who = G.versus && !G.online ? `<span class="vsTag p${c.side === G.p1 ? 1 : 2}">${pName(c.side)}</span>` : '';
   if (c.mode === 'kickoff') {
     $('pcHead').innerHTML = who + 'KICKOFF <span class="pcsub">You kick to them</span>';
     pcList = [{ key: 'ko', name: 'Kickoff', desc: 'Boom it deep, then cover the return!', special: true },
@@ -538,13 +538,15 @@ function coachPick(c, list) {
   return pick(['c3', 'c2', 'man']);
 }
 function choose(i) {
-  const p = pcList[i]; if (!p || G.phase !== 'playcall') return;
+  const p = pcList[i]; if (!p) return;
+  // online guest: the call screen can open a moment before the host's game update says 'playcall' - the open call counts
+  if (G.phase !== 'playcall' && !(G.online && Net.role === 'guest' && pcCtx && pcCtx.id != null && pcCtx.id === Net.gCallId)) return;
   if (G.patSide == null && p.key === 'xp') return;
   if (G.online) { // online: send your pick, the host starts the play when both picks are in
     Sound.click(); show(null);
     if (pcCtx.mode === 'off') G.lastOffKey = p.key; else if (pcCtx.mode === 'def') G.lastDefKey = p.key;
     if (Net.role === 'host') Net.pick(0, pcCtx.mode, p.key, pcCtx.id);
-    else { Net.send({ t: 'pick', mode: pcCtx.mode, key: p.key, id: pcCtx.id }); onlineWait('Waiting for your opponent to pick...'); }
+    else { Net.send(Net.gPick = { t: 'pick', mode: pcCtx.mode, key: p.key, id: pcCtx.id }); onlineWait('Waiting for your opponent to pick...'); }
     return;
   }
   if (p.key === 'ko' || p.key === 'onside') { show(null); Sound.click(); return chooseKickoff(p.key); }
