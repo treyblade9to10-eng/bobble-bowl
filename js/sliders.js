@@ -22,6 +22,7 @@ const Sliders = {
   val(k) { const v = this.v[k]; return v == null ? 50 : v; },
   // 50 = exactly 1, so the default game is untouched
   mul(k) {
+    if (G.online) return 1; // online = the normal game for both players
     const v = this.val(k); if (v === 50) return 1;
     const d = SLIDER_DEFS.find(x => x[0] === k); if (!d) return 1;
     return v < 50 ? lerp(d[3], 1, v / 50) : lerp(1, d[4], (v - 50) / 50);

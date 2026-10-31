@@ -477,8 +477,6 @@ body.pad button:focus, body.pad .pcard:focus, body.pad .mdcard:focus, body.pad .
 #btnInstall { position: absolute; right: 18px; bottom: 12px; font-size: 14px; padding: 8px 16px; }
 
 /* ---- online ---- */
-#onTeamRow { display: flex; align-items: center; gap: 14px; margin: 4px 0 14px; font-family: var(--hd); font-weight: 800; font-size: 22px; }
-#onTeam b { color: var(--gold); margin-left: 8px; } #onTeam .dot { display: inline-block; width: 14px; height: 14px; margin-right: 8px; vertical-align: middle; }
 .arrB { width: 46px; height: 46px; padding: 0; font-size: 28px; margin: 0; }
 #onCodeBox { text-align: center; } .onLbl { font-family: var(--hd); font-weight: 800; letter-spacing: .3em; color: var(--dim); }
 #onCode { font-family: var(--hd); font-weight: 900; font-style: italic; font-size: 110px; letter-spacing: .12em; color: var(--gold); line-height: 1; }

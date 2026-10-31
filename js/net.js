@@ -275,7 +275,7 @@ const Net = {
     c.on('open', () => {
       if (c !== this.conn) return;
       this.ready = true; this.okT = this.rxT = this.inT = this.snapRxT = performance.now();
-      if (this.role === 'guest') c.send({ t: 'hello', team: TEAMS[sel.idx[sel.you]].id, mode: Pad.ui ? 'computer' : G.mode, v: NET_VERSION, on: G.online ? 1 : 0 });
+      if (this.role === 'guest') c.send({ t: 'hello', team: TEAMS[sel.idx[sel.you]].id, ct: this.myTeam(), mode: Pad.ui ? 'computer' : G.mode, v: NET_VERSION, on: G.online ? 1 : 0 });
       onStatus(this.onRelay ? 'CONNECTED (RELAY)' : 'CONNECTED (DIRECT)');
     });
     c.on('data', m => { if (c === this.conn) this.recv(m); });
@@ -417,11 +417,29 @@ const Net = {
     if (m.t === 'bye') this.lost();
   },
 
+  // ---------------- created teams ----------------
+  // a created team goes over the wire as a cleaned copy with a small logo (made ahead, when you pick it)
+  pack: null,
+  packTeam(t) {
+    if (!t || !t.custom) { this.pack = null; return; }
+    const body = { ...t }; delete body.qb2; delete body.rb2; delete body.bench; delete body.logo; delete body.replaces;
+    this.pack = { uid: t.uid, team: body };
+    if (t.logo) CT.smallLogo(t.logo).then(u => { if (this.pack && this.pack.uid === t.uid && u) this.pack.team = { ...body, logo: u }; });
+  },
+  myTeam() { const t = TEAMS[sel.idx[sel.you]]; return t && t.custom && this.pack && this.pack.uid === t.uid ? this.pack.team : null; },
+  // the friend's created team: same safety checks as the Team Database
+  theirTeam(ct, notId) {
+    const t = typeof CT !== 'undefined' && CT.clean(ct); if (!t || !CT.isClean(t)) return null;
+    if (t.id === notId || CT.NFL.some(n => n.id === t.id)) t.id = (t.id.slice(0, 3) + '2').slice(0, 4); // two teams can't share an id
+    return t;
+  },
+
   // ---------------- host ----------------
   startHost(hello) {
-    const mine = TEAMS[sel.idx[sel.you]];
-    let theirs = TEAMS.find(t => t.id === hello.team) || TEAMS[(sel.idx[sel.you] + 1) % 32];
-    if (theirs.id === mine.id) theirs = TEAMS[(TEAMS.indexOf(mine) + 1) % 32]; // can't both be the same team
+    let mine = TEAMS[sel.idx[sel.you]];
+    if (mine.custom) mine = this.myTeam() ? CT.clean(this.myTeam()) : { ...mine, logo: undefined }; // no big logo in the start message
+    let theirs = (hello.ct && this.theirTeam(hello.ct, mine.id)) || CT.NFL.find(t => t.id === hello.team) || CT.NFL[(sel.idx[sel.you] + 1) % 32];
+    if (theirs.id === mine.id) theirs = CT.NFL[(CT.NFL.findIndex(t => t.id === mine.id) + 1) % 32] || CT.NFL[0]; // can't both be the same team
     Input.online = true; Input.store[1] = Input.remote(); Input.use(0);
     G.online = true; G.netModes = [G.mode, hello.mode === 'mobile' ? 'mobile' : 'computer'];
     G.demo = false; G.season = false; G.challenge = null; G.mini = null; show(null);

@@ -66,7 +66,7 @@
       <button id="btnMode">MODE: <span id="modeLabel">?</span></button>
     </div>
     <button id="btnInstall" style="display:none">INSTALL APP</button>
-    <div class="ver">v12.3</div>
+    <div class="ver">v12.4</div>
   </div>
 
   <!-- Mode select -->
@@ -222,13 +222,24 @@
 
   <!-- Online play -->
   <div id="online" class="screen">
-    <h2>Online</h2>
-    <div id="onTeamRow"><button class="arrB" id="onPrev">‹</button><div id="onTeam"></div><button class="arrB" id="onNext">›</button></div>
-    <div id="onPick" class="row"><button class="big gold" id="onHost">HOST GAME</button><button class="big" id="onJoin">JOIN GAME</button></div>
-    <div id="onCodeBox" style="display:none"><div class="onLbl">YOUR CODE</div><div id="onCode">....</div></div>
-    <div id="onJoinBox" style="display:none"><input id="onCodeIn" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="CODE"><button class="big gold" id="onGo">JOIN</button></div>
-    <div id="onStatus"></div>
-    <button id="onBack">BACK</button>
+    <div id="onTop"><span>PLAY A FRIEND</span><b>ONLINE</b></div>
+    <div id="onRow">
+      <div class="muCard" id="onCard">
+        <div class="muHead"><span class="pside">YOUR TEAM</span><span class="muCnt"></span></div>
+        <div class="muBody"></div>
+        <button class="muArr l" data-d="-1" aria-label="previous team"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+        <button class="muArr r" data-d="1" aria-label="next team"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></button>
+        <div class="onFilt"><button data-f="all">ALL</button><button data-f="nfl">NFL</button><button data-f="mine">MY TEAMS</button></div>
+      </div>
+      <div id="onSide">
+        <div id="onPick"><button class="big gold" id="onHost">HOST GAME</button><button class="big" id="onJoin">JOIN GAME</button></div>
+        <div id="onCodeBox" style="display:none"><div class="onLbl">YOUR CODE</div><div id="onCode">....</div></div>
+        <div id="onJoinBox" style="display:none"><input id="onCodeIn" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="CODE"><button class="big gold" id="onGo">JOIN</button></div>
+        <div id="onStatus"></div>
+        <div class="onNote">Sliders are off in online games. Same game for both of you.</div>
+        <button id="onBack">BACK</button>
+      </div>
+    </div>
   </div>
 
   <!-- Franchise: rookie draft -->

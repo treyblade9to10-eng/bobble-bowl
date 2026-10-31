@@ -213,3 +213,33 @@ body:not(.mobile) #select #pAway .muArr { left: 0; right: auto; }
 body:not(.mobile) #select #pHome .muArr { right: 0; left: auto; }
 body:not(.mobile) #select .muArr::after { content: attr(data-key); font-family: var(--hd); font-weight: 800; font-size: 13px; color: #ffffffb0; line-height: 1; }
 body:not(.mobile) #select .muArr:hover::after { color: var(--gold); }
+
+/* ---- Online screen: your team card (same as the matchup cards) + host / join on the right ---- */
+#online.screen { justify-content: center; padding: 14px max(18px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left)); overflow: hidden;
+  background: radial-gradient(ellipse at 50% 45%, #0c1016de, #0c1016f7 75%); }
+#onTop { display: flex; flex-direction: column; align-items: center; margin-bottom: 12px; font-family: var(--hd); line-height: 1; }
+#onTop span { font-weight: 800; font-size: 13px; letter-spacing: .34em; color: var(--dim); padding-left: .34em; }
+#onTop b { font-style: italic; font-weight: 900; font-size: 34px; letter-spacing: .02em; position: relative; padding-bottom: 7px; }
+#onTop b::after { content: ''; position: absolute; left: 50%; bottom: 0; width: 44px; height: 3px; margin-left: -22px; background: var(--gold); transform: skewX(-20deg); }
+#onRow { display: grid; grid-template-columns: minmax(0, 420px) minmax(0, 400px); justify-content: center; align-items: stretch; gap: 26px; width: 100%; flex: 0 1 470px; min-height: 0; }
+#onCard .muBody { cursor: grab; }
+.onFilt { display: flex; justify-content: center; gap: 0; padding: 8px; background: #000000a6; }
+.onFilt button { margin: 0; padding: 6px 14px; font-size: 13px; letter-spacing: .12em; background: #ffffff14; color: #ffffffb3; }
+.onFilt button.on { background: var(--gold); color: #111; }
+.onFilt button:disabled { opacity: .35; }
+#onSide { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; min-width: 0; padding: 16px; background: #0b0f16cc; border-left: 4px solid var(--gold); }
+#onPick { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 300px; }
+#onPick button { width: 100%; margin: 0; }
+#onSide #onStatus { margin: 8px 0; font-size: 15px; }
+.onNote { font-size: 12px; color: var(--dim); letter-spacing: .04em; text-align: center; }
+#onBack { margin-top: 8px; }
+@media (max-height: 560px) {
+  #online.screen { padding-top: 8px; }
+  #onTop { margin-bottom: 6px; } #onTop span { display: none; } #onTop b { font-size: 24px; padding-bottom: 5px; }
+  #onRow { gap: 16px; grid-template-columns: minmax(0, 380px) minmax(0, 360px); }
+  #onCard .muLogo { height: min(84px, 20vh); } #onCard .muName { font-size: 32px; } #onCard .muCity { margin-top: 2px; font-size: 13px; }
+  #onCard .muRat { margin-top: 4px; padding: 3px 10px; } #onCard .muOvr b { font-size: 28px; } #onCard .muPl { margin-top: 4px; } #onCard .muP { padding: 2px 8px; font-size: 12px; }
+  #onCard .muPl .muP:nth-child(2) { display: none; }
+  .onFilt { padding: 5px; } .onFilt button { padding: 4px 10px; font-size: 11px; }
+  #onSide { padding: 10px; } #onPick { gap: 8px; } #onSide #onStatus { margin: 4px 0; font-size: 13px; } #onBack { margin-top: 2px; }
+}

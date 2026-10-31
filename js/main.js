@@ -366,7 +366,7 @@ $('btnZoomOpt').onclick = () => {
   Sound.click(); setZoom({ normal: 'far', far: 'farthest', farthest: 'normal' }[camZoom]); saveOpts(); zoomLabel();
   if (G.paused && G.teams && !G.demo) { render(); updateCamera(5); } // new zoom now, then put the camera where it would be (paused = it isn't moving)
 };
-$('btnSlidersOpt').onclick = () => { Sound.click(); Sliders.open(); };
+$('btnSlidersOpt').onclick = () => { if (G.online) return; Sound.click(); Sliders.open(); };
 Logo.onReady(() => { if ($('select').classList.contains('show')) renderSelect(); });
 // Coach Mode (you call the plays, the CPU plays them): one saved setting shared by Quick Game, Season and the pause menu
 function setCoachMode(on) {
@@ -741,6 +741,7 @@ function renderPauseXF() {
 }
 function togglePause() {
   if (!G.teams || G.phase === 'over' || G.demo || Highlights.on || $('hlMenu').classList.contains('show')) return;
+  $('btnSlidersOpt').style.display = G.online ? 'none' : '';
   if (G.online) { const on = !$('pause').classList.contains('show'); if (on) { zoomLabel(); $('pausePbp').innerHTML = '<div class="pbpHead">ONLINE GAME KEEPS GOING WHILE THIS IS OPEN</div>' + pbpHtml(6); show('pause'); } else show(null); return; }
   G.paused = !G.paused;
   if (G.paused) { G.pauseFrom = $('playcall').classList.contains('show') ? 'playcall' : null; coachLabel(); tagsLabel(); zoomLabel(); $('btnCoachOpt').style.display = G.versus || G.lock || G.mini || G.challenge ? 'none' : ''; $('pausePbp').innerHTML = pbpHtml(8); renderPauseXF(); show('pause'); }
@@ -1043,9 +1044,26 @@ window.addEventListener('appinstalled', () => { $('btnInstall').style.display = 
 
 // ---------- ONLINE: host a game (get a code) or join with your friend's code ----------
 screens.push('online'); menuScreens.push('online');
-function renderOnlineTeam() {
-  const t = TEAMS[sel.idx[sel.you]];
-  $('onTeam').innerHTML = `<span class="dot" style="background:${t.c1}"></span>${t.city} ${t.name}  <b>${teamOvr(t)} OVR</b>`;
+// your team for online: any NFL team or one of your created teams (it gets sent to your friend's game)
+let onFilt = 'all';
+function onList() { return TEAMS.map((t, i) => i).filter(i => onFilt === 'all' || (onFilt === 'mine') === !!TEAMS[i].custom); }
+function renderOnlineTeam(bump) {
+  if (typeof CT !== 'undefined' && CT.mode !== 'all') CT.useAll();
+  const mine = TEAMS.some(t => t.custom); if (!mine && onFilt === 'mine') onFilt = 'all';
+  let list = onList(); if (!list.includes(sel.idx[sel.you])) sel.idx[sel.you] = list[0];
+  const t = TEAMS[sel.idx[sel.you]], card = $('onCard');
+  card.querySelector('.muBody').innerHTML = muCard(t);
+  card.style.setProperty('--c1', t.c1); card.style.setProperty('--c2', t.c2); card.style.setProperty('--fg', textOn(t.c1));
+  card.querySelector('.muCnt').textContent = `${list.indexOf(sel.idx[sel.you]) + 1} / ${list.length}`;
+  card.querySelector('.pside').textContent = t.custom ? 'YOUR TEAM  ·  CREATED' : 'YOUR TEAM';
+  card.querySelectorAll('.onFilt button').forEach(b => { b.classList.toggle('on', b.dataset.f === onFilt); b.disabled = b.dataset.f === 'mine' && !mine; });
+  if (bump) { card.classList.remove('bump'); void card.offsetWidth; card.classList.add('bump'); }
+  if (typeof Net !== 'undefined' && Net.packTeam) Net.packTeam(t);
+  try { localStorage.setItem('bobbleSel', JSON.stringify(sel)); } catch (e) {}
+}
+function onMove(d) {
+  const list = onList(), k = list.indexOf(sel.idx[sel.you]);
+  sel.idx[sel.you] = list[(k + d + list.length) % list.length]; Sound.click(); renderOnlineTeam(true);
 }
 function openOnline(msg) {
   $('onCodeBox').style.display = 'none'; $('onJoinBox').style.display = 'none'; $('onPick').style.display = '';
@@ -1055,8 +1073,19 @@ function openOnline(msg) {
 function onlineMsg(t) { onlineWait(null); openOnline(t); }
 function onlineWait(t) { const el = $('onWait'); el.textContent = t || ''; el.style.display = t ? 'block' : 'none'; }
 $('btnOnline').onclick = () => { Sound.init(); Sound.click(); openOnline(); };
-$('onPrev').onclick = () => { sel.idx[sel.you] = (sel.idx[sel.you] + 31) % 32; Sound.click(); renderOnlineTeam(); };
-$('onNext').onclick = () => { sel.idx[sel.you] = (sel.idx[sel.you] + 1) % 32; Sound.click(); renderOnlineTeam(); };
+document.querySelectorAll('#onCard .muArr').forEach(b => b.onclick = e => { e.stopPropagation(); if (!Net.role) onMove(+b.dataset.d); });
+document.querySelectorAll('#onCard .onFilt button').forEach(b => b.onclick = () => { if (Net.role) return; onFilt = b.dataset.f; Sound.click(); renderOnlineTeam(true); });
+{ // swipe / mouse wheel on the card
+  const el = $('onCard').querySelector('.muBody'); let x0 = null, y0 = 0;
+  el.addEventListener('wheel', e => { e.preventDefault(); if (!Net.role) onMove(e.deltaY > 0 ? 1 : -1); }, { passive: false });
+  el.addEventListener('pointerdown', e => { x0 = e.clientX; y0 = e.clientY; });
+  el.addEventListener('pointerup', e => { if (x0 == null) return; const dx = e.clientX - x0, dy = e.clientY - y0; x0 = null; if (!Net.role && Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) onMove(dx < 0 ? 1 : -1); });
+  el.addEventListener('pointercancel', () => { x0 = null; });
+}
+addEventListener('keydown', e => {
+  if (!$('online').classList.contains('show') || Net.role || document.activeElement === $('onCodeIn')) return;
+  if (e.code === 'ArrowLeft' || e.code === 'KeyA') onMove(-1); if (e.code === 'ArrowRight' || e.code === 'KeyD') onMove(1);
+});
 $('onBack').onclick = () => { Net.reset(); show('title'); };
 $('onHost').onclick = () => {
   Sound.click(); if (G.mode === 'mobile') goFullscreen();
