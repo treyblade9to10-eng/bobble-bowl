@@ -682,7 +682,7 @@ const Net = {
       p.sprinting = !!a[n + 6]; if (p.xf) p.xf.on = !!a[n + 7]; p.celly = a[n + 8] ? { type: a[n + 8], t: a[n + 9] } : null;
       p.throwKey = a[n + 10]; p.openness = a[n + 11] < 0 ? null : a[n + 11];
       p.kneel = a[n + 12] || 0; p.kickT = a[n + 13] >= 0 ? a[n + 13] : null; p.kpose = [null, 'hold', 'pc'][a[n + 14]] || null; p.fair = a[n + 15] || 0;
-      p.ctl = p.side === G.human ? 0 : 1; // you're always the yellow ring on your own screen
+      p.ctl = p.side === G.human ? 0 : 1; // you = 0 on your own screen (draw.js ptagOf: the host is still P1 on both screens)
     });
     if (s.b) {
       const b = G.ball || (G.ball = {});
@@ -695,7 +695,7 @@ const Net = {
     G.refs = s.rf.map((r, i) => ({ x: oldRefs[i] ? oldRefs[i].x : r[0], y: oldRefs[i] ? oldRefs[i].y : r[1], face: r[2], anim: relay && oldRefs[i] ? oldRefs[i].anim : r[3], moving: r[4], throwT: r[5] }));
     const me = G.coop ? 1 : G.human; // (co-op: hp / hd are by player, the guest is player 2)
     G.hp = s.hp.map(i => P[i] || null); G.humanPlayer = G.hp[me]; G.humanDef = P[s.hd[me]] || null;
-    if (G.coop) for (const p of G.hp) if (p) p.ctl = p === G.humanPlayer ? 0 : 1; // your guy yellow, your friend's blue
+    if (G.coop) for (const p of G.hp) if (p) p.ctl = p === G.humanPlayer ? 0 : 1; // your guy 0, your friend's 1
     G.cellyGuy = P[s.cg] || null;
     // close a call screen only once the host's game has been in 'playcall' and moved on (updates can arrive after the call itself)
     if (G.phase === 'playcall') this.sawPC = true;

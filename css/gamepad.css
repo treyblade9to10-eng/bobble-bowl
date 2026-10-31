@@ -60,3 +60,30 @@ body:not(.padui) #padBar { display: none; }
   #padCtl .row button { font-size: 14px; padding: 6px 14px; margin: 3px; }
   #padBar { bottom: 3px; } #padBar b { font-size: 12px; }
 }
+
+/* ---- 2 controllers: each has its own box, P1 red / P2 blue, with a P1 / P2 square on it (the square art comes from draw.js ptagSprite) ---- */
+.padTag { position: fixed; left: 0; top: 0; z-index: 80; width: 38px; height: auto; pointer-events: none; }
+body:not(.padui) .padTag, body:not(.pad2) .padTag { display: none !important; }
+body.padui.pad2 .pfocus { outline-color: #e0222b; box-shadow: 0 0 0 6px #e0222b40, 0 6px 18px #0009; }
+body.padui.pad2 .pfocus2 { outline: 3px solid #1f63e0; outline-offset: 2px; box-shadow: 0 0 0 6px #1f63e040, 0 6px 18px #0009; }
+body.padui.pad2 .pfocus.pfocus2 { outline-color: #e0222b; box-shadow: 0 0 0 4px #1f63e0, 0 6px 18px #0009; }
+body.padui.pad2 button.pfocus, body.padui.pad2 button.gold.pfocus, body.padui.pad2 button.big.gold.pfocus { outline: 0; box-shadow: none; background: #e0222b !important; color: #fff !important; transform: scale(1.06); }
+body.padui.pad2 button.pfocus2, body.padui.pad2 button.gold.pfocus2, body.padui.pad2 button.big.gold.pfocus2 { outline: 0; box-shadow: none; background: #1f63e0 !important; color: #fff !important; transform: scale(1.06); }
+body.padui.pad2 button.pfocus.pfocus2 { background: linear-gradient(100deg, #e0222b 50%, #1f63e0 50%) !important; }
+body.padui.pad2 button.pfocus svg, body.padui.pad2 button.pfocus2 svg { stroke: #fff; }
+body.padui.pad2 .pcard.pfocus { border-color: #e0222b; } body.padui.pad2 .pcard.pfocus2 { transform: translateY(-4px); border-color: #1f63e0; background: #1d2633; outline-offset: 1px; }
+body.pad2 .padPick { background: #e0222b; color: #fff; } body.pad2 .padPick.p2 { background: #1f63e0; }
+/* October: same idea, blood red + midnight blue with a little glow */
+body.spooky.padui.pad2 .pfocus { outline-color: #b3121f; box-shadow: 0 0 12px 3px #ff2a3a66, 0 6px 18px #0009; }
+body.spooky.padui.pad2 .pfocus2 { outline-color: #4a35d0; box-shadow: 0 0 12px 3px #8f74ff66, 0 6px 18px #0009; }
+body.spooky.padui.pad2 button.pfocus, body.spooky.padui.pad2 button.gold.pfocus, body.spooky.padui.pad2 button.big.gold.pfocus { background: linear-gradient(180deg, #c4141f, #6a0812) !important; box-shadow: 0 0 14px #ff2a3a88; }
+body.spooky.padui.pad2 button.pfocus2, body.spooky.padui.pad2 button.gold.pfocus2, body.spooky.padui.pad2 button.big.gold.pfocus2 { background: linear-gradient(180deg, #5a43e0, #1e1570) !important; box-shadow: 0 0 14px #8f74ff88; }
+body.spooky.padui.pad2 button.pfocus.pfocus2 { background: linear-gradient(100deg, #b3121f 50%, #3a2ab8 50%) !important; }
+body.spooky.pad2 .padPick { background: #9e0f1a; } body.spooky.pad2 .padPick.p2 { background: #3a2ab8; }
+/* the same squares on the matchup cards + the 2-player call screen */
+.muHead .who.tags { display: flex; gap: 3px; padding: 0; background: none; }
+.muHead .who img.ptag { display: block; height: 38px; width: auto; margin: -9px -2px -12px; }
+.vsTag.p1 { background: #e0222b; color: #fff; } .vsTag.p2 { background: #1f63e0; color: #fff; }
+body.spooky .vsTag.p1 { background: linear-gradient(180deg, #c4141f, #6a0812); box-shadow: 0 0 12px #ff2a3a66; }
+body.spooky .vsTag.p2 { background: linear-gradient(180deg, #5a43e0, #1e1570); box-shadow: 0 0 12px #8f74ff66; }
+@media (max-height: 500px) { .muHead .who img.ptag { height: 34px; margin: -8px -2px -11px; } .padTag { width: 34px; } }

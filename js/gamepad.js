@@ -8,6 +8,7 @@
 //  Defense: A dive (jump for the pick while the ball is in the air), Y jump, B switch to the guy closest to the ball, X swim, RB / right stick = hit stick
 //  Kicks: A stops the meter. Punt coming down: A fair catch. After a TD: d-pad / A B X Y / LB RB celebrate
 //  Menus: stick / d-pad move the gold box, A pick, B back, LB / RB pages (play call) or teams (matchup), Y last play
+//  Two controllers: each one has its own box in the menus (P1 red, P2 blue), and its bumpers change its own team on the matchup
 const PB = { A: 0, B: 1, X: 2, Y: 3, LB: 4, RB: 5, LT: 6, RT: 7, VIEW: 8, MENU: 9, LS: 10, RS: 11, UP: 12, DOWN: 13, LEFT: 14, RIGHT: 15, MOVE: 20, FLICK: 21, DPAD: 22 };
 const PAD_COL = { xb: ['#5ad85a', '#ff5a52', '#4aa6ff', '#ffc933'], ps: ['#86b6ff', '#ff6f7a', '#f08ad8', '#3fe0b5'] };
 const PAD_NAMES = { xb: ['A', 'B', 'X', 'Y', 'LB', 'RB', 'LT', 'RT', 'VIEW', 'MENU', 'L3', 'R3'], ps: ['CROSS', 'CIRCLE', 'SQUARE', 'TRIANGLE', 'L1', 'R1', 'L2', 'R2', 'CREATE', 'OPTIONS', 'L3', 'R3'] };
@@ -56,7 +57,9 @@ function padGlyphDraw(g, k, t) {
 
 const Pad = {
   prev: [[], []], bind: [{}, {}], holds: [{}, {}], rsOn: [false, false], navs: [{ dir: '', t: 0 }, { dir: '', t: 0 }],
-  ids: [null, null], on: false, ui: false, type: 'xb', cur: null, hotShow: false, barKey: '', imgs: {},
+  ids: [null, null], on: false, ui: false, type: 'xb', curs: [null, null], hotShow: false, barKey: '', imgs: {},
+  get cur() { return this.curs[0]; }, set cur(e) { this.curs[0] = e; }, // (the 1st controller's box: the only one with 1 controller)
+  two() { return !!(this.ids[0] && this.ids[1]); },
   rumble: (() => { try { return localStorage.getItem('bobblePadRumble') !== '0'; } catch (e) { return true; } })(),
   poll(dt) {
     const pads = (navigator.getGamepads ? Array.from(navigator.getGamepads()) : []).filter(p => p && p.connected);
@@ -68,19 +71,22 @@ const Pad = {
     }
     if (ids[0] !== this.ids[0] || ids[1] !== this.ids[1]) setTimeout(() => { if ($('select').classList.contains('show') && typeof renderSelect === 'function') renderSelect(); }, 0); // PLAYERS shows up with 2 pads
     this.ids = ids;
+    if (document.body.classList.contains('pad2') !== this.two()) { document.body.classList.toggle('pad2', this.two()); if (!this.two()) this.focus(null, 1); }
     const pc = $('padCtl'); if (pc && pc.classList.contains('show') && !$(pc.dataset.from || 'how').classList.contains('show')) pc.classList.remove('show'); // its menu closed under it
     if (!pads.length) { if (this.on) { this.on = false; document.body.classList.remove('pad'); this.setUI(false); } return; }
     if (!this.on) { this.on = true; document.body.classList.add('pad'); }
     pads.slice(0, 2).forEach((gp, i) => this.one(gp, i, dt));
     if (this.ui) this.bar();
+    this.tags();
   },
   // last thing touched was a pad: show its buttons (keyboard / mouse / finger hides them again)
   setUI(on, t) {
     if (t && t !== this.type) { this.type = t; document.body.classList.toggle('pad-ps', t === 'ps'); this.barKey = ''; }
     if (on === this.ui) return;
     this.ui = on; document.body.classList.toggle('padui', on);
-    if (!on && this.cur) { this.cur.classList.remove('pfocus'); this.dropPick(); this.cur = null; }
+    if (!on) this.clearCurs();
   },
+  clearCurs() { this.focus(null, 0); this.focus(null, 1); this.tags(); },
   letGo(i) {
     for (const k in this.bind[i]) for (const c of this.bind[i][k]) Input.release_(c);
     for (const c in this.holds[i]) Input.release_(c);
@@ -111,6 +117,7 @@ const Pad = {
     const hold = (c, on) => { const cc = code(c), H = this.holds[i]; if (on && !H[cc]) { H[cc] = 1; Input.press(cc); } else if (!on && H[cc]) { delete H[cc]; Input.release_(cc); } };
     if (hit(PB.MENU) && G.teams && !G.demo && (!document.querySelector('.screen.show') || $('pause').classList.contains('show') || $('playcall').classList.contains('show')) && !$('padCtl').classList.contains('show')) { togglePause(); return; }
     if (this.menu()) { hold('ShiftLeft', false); hold('ControlLeft', false); return this.menuNav(i, hit, x, y, mag > 0 || dx || dy, dt, ry); }
+    if (i === 1 && this.curs[1]) this.focus(null, 1);
     if (!G.teams || G.demo) return;
     const side = Input.versus && !G.coop ? (i === 0 ? G.p1 : 1 - G.p1) : G.human;
     const cx = G.coop && !G.online && i === 1 ? withC2(() => this.ctx()) : withSide(side, () => this.ctx()); // local co-op: the 2nd pad is player 2
@@ -191,24 +198,56 @@ const Pad = {
       return onTop(e, r);
     }).filter((e, _, all) => !(e.tagName === 'LABEL' && all.some(o => o !== e && e.contains(o)))); // a label around a select: just the select
   },
-  focus(e) {
-    if (this.cur === e) return;
-    if (this.cur) { this.cur.classList.remove('pfocus'); this.dropPick(); }
-    this.cur = e; if (!e) return;
-    e.classList.add('pfocus');
-    try { e.focus({ preventScroll: true }); } catch (x) {}
+  // c = which box: 0 = the 1st controller's (gold, red with 2 controllers), 1 = the 2nd controller's (blue)
+  focus(e, c = 0) {
+    const old = this.curs[c], cls = c ? 'pfocus2' : 'pfocus';
+    if (old === e) return;
+    if (old) { old.classList.remove(cls); this.dropPick(c); }
+    this.curs[c] = e; if (!e) return;
+    e.classList.add(cls);
+    if (!c) try { e.focus({ preventScroll: true }); } catch (x) {}
     e.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-    if (e.classList.contains('pcard')) { const s = document.createElement('span'); s.className = 'padPick'; s.innerHTML = this.icon(PB.A) + 'PICK'; e.appendChild(s); }
+    if (e.classList.contains('pcard')) { const s = document.createElement('span'); s.className = 'padPick' + (c ? ' p2' : ''); s.dataset.c = c; s.innerHTML = this.icon(PB.A) + 'PICK'; e.appendChild(s); }
   },
-  dropPick() { document.querySelectorAll('.padPick').forEach(s => s.remove()); },
+  dropPick(c) { document.querySelectorAll('.padPick').forEach(s => { if (c == null || +s.dataset.c === c) s.remove(); }); },
+  // 2 players, one call screen: only the player making the call moves on it (-1 = anybody)
+  owner() {
+    if (!G.versus || G.online || G.demo || !$('playcall').classList.contains('show') || typeof pcCtx === 'undefined' || pcCtx.side == null) return -1;
+    return pcCtx.side === G.p1 ? 0 : 1;
+  },
+  // the matchup side a controller's bumpers change: 2 players = your own team (P2 = the other side), else the human team
+  padSide(c) { return c === 1 && $('optPlayers').value === '2' && localMulti() ? 1 - sel.you : sel.you; },
+  // SWITCH SIDES: a box on a team card jumps to the same spot on the other card (it goes with your team)
+  swapCards() {
+    if (!this.two()) return;
+    this.curs.forEach((e, c) => {
+      const card = e && e.closest('.muCard'); if (!card) return;
+      const o = $(card.id === 'pHome' ? 'pAway' : 'pHome'), k = x => x.tagName + x.className.replace(/\s*pfocus2?\b/g, '') + (x.dataset.d || '');
+      const like = r => [...r.querySelectorAll(e.tagName)].filter(x => k(x) === k(e)), t = e === card ? o : like(o)[like(card).indexOf(e)];
+      if (t) this.focus(t, c);
+    });
+  },
+  // the little P1 / P2 square on each box (2 controllers only)
+  tags() {
+    for (let c = 0; c < 2; c++) {
+      const el = this.tagEls && this.tagEls[c]; if (!el) continue;
+      const e = this.curs[c], on = this.ui && this.two() && e && e.isConnected && this.menu();
+      const r = on && e.getBoundingClientRect();
+      if (!r || !r.width) { if (el.style.display !== 'none') el.style.display = 'none'; continue; }
+      const u = typeof ptagURL === 'function' ? ptagURL(c) : ''; if (el.getAttribute('src') !== u) el.src = u;
+      const x = c ? r.right - 26 : r.left - 10, y = Math.max(0, r.top - 18);
+      el.style.display = ''; el.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
+    }
+  },
   firstPick(items) {
     const want = ['.pcard.coach', '#pcReveal', '.modecard[data-mode="computer"]', '#btnResume', '#pcBack', 'button.big'];
     for (const q of want) { const e = items.find(x => x.matches(q)); if (e) return e; }
     return items[0];
   },
   menuNav(i, hit, x, y, moving, dt, ry) {
-    const N = this.navs[i];
-    if (Math.abs(ry) > 0.3) { const sb = this.scroller(); if (sb) sb.scrollTop += ry * dt * 900; } // right stick scrolls a long list
+    const N = this.navs[i], c = this.two() ? i : 0; // (1 controller: the box everybody shares)
+    const own = this.owner(); if (this.two() && own >= 0 && own !== c) { this.focus(null, c); return; } // not your call: hands off
+    if (Math.abs(ry) > 0.3) { const sb = this.scroller(c); if (sb) sb.scrollTop += ry * dt * 900; } // right stick scrolls a long list
     const dir = !moving ? '' : Math.abs(x) > Math.abs(y) ? (x > 0 ? 'r' : 'l') : (y > 0 ? 'd' : 'u');
     let step = false;
     if (dir && dir !== N.dir) { step = true; N.t = 0.38; } else if (dir) { N.t -= dt; if (N.t <= 0) { step = true; N.t = 0.11; } }
@@ -216,23 +255,23 @@ const Pad = {
     const any = step || [0, 1, 2, 3, 4, 5, 8].some(hit);
     // a new menu (or a box opened over it): put the gold box on its main button right away
     const sk = [...document.querySelectorAll('.screen.show')].map(s => s.id).join();
-    this.chk = (this.chk || 0) - dt;
-    if (!any && this.ui && (sk !== this.scrKey || !this.cur || !this.cur.isConnected || !this.cur.getClientRects().length || this.chk <= 0)) {
-      this.scrKey = sk; this.chk = 0.5;
-      const it = this.items(); if (it.length && !it.includes(this.cur)) this.focus(this.firstPick(it));
+    N.chk = (N.chk || 0) - dt; const C = this.curs[c];
+    if (!any && this.ui && (sk !== N.scrKey || !C || !C.isConnected || !C.getClientRects().length || N.chk <= 0)) {
+      N.scrKey = sk; N.chk = 0.5;
+      const it = this.items(); if (it.length && !it.includes(C)) this.focus(this.firstPick(it), c);
       return;
     }
     if (!any) return;
     const items = this.items();
     if (!items.length) return;
-    if (!items.includes(this.cur)) { this.focus(this.firstPick(items)); return; }
-    const cur = this.cur;
+    if (!items.includes(C)) { this.focus(this.firstPick(items), c); return; }
+    const cur = C;
     if (step) {
       // a dropdown / slider: left-right changes it
       if ((dir === 'l' || dir === 'r') && cur.tagName === 'SELECT') { const n = cur.selectedIndex + (dir === 'r' ? 1 : -1); if (n >= 0 && n < cur.options.length) { cur.selectedIndex = n; cur.dispatchEvent(new Event('change', { bubbles: true })); Sound.click(); } return; }
       if ((dir === 'l' || dir === 'r') && cur.tagName === 'INPUT' && cur.type === 'range') { if (dir === 'r') cur.stepUp(); else cur.stepDown(); cur.dispatchEvent(new Event('input', { bubbles: true })); cur.dispatchEvent(new Event('change', { bubbles: true })); return; }
       const best = this.near(items, cur, dir);
-      if (best) { this.focus(best); Sound.click(); }
+      if (best) { this.focus(best, c); Sound.click(); }
     }
     if (hit(PB.A)) { if (cur.tagName === 'INPUT' && /text|search|number/.test(cur.type)) cur.focus(); else cur.click(); }
     if (hit(PB.B)) { const b = items.find(e => /^\s*(‹\s*)?(BACK|CLOSE|DONE|CANCEL|EXIT)\b|^\s*RESUME\s*$/i.test(e.textContent) || /back|close/i.test(e.id)); if (b) b.click(); }
@@ -240,17 +279,17 @@ const Pad = {
     const btn = re => items.find(e => re.test(e.textContent));
     if (hit(PB.LB) || hit(PB.RB)) {
       const d = hit(PB.RB) ? 1 : -1;
-      if (pc) { const b = btn(d > 0 ? /NEXT/ : /PREV/); if (b) { b.click(); this.cur = null; const it = this.items(); this.focus(it.find(e => e.classList.contains('pcard')) || this.firstPick(it)); } }
-      else if ($('select').classList.contains('show') && items.some(e => e.classList.contains('muArr'))) moveTeam(sel.you, d);
-      else this.tab(items, d);
+      if (pc) { const b = btn(d > 0 ? /NEXT/ : /PREV/); if (b) { b.click(); this.curs[c] = null; const it = this.items(); this.focus(it.find(e => e.classList.contains('pcard')) || this.firstPick(it), c); } }
+      else if ($('select').classList.contains('show') && items.some(e => e.classList.contains('muArr'))) moveTeam(this.padSide(c), d);
+      else this.tab(items, d, c);
     }
     if (hit(PB.Y) && pc) { const b = btn(/^LAST PLAY/); if (b) b.click(); }
     if (hit(PB.VIEW) && pc) { const b = btn(/^TIMEOUT/); if (b) b.click(); }
   },
   // the list the right stick scrolls: the one around the gold box, or the biggest one on the top screen
-  scroller() {
+  scroller(c = 0) {
     const ok = a => { const cs = getComputedStyle(a); return /(auto|scroll)/.test(cs.overflowY) && a.scrollHeight > a.clientHeight + 4; };
-    for (let a = this.cur && this.cur.parentElement; a && a !== document.body; a = a.parentElement) if (ok(a)) return a;
+    for (let a = this.curs[c] && this.curs[c].parentElement; a && a !== document.body; a = a.parentElement) if (ok(a)) return a;
     const top = [...document.querySelectorAll('.screen.show')].pop(); if (!top) return null;
     if (ok(top)) return top;
     let best = null, bh = 0; for (const a of top.querySelectorAll('div')) if (a.clientHeight > bh && ok(a)) { bh = a.clientHeight; best = a; }
@@ -275,13 +314,13 @@ const Pad = {
     return best;
   },
   // bumpers on screens with tabs: next / previous tab
-  tab(items, d) {
+  tab(items, d, c = 0) {
     const tabs = items.filter(e => e.tagName === 'BUTTON' && e.parentElement && /tab/i.test(e.parentElement.id + ' ' + e.parentElement.className));
     if (tabs.length < 2) return;
     const on = tabs.findIndex(e => /\b(on|sel|active|cur)\b/.test(e.className) || e.getAttribute('aria-selected') === 'true');
     const n = tabs[((on < 0 ? 0 : on) + d + tabs.length) % tabs.length];
-    n.click(); this.cur = null; Sound.click();
-    const it = this.items(); const back = it.find(e => e.textContent === n.textContent && e.tagName === 'BUTTON'); this.focus(back || this.firstPick(it));
+    n.click(); this.curs[c] = null; Sound.click();
+    const it = this.items(); const back = it.find(e => e.textContent === n.textContent && e.tagName === 'BUTTON'); this.focus(back || this.firstPick(it), c);
   },
   // button prompts along the bottom of a menu
   bar() {
@@ -385,7 +424,7 @@ const Pad = {
   // ---------- CONTROLLER page (pause menu / How to Play) ----------
   openCtl(from) {
     const el = $('padCtl'); el.dataset.from = from; this.ctlType = this.type; this.renderCtl(); el.classList.add('show');
-    if (this.cur) { this.cur.classList.remove('pfocus'); this.cur = null; }
+    this.clearCurs();
   },
   renderCtl() {
     const t = this.ctlType || this.type, I = k => this.icon(k, t), N = PAD_NAMES[t];
@@ -425,6 +464,7 @@ addEventListener('keydown', () => Pad.setUI(false), true);
 addEventListener('pointerdown', e => { if (e.isTrusted) Pad.setUI(false); }, true);
 (() => { // (this file loads after #stage, so the toast / bar / page can go in right away)
   const st = document.getElementById('stage'), $ = id => document.getElementById(id);
+  Pad.tagEls = [0, 1].map(c => { const im = document.createElement('img'); im.className = 'padTag'; im.alt = 'P' + (c + 1); im.style.display = 'none'; document.body.appendChild(im); return im; });
   st.insertAdjacentHTML('beforeend', `<div id="padToast"></div><div id="padBar"></div>
     <div id="padCtl" class="screen"><h2>Controller</h2>
       <div id="pcCols"></div>
@@ -432,7 +472,7 @@ addEventListener('pointerdown', e => { if (e.isTrusted) Pad.setUI(false); }, tru
   $('pcTypeX').onclick = () => { Sound.click(); Pad.ctlType = 'xb'; Pad.renderCtl(); };
   $('pcTypeP').onclick = () => { Sound.click(); Pad.ctlType = 'ps'; Pad.renderCtl(); };
   $('pcRumble').onclick = () => { Sound.click(); Pad.rumble = !Pad.rumble; try { localStorage.setItem('bobblePadRumble', Pad.rumble ? '1' : '0'); } catch (e) {} Pad.renderCtl(); if (Pad.rumble) Pad.buzz('hit'); };
-  $('pcBack').onclick = () => { Sound.click(); $('padCtl').classList.remove('show'); if (Pad.cur) { Pad.cur.classList.remove('pfocus'); Pad.cur = null; } };
+  $('pcBack').onclick = () => { Sound.click(); $('padCtl').classList.remove('show'); Pad.clearCurs(); };
   if ($('btnPadOpt')) $('btnPadOpt').onclick = () => { Sound.click(); Pad.openCtl('pause'); };
   if ($('btnHowPad')) $('btnHowPad').onclick = () => { Sound.click(); Pad.openCtl('how'); };
 })();

@@ -555,6 +555,46 @@ function shadowSprite(r) {
   g.fillStyle = shg; g.beginPath(); g.arc(m, m, m, 0, 7); g.fill();
   return (shadowSprites[r] = c);
 }
+// 2 people playing: the P1 (red) / P2 (blue) square tag. Painted once per look (October = spooky drips + glow), also used by the menus
+const PTAG_W = 34, PTAG_H = 36, ptagSprites = {};
+const ptagSpooky = () => typeof document !== 'undefined' && document.body.classList.contains('spooky');
+function ptagSprite(n, spooky = ptagSpooky()) {
+  const id = n + (spooky ? 's' : '') + (document.fonts && document.fonts.status);
+  if (ptagSprites[id]) return ptagSprites[id];
+  const s = 3, c = document.createElement('canvas'); c.width = PTAG_W * s; c.height = PTAG_H * s;
+  const g = c.getContext('2d'); if (!g) return null;
+  g.scale(s, s); g.translate(PTAG_W / 2, 15);
+  const k = 3, x0 = -11, x1 = 11, y0 = -10, y1 = 10; // slanted square: the top leans right
+  const body = () => { g.beginPath(); g.moveTo(x0 + k, y0); g.lineTo(x1 + k, y0); g.lineTo(x1 - k, y1); g.lineTo(x0 - k, y1); g.closePath(); };
+  if (spooky) {
+    const col = n ? ['#5a43e0', '#1e1570', '#8f74ff'] : ['#c4141f', '#5a0610', '#ff2a3a'];
+    const gr = g.createLinearGradient(0, y0, 0, y1 + 8); gr.addColorStop(0, col[0]); gr.addColorStop(1, col[1]);
+    g.shadowColor = col[2]; g.shadowBlur = 5;
+    // the bottom edge drips: three runs of different length
+    g.beginPath(); g.moveTo(x0 + k, y0); g.lineTo(x1 + k, y0); g.lineTo(x1 - k, y1);
+    for (const [dx, len] of [[5, 4], [-1, 8], [-8, 5]]) { g.lineTo(dx + 2.4, y1); g.lineTo(dx + 1.6, y1 + len - 1.6); g.arc(dx, y1 + len - 1.6, 1.6, 0, Math.PI); g.lineTo(dx - 2.4, y1); }
+    g.lineTo(x0 - k, y1); g.closePath();
+    g.fillStyle = gr; g.fill(); g.shadowBlur = 0;
+    g.strokeStyle = '#000000b0'; g.lineWidth = 1.4; g.stroke();
+  } else {
+    g.fillStyle = '#00000066'; g.save(); g.translate(1.5, 2); body(); g.fill(); g.restore();
+    body(); g.fillStyle = n ? '#1f63e0' : '#e0222b'; g.fill();
+    g.strokeStyle = '#ffffff'; g.lineWidth = 1.8; g.stroke();
+  }
+  g.font = 'italic 900 15px "Barlow Condensed", "Arial Narrow", Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillStyle = '#00000080'; g.fillText('P' + (n + 1), 1, 2);
+  g.fillStyle = spooky ? '#f6efff' : '#fff'; g.fillText('P' + (n + 1), 0, 1);
+  return (ptagSprites[id] = c);
+}
+const ptagURLs = {};
+function ptagURL(n) { const c = ptagSprite(n), id = n + (ptagSpooky() ? 's' : '') + (document.fonts && document.fonts.status); return ptagURLs[id] || (ptagURLs[id] = c ? c.toDataURL() : ''); }
+function ptagImg(n, cls = '') { return `<img class="ptag ${cls}" src="${ptagURL(n)}" alt="P${n + 1}">`; }
+// which tag a human player gets: 2 people playing only (online: the host is P1 on both screens)
+function ptagOf(p) {
+  if (!p.isHuman || !(G.versus || G.coop) || G.demo) return -1;
+  const n = p.ctl === 1 ? 1 : 0;
+  return G.online && typeof Net !== 'undefined' && Net.role === 'guest' ? 1 - n : n;
+}
 // drawing a picture tilted is ~5x slower than straight on phones, so tilted heads/jerseys get turned once per small angle step
 // and copied over straight on whole pixels (zoomed out camera: shrunk in the same step). Anything else zoomed or squashed draws the normal way
 const rotSprites = new Map(); let rotSpriteId = 0;
@@ -709,9 +749,11 @@ function drawPlayer(g, p, G, at) {
   if (pose) hop = pose.hop;
 
   // ground marks
-  if (p.isHuman && !at && (G.phase !== 'kick' && G.phase !== 'kickmeter' || (G.phase === 'kickmeter' && (!p.off || (G.km && G.km.kind === 'punt'))))) { // + your rusher on a field goal / your guy on a punt
+  const mine = p.isHuman && !at && (G.phase !== 'kick' && G.phase !== 'kickmeter' || (G.phase === 'kickmeter' && (!p.off || (G.km && G.km.kind === 'punt')))); // + your rusher on a field goal / your guy on a punt
+  const ptag = mine ? ptagOf(p) : -1; // 2 people: a P1 / P2 tag over his head instead of the ring
+  if (mine && ptag < 0) {
     const pulse = 1 + Math.sin(G.time * 8) * 0.08;
-    g.strokeStyle = (G.versus || G.coop) && p.ctl === 1 ? '#5ad1ff' : '#ffe14d'; g.lineWidth = 3.5;
+    g.strokeStyle = '#ffe14d'; g.lineWidth = 3.5;
     g.beginPath(); g.ellipse(x, y, 22 * pulse, 9 * pulse, 0, 0, 7); g.stroke();
   }
   if (!at) drawXFRing(g, p, x, y);
@@ -859,7 +901,10 @@ function drawPlayer(g, p, G, at) {
   if (cel) Celly.overlay(g, p, x, y, hop);
   // labels
   const headTop = y - hop - (big ? 85 : 92);
-  if (at || G.phase === 'kick' || G.phase === 'kickmeter') return;
+  if (at) return;
+  const pk = ptag >= 0 && typeof Pad !== 'undefined' ? Pad.scale(1.6) : 1; // (phones: the field is drawn small, so the square grows)
+  const ptagAt = (tx, ty) => { const c = ptagSprite(ptag); if (c) g.drawImage(c, tx - PTAG_W * pk / 2, ty - 15 * pk, PTAG_W * pk, PTAG_H * pk); };
+  if (G.phase === 'kick' || G.phase === 'kickmeter') { if (ptag >= 0) { g.save(); uiAt(g, x, headTop); ptagAt(x, headTop + 6); g.restore(); } return; }
   const zs = uiK !== 1; if (zs) { g.save(); uiAt(g, x, headTop); } // (zoomed out: same screen size as normal)
   const tagBox = b => tagBoxes.push(uiK === 1 ? b : { x0: x + (b.x0 - x) * uiK, x1: x + (b.x1 - x) * uiK, y0: headTop + (b.y0 - headTop) * uiK, y1: headTop + (b.y1 - headTop) * uiK });
   if (p.xf && p.xf.on && p.down <= 0) { drawXFBadge(g, p, x, headTop - (p.isHuman || carrying ? 44 : 4)); }
@@ -870,13 +915,18 @@ function drawPlayer(g, p, G, at) {
     g.font = 'bold 13px Barlow, Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
     const full = p.isHuman || carrying, label = full ? `${p.name}` : lastName(p.name) + (p.tw2 && G.phase === 'presnap' ? '  ·  2-WAY' : '');
     const w = g.measureText(label).width + 14;
-    g.fillStyle = p.isHuman ? ((G.versus || G.coop) && p.ctl === 1 ? '#5ad1ff' : '#ffe14d') : '#000000c0'; roundRect(g, x - w / 2, ly - 10, w, 20, 10); g.fill();
-    if (p.cap) { g.strokeStyle = '#f6c31c'; g.lineWidth = 2; g.stroke(); }
-    g.fillStyle = p.isHuman ? '#111' : '#fff'; g.fillText(label, x, ly + 1);
+    const you = p.isHuman && ptag < 0, pt = ptag >= 0 ? Math.round(28 * pk) : 0; // (2 people: dark tag with a red / blue edge, the P1 / P2 square on its left)
+    g.fillStyle = you ? '#ffe14d' : '#000000c0'; roundRect(g, x - w / 2, ly - 10, w, 20, 10); g.fill();
+    if (p.cap || pt) { g.strokeStyle = pt ? (ptagSpooky() ? (ptag ? '#7a5cff' : '#d01a28') : ptag ? '#4d8cff' : '#ff4a50') : '#f6c31c'; g.lineWidth = 2; g.stroke(); }
+    g.fillStyle = you ? '#111' : '#fff'; g.fillText(label, x, ly + 1);
     if (full) { g.font = 'bold 10px Barlow, Arial, sans-serif'; g.fillStyle = '#fff'; g.strokeStyle = '#000'; g.lineWidth = 3; const r = `${p.tw2 ? '2-WAY ' : ''}${p.pos} • ${p.ovr} OVR`; g.strokeText(r, x, ly - 17); g.fillText(r, x, ly - 17); }
-    if (p.xf && p.xf.on) drawXFBadge(g, p, x - w / 2 - 12, ly); // X-Factor badge sits next to his name
-    tagBox({ x0: x - w / 2 - (p.xf && p.xf.on ? 24 : 0), x1: x + w / 2, y0: ly - (full ? 24 : 10), y1: ly + 10 });
+    if (pt) ptagAt(x - w / 2 - pt / 2 + 1, ly);
+    if (p.xf && p.xf.on) drawXFBadge(g, p, x - w / 2 - 12 - pt, ly); // X-Factor badge sits next to his name
+    tagBox({ x0: x - w / 2 - pt - (p.xf && p.xf.on ? 24 : 0), x1: x + w / 2, y0: ly - (full ? 24 : 10), y1: ly + 10 });
     ly -= 30;
+  } else if (ptag >= 0) { // no name over him (down, celebrating, tags off): just the square
+    ptagAt(x, ly); tagBox({ x0: x - 14 * pk, x1: x + 14 * pk, y0: ly - 11 * pk, y1: ly + 12 * pk });
+    ly -= 28 * pk;
   } else if (p.xf && p.xf.on && p.down <= 0) drawXFBadge(g, p, x, headTop - 4);
   if (p.hot && G.phase === 'presnap') {
     g.font = 'bold 11px Barlow, Arial, sans-serif'; g.textAlign = 'center'; const w = g.measureText(p.hot).width + 12;
@@ -1301,7 +1351,7 @@ function drawHUDBase(g, G, S, x0, y0, W, H, bx) {
     if (lx > 10) g.drawImage(Logo.canvas(t, 64), x + 4, y0 + 6, 34, 34);
     if (S) bcCellDeco(g, G.bcast, x, y0);
     g.fillText(t.id, x + lx, ny);
-    if (G.versus && !G.online) { const tg = G.teams.indexOf(t) === G.p1 ? 'P1' : 'P2'; g.font = '800 12px "Barlow Condensed", Arial, sans-serif'; g.fillStyle = tg === 'P1' || tg === 'YOU' ? '#ffe14d' : '#5ad1ff'; g.fillText(tg, x + lx, y0 + 9); g.font = 'italic 900 23px "Barlow Condensed", "Arial Black", sans-serif'; g.fillStyle = textOn(t.c1); }
+    if (G.versus && !G.online) { const tg = G.teams.indexOf(t) === G.p1 ? 'P1' : 'P2'; g.font = 'italic 900 11px "Barlow Condensed", Arial, sans-serif'; g.fillStyle = tg === 'P1' ? '#e0222b' : '#1f63e0'; g.fillRect(x + 1, y0 + 3, g.measureText(tg).width + 6, 13); g.fillStyle = '#fff'; g.fillText(tg, x + 4, y0 + 10); g.font = 'italic 900 23px "Barlow Condensed", "Arial Black", sans-serif'; g.fillStyle = textOn(t.c1); }
     if (poss && !(S && bcPoss(g, G.bcast, x + lx + g.measureText(t.id).width + 16, ny))) drawFootball(g, x + lx + g.measureText(t.id).width + 16, ny, 0.9);
     g.font = 'italic 900 36px "Barlow Condensed", "Arial Black", sans-serif'; g.textAlign = 'right'; g.fillText(s, x + 192, y0 + H / 2 + 1);
     const side = G.teams.indexOf(t);

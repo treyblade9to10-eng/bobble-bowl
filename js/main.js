@@ -174,25 +174,29 @@ function renderSelect(bumpSide) {
     el.innerHTML = muCard(t);
     card.style.setProperty('--c1', t.c1); card.style.setProperty('--c2', t.c2); card.style.setProperty('--fg', textOn(t.c1));
     card.querySelector('.muCnt').textContent = `${sel.idx[side] + 1} / ${TEAMS.length}`;
-    const who = card.querySelector('.who');
-    who.textContent = sel.you === side ? (two ? 'P1' : coop ? 'P1 + P2' : 'YOU') : (two ? 'P2' : 'CPU'); who.className = 'who ' + (sel.you === side ? 'you' : two ? 'p2' : 'cpu');
+    const who = card.querySelector('.who'), me = sel.you === side;
+    if (two || (coop && me)) { who.innerHTML = two ? ptagImg(me ? 0 : 1) : ptagImg(0) + ptagImg(1); who.className = 'who tags'; } // the red P1 / blue P2 squares go with the players' teams
+    else { who.textContent = me ? 'YOU' : 'CPU'; who.className = 'who ' + (me ? 'you' : 'cpu'); }
     const foot = card.querySelector('.muFoot'); // the ROSTER button (benchedit.js) lives in the card footer
     card.querySelectorAll(':scope > .beOpen').forEach(b => foot.appendChild(b));
     if (bumpSide === side) { card.classList.remove('bump'); void card.offsetWidth; card.classList.add('bump'); }
   }
   muPaint();
+  const ws = wasdSide(); // computer arrows: W / S on one card, the arrow keys on the other
+  document.querySelectorAll('#select .muArr').forEach(b => { b.dataset.key = +b.dataset.side === ws ? (b.dataset.d === '-1' ? 'W' : 'S') : (b.dataset.d === '-1' ? '\u2191' : '\u2193'); });
   $('selHint').textContent = G.mode === 'mobile' ? '' : coop ? 'CO-OP vs the CPU   P1: WASD, SPACE snap/dive, SHIFT sprint, 1-4 throw, Q switch      P2: ARROWS, ENTER, RIGHT SHIFT, L pick your guy' : two ? 'P1: WASD move, SPACE snap/dive, SHIFT sprint, 1-4 throw, E/F/R moves, Q switch      P2: ARROWS, ENTER, RIGHT SHIFT, 7-0 throw, / . , moves, L switch' : 'W / S  away team      ↑ / ↓  home team      ENTER  play';
   try { localStorage.setItem('bobbleSel', JSON.stringify(sel)); } catch (e) {}
 }
+// keyboard on the matchup: W / S = the away team, arrows = home. 2 players: W / S = P1's team (WASD player), arrows = P2's
+const wasdSide = () => $('optPlayers').value === '2' && localMulti() ? sel.you : 1;
 function moveTeam(side, d) {
   let i = sel.idx[side];
   do { i = (i + d + TEAMS.length) % TEAMS.length; } while (i === sel.idx[1 - side]);
   sel.idx[side] = i; Sound.click(); renderSelect(side);
 }
 document.querySelectorAll('#select .muArr').forEach(b => b.onclick = e => { e.stopPropagation(); moveTeam(+b.dataset.side, +b.dataset.d); });
-// key labels for the computer arrows: away = W / S, home = arrow keys (up = previous team, down = next)
-document.querySelectorAll('#select .muArr').forEach(b => { b.dataset.key = b.dataset.side === '1' ? (b.dataset.d === '-1' ? 'W' : 'S') : (b.dataset.d === '-1' ? '\u2191' : '\u2193'); });
-$('btnSwap').onclick = () => { sel.you = 1 - sel.you; Sound.click(); renderSelect(); };
+// (key labels for the computer arrows: renderSelect)
+$('btnSwap').onclick = () => { sel.you = 1 - sel.you; Sound.click(); renderSelect(); if (typeof Pad !== 'undefined') Pad.swapCards(); };
 // card body: tap = team grid, swipe left/right = next/previous team, mouse wheel scrolls teams
 document.querySelectorAll('#select .muBody').forEach(el => {
   const side = +el.parentNode.dataset.side; let x0 = null, y0 = 0, swiped = false;
@@ -211,8 +215,9 @@ window.addEventListener('keydown', e => {
     if (e.code === 'Escape' || e.code === 'Enter') { e.preventDefault(); $('tgrid').classList.remove('show'); muSetShow(false); }
     return;
   }
-  if (e.code === 'KeyW') moveTeam(1, -1); if (e.code === 'KeyS') moveTeam(1, 1);
-  if (e.code === 'ArrowUp') moveTeam(0, -1); if (e.code === 'ArrowDown') moveTeam(0, 1);
+  const ws = wasdSide();
+  if (e.code === 'KeyW') moveTeam(ws, -1); if (e.code === 'KeyS') moveTeam(ws, 1);
+  if (e.code === 'ArrowUp') moveTeam(1 - ws, -1); if (e.code === 'ArrowDown') moveTeam(1 - ws, 1);
   if (e.code === 'Enter') startGame();
 });
 function buildGrid() { renderSelect(); }
