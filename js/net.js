@@ -5,7 +5,8 @@
 // and a "fast" one for the constant position updates, so one lost packet can't freeze everything behind it.
 // The guest plays the updates back ~0.1s behind and slides players smoothly between them, except its own guy:
 // he moves on the guest's screen right away and the host goes with where he is (predict / adopt).
-const NET_VERSION = 5;
+// CO-OP: both on the host's team vs the CPU. The host calls the plays and kicks, the guest plays his own guy (G.hp[1] in engine.js).
+const NET_VERSION = 6;
 const NET_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 const NET_KEYS = ['Space', 'ShiftLeft', 'ControlLeft', 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyE', 'KeyF', 'KeyR', 'KeyQ', 'Tab', 'KeyC',
   'Digit1', 'Digit2', 'Digit3', 'Digit4', 'Numpad1', 'Numpad2', 'Numpad3', 'Numpad4', 'KeyT', 'KeyX', 'KeyM', 'KeyV', 'KeyB', 'Enter', 'Escape', 'KeyY', 'KeyG', 'KeyU'];
@@ -172,7 +173,7 @@ const Net = {
     Relay.load().then(db => {
       if (this.code !== code || this.role !== 'host' || this.relayRoom) return;
       const room = this.relayRoom = this.rroom = db.ref('bobble/rooms/' + code);
-      this.relayOffs.push(Relay.presence(db, room, 'host', () => ({ t: firebase.database.ServerValue.TIMESTAMP, v: NET_VERSION, busy: G.online ? 1 : 0 }), ['h2g']));
+      this.relayOffs.push(Relay.presence(db, room, 'host', () => ({ t: firebase.database.ServerValue.TIMESTAMP, v: NET_VERSION, busy: G.online ? 1 : 0, coop: onCoop() ? 1 : 0 }), ['h2g']));
       const g = room.child('guest'), cb = g.on('value', sn => {
         if (this.relayRoom !== room || !sn.val() || this.onRelay) return;
         // a guest came in the relay way (before the game, or a direct game that dropped)
@@ -243,7 +244,7 @@ const Net = {
         if (!h) { noGame = true; onStatus('No game with that code. Check it with your friend, and make sure they are still on the HOST screen.'); return; }
         if (h.v !== NET_VERSION) { onStatus('You two are on different versions. Both of you: close the game all the way and reopen it.'); return; }
         if (h.busy) { onStatus('That game already has two players.'); return; }
-        onStatus(`FOUND GAME ${code}. CONNECTING...`);
+        onStatus(`FOUND ${h.coop ? 'CO-OP ' : ''}GAME ${code}. CONNECTING...`);
         const wait = () => {
           if (!alive() || this.ready || this.onRelay) return;
           // the direct line is just about to open: give it a little longer
@@ -445,16 +446,17 @@ const Net = {
   startHost(hello) {
     let mine = TEAMS[sel.idx[sel.you]];
     if (mine.custom) mine = this.myTeam() ? CT.clean(this.myTeam()) : { ...mine, logo: undefined }; // no big logo in the start message
-    let theirs = (hello.ct && this.theirTeam(hello.ct, mine.id)) || CT.NFL.find(t => t.id === hello.team) || CT.NFL[(sel.idx[sel.you] + 1) % 32];
+    const coop = onCoop(); // co-op: the host picked both teams, the guest's pick doesn't matter
+    let theirs = coop ? onCpuTeam() : (hello.ct && this.theirTeam(hello.ct, mine.id)) || CT.NFL.find(t => t.id === hello.team) || CT.NFL[(sel.idx[sel.you] + 1) % 32];
     if (theirs.id === mine.id) theirs = CT.NFL[(CT.NFL.findIndex(t => t.id === mine.id) + 1) % 32] || CT.NFL[0]; // can't both be the same team
     Input.online = true; Input.store[1] = Input.remote(); Input.use(0);
     G.online = true; G.netModes = [G.mode, hello.mode === 'mobile' ? 'mobile' : 'computer'];
     G.demo = false; G.season = false; G.challenge = null; G.mini = null; show(null);
     const bc = typeof quickBcast === 'function' ? quickBcast() : null;
-    const opts = { qtr: +$('optQtr').value, diff: 1, humanSide: 0, versus: true, weather: typeof bcWeather === 'function' ? bcWeather(bc, pickWeather($('optWeather').value), $('optWeather').value) : pickWeather($('optWeather').value), night: $('optNight').value === '1', bcast: bc };
+    const opts = { qtr: +$('optQtr').value, diff: coop ? +$('optDiff').value : 1, humanSide: 0, versus: !coop, coop, weather: typeof bcWeather === 'function' ? bcWeather(bc, pickWeather($('optWeather').value), $('optWeather').value) : pickWeather($('optWeather').value), night: $('optNight').value === '1', bcast: bc };
     newGame(mine, theirs, opts);
     if (this.relayRoom) this.relayRoom.child('host/busy').set(1); // nobody else can join now
-    this.send(this.startMsg = { t: 'start', v: NET_VERSION, teams: G.teams, opts: { qtr: opts.qtr, weather: G.storm ? 'storm' : G.fog ? 'fog' : G.weather, night: G.night, bcast: G.bcast }, modes: G.netModes });
+    this.send(this.startMsg = { t: 'start', v: NET_VERSION, teams: G.teams, opts: { qtr: opts.qtr, weather: G.storm ? 'storm' : G.fog ? 'fog' : G.weather, night: G.night, bcast: G.bcast, coop: coop ? 1 : 0, diff: G.diff }, modes: G.netModes });
   },
   // after the engine used the guest's one-shot inputs (this frame / first catch-up step), clear them
   usedOneShots() {
@@ -559,7 +561,7 @@ const Net = {
         p.kneel > 0 ? 1 : 0, p.kickT != null ? r2(p.kickT) : -1, p.kpose === 'hold' ? 1 : p.kpose === 'pc' ? 2 : 0, p.fair ? 1 : 0])), // kick poses (at the end: older guests just ignore them)
       b: b ? [r2(b.x), r2(b.y), r2(b.z), r2(b.spin || 0), idx(b.holder), b.flight ? [r2(b.flight.sx), r2(b.flight.sy), r2(b.flight.tx), r2(b.flight.ty), r2(b.flight.t), r2(b.flight.T), r2(b.flight.peak), b.flight.pitch ? 1 : 0, b.flight.kick || 0, b.flight.duck ? 1 : 0, idx(b.flight.intended), b.flight.style || ''] : null, b.loose ? 1 : 0, r2(b.hold || 0), b.snap || 0] : null,
       rf: (G.refs || []).map(r => [r2(r.x), r2(r.y), r.face, r2(r.anim || 0), r.moving, r2(r.throwT || 0)]),
-      hp: [idx(G.hp && G.hp[0]), idx(G.hp && G.hp[1])], hd: [idx(G.hd && G.hd[0]), idx(G.hd && G.hd[1])],
+      hp: [idx(G.hp && G.hp[0]), idx(G.hp && G.hp[1])], hd: G.coop ? [idx(G.humanDef), idx(G.hd2)] : [idx(G.hd && G.hd[0]), idx(G.hd && G.hd[1])], // (co-op: by player, like hp)
       km: G.km && (G.phase === 'kickmeter' || G.phase === 'kick') ? { kind: G.km.kind, stage: G.km.stage, power: G.km.power, aim: G.km.aim, side: G.km.side, need: G.km.need, tol: G.km.tol, yds: G.km.yds, kk: G.km.kk, cpuT: G.km.cpuT != null ? 1 : null, wait: G.km.wait, needle: G.km.needle, wind: G.wind } : null,
       aim: G.aim, mv: G.meterV ? G.meterV.map(r2) : null, cv: G.chold ? r2(catchFill()) : null, cgw: G.chold && G.chold.g ? G.chold.g.map(r2) : null, cg: idx(G.cellyGuy), hy: Math.round(G.crowdHype * 100) / 100, sh: Math.round(cam.shake), sm: G.slowmo > 0 ? 1 : 0, flg: (G.flags || []).length,
       mo: Math.round(G.mo || 0), cw: G.rvWin ? [G.rvWin.side, r2(G.rvWin.t)] : 0, chl: G.chalLeft, rvs: G.phase === 'review' ? G.rvShow : 0, // momentum, challenge window, review overlay
@@ -599,11 +601,12 @@ const Net = {
       }) });
   },
   // play calls: the offense and defense pick at the same time, each on their own screen
+  // co-op: the host calls every play (the guest waits)
   onPlayCall(c) {
     this.picks = {}; this.callId++;
-    const id = this.callId, side = c.side != null ? c.side : G.poss;
+    const id = this.callId, side = G.coop ? 0 : c.side != null ? c.side : G.poss;
     const reqs = [{ ...c, side }];
-    if (c.mode === 'off') reqs.push({ ...withSide(1 - side, playCallCtx), side: 1 - side });
+    if (c.mode === 'off' && !G.coop) reqs.push({ ...withSide(1 - side, playCallCtx), side: 1 - side });
     this.pendingCall = { id, reqs }; this.callT = performance.now();
     this.callMsgs = [];
     for (const r of reqs) {
@@ -616,9 +619,10 @@ const Net = {
   },
   pick(side, mode, key, id) {
     const pc = this.pendingCall; if (!pc || id !== pc.id || G.phase !== 'playcall') return;
-    this.picks[side] = key;
-    const offSide = pc.reqs[0].side, offKey = this.picks[offSide], defKey = this.picks[1 - offSide];
     const m = pc.reqs[0].mode;
+    this.picks[side] = key;
+    if (G.coop) { if (side !== 0) return; this.done(); return m === 'kickoff' ? chooseKickoff(key) : m === 'pat' ? choosePAT(key) : choosePlay(key); }
+    const offSide = pc.reqs[0].side, offKey = this.picks[offSide], defKey = this.picks[1 - offSide];
     const special = offKey && ['punt', 'fg', 'fakepunt', 'fakefg', 'kneel'].includes(offKey);
     if (m === 'kickoff' && offKey) { this.done(); return chooseKickoff(offKey); }
     if (m === 'pat' && offKey) { this.done(); return choosePAT(offKey); }
@@ -633,7 +637,8 @@ const Net = {
     if (m.v !== NET_VERSION) { if (typeof onlineMsg === 'function') onlineMsg('You two are on different versions. Both of you: close the game all the way and reopen it.'); return this.reset(); }
     Input.online = true;
     G.online = true; G.netModes = m.modes; G.demo = false; G.season = false; G.challenge = null; G.mini = null; show(null);
-    initGame(m.teams[0], m.teams[1], { qtr: m.opts.qtr, diff: 1, humanSide: 1, versus: true, weather: m.opts.weather, night: m.opts.night, bcast: m.opts.bcast });
+    const coop = !!m.opts.coop; // co-op: same team as the host (home), vs the CPU
+    initGame(m.teams[0], m.teams[1], { qtr: m.opts.qtr, diff: coop ? m.opts.diff : 1, humanSide: coop ? 0 : 1, versus: !coop, coop, weather: m.opts.weather, night: m.opts.night, bcast: m.opts.bcast });
     G.phase = 'idle'; G.players = []; G.ball = null;
   },
   applyRoster(m) {
@@ -687,7 +692,9 @@ const Net = {
     } else G.ball = null;
     const oldRefs = G.refs || [];
     G.refs = s.rf.map((r, i) => ({ x: oldRefs[i] ? oldRefs[i].x : r[0], y: oldRefs[i] ? oldRefs[i].y : r[1], face: r[2], anim: relay && oldRefs[i] ? oldRefs[i].anim : r[3], moving: r[4], throwT: r[5] }));
-    G.hp = s.hp.map(i => P[i] || null); G.humanPlayer = G.hp[G.human]; G.humanDef = P[s.hd[G.human]] || null;
+    const me = G.coop ? 1 : G.human; // (co-op: hp / hd are by player, the guest is player 2)
+    G.hp = s.hp.map(i => P[i] || null); G.humanPlayer = G.hp[me]; G.humanDef = P[s.hd[me]] || null;
+    if (G.coop) for (const p of G.hp) if (p) p.ctl = p === G.humanPlayer ? 0 : 1; // your guy yellow, your friend's blue
     G.cellyGuy = P[s.cg] || null;
     // close a call screen only once the host's game has been in 'playcall' and moved on (updates can arrive after the call itself)
     if (G.phase === 'playcall') this.sawPC = true;
@@ -803,7 +810,7 @@ const Net = {
     const b = G.ball, car = b.holder === p, off = G.play && G.play.off;
     if (off && off.chain && G.bstate === 'snap') return null; // trick play: the handoffs run themselves
     const spd = s.gs[0], boost = sprintBoost(p), spin = p.spin > 0 ? 0.8 : 1;
-    if (G.netModes && G.netModes[G.human] === 'mobile') {
+    if (G.netModes && G.netModes[G.coop ? 1 : G.human] === 'mobile') {
       const st = Input.stick; if (!(st.m > 0.15) || !isFinite(st.x) || !isFinite(st.y)) return null;
       if (car && p === G.O[0] && G.bstate === 'snap' && !s.hs) return [st.x * spd * 0.75, st.y * spd * 0.75]; // QB sliding in the pocket
       const mul = (st.m > 0.9 && p.stamina > 0.05 ? boost : 1) * spin;
@@ -843,7 +850,7 @@ const Net = {
   showCall(m) {
     const c = m.ctx;
     if (c.mode === 'close') { this.gCallId = null; onlineWait(null); return show(null); }
-    if (c.mode === 'wait') { if (c.id !== this.gCallId) { this.gCallId = c.id; this.gPick = null; this.sawPC = false; } return onlineWait('Your opponent is picking a play...'); }
+    if (c.mode === 'wait') { if (c.id !== this.gCallId) { this.gCallId = c.id; this.gPick = null; this.sawPC = false; } return onlineWait(G.coop ? 'Your friend is calling the play...' : 'Your opponent is picking a play...'); }
     if (c.id != null && c.id === this.gCallId) { // the host sent this call again (it hasn't got our pick)
       if (this.gPick && this.gPick.id === c.id) return this.send(this.gPick); // our pick got lost: send it again
       if ($('playcall').classList.contains('show')) return;

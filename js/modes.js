@@ -311,7 +311,7 @@ const Weekly = {
   daysLeft() { const d = new Date(), wd = (d.getDay() + 6) % 7; return 7 - wd; },
   // after a normal game vs the CPU; returns lines for the game-over screen
   afterGame(s) {
-    if (G.versus || G.online || G.mini || (G.challenge && G.challenge.type !== 'daily') || s.human < 0) return null;
+    if (G.versus || G.coop || G.online || G.mini || (G.challenge && G.challenge.type !== 'daily') || s.human < 0) return null;
     const R = this.state(), w = R.weekly, me = s.human, them = 1 - me, out = [];
     for (const [k, text, n, kind, f] of this.goals(w.wk)) {
       const before = w.prog[k] || 0; if (before >= n) continue;
