@@ -281,6 +281,20 @@ function kickLean(G, b) {
   return [d * postShift(b.y) * e * PX, (postDeep(b.y) - b.y) * e * PY];
 }
 
+// feet-first slide: drops back fast, legs out in front along the turf, free hand trailing on the ground,
+// ball tucked; skids on his momentum, then eases back up at the very end
+const HIP0 = p => p.pos === 'OL' || p.pos === 'DL' ? 17 : 18;
+function slidePose(p, HIP) {
+  const t = SLIDE_T - p.slideT, a = ease(Math.min(1, t / 0.16)), up = p.slideT < 0.2 ? ease(1 - p.slideT / 0.2) : 0, f = a * (1 - up);
+  const P = { hop: -f * 9, rot: 0, sy: 1, lie: -1.15 * f, legK: 0, head: 0.38 * f, arm: null, leg: null, noBall: false };
+  const c = Math.cos(1.15 * f), s = Math.sin(1.15 * f); // ground-forward, seen from his leaned-back body
+  P.leg = (side, hx, hy, kx, ky, fx, fy) => side > 0
+    ? { kx: lerp(kx, hx + c * 9, f), ky: lerp(ky, hy + s * 9, f), fx: lerp(fx, hx + c * 18 + 1, f), fy: lerp(fy, hy + s * 18 - 1, f) } // lead leg straight out
+    : { kx: lerp(kx, hx + c * 7 + 2, f), ky: lerp(ky, hy + s * 7 - 3, f), fx: lerp(fx, hx + 3, f), fy: lerp(fy, hy + 14, f) };       // trail leg bent under
+  P.arm = (front, shx, shy) => front ? null : { ex: shx - 7 * f, ey: shy + 8, hx: shx - 13 * f, hy: shy + 17 }; // free hand drags behind
+  return P;
+}
+
 // draw a canvas laid out like the field canvas (same padding + scale) under the current camera
 function blitWorld(g, cv) {
   if (viewZ !== 1 && (cv === fieldCv || (typeof wxMix !== 'undefined' && cv === wxMix)) && blitShrunk(g, cv)) return;
@@ -689,7 +703,8 @@ function drawPlayer(g, p, G, at) {
   const carrying = G.ball && G.ball.holder === p;
   const celebrate = p.celebrate > 0;
   const jumping = p.jump > 0;
-  const cel = p.celly, ct = cel ? cel.t : 0, pose = cel ? Celly.pose(p, cel.type, ct) : null;
+  const cel = p.celly, ct = cel ? cel.t : 0, pose = cel ? Celly.pose(p, cel.type, ct) : p.slideT > 0 && p.down > 0 ? slidePose(p, HIP0(p)) : null;
+  if (pose && !cel) k = 0;
   let hop = (celebrate && !cel && !p.pinAt ? Math.abs(Math.sin(G.time * 10 + p.slot)) * 14 : 0) + (jumping ? Math.sin((0.55 - p.jump) / 0.55 * Math.PI) * 30 : 0);
   if (pose) hop = pose.hop;
 
@@ -738,7 +753,7 @@ function drawPlayer(g, p, G, at) {
     if (pose.lie) { g.translate(0, -6); g.rotate(pose.lie * dir); }
     if (pose.sy !== 1) g.scale(1 / Math.sqrt(pose.sy), pose.sy); // squash and stretch
   }
-  if (p.down > 0) { g.translate(0, -6); g.rotate(p.downDir * 1.45); }
+  if (p.down > 0 && !(p.slideT > 0)) { g.translate(0, -6); g.rotate(p.downDir * 1.45); }
   else if (p.dive > 0) { g.rotate(dir * 1.0); }
   const spinScale = p.spin > 0 ? Math.cos(p.spin * 20) : 1;
   g.scale(dir * (Math.abs(spinScale) < 0.15 ? 0.15 * Math.sign(spinScale || 1) : spinScale), 1);

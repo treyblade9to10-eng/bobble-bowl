@@ -1353,10 +1353,14 @@ function qbTakeOff(qb) {
 // faster guys get a bigger burst: 99 SPD ≈ +18%, 80 ≈ +11%, 65 ≈ +6%
 function sprintBoost(p) { return 1.0 + clamp((p.spdR || 80) - 50, 0, 50) * 0.002; }
 // slide / give yourself up: the play ends right there (no big hit, no fumble)
+const SLIDE_T = 0.95;
 function canSlide(p) { return G.phase === 'live' && G.ball.holder === p && p.down <= 0 && !G.mini && !trickBusy() && (G.bstate === 'run' || dirOf(p.side) * (p.x - G.los) > 0.5); }
 function doSlide(p) {
-  p.down = 1; p.downDir = dirOf(p.side); p.vx *= 0.35; p.vy *= 0.35; p.dvx = p.dvy = 0;
-  addText(p.x, p.y, 'SLIDE', '#cfe3ff', 16, 0.8); Sound.click();
+  // feet first: he drops back and skids on his momentum (the ball is spotted where he started the slide)
+  const sp = Math.hypot(p.vx, p.vy), k = sp > 0.1 ? Math.min(1, (p.spd * 0.8) / sp) : 0;
+  p.down = SLIDE_T; p.slideT = SLIDE_T; p.downDir = dirOf(p.side); p.vx *= k * 0.95 + 0.05; p.vy *= k * 0.95 + 0.05; p.dvx = p.dvy = 0;
+  if (Math.abs(p.vx) > 0.5) p.face.dir = Math.sign(p.vx);
+  addDust(p.x, p.y, 4); addText(p.x, p.y, 'SLIDE', '#cfe3ff', 16, 0.8); Sound.click();
   endPlay({ type: 'tackle', carrier: p, x: p.x, y: p.y });
 }
 function doStiff(p) { p.stiff = 0.4; p.stiffCd = 1.4; Sound.tone(160, 0.12, 'sawtooth', 0.08); }
@@ -1916,7 +1920,8 @@ function applyMove(p, dt) {
   p.lx = p.x; p.ly = p.y;
   if (p.down > 0) {
     // on the ground: mud / grass / snow sticks to the uniform for the rest of the game. Slips slide farther on a wet field
-    const fr = p.slip > 0 ? 0.955 : 0.88;
+    const fr = p.slideT > 0 ? 0.94 : p.slip > 0 ? 0.955 : 0.88;
+    if (p.slideT > 0) { p.slideT = Math.max(0, p.slideT - dt); if (Math.hypot(p.vx, p.vy) > 1.2) { groundMark(p.x, p.y, 1.2, G.weather !== 'clear'); if (Math.random() < dt * 14) addDust(p.x - Math.sign(p.vx) * 0.6, p.y, 1); } }
     p.down -= dt; p.slip = Math.max(0, (p.slip || 0) - dt); p.vx *= fr; p.vy *= fr; p.x += p.vx * dt; p.y += p.vy * dt;
     if (G.dirt && G.phase === 'live') { p.dirt = Math.min(1, (p.dirt || 0) + dt * (G.weather === 'clear' ? 0.12 : 0.45)); G.dirt[p.side + ':' + p.name] = p.dirt; }
     if (p.slip > 0 && Math.hypot(p.vx, p.vy) > 1.5) groundMark(p.x, p.y, 1.4, true);
