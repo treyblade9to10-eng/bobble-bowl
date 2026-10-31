@@ -281,6 +281,20 @@ function kickLean(G, b) {
   return [d * postShift(b.y) * e * PX, (postDeep(b.y) - b.y) * e * PY];
 }
 
+// feet-first slide: drops back fast, legs out in front along the turf, free hand trailing on the ground,
+// ball tucked; skids on his momentum, then eases back up at the very end
+const HIP0 = p => p.pos === 'OL' || p.pos === 'DL' ? 17 : 18;
+function slidePose(p, HIP) {
+  const t = SLIDE_T - p.slideT, a = ease(Math.min(1, t / 0.16)), up = p.slideT < 0.2 ? ease(1 - p.slideT / 0.2) : 0, f = a * (1 - up);
+  const P = { hop: -f * 9, rot: 0, sy: 1, lie: -1.15 * f, legK: 0, head: 0.38 * f, arm: null, leg: null, noBall: false };
+  const c = Math.cos(1.15 * f), s = Math.sin(1.15 * f); // ground-forward, seen from his leaned-back body
+  P.leg = (side, hx, hy, kx, ky, fx, fy) => side > 0
+    ? { kx: lerp(kx, hx + c * 9, f), ky: lerp(ky, hy + s * 9, f), fx: lerp(fx, hx + c * 18 + 1, f), fy: lerp(fy, hy + s * 18 - 1, f) } // lead leg straight out
+    : { kx: lerp(kx, hx + c * 7 + 2, f), ky: lerp(ky, hy + s * 7 - 3, f), fx: lerp(fx, hx + 3, f), fy: lerp(fy, hy + 14, f) };       // trail leg bent under
+  P.arm = (front, shx, shy) => front ? null : { ex: shx - 7 * f, ey: shy + 8, hx: shx - 13 * f, hy: shy + 17 }; // free hand drags behind
+  return P;
+}
+
 // draw a canvas laid out like the field canvas (same padding + scale) under the current camera
 function blitWorld(g, cv) {
   if (viewZ !== 1 && (cv === fieldCv || (typeof wxMix !== 'undefined' && cv === wxMix)) && blitShrunk(g, cv)) return;
@@ -689,14 +703,15 @@ function drawPlayer(g, p, G, at) {
   const carrying = G.ball && G.ball.holder === p;
   const celebrate = p.celebrate > 0;
   const jumping = p.jump > 0;
-  const cel = p.celly, ct = cel ? cel.t : 0, pose = cel ? Celly.pose(p, cel.type, ct) : null;
+  const cel = p.celly, ct = cel ? cel.t : 0, pose = cel ? Celly.pose(p, cel.type, ct) : p.slideT > 0 && p.down > 0 ? slidePose(p, HIP0(p)) : null;
+  if (pose && !cel) k = 0;
   let hop = (celebrate && !cel && !p.pinAt ? Math.abs(Math.sin(G.time * 10 + p.slot)) * 14 : 0) + (jumping ? Math.sin((0.55 - p.jump) / 0.55 * Math.PI) * 30 : 0);
   if (pose) hop = pose.hop;
 
   // ground marks
   if (p.isHuman && !at && (G.phase !== 'kick' && G.phase !== 'kickmeter' || (G.phase === 'kickmeter' && (!p.off || (G.km && G.km.kind === 'punt'))))) { // + your rusher on a field goal / your guy on a punt
     const pulse = 1 + Math.sin(G.time * 8) * 0.08;
-    g.strokeStyle = G.versus && p.ctl === 1 ? '#5ad1ff' : '#ffe14d'; g.lineWidth = 3.5;
+    g.strokeStyle = (G.versus || G.coop) && p.ctl === 1 ? '#5ad1ff' : '#ffe14d'; g.lineWidth = 3.5;
     g.beginPath(); g.ellipse(x, y, 22 * pulse, 9 * pulse, 0, 0, 7); g.stroke();
   }
   if (!at) drawXFRing(g, p, x, y);
@@ -738,7 +753,7 @@ function drawPlayer(g, p, G, at) {
     if (pose.lie) { g.translate(0, -6); g.rotate(pose.lie * dir); }
     if (pose.sy !== 1) g.scale(1 / Math.sqrt(pose.sy), pose.sy); // squash and stretch
   }
-  if (p.down > 0) { g.translate(0, -6); g.rotate(p.downDir * 1.45); }
+  if (p.down > 0 && !(p.slideT > 0)) { g.translate(0, -6); g.rotate(p.downDir * 1.45); }
   else if (p.dive > 0) { g.rotate(dir * 1.0); }
   const spinScale = p.spin > 0 ? Math.cos(p.spin * 20) : 1;
   g.scale(dir * (Math.abs(spinScale) < 0.15 ? 0.15 * Math.sign(spinScale || 1) : spinScale), 1);
@@ -855,7 +870,7 @@ function drawPlayer(g, p, G, at) {
     g.font = 'bold 13px Barlow, Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
     const full = p.isHuman || carrying, label = full ? `${p.name}` : lastName(p.name) + (p.tw2 && G.phase === 'presnap' ? '  ·  2-WAY' : '');
     const w = g.measureText(label).width + 14;
-    g.fillStyle = p.isHuman ? (G.versus && p.ctl === 1 ? '#5ad1ff' : '#ffe14d') : '#000000c0'; roundRect(g, x - w / 2, ly - 10, w, 20, 10); g.fill();
+    g.fillStyle = p.isHuman ? ((G.versus || G.coop) && p.ctl === 1 ? '#5ad1ff' : '#ffe14d') : '#000000c0'; roundRect(g, x - w / 2, ly - 10, w, 20, 10); g.fill();
     if (p.cap) { g.strokeStyle = '#f6c31c'; g.lineWidth = 2; g.stroke(); }
     g.fillStyle = p.isHuman ? '#111' : '#fff'; g.fillText(label, x, ly + 1);
     if (full) { g.font = 'bold 10px Barlow, Arial, sans-serif'; g.fillStyle = '#fff'; g.strokeStyle = '#000'; g.lineWidth = 3; const r = `${p.tw2 ? '2-WAY ' : ''}${p.pos} • ${p.ovr} OVR`; g.strokeText(r, x, ly - 17); g.fillText(r, x, ly - 17); }
@@ -1099,7 +1114,7 @@ function drawMeter(g, G) {
 }
 // catch / defense meter: a bar over where the ball lands. Press when the needle hits the green
 function drawFlightMeter(g, G) {
-  const f = G.ball && G.ball.flight, me = G.humanPlayer; if (!f || f.pitch || f.kick || !me || G.human < 0 || !(f.T > 0)) return;
+  const f = G.ball && G.ball.flight, me = G.coop && f && G.hp && f.intended && f.intended === G.hp[1] ? G.hp[1] : G.humanPlayer; if (!f || f.pitch || f.kick || !me || G.human < 0 || !(f.T > 0)) return; // (co-op: player 2's catch too)
   const off = G.poss === G.human;
   if (off) { // hold-to-catch bar: only while you're holding
     const v = G.catchV != null ? G.catchV : catchFill(); if (!G.chold && G.catchV == null || f.intended !== me) return;
@@ -1423,7 +1438,8 @@ function drawKickMeter(g, G) {
   }
   const tap = G.mode === 'mobile' ? 'TAP' : G.online ? 'SPACE' : G.versus && km.side !== G.p1 ? 'ENTER' : 'SPACE';
   g.textAlign = 'center'; g.fillStyle = '#f6c31c'; g.font = 'italic 900 19px "Barlow Condensed", Arial, sans-serif';
-  if (Pad.ui && st < 2 && !(G.versus && !G.online)) { // controller: the A / cross glyph instead of SPACE
+  if (G.coop && G.online && typeof Net !== 'undefined' && Net.role === 'guest') g.fillText(st < 2 ? 'YOUR FRIEND IS KICKING' : '', CW / 2, y0 + H - 14); // co-op: the host kicks
+  else if (Pad.ui && st < 2 && !(G.versus && !G.online)) { // controller: the A / cross glyph instead of SPACE
     const t = st === 0 ? 'TO SET THE POWER' : "WHEN IT'S IN THE GREEN", w = g.measureText(t).width + 30;
     Pad.drawGlyph(g, 0, CW / 2 - w / 2 + 11, y0 + H - 20, 11); g.textAlign = 'left'; g.fillStyle = '#f6c31c'; g.fillText(t, CW / 2 - w / 2 + 30, y0 + H - 14);
   } else

@@ -209,7 +209,7 @@ const Review = {
   tick(dt) {
     const w = G.rvWin; if (!w) return;
     w.t -= dt;
-    if (withSide(w.side, () => Input.hit('KeyY'))) return this.throwFlag(w.side);
+    if (withSide(w.side, () => Input.hit('KeyY')) || (G.coop && withC2(() => Input.hit('KeyY')))) return this.throwFlag(w.side); // (co-op: either of you)
     if (w.t <= 0) { G.rvWin = null; if (G.rv && !G.rv.flag) G.rv = null; }
   },
   throwFlag(s) {

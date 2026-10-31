@@ -104,6 +104,10 @@ function buildHow() {
       <p><b>Player Lock</b>: you only control your guy. Receivers: <b>SPACE</b> (or tap) to call for the ball. Level up for skill points, hit game goals for bonus XP.</p></div>
     <div><h3>Online</h3>
       <p>Tap <b>ONLINE</b>. One player hits <b>HOST</b> and gets a 4-letter code, the other hits <b>JOIN</b> and types it in. Each of you picks plays on your own screen.</p></div>
+    <div><h3>Co-op (two of you vs the CPU)</h3>
+      <p><b>Two phones:</b> ONLINE, pick <b>CO-OP</b>. The host picks your team, the CPU team and how hard the CPU is, then hits HOST. The friend hits JOIN and types the code.</p>
+      <p>The host calls the plays, snaps and kicks. On offense the host is the QB and the friend plays a receiver (<b>SWITCH</b> before the snap picks which one). Throw it to him and he runs with it. On defense you each play your own guy. Your guy has the <b>yellow</b> ring, your friend's is <b>blue</b>.</p>
+      <p><b>One computer:</b> PLAYERS: <b>2 Players Co-op</b>. P1 uses WASD + SPACE, P2 uses the ARROWS + ENTER (L picks your guy).</p></div>
     <div><h3>Before the snap</h3>
       <p><b>MOTION</b> (M) sends a receiver across. If a defender follows him, it's man coverage. On defense: <b>PRESS</b> (V) jams receivers, <b>SHOW BLITZ</b> (B) fakes a blitz.</p></div>
     <div><h3>Create a Team</h3>
@@ -162,20 +166,20 @@ function muCard(t) {
 }
 function renderSelect(bumpSide) {
   if (typeof renderUniBtns === 'function') setTimeout(renderUniBtns, 0);
-  const two = $('optPlayers').value === '2' && G.mode !== 'mobile';
+  const two = $('optPlayers').value === '2' && G.mode !== 'mobile', coop = $('optPlayers').value === 'coop' && G.mode !== 'mobile';
   for (const [side, id] of [[0, 'pHome'], [1, 'pAway']]) {
     const t = TEAMS[sel.idx[side]], card = $(id), el = card.querySelector('.muBody');
     el.innerHTML = muCard(t);
     card.style.setProperty('--c1', t.c1); card.style.setProperty('--c2', t.c2); card.style.setProperty('--fg', textOn(t.c1));
     card.querySelector('.muCnt').textContent = `${sel.idx[side] + 1} / ${TEAMS.length}`;
     const who = card.querySelector('.who');
-    who.textContent = sel.you === side ? (two ? 'P1' : 'YOU') : (two ? 'P2' : 'CPU'); who.className = 'who ' + (sel.you === side ? 'you' : two ? 'p2' : 'cpu');
+    who.textContent = sel.you === side ? (two ? 'P1' : coop ? 'P1 + P2' : 'YOU') : (two ? 'P2' : 'CPU'); who.className = 'who ' + (sel.you === side ? 'you' : two ? 'p2' : 'cpu');
     const foot = card.querySelector('.muFoot'); // the ROSTER button (benchedit.js) lives in the card footer
     card.querySelectorAll(':scope > .beOpen').forEach(b => foot.appendChild(b));
     if (bumpSide === side) { card.classList.remove('bump'); void card.offsetWidth; card.classList.add('bump'); }
   }
   muPaint();
-  $('selHint').textContent = G.mode === 'mobile' ? '' : two ? 'P1: WASD move, SPACE snap/dive, SHIFT sprint, 1-4 throw, E/F/R moves, Q switch      P2: ARROWS, ENTER, RIGHT SHIFT, 7-0 throw, / . , moves, L switch' : 'W / S  away team      ↑ / ↓  home team      ENTER  play';
+  $('selHint').textContent = G.mode === 'mobile' ? '' : coop ? 'CO-OP vs the CPU   P1: WASD, SPACE snap/dive, SHIFT sprint, 1-4 throw, Q switch      P2: ARROWS, ENTER, RIGHT SHIFT, L pick your guy' : two ? 'P1: WASD move, SPACE snap/dive, SHIFT sprint, 1-4 throw, E/F/R moves, Q switch      P2: ARROWS, ENTER, RIGHT SHIFT, 7-0 throw, / . , moves, L switch' : 'W / S  away team      ↑ / ↓  home team      ENTER  play';
   try { localStorage.setItem('bobbleSel', JSON.stringify(sel)); } catch (e) {}
 }
 function moveTeam(side, d) {
@@ -323,11 +327,11 @@ function muStadium() {
 // one summary line on the SETTINGS button, so you can see the setup without opening the panel
 function muPaint() {
   const txt = id => { const s = $(id); return s.options[s.selectedIndex] ? s.options[s.selectedIndex].text : ''; };
-  const two = $('optPlayers').value === '2' && G.mode !== 'mobile';
+  const two = $('optPlayers').value === '2' && G.mode !== 'mobile', coop = $('optPlayers').value === 'coop' && G.mode !== 'mobile';
   $('muRow_optPlayers').style.display = G.mode === 'mobile' ? 'none' : '';
-  $('muRow_optCoachMode').style.display = two ? 'none' : '';
+  $('muRow_optCoachMode').style.display = two || coop ? 'none' : '';
   for (const [, f] of muRows) f();
-  const bits = [txt('optQtr') + ' QTRS', two ? '2 PLAYERS' : 'CPU ' + txt('optDiff'), txt('optWeather') + (txt('optNight') === 'Night' ? ' NIGHT' : ''), typeof BCAST !== 'undefined' && BCAST[quickBcast()] ? BCAST[quickBcast()].short : '', $('optGame').value === 'bowl' ? 'BOBBLE BOWL' : ''];
+  const bits = [txt('optQtr') + ' QTRS', two ? '2 PLAYERS' : (coop ? 'CO-OP  ·  ' : '') + 'CPU ' + txt('optDiff'), txt('optWeather') + (txt('optNight') === 'Night' ? ' NIGHT' : ''), typeof BCAST !== 'undefined' && BCAST[quickBcast()] ? BCAST[quickBcast()].short : '', $('optGame').value === 'bowl' ? 'BOBBLE BOWL' : ''];
   $('muSetSum').textContent = bits.filter(Boolean).join('  ·  ');
   if (typeof bcLockPaint === 'function') bcLockPaint();
   $('muStadName').textContent = muStadium();
@@ -388,7 +392,7 @@ function startGame() {
   const bc = typeof quickBcast === 'function' ? quickBcast() : null;
   newGame(TEAMS[sel.idx[0]], TEAMS[sel.idx[1]], { qtr: +$('optQtr').value, diff: +$('optDiff').value, coach: $('optCoach').value, humanSide: sel.you,
     weather: typeof bcWeather === 'function' ? bcWeather(bc, pickWeather($('optWeather').value), $('optWeather').value) : pickWeather($('optWeather').value), night: $('optNight').value === '1', bcast: bc, uni: [$('optUni0').value, $('optUni1').value],
-    versus: $('optPlayers').value === '2' && G.mode !== 'mobile', bigGame: $('optGame').value === 'bowl' ? quickBowlYear() : 0 });
+    versus: $('optPlayers').value === '2' && G.mode !== 'mobile', coop: $('optPlayers').value === 'coop' && G.mode !== 'mobile', bigGame: $('optGame').value === 'bowl' ? quickBowlYear() : 0 });
   Broadcast.show();
 }
 
@@ -658,7 +662,7 @@ G.hooks.onGameOver = s => {
   $('btnAgain').textContent = ch && ch.next ? 'NEXT GAME' : G.challenge && G.challenge.type === 'draft' ? 'NEW DRAFT' : G.challenge ? 'TRY AGAIN' : 'REMATCH';
   $('btnNewTeams').textContent = G.challenge ? 'CHALLENGES' : G.online ? 'MAIN MENU' : 'NEW TEAMS';
   if (G.online && Net.role === 'host') Net.over(s);
-  if (won && (G.rivalryMatch || G.rivalry) && !G.versus && !G.challenge && !G.mini && !G.online) { Career.addRivalTrophy(s.teams[me].id, s.teams[them].id, inSeason && Season.data ? Season.data.year : 1); $('overChal').textContent = `RIVALRY TROPHY: you beat the ${s.teams[them].name}. It's in your Trophy Case.`; $('overChal').style.color = '#ffd23f'; }
+  if (won && (G.rivalryMatch || G.rivalry) && !G.versus && !G.coop && !G.challenge && !G.mini && !G.online) { Career.addRivalTrophy(s.teams[me].id, s.teams[them].id, inSeason && Season.data ? Season.data.year : 1); $('overChal').textContent = `RIVALRY TROPHY: you beat the ${s.teams[them].name}. It's in your Trophy Case.`; $('overChal').style.color = '#ffd23f'; }
   if (inSeason) { Season.addPlayedStats(G.pstats, G.teams); seasonGameDone(s.score); }
   const inCareer = !!G.career;
   $('btnSeasonCont').style.display = inSeason || inCareer ? '' : 'none';
@@ -666,7 +670,7 @@ G.hooks.onGameOver = s => {
   if (G.online) $('btnAgain').style.display = 'none';
   if (inSeason && G.playoff && won) $('overTitle').textContent = Season.data.phase === 'done' ? 'CHAMPIONS' : 'YOU ADVANCE!';
   // the Bobble Bowl: trophy ceremony for the winners first (a Quick Game Bobble Bowl win goes in the Trophy Case too)
-  if (G.bigGame && won && !inSeason && !G.career && !G.versus && !G.online) Career.addTitle(s.teams[me].id, G.bigGame.year);
+  if (G.bigGame && won && !inSeason && !G.career && !G.versus && !G.coop && !G.online) Career.addTitle(s.teams[me].id, G.bigGame.year);
   if (G.bigGame && !tie && !G.demo) {
     const ws = s.score[0] > s.score[1] ? 0 : 1;
     const best = Object.values(G.pstats || {}).filter(p => p.side === ws).sort((a, b) => score(b) - score(a))[0];
@@ -746,7 +750,7 @@ function togglePause() {
   $('btnSlidersOpt').style.display = G.online ? 'none' : '';
   if (G.online) { const on = !$('pause').classList.contains('show'); if (on) { zoomLabel(); $('pausePbp').innerHTML = '<div class="pbpHead">ONLINE GAME KEEPS GOING WHILE THIS IS OPEN</div>' + pbpHtml(6); show('pause'); } else show(null); return; }
   G.paused = !G.paused;
-  if (G.paused) { G.pauseFrom = $('playcall').classList.contains('show') ? 'playcall' : null; coachLabel(); tagsLabel(); zoomLabel(); $('btnCoachOpt').style.display = G.versus || G.lock || G.mini || G.challenge ? 'none' : ''; $('pausePbp').innerHTML = pbpHtml(8); renderPauseXF(); show('pause'); }
+  if (G.paused) { G.pauseFrom = $('playcall').classList.contains('show') ? 'playcall' : null; coachLabel(); tagsLabel(); zoomLabel(); $('btnCoachOpt').style.display = G.versus || G.coop || G.lock || G.mini || G.challenge ? 'none' : ''; $('pausePbp').innerHTML = pbpHtml(8); renderPauseXF(); show('pause'); }
   else show(G.pauseFrom);
 }
 $('btnPause').onclick = togglePause;
@@ -843,8 +847,9 @@ function updateMobileButtons() {
     else if (G.lock && h !== G.O[0] && G.bstate === 'snap' && !b.flight) st = 'call';
     else if (b.flight && b.flight.kick === 'punt' && b.flight.intended === h && !h.fair) st = 'ret'; // punt coming down: FAIR CATCH button
   }
-  if (G.phase === 'dead' && G.cellyGuy && !G.cellyGuy.celly && !G.cellyGuy.cellyNext && !G.demo && (!G.online || G.cellyGuy.side === G.human)) st = 'celly'; // buttons hide once he's celebrating
-  if (G.phase === 'presnap' && !G.demo) st = 'presnap';
+  const myCelly = c => G.coop ? (G.online && Net.role === 'guest' ? c === G.humanPlayer : c !== G.hp[1]) : !G.online || c.side === G.human; // co-op: only the scorer's player
+  if (G.phase === 'dead' && G.cellyGuy && !G.cellyGuy.celly && !G.cellyGuy.cellyNext && !G.demo && myCelly(G.cellyGuy)) st = 'celly'; // buttons hide once he's celebrating
+  if (G.phase === 'presnap' && !G.demo) st = G.coop && G.online && Net.role === 'guest' ? 'cpre' : 'presnap'; // co-op guest: just SWITCH (the host snaps)
   const coach = coachOn(); // Coach Mode: no stick or move buttons, just AUDIBLE / TIMEOUT before the snap
   if (coach && st !== 'presnap') st = '';
   // stays up the whole play so your thumb never loses it (+ rushing a field goal). Online guest: up before the snap too,
@@ -917,7 +922,7 @@ $('moBack').onclick = () => { G.mini = null; G.teams = null; openModes(); };
 // ---------- title screen background: a fake game ----------
 function demoSetup() {
   const a = pick(TEAMS); let b; do { b = pick(TEAMS); } while (b === a);
-  Object.assign(G, { teams: [a, b], human: -1, diff: 1, poss: 0, los: rand(30, 70), ballY: MID, down: 1, score: [0, 0], quarter: 1, clock: 180, demo: true, fx: [], weather: 'clear', night: typeof spookyNow === 'function' && spookyNow(), bcast: null, uni: null, versus: false, xf: null,
+  Object.assign(G, { teams: [a, b], human: -1, diff: 1, poss: 0, los: rand(30, 70), ballY: MID, down: 1, score: [0, 0], quarter: 1, clock: 180, demo: true, fx: [], weather: 'clear', night: typeof spookyNow === 'function' && spookyNow(), bcast: null, uni: null, versus: false, coop: false, xf: null,
     pstats: {}, tstats: [{ pass: 0, rush: 0, to: 0 }, { pass: 0, rush: 0, to: 0 }], patSide: null, twoPt: false, next: null, paused: false, slowmo: 0, banner: null, practice: null });
   setFirstDown();
   setupPlay(pick(OFF_PLAYS.filter(p => !p.custom)), pick(DEF_PLAYS));
@@ -955,7 +960,7 @@ function step(now) {
   const dt = Math.min(raw, 0.033);
   if (Input.pointer.down) Input.pointer.t += dt;
   Pad.poll(dt);
-  Input.versus = !!G.versus && !G.demo; if (!Input.versus) Input.ctl = 0;
+  Input.versus = (!!G.versus || (!!G.coop && !G.online)) && !G.demo; if (!Input.versus) Input.ctl = 0; // (local co-op splits the keyboard too)
   const inMenu = menuScreens.some(id => $(id).classList.contains('show')) && !(G.mini && $('miniOver').classList.contains('show'));
   if (Highlights.on) Highlights.update(raw); // the highlight reel drives the picture by itself
   else if (inMenu) {
@@ -1067,12 +1072,38 @@ function renderOnlineTeam(bump) {
 }
 function onMove(d) {
   const list = onList(), k = list.indexOf(sel.idx[sel.you]);
-  sel.idx[sel.you] = list[(k + d + list.length) % list.length]; Sound.click(); renderOnlineTeam(true);
+  sel.idx[sel.you] = list[(k + d + list.length) % list.length]; Sound.click(); renderOnlineTeam(true); renderOnlineMode();
 }
+// VERSUS = you vs your friend, CO-OP = you two on the same team vs the CPU (the host's choice counts: teams, CPU team, CPU level)
+let onMode = 'vs', onCpu = 1;
+try { const o = JSON.parse(localStorage.getItem('bobbleOnline') || '{}'); if (o.m === 'coop') onMode = 'coop'; if (o.cpu >= 0) onCpu = o.cpu; } catch (e) {}
+const onCoop = () => onMode === 'coop';
+function onCpuTeam() {
+  const L = CT.NFL, mine = TEAMS[sel.idx[sel.you]];
+  onCpu = (onCpu % L.length + L.length) % L.length;
+  return L[onCpu].id === (mine && mine.id) ? L[(onCpu + 1) % L.length] : L[onCpu];
+}
+const ON_HELP = { vs: 'Play a friend on another phone or computer. One of you hosts and gets a code, the other types it in.',
+  coop: 'You two on the same team vs the CPU. The host picks the teams and calls the plays, then gets a code for the friend to type in.' };
+function renderOnlineMode() {
+  $('onMode').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.m === onMode));
+  $('online').classList.toggle('coop', onCoop());
+  const t = onCpuTeam(); $('onCpuName').textContent = t.city + ' ' + t.name; $('onCpuRow').style.setProperty('--cc', t.c1);
+  $('onDiff').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === $('optDiff').value));
+  if (!Net.role && $('onPick').style.display !== 'none' && Object.values(ON_HELP).includes($('onStatus').textContent)) $('onStatus').textContent = ON_HELP[onMode];
+  try { localStorage.setItem('bobbleOnline', JSON.stringify({ m: onMode, cpu: onCpu })); } catch (e) {}
+}
+$('onMode').querySelectorAll('button').forEach(b => b.onclick = () => { if (Net.role || onMode === b.dataset.m) return; onMode = b.dataset.m; Sound.click(); renderOnlineMode(); });
+$('onCpuRow').querySelectorAll('.muStep').forEach(b => b.onclick = () => {
+  if (Net.role) return;
+  const was = onCpuTeam(); onCpu += +b.dataset.d; if (onCpuTeam() === was) onCpu += +b.dataset.d; // (skips your own team)
+  Sound.click(); renderOnlineMode();
+});
+$('onDiff').querySelectorAll('button').forEach(b => b.onclick = () => { if (Net.role) return; $('optDiff').value = b.dataset.v; saveOpts(); Sound.click(); renderOnlineMode(); });
 function openOnline(msg) {
   $('onCodeBox').style.display = 'none'; $('onJoinBox').style.display = 'none'; $('onPick').style.display = '';
-  $('onStatus').textContent = msg || 'Play a friend on another phone or computer. One of you hosts and gets a code, the other types it in.';
-  renderOnlineTeam(); show('online');
+  $('onStatus').textContent = msg || ON_HELP[onMode];
+  renderOnlineTeam(); renderOnlineMode(); show('online');
 }
 function onlineMsg(t) { onlineWait(null); openOnline(t); }
 function onlineWait(t) { const el = $('onWait'); el.textContent = t || ''; el.style.display = t ? 'block' : 'none'; }
@@ -1096,7 +1127,7 @@ $('onHost').onclick = () => {
   if (typeof Peer === 'undefined') { $('onStatus').textContent = "Online play couldn't load. Check your internet and refresh."; return; }
   $('onPick').style.display = 'none'; $('onCodeBox').style.display = ''; $('onCode').textContent = '....';
   $('onStatus').textContent = 'Getting a code...';
-  Net.host(code => { $('onCode').textContent = code; $('onStatus').textContent = 'Tell your friend this code. The game starts when they join. Keep this screen open.'; },
+  Net.host(code => { $('onCode').textContent = code; $('onStatus').textContent = `Tell your friend this code. ${onCoop() ? 'They join your team. ' : ''}The game starts when they join. Keep this screen open.`; },
     st => { $('onStatus').textContent = st; });
 };
 $('onJoin').onclick = () => { Sound.click(); $('onPick').style.display = 'none'; $('onJoinBox').style.display = ''; $('onCodeIn').value = ''; $('onCodeIn').focus(); $('onStatus').textContent = 'Type the 4-letter code from your friend\'s screen.'; };

@@ -111,8 +111,8 @@ const Pad = {
     if (hit(PB.MENU) && G.teams && !G.demo && (!document.querySelector('.screen.show') || $('pause').classList.contains('show') || $('playcall').classList.contains('show')) && !$('padCtl').classList.contains('show')) { togglePause(); return; }
     if (this.menu()) { hold('ShiftLeft', false); hold('ControlLeft', false); return this.menuNav(i, hit, x, y, mag > 0 || dx || dy, dt, ry); }
     if (!G.teams || G.demo) return;
-    const side = Input.versus ? (i === 0 ? G.p1 : 1 - G.p1) : G.human;
-    const cx = withSide(side, () => this.ctx());
+    const side = Input.versus && !G.coop ? (i === 0 ? G.p1 : 1 - G.p1) : G.human;
+    const cx = G.coop && !G.online && i === 1 ? withC2(() => this.ctx()) : withSide(side, () => this.ctx()); // local co-op: the 2nd pad is player 2
     hold('ShiftLeft', now[PB.RT] && cx !== 'celly');
     hold('ControlLeft', now[PB.LT] && cx === 'throw');
     const map = {};
@@ -120,7 +120,8 @@ const Pad = {
     else if (cx === 'dash') Object.assign(map, { 0: 'KeyA', 4: 'KeyA', 14: 'KeyA', 1: 'KeyD', 5: 'KeyD', 15: 'KeyD' });
     else if (cx === 'kick') Object.assign(map, { 0: 'Space', 3: 'Space', 1: 'KeyQ', 4: 'KeyQ', 2: 'KeyE' });
     else if (cx === 'preO') {
-      if (now[PB.LB]) { Object.assign(map, { 0: 'Digit1', 1: 'Digit2', 2: 'Digit3', 3: 'Digit4' }); this.hotShow = G.play && G.play.off && G.play.off.type === 'pass'; }
+      if (G.coop && !G.online && i === 1) Object.assign(map, { 1: 'KeyQ', 4: 'KeyQ' }); // co-op player 2: pick your receiver
+      else if (now[PB.LB]) { Object.assign(map, { 0: 'Digit1', 1: 'Digit2', 2: 'Digit3', 3: 'Digit4' }); this.hotShow = G.play && G.play.off && G.play.off.type === 'pass'; }
       else Object.assign(map, { 0: 'Space', 2: 'KeyM', 3: 'KeyZ' });
       map[8] = 'KeyT';
     } else if (cx === 'preD') Object.assign(map, { 1: 'KeyQ', 4: 'KeyQ', 2: 'KeyV', 5: 'KeyB', 3: 'KeyZ', 8: 'KeyT' });
@@ -312,7 +313,7 @@ const Pad = {
   // in-game prompts with real buttons (engine updateHint asks first)
   setHint() {
     G.padHint = null;
-    if (!this.ui || G.versus || G.demo || G.mini || coachOn()) return false;
+    if (!this.ui || G.versus || G.coop || G.demo || G.mini || coachOn()) return false;
     const humanOff = G.poss === G.human, b = G.ball, ph = G.phase, H = [];
     const cx = this.ctx(), h = G.humanPlayer;
     if (ph === 'kickmeter' && cx === 'kick') return false;
