@@ -39,7 +39,8 @@ const CT = {
     const ks = (k, d) => this.ex([this.str(k && k[0], 18) || d, this.num(k && k[1], 0, 99, 3), this.num(k && k[2], 40, 99, 72), this.num(k && k[3], 0, 5, 2)], k && k[4], true);
     return {
       id, city: this.str(t.city, 16) || 'My', name: this.str(t.name, 16) || 'Team', conf: 'CUSTOM', div: '', custom: true,
-      uid: this.str(t.uid, 24) || this.newUid(), by: this.str(t.by, 16), pub: !!t.pub, at: this.num(t.at, 0, 9e15, Date.now()), dl: this.num(t.dl, 0, 1e9, 0),
+      uid: this.str(t.uid, 24) || this.newUid(), by: this.str(t.by, 16), pub: !!t.pub, ...(t.pub || t.wasPub ? { wasPub: true } : {}),
+      ...(this.str(t.from, 24) ? { from: this.str(t.from, 24) } : {}), ...(this.str(t.fromBy, 16) ? { fromBy: this.str(t.fromBy, 16) } : {}), at: this.num(t.at, 0, 9e15, Date.now()), dl: this.num(t.dl, 0, 1e9, 0),
       c1: this.col(t.c1, '#1F3A93'), c2: this.col(t.c2, '#F6C31C'), helmet: this.col(t.helmet, '#1F3A93'), mask: this.col(t.mask, '#FFFFFF'), pants: this.col(t.pants, '#FFFFFF'),
       shape: this.SHAPES.includes(t.shape) ? t.shape : 'shield', stadium: this.str(t.stadium, 24) || 'Home Field', dome: !!t.dome,
       off: this.OFF.map((pos, i) => pl(t.off && t.off[i], pos)), def: this.DEF.map((pos, i) => pl(t.def && t.def[i], pos)),
@@ -160,6 +161,33 @@ const CT = {
       img.onerror = () => res(null); img.src = url;
     });
   },
+  // a team its maker deletes is gone for everyone: /bobble/gone keeps a note, and every game drops its copy
+  // unless that copy is in one of their seasons / careers / a saved game (those keep working)
+  GONE: 'https://cardio-game-3713-default-rtdb.firebaseio.com/bobble/gone',
+  async tombstone(t) {
+    if (!t.pub && !t.wasPub) return; // never went online, nobody has a copy
+    try { await fetch(`${this.GONE}/${t.uid}.json`, { method: 'PUT', body: JSON.stringify({ at: Date.now(), by: t.by || '', city: t.city, name: t.name }) }); } catch (e) {}
+  },
+  inUse(t) {
+    const tag = `"uid":"${t.uid}"`;
+    try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (/^bobble(Season|Career|Live)/.test(k) && (localStorage.getItem(k) || '').includes(tag)) return true; } } catch (e) {}
+    return false;
+  },
+  // copies from before we kept 'from' only know who made it + the name
+  goneMatch(t, gone) {
+    if (t.from) return gone[t.from] ? t.from : null;
+    if (!t.by || t.wasPub) return null; // your own team (or one you posted yourself)
+    for (const u in gone) { const g = gone[u]; if (g && g.by === t.by && g.city === t.city && g.name === t.name) return u; }
+    return null;
+  },
+  async sweep() {
+    if (!this.mine.some(t => t.from || t.by)) return [];
+    let gone; try { const r = await fetch(`${this.GONE}.json`); if (!r.ok) return []; gone = (await r.json()) || {}; } catch (e) { return []; }
+    const out = [];
+    this.mine = this.mine.filter(t => { if (!this.goneMatch(t, gone) || this.inUse(t)) return true; out.push(t); return false; });
+    if (out.length) { this.save(); if (this.mode === 'all') this.useAll(); this.told = (this.told || []).concat(out); }
+    return out;
+  },
   async unpublish(t) { try { await fetch(`${this.DB}/${t.uid}.json`, { method: 'DELETE' }); } catch (e) {} },
   async browse() {
     const r = await fetch(`${this.DB}.json`);
@@ -171,7 +199,7 @@ const CT = {
   // put somebody else's team in My Teams (your copy is private and editable)
   adopt(t) {
     const c = this.clean({ ...t, uid: this.newUid(), pub: false, from: t.uid });
-    c.id = this.freeId(c.id, c.uid); c.fromBy = t.by;
+    c.id = this.freeId(c.id, c.uid); c.fromBy = t.by; delete c.wasPub;
     this.mine.push(c); this.save(); return c;
   }
 };
@@ -179,3 +207,5 @@ const TL_FIRST = ['Marcus', 'Jaylen', 'Tyler', 'DeShawn', 'Cole', 'Malik', 'Bryc
 const TL_LAST = ['Barnes', 'Whitfield', 'Okoro', 'Castillo', 'Merritt', 'Hayes', 'Sutton', 'Lockhart', 'Boone', 'Fairley', 'Granger', 'Pruitt', 'Ashby', 'Delaney', 'Kincaid', 'Mercer', 'Tolliver', 'Vance', 'Holloway', 'Rhodes', 'Stallings', 'Bishop', 'Crowder', 'Mabry', 'Ellison', 'Foreman', 'Lattimore', 'Quarles', 'Redmond', 'Sterling'];
 CT.load();
 CT.useAll();
+// drop teams their makers deleted (only on the menus, never under a game in progress)
+setTimeout(() => { if (typeof $ === 'function' && $('title') && $('title').classList.contains('show')) CT.sweep(); }, 1200);

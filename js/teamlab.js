@@ -91,6 +91,7 @@ const TeamLab = {
   open(tab) {
     if (tab) this.tab = tab;
     CT.useAll(); show('tlHub'); this.renderHub();
+    CT.sweep().then(() => { const g = CT.told || []; if (g.length && $('tlHub').classList.contains('show')) { CT.told = []; this.renderHub(); this.toast(`${g.map(t => `${t.city} ${t.name}`).join(', ')} deleted by ${g.length > 1 ? 'their makers' : 'its maker'}`); } });
     if (this.tab === 'db' && !this.db && !this.loading) this.fetchDb();
   },
   renderHub() {
@@ -136,6 +137,7 @@ const TeamLab = {
       const t = CT.mine[+d.i], b = $('tlGrid').querySelector(`button[data-a="del"][data-i="${d.i}"]`);
       if (!b.classList.contains('sure')) { b.classList.add('sure'); b.textContent = 'SURE?'; return; }
       if (t.pub) CT.unpublish(t);
+      if (!t.from) CT.tombstone(t); // gone from everyone's game too (not if it's just your copy of someone else's)
       CT.mine.splice(+d.i, 1); CT.save(); CT.useAll(); this.renderHub(); this.toast(`${t.city} ${t.name} deleted`); return;
     }
     if (a === 'get') {
