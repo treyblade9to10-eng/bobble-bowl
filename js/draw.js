@@ -696,7 +696,7 @@ function drawPlayer(g, p, G, at) {
   // ground marks
   if (p.isHuman && !at && (G.phase !== 'kick' && G.phase !== 'kickmeter' || (G.phase === 'kickmeter' && (!p.off || (G.km && G.km.kind === 'punt'))))) { // + your rusher on a field goal / your guy on a punt
     const pulse = 1 + Math.sin(G.time * 8) * 0.08;
-    g.strokeStyle = G.versus && p.ctl === 1 ? '#5ad1ff' : '#ffe14d'; g.lineWidth = 3.5;
+    g.strokeStyle = (G.versus || G.coop) && p.ctl === 1 ? '#5ad1ff' : '#ffe14d'; g.lineWidth = 3.5;
     g.beginPath(); g.ellipse(x, y, 22 * pulse, 9 * pulse, 0, 0, 7); g.stroke();
   }
   if (!at) drawXFRing(g, p, x, y);
@@ -855,7 +855,7 @@ function drawPlayer(g, p, G, at) {
     g.font = 'bold 13px Barlow, Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
     const full = p.isHuman || carrying, label = full ? `${p.name}` : lastName(p.name) + (p.tw2 && G.phase === 'presnap' ? '  ·  2-WAY' : '');
     const w = g.measureText(label).width + 14;
-    g.fillStyle = p.isHuman ? (G.versus && p.ctl === 1 ? '#5ad1ff' : '#ffe14d') : '#000000c0'; roundRect(g, x - w / 2, ly - 10, w, 20, 10); g.fill();
+    g.fillStyle = p.isHuman ? ((G.versus || G.coop) && p.ctl === 1 ? '#5ad1ff' : '#ffe14d') : '#000000c0'; roundRect(g, x - w / 2, ly - 10, w, 20, 10); g.fill();
     if (p.cap) { g.strokeStyle = '#f6c31c'; g.lineWidth = 2; g.stroke(); }
     g.fillStyle = p.isHuman ? '#111' : '#fff'; g.fillText(label, x, ly + 1);
     if (full) { g.font = 'bold 10px Barlow, Arial, sans-serif'; g.fillStyle = '#fff'; g.strokeStyle = '#000'; g.lineWidth = 3; const r = `${p.tw2 ? '2-WAY ' : ''}${p.pos} • ${p.ovr} OVR`; g.strokeText(r, x, ly - 17); g.fillText(r, x, ly - 17); }
@@ -1099,7 +1099,7 @@ function drawMeter(g, G) {
 }
 // catch / defense meter: a bar over where the ball lands. Press when the needle hits the green
 function drawFlightMeter(g, G) {
-  const f = G.ball && G.ball.flight, me = G.humanPlayer; if (!f || f.pitch || f.kick || !me || G.human < 0 || !(f.T > 0)) return;
+  const f = G.ball && G.ball.flight, me = G.coop && f && G.hp && f.intended && f.intended === G.hp[1] ? G.hp[1] : G.humanPlayer; if (!f || f.pitch || f.kick || !me || G.human < 0 || !(f.T > 0)) return; // (co-op: player 2's catch too)
   const off = G.poss === G.human;
   if (off) { // hold-to-catch bar: only while you're holding
     const v = G.catchV != null ? G.catchV : catchFill(); if (!G.chold && G.catchV == null || f.intended !== me) return;
@@ -1423,7 +1423,8 @@ function drawKickMeter(g, G) {
   }
   const tap = G.mode === 'mobile' ? 'TAP' : G.online ? 'SPACE' : G.versus && km.side !== G.p1 ? 'ENTER' : 'SPACE';
   g.textAlign = 'center'; g.fillStyle = '#f6c31c'; g.font = 'italic 900 19px "Barlow Condensed", Arial, sans-serif';
-  if (Pad.ui && st < 2 && !(G.versus && !G.online)) { // controller: the A / cross glyph instead of SPACE
+  if (G.coop && G.online && typeof Net !== 'undefined' && Net.role === 'guest') g.fillText(st < 2 ? 'YOUR FRIEND IS KICKING' : '', CW / 2, y0 + H - 14); // co-op: the host kicks
+  else if (Pad.ui && st < 2 && !(G.versus && !G.online)) { // controller: the A / cross glyph instead of SPACE
     const t = st === 0 ? 'TO SET THE POWER' : "WHEN IT'S IN THE GREEN", w = g.measureText(t).width + 30;
     Pad.drawGlyph(g, 0, CW / 2 - w / 2 + 11, y0 + H - 20, 11); g.textAlign = 'left'; g.fillStyle = '#f6c31c'; g.fillText(t, CW / 2 - w / 2 + 30, y0 + H - 14);
   } else

@@ -233,6 +233,15 @@ body:not(.mobile) #select .muArr:hover::after { color: var(--gold); }
 #onSide #onStatus { margin: 8px 0; font-size: 15px; }
 .onNote { font-size: 12px; color: var(--dim); letter-spacing: .04em; text-align: center; }
 #onBack { margin-top: 8px; }
+/* VERSUS / CO-OP switch + co-op CPU team / level (same rows as the game settings panel) */
+#onSet { width: 100%; max-width: 330px; margin-bottom: 6px; }
+#onSet .muRow { padding: 2px 0; gap: 8px; }
+#onSet .muL { width: 74px; font-size: 13px; }
+#onSet .muC { min-height: 32px; }
+#onSet .muC button { padding: 6px 4px; font-size: 13px; }
+#onSet .onCo { display: none; }
+#online.coop #onSet .onCo { display: flex; }
+#onCpuRow .muV { font-size: 14px; color: #fff; border-left: 4px solid var(--cc, #888); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 6px; }
 @media (max-height: 560px) {
   #online.screen { padding-top: 8px; }
   #onTop { margin-bottom: 6px; } #onTop span { display: none; } #onTop b { font-size: 24px; padding-bottom: 5px; }
@@ -241,5 +250,7 @@ body:not(.mobile) #select .muArr:hover::after { color: var(--gold); }
   #onCard .muRat { margin-top: 4px; padding: 3px 10px; } #onCard .muOvr b { font-size: 28px; } #onCard .muPl { margin-top: 4px; } #onCard .muP { padding: 2px 8px; font-size: 12px; }
   #onCard .muPl .muP:nth-child(2) { display: none; }
   .onFilt { padding: 5px; } .onFilt button { padding: 4px 10px; font-size: 11px; }
+  #onSet { margin-bottom: 2px; } #onSet .muRow { padding: 1px 0; } #onSet .muC { min-height: 28px; } #onSet .muC button { padding: 4px 3px; font-size: 12px; } #onSet .muL { width: 62px; font-size: 12px; } #onCpuRow .muV { font-size: 13px; }
+  #online.coop .onNote { display: none; }
   #onSide { padding: 10px; } #onPick { gap: 8px; } #onSide #onStatus { margin: 4px 0; font-size: 13px; } #onBack { margin-top: 2px; }
 }

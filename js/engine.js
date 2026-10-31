@@ -17,11 +17,25 @@ function withSide(s, fn) {
   try { return fn(); } finally { G.hd[s] = G.humanDef; G.human = h; G.humanDef = G.hd[h]; Input.ctl = ctl; if (G.online) Input.use(ctl); }
 }
 function setHD(side, p) { if (G.versus) G.hd[side] = p; if (side === G.human) G.humanDef = p; }
+// co-op: two humans on the same team vs the CPU. Player 1 (online: the host) is the usual human; player 2 (the guest)
+// drives G.hp[1] with his own controls (Input slot 1) and his own defender pick (G.hd2). withC2 runs code as player 2.
+function withC2(fn) {
+  const hd = G.humanDef, hp = G.humanPlayer, ctl = Input.ctl, cur = Input.cur;
+  G.humanDef = G.hd2; G.humanPlayer = G.hp[1]; Input.ctl = 1; G.inC2 = true;
+  if (G.online) Input.use(1);
+  try { return fn(); } finally {
+    G.hd2 = G.humanDef; G.humanDef = hd; G.humanPlayer = hp; Input.ctl = ctl; G.inC2 = false;
+    if (G.online) Input.use(cur);
+    if (G.needUH) { G.needUH = false; updateHuman(); }
+  }
+}
+// run fn with the controls of whoever drives p
+function withCtl(p, fn) { return G.coop && p && p === G.hp[1] ? withC2(fn) : withSide(p ? p.side : G.human, fn); }
 const pName = s => G.online ? (s === G.human ? 'YOU' : 'OPP') : G.versus ? (s === G.p1 ? 'P1' : 'P2') : (s === G.human ? 'YOU' : 'CPU');
 // mobile or computer controls for whoever is acting right now (online: each player's own device)
 // Coach Mode: you call the plays, the CPU runs every one of your players (no stick, auto snap, auto kicks). Not in 2-player / online / Player Lock / challenges
 const coachPref = () => { try { return JSON.parse(localStorage.getItem('bobbleOpts') || '{}').optCoachMode === '1'; } catch (e) { return false; } };
-const coachOn = () => !!G.coachMode && !G.versus && !G.online && !G.lock && !G.demo && !G.mini && !G.challenge && G.human >= 0;
+const coachOn = () => !!G.coachMode && !G.versus && !G.coop && !G.online && !G.lock && !G.demo && !G.mini && !G.challenge && G.human >= 0;
 // Career: until the coach trusts you (or you're a veteran) he calls your team's plays (you still play your guy). No timeouts / audibles for you then
 const coachCalls = () => !!G.coachCalls && !!G.career && !G.versus && !G.online && !G.demo && !G.mini && !G.challenge && G.human >= 0;
 // kicks the human never aims: Coach Mode and every career game (rating-based, like the CPU)
@@ -74,7 +88,7 @@ function initGame(home, away, opts) {
     timeouts: [3, 3], special: null, pendingRunoff: 0, twoMinQ: 0, twoMinAfterPlay: false, runFrom: 0, mini: null, scenario: opts.scenario || null,
     weather: stadiumOf(home).dome ? 'clear' : opts.weather === 'storm' ? 'rain' : opts.weather === 'fog' ? 'clear' : (opts.weather || 'clear'),
     storm: !stadiumOf(home).dome && opts.weather === 'storm', fog: !stadiumOf(home).dome && opts.weather === 'fog', ltn: null, night: !!opts.night || !!(typeof BCAST !== 'undefined' && BCAST[opts.bcast] && BCAST[opts.bcast].night), stadium: stadiumOf(home), uni: opts.uni || null, pbp: [], pbpShow: null, lastResult: null,
-    versus: !!opts.versus, p1: opts.humanSide || 0, hd: [null, null], hp: [null, null], humanDef: null,
+    versus: !!opts.versus, p1: opts.humanSide || 0, hd: [null, null], hp: [null, null], humanDef: null, coop: !opts.versus && !!opts.coop, hd2: null, coopSlot: 2, inC2: false, needUH: false,
     career: opts.career || false, practice: opts.practice || null, lock: !!opts.lock, callBall: 0, sitOut: false, dirt: {}, coachCalls: !!opts.coachCalls, careerSlot: opts.careerSlot || 0, coachTok: null, coachCallName: null,
     bigGame: opts.bigGame ? { year: opts.bigGame, name: bowlName(opts.bigGame) } : null,
     bcast: typeof BCAST !== 'undefined' && BCAST[opts.bcast] && !opts.bigGame ? opts.bcast : null, // primetime TV look (primetime.js)
@@ -85,7 +99,7 @@ function initGame(home, away, opts) {
   if (G.rivalryMatch && (!G.uni || (G.uni[0] === 'home' && G.uni[1] === 'away'))) G.uni = ['rivalry', 'away'];
   if (G.versus) G.diff = 1;
   Injury.reset();
-  Input.versus = G.versus; Input.ctl = 0;
+  Input.versus = G.versus || (G.coop && !G.online); Input.ctl = 0; // (local co-op splits the keyboard like 2-player)
   setupXFactors();
   G.mo = 0; Review.reset(); // momentum meter + challenges (rules.js)
 }
@@ -581,6 +595,7 @@ function setupPlay(offPlay, defPlay, preview) {
   for (const p of P) p.isHuman = false;
   if (G.versus) { G.hd[dsd] = D[3]; G.hd[o] = null; G.humanDef = G.hd[G.human]; }
   else if (o !== G.human) G.humanDef = D.find(p => p.cap) || D[3];
+  if (G.coop) G.hd2 = o !== G.human ? (G.humanDef === D[4] ? D[3] : D[4]) : null; // player 2 starts on the other linebacker
   updateHuman();
 }
 
@@ -712,6 +727,7 @@ function update(dt) {
   if (G.phase === 'presnap') {
     if (G.versus) { withSide(G.poss, () => presnapInput(dt)); if (G.phase === 'presnap') withSide(1 - G.poss, () => presnapInput(dt)); }
     else if (presnapInput(dt) === 'audible') return;
+    if (G.coop && G.phase === 'presnap') withC2(coopPresnap);
     idlePlayers(dt);
     if (G.phase === 'presnap') updateMotion(dt);
   } else if (G.phase === 'live') {
@@ -720,7 +736,7 @@ function update(dt) {
     for (const p of G.players) { p.dvx = 0; p.dvy = 0; applyMove(p, dt); if (p.celly) Celly.update(p, dt); }
     if (G.tdScorer) Celly.stage(G.tdScorer, dt);
     const cg = G.cellyGuy;
-    if (cg) withSide(cg.side, () => Celly.input(cg));
+    if (cg) withCtl(cg, () => Celly.input(cg));
     updateBallPhysicsDead(dt);
     Review.tick(dt);
     G.deadT -= dt;
@@ -824,7 +840,7 @@ function livePlay(dt) {
     if (pl.off.kneel && b.holder === G.O[0]) { // victory formation: QB backs up a step, everybody else stands down
       p.dvx = p === G.O[0] && pl.t < 0.3 ? -dirOf(G.poss) * 3 : 0; p.dvy = 0; p.engaged = null; p.sdx = p.dvx; p.sdy = p.dvy; continue;
     }
-    if (p.isHuman && withSide(p.side, () => humanControl(p, dt) && (p.humanDriven = Input.axis().m > 0.1 || Input.stick.m > 0.15 || Input.pointer.down || p.dive > 0, true))) { if (p.tuck && b.holder === p) { p.dvx *= 0.92; p.dvy *= 0.92; } p.sdx = p.dvx; p.sdy = p.dvy; continue; }
+    if (p.isHuman && withCtl(p, () => humanControl(p, dt) && (p.humanDriven = Input.axis().m > 0.1 || Input.stick.m > 0.15 || Input.pointer.down || p.dive > 0, true))) { if (p.tuck && b.holder === p) { p.dvx *= 0.92; p.dvy *= 0.92; } p.sdx = p.dvx; p.sdy = p.dvy; continue; }
     ai(p, dt);
     // smooth AI steering so players don't twitch
     const k = 1 - Math.exp(-dt * 12);
@@ -872,7 +888,7 @@ function livePlay(dt) {
   if (b.holder) { b.x = b.holder.x; b.y = b.holder.y; b.z = 1; }
 
   // throw markers for human QB
-  withSide(G.poss, humanQBInput);
+  if (G.coop) withCtl(curPasser(), humanQBInput); else withSide(G.poss, humanQBInput); // co-op: whoever has the passer throws
 
   if (G.phase !== 'live') return;
   checkFouls();
@@ -1107,7 +1123,7 @@ function humanCanThrow() {
   const b = G.ball, qb = curPasser(), off = G.play && G.play.off;
   if (!qb || !off || off.noThrow || trickBusy()) return false;
   const passing = G.trickPasser || G.rpoKeep || (off.rpo && !G.handedOff) || (G.passPlay !== false && off.type === 'pass');
-  return G.phase === 'live' && G.bstate === 'snap' && b.holder === qb && qb.isHuman && passing &&
+  return G.phase === 'live' && G.bstate === 'snap' && b.holder === qb && qb.isHuman && passing && (!G.coop || qb === G.humanPlayer) &&
     dirOf(G.poss) * (qb.x - G.los) < 0.5 && !G.humanScramble;
 }
 // who throws it: the QB, or on a trick play the RB / WR who ends up with it
@@ -1172,6 +1188,7 @@ function rpoRead() {
 
 // who the human is driving right now
 function updateHuman() {
+  if (G.inC2) { G.needUH = true; return; } // co-op: player 2 just switched, done right after his turn (withC2)
   for (const p of G.players) p.isHuman = false;
   G.humanPlayer = null;
   if (!G.ball || G.human < 0) return;
@@ -1179,6 +1196,15 @@ function updateHuman() {
     const hs = [0, 1].map(s => withSide(s, humanFor));
     hs.forEach((h, s) => { if (h) { h.isHuman = true; h.ctl = s === G.p1 ? 0 : 1; } });
     G.hp = hs; G.humanPlayer = hs[G.human];
+    return;
+  }
+  if (G.coop) {
+    let h1 = humanFor(), h2 = coopFor();
+    // never the same guy: whoever already had him keeps him (a catch / pick: the catcher's owner runs), the other gets someone else
+    if (h1 && h1 === h2) { if (G.hp[1] === h2) h1 = coopAlt(h2, true); else h2 = coopAlt(h1, false); }
+    G.hp = [h1, h2]; G.humanPlayer = h1;
+    if (h1) { h1.isHuman = true; h1.ctl = 0; }
+    if (h2) { h2.isHuman = true; h2.ctl = 1; }
     return;
   }
   if (coachOn()) return; // Coach Mode: the CPU plays everybody
@@ -1220,19 +1246,58 @@ function humanFor() {
   }
   return h;
 }
+// co-op player 2: his receiver on offense (and kick returns), his own defender otherwise. Nobody on a field goal / live punt
+function coopFor() {
+  const b = G.ball, pl = G.play;
+  if (G.phase === 'kickmeter' || G.phase === 'kick' || G.special === 'fgblock' || (pl && pl.off && pl.off.type === 'kick') || (G.km && G.km.live && G.km.live.kicked == null && G.phase !== 'live')) return null;
+  const theirs = b.holder && b.holder.side !== G.human;
+  if (G.poss === G.human && !theirs) return G.O[G.coopSlot] || G.O[2];
+  if (b.holder && b.holder === G.hd2) return b.holder; // he picked it off
+  const d = G.hd2;
+  if (!d || d.side !== G.human || !G.players.includes(d) || d === G.humanDef) G.hd2 = coopAlt(G.humanDef, false);
+  return G.hd2;
+}
+// someone else for one of the two (not `other`): the QB for player 1 on offense, else the closest teammate to the ball
+function coopAlt(other, p1) {
+  const b = G.ball, off = G.poss === G.human && !(b.holder && b.holder.side !== G.human);
+  if (p1 && off && G.O[0] !== other) return G.O[0];
+  const n = nearestTo(G.players.filter(p => p.side === G.human && p !== other && p !== b.holder && (p1 || (p.pos !== 'K' && p.pos !== 'P'))), b.holder || b);
+  if (!off) { if (p1) G.humanDef = n; else G.hd2 = n; }
+  return n;
+}
+// co-op player 2 before the snap: SWITCH / Q / a tap picks his receiver (offense) or his defender. Player 1 snaps
+function coopPresnap() {
+  if (G.sitOut || !G.O || !G.hp[1]) return;
+  const busy = G.hp[0], taps = G.online ? Input.taps : []; // (one computer: the mouse is player 1's)
+  if (G.poss === G.human) {
+    const list = [2, 3, 4, 1].map(i => G.O[i]).filter(r => r && r !== busy);
+    let to = null;
+    if (Input.hit('KeyQ') || Input.hit('Tab')) to = list[(list.indexOf(G.hp[1]) + 1) % list.length];
+    for (const c of taps) { let bd = 55; for (const r of list) { const dd = Math.hypot(sx(r.x) - c.x, sy(r.y) - 30 * viewZ - c.y); if (dd < bd) { bd = dd; to = r; } } }
+    if (to && to !== G.hp[1]) { G.coopSlot = G.O.indexOf(to); Sound.click(); updateHuman(); }
+    return;
+  }
+  if (Input.hit('KeyQ') || Input.hit('Tab')) presnapSwitch();
+  for (const c of taps) {
+    let best = null, bd = 55;
+    for (const d of G.D) { const dd = Math.hypot(sx(d.x) - c.x, sy(d.y) - 30 * viewZ - c.y); if (dd < bd && d !== busy) { bd = dd; best = d; } }
+    if (best && best !== G.humanDef) { G.humanDef = best; Sound.click(); updateHuman(); G.snapTimer = Math.max(G.snapTimer, 0.9); }
+  }
+}
 // before the snap: cycle through every defender so you can pick a pass rusher
 function presnapSwitch() {
   if (G.lock && lockedGuy()) return; // your guy is on the field: no switching
   const order = [3, 4, 0, 1, 2, 5, 6, 7].map(i => G.D[i]);
-  const i = order.indexOf(G.humanDef);
-  G.humanDef = order[(i + 1) % order.length]; Sound.click(); updateHuman();
+  let i = order.indexOf(G.humanDef);
+  do i = (i + 1) % order.length; while (order[i].isHuman && order[i] !== G.humanDef); // (co-op: skip your teammate's guy)
+  G.humanDef = order[i]; Sound.click(); updateHuman();
   G.snapTimer = Math.max(G.snapTimer, 0.6);
 }
 function nearestTo(list, t) { let best = null, bd = 1e9; for (const p of list) { const d = dist(p, t); if (d < bd && p.down <= 0) { bd = d; best = p; } } return best; }
 function cycleHumanDef() {
   if (G.lock && lockedGuy()) return;
   const b = G.ball; const target = b.holder || b;
-  const pool = G.players.filter(p => p.side === G.human && p !== G.humanDef && !(b.holder === p));
+  const pool = G.players.filter(p => p.side === G.human && p !== G.humanDef && !(b.holder === p) && !p.isHuman); // (co-op: not your teammate's guy)
   const n = nearestTo(pool, target.flight ? { x: target.flight.tx, y: target.flight.ty } : target);
   if (n) { G.humanDef = n; Sound.click(); }
 }
@@ -1310,7 +1375,7 @@ function mobileControl(p, dt, isCarrier) {
     if (isCarrier) { if (p.jukeCd <= 0) doJuke(p, { x: 0, y: wy(c.y) < p.y ? -1 : 1, m: 1 }); }
     else if (p.side !== G.poss || (b.holder && b.holder.side !== p.side)) {
       const w = { x: wx(c.x), y: wy(c.y) };
-      const mate = G.players.find(q => q.side === p.side && q !== p && Math.hypot(q.x - w.x, q.y - w.y) < 2.5);
+      const mate = G.players.find(q => q.side === p.side && q !== p && !q.isHuman && Math.hypot(q.x - w.x, q.y - w.y) < 2.5);
       if (mate) { G.humanDef = mate; Sound.click(); return true; }
       const car = b.holder;
       if (car && dist(p, car) < 4.5 && p.dive <= 0) { doDive(p, { x: car.x - p.x, y: car.y - p.y, m: 1 }); return true; }
@@ -1882,7 +1947,7 @@ function resolveBlocks(dt) {
     if (bl.role === 'screenblock') rate *= 1.8;
     const so = G.play.off; if (!big && bl.off && (so.screen || so.screenTo)) rate *= 0.6; // screens are built on these blocks: receivers set up to hold them
     if (G.play.off.draw && G.drawAt != null && big) rate *= 0.6; // the rushers came upfield on a draw: easy to ride them out
-    if (df.isHuman && withSide(df.side, () => Input.axis().m) > 0.3) rate *= 1.7;
+    if (df.isHuman && withCtl(df, () => Input.axis().m) > 0.3) rate *= 1.7;
     if (xfOn(df, 'unstoppable')) rate *= 2.6;
     if (passPro && (xfOn(df, 'relentless') || xfOn(df, 'dualthreat'))) rate *= 2.2;
     if (!passPro && xfOn(df, 'reinforcement')) rate *= 2.4;
@@ -2750,6 +2815,11 @@ function updateHint() {
   if (G.phase === 'kickmeter' || G.mini) { G.hint = ''; return; }
   if (G.cellyGuy && G.phase === 'dead') { G.hint = G.versus && !G.online ? `${pName(G.cellyGuy.side)}: CELEBRATE!` : G.mode === 'mobile' ? '' : 'CELLY:  ↑ Leap  ↓ Griddy  ← Spike  → Dab   1 Flex  2 Bow  3 Shush  4 Moonwalk   E Nap   F Bowling' + (G.weather === 'snow' ? '   R Snow Angel' : G.weather === 'rain' ? '   C Mud Slide' : '') + (clubCelly(G.cellyGuy) ? `   G ${clubCelly(G.cellyGuy).name}` : '') + CELLYS.filter(c => c.lock && Unlocks.has(c.id)).map(c => `   ${CELLY_KEY_NAME[c.keys[0]]} ${c.name}`).join(''); return; }
   if (coachOn()) { G.hint = G.phase === 'presnap' && G.poss === G.human ? (G.mode === 'mobile' ? 'You call the plays, your team plays them  •  TAP to snap' : 'You call the plays, your team plays them  •  SPACE snap  •  Z audible  •  T timeout') : G.phase === 'presnap' || G.phase === 'live' ? 'You call the plays, your team plays them' + (G.phase === 'presnap' && G.mode !== 'mobile' ? '  •  Z audible  •  T timeout' : '') : ''; return; }
+  if (G.coop && G.phase === 'presnap' && !G.sitOut) { // co-op: who does what before the snap
+    const off = G.poss === G.human, guest = G.online && typeof Net !== 'undefined' && Net.role === 'guest', mob = G.mode === 'mobile';
+    if (guest) { G.hint = (off ? 'Your friend snaps it  •  ' : '') + (mob ? `SWITCH or TAP a ${off ? 'receiver' : 'defender'} to pick your guy` : `Q pick your ${off ? 'receiver' : 'defender'}`); return; }
+    if (!G.online) { G.hint = off ? 'P1: SPACE snap  •  1-4 hot route  •  T timeout     P2: L pick your receiver' : 'P1: Q pick defender  •  V press  •  B show blitz     P2: L pick defender'; return; }
+  }
   if (G.mode === 'mobile') return updateHintMobile();
   if (G.versus && !G.online) {
     const k = s => s === G.p1 ? 'SPACE' : 'ENTER';

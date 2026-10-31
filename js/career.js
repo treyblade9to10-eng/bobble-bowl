@@ -453,7 +453,7 @@ const Career = {
 
   // ---------------- trophy case (all modes) ----------------
   gameDone(s) {
-    if (G.versus || G.challenge || G.mini) return;
+    if (G.versus || G.coop || G.challenge || G.mini) return; // (co-op games don't count)
     const me = s.human, them = 1 - me, T = this.tro;
     T.games++;
     if (s.score[me] > s.score[them]) {

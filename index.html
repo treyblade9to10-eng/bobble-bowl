@@ -142,7 +142,7 @@
         <label>Meter speed <select id="optMeterSpd"><option value="normal">Normal</option><option value="slow">Slow</option><option value="fast">Fast</option></select></label>
         <label>Catch meter <select id="optCatchM"><option value="1">On</option><option value="0">Off</option></select></label>
         <label>Defense meter <select id="optDefM"><option value="0">Off</option><option value="1">On</option></select></label>
-        <label>Players <select id="optPlayers"><option value="1">1 vs CPU</option><option value="2">2 Players</option></select></label>
+        <label>Players <select id="optPlayers"><option value="1">1 vs CPU</option><option value="2">2 Players</option><option value="coop">2 Players Co-op</option></select></label>
       </div>
     </div>
     <div id="selHint"></div>
@@ -232,6 +232,12 @@
         <div class="onFilt"><button data-f="all">ALL</button><button data-f="nfl">NFL</button><button data-f="mine">MY TEAMS</button></div>
       </div>
       <div id="onSide">
+        <!-- VERSUS / CO-OP + the CPU team and level for co-op (main.js renderOnlineMode) -->
+        <div id="onSet">
+          <div class="muRow"><div class="muL">MODE</div><div class="muC seg" id="onMode"><button data-m="vs">VERSUS</button><button data-m="coop">CO-OP</button></div></div>
+          <div class="muRow onCo"><div class="muL">CPU TEAM</div><div class="muC step" id="onCpuRow"><button class="muStep" data-d="-1" aria-label="previous team"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button><span class="muV" id="onCpuName"></span><button class="muStep" data-d="1" aria-label="next team"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></button></div></div>
+          <div class="muRow onCo"><div class="muL">CPU</div><div class="muC seg" id="onDiff"><button data-v="0">ROOKIE</button><button data-v="1">PRO</button><button data-v="2">ALL-PRO</button><button data-v="3">MADDEN</button></div></div>
+        </div>
         <div id="onPick"><button class="big gold" id="onHost">HOST GAME</button><button class="big" id="onJoin">JOIN GAME</button></div>
         <div id="onCodeBox" style="display:none"><div class="onLbl">YOUR CODE</div><div id="onCode">....</div></div>
         <div id="onJoinBox" style="display:none"><input id="onCodeIn" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="CODE"><button class="big gold" id="onGo">JOIN</button></div>
@@ -373,6 +379,7 @@
     <button data-k="KeyC" data-show="ret">FAIR CATCH</button>
     <button data-k="KeyM" data-show="presnap" data-side="off">MOTION</button>
     <button data-k="KeyQ" data-show="presnap" data-side="def" id="mbPreSw">SWITCH</button>
+    <button data-k="KeyQ" data-show="cpre">SWITCH</button>
     <button data-k="KeyV" data-show="presnap" data-side="def">PRESS</button>
     <button data-k="KeyB" data-show="presnap" data-side="def">SHOW BLITZ</button>
     <button data-k="KeyZ" data-show="presnap">AUDIBLE</button>
