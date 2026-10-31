@@ -1546,3 +1546,7 @@ body.mobile #chalBtn { top: 50px; width: 170px; font-size: 21px; padding: 10px 1
 .bcLocked .muC button:disabled { opacity: .35; cursor: default; }
 .bcLocked .muC button.on:disabled { opacity: 1; }
 .bcLockNote { flex-basis: 100%; font-family: var(--hd); font-weight: 800; font-size: 12px; letter-spacing: .08em; color: #ff9a3c; margin-top: 4px; }
+/* update ready: one-tap update bar on the menus */
+#updBar { display: none; position: fixed; top: max(8px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%) skewX(-10deg); z-index: 60; margin: 0; padding: 8px 18px; background: var(--gold); color: #111; font-family: var(--hd); font-weight: 800; font-size: 15px; letter-spacing: .08em; box-shadow: 0 4px 14px #0008; }
+#updBar.on { display: flex; gap: 10px; align-items: center; }
+#updBar b { font-weight: 900; font-style: italic; } #updBar span { background: #111; color: var(--gold); padding: 2px 8px; font-size: 12px; }

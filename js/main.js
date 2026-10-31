@@ -1048,6 +1048,25 @@ requestAnimationFrame(frame);
 
 // ---------- install as an app (home screen icon, full screen, works offline) ----------
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
+// new version out? check the live page (skipping every cache) and offer a one-tap update on the menus
+function checkUpdate() {
+  if (!location.protocol.startsWith('http') || (G.teams && !G.demo)) return;
+  fetch('index.html?u=' + Date.now(), { cache: 'no-store' }).then(r => r.ok ? r.text() : '').then(t => {
+    const m = t.match(/class="ver">(v[\d.]+)</), cur = (document.querySelector('.ver') || {}).textContent;
+    if (!m || !cur || m[1] === cur.trim()) return;
+    let el = $('updBar');
+    if (!el) { el = document.createElement('button'); el.id = 'updBar'; document.body.appendChild(el); el.onclick = doUpdate; }
+    el.innerHTML = `<b>UPDATE READY</b> ${m[1]}<span>TAP TO UPDATE</span>`; el.classList.add('on');
+  }).catch(() => {});
+}
+async function doUpdate() {
+  $('updBar').innerHTML = '<b>UPDATING...</b>';
+  try { const r = await navigator.serviceWorker.getRegistration(); if (r) await r.update(); } catch (e) {}
+  try { for (const k of await caches.keys()) await caches.delete(k); } catch (e) {}
+  location.replace(location.pathname + '?u=' + Date.now());
+}
+setTimeout(checkUpdate, 2500); setInterval(checkUpdate, 5 * 60000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) checkUpdate(); });
 let installEvt = null;
 window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; $('btnInstall').style.display = ''; });
 $('btnInstall').onclick = async () => { if (!installEvt) return; installEvt.prompt(); try { await installEvt.userChoice; } catch (e) {} installEvt = null; $('btnInstall').style.display = 'none'; };
