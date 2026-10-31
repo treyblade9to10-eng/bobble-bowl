@@ -835,7 +835,7 @@ const Net = {
     this.sendT -= dt;
     if (this.sendT > 0) return;
     // how you're playing right now: a controller plays like the keyboard even in Mobile mode (the host only knew the mode you joined with)
-    const md = Pad.ui ? 'computer' : G.mode; if (G.netModes) G.netModes[G.human] = md;
+    const md = Pad.ui ? 'computer' : G.mode; if (G.netModes) G.netModes[G.coop ? 1 : G.human] = md;
     const m = { held: NET_KEYS.filter(c => Input.down[c]), st: [r2(Input.stick.x), r2(Input.stick.y), r2(Input.stick.m)], ax: Input.pads[0] ? [r2(ax.x), r2(ax.y), r2(ax.m)] : null, p: ptr, md: md === 'mobile' ? 1 : 0 };
     const q = this.pr; // where you have your guy (see predict)
     if (q) m.me = [G.players.indexOf(q.p), r2(q.x), r2(q.y), r2(q.vx), r2(q.vy), Math.round(q.t)];
