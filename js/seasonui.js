@@ -20,7 +20,7 @@ function renderSeasonNew() {
   }
   if (!(snIdx >= 0 && snIdx < TEAMS.length)) snIdx = 0;
   const t = TEAMS[snIdx], card = $('pSeason');
-  card.querySelector('.muBody').innerHTML = muCard(t);
+  Career.noCAP = true; try { card.querySelector('.muBody').innerHTML = muCard(t); } finally { Career.noCAP = false; }
   card.style.setProperty('--c1', t.c1); card.style.setProperty('--c2', t.c2); card.style.setProperty('--fg', textOn(t.c1));
   card.querySelector('.muCnt').textContent = `${snIdx + 1} / ${TEAMS.length}`;
   $('snMine').style.display = TEAMS.some(x => x.custom) ? '' : 'none';
@@ -74,7 +74,7 @@ let snGConf = 'all';
 function snOpenGrid(f) { snGConf = f || 'all'; Sound.click(); snRenderGrid(); $('snGrid').classList.add('show'); $('snGList').scrollTop = 0; }
 function snRenderGrid() {
   document.querySelectorAll('#snGTabs button').forEach(b => b.classList.toggle('on', b.dataset.f === snGConf));
-  const tile = (t, i) => `<button class="tgT${snIdx === i ? ' cur' : ''}" data-i="${i}" style="--c1:${t.c1};--c2:${t.c2}">${teamBadge(t)}<span class="tgN">${t.city}<br><b>${t.name}</b></span><span class="tgO">${teamOvr(Career.withCAP(t))}</span></button>`;
+  const tile = (t, i) => `<button class="tgT${snIdx === i ? ' cur' : ''}" data-i="${i}" style="--c1:${t.c1};--c2:${t.c2}">${teamBadge(t)}<span class="tgN">${t.city}<br><b>${t.name}</b></span><span class="tgO">${teamOvr(t)}</span></button>`;
   let h = '';
   for (const conf of ['AFC', 'NFC']) for (const dv of ['East', 'North', 'South', 'West']) {
     if (snGConf !== 'all' && snGConf !== conf) continue;

@@ -138,8 +138,11 @@ const Career = {
       { cap: true, thp: c.pos === 'QB' ? c.a[0] : null, tha: c.pos === 'QB' ? c.a[1] : null, visor: !!c.gear.visor, gloves: gl, teamGloves: c.gear.gloves === 'team', tw: c.tw ? { pos: c.tw.pos, d: this.ovr2() - this.ovr() } : null }];
   },
   // slot the created player onto his team's roster (replacing the weakest guy at his spot)
+  // (never in a Season / franchise: those leagues are separate from your career, so he can't show up in their games, stats or sims)
+  noCAP: false,
   withCAP(team) {
     const c = this.cap; if (!c || !team || c.team !== team.id || c.phase === 'retired') return team;
+    if (this.noCAP || (G.season && !G.career && !(typeof Season !== 'undefined' && Season.slot === 'career'))) return team;
     if (team.off.concat(team.def).some(p => p[6] && p[6].cap)) return team; // already on there
     const t = { ...team, off: team.off.slice(), def: team.def.slice() }, tp = this.tuple();
     const swap = (list, idxs) => { let bi = idxs[0]; for (const i of idxs) if (list[i][3] < list[bi][3]) bi = i; list[bi] = tp; };
