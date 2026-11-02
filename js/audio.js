@@ -2,7 +2,12 @@
 // only the real-sounding ones play: whistles, hits, crowd, thunder. The old 8-bit beeps (square/sawtooth/triangle) are gone (Trey: 'dumb sounds')
 const Sound = {
   ctx: null, muted: false,
-  init() { if (!this.ctx) { try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} } if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume(); },
+  init() {
+    // iPhone: the silent switch mutes web game sound unless we ask for 'playback' (iOS 17+), older iOS: a silent <audio> loop does the same
+    if (!this.unlocked) { this.unlocked = true;
+      try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
+      try { const a = new Audio('data:audio/mp4;base64,AAAAHGZ0eXBNNEEgAAACAE00QSBpc29taXNvMgAAAAhmcmVlAAAAGm1kYXQhEAUgpBv/wAAAAAAAAAAAAAAAAAAAAA=='); a.loop = true; a.volume = 0.01; a.setAttribute('playsinline', ''); a.play().catch(() => {}); this.keep = a; } catch (e) {} }
+    if (!this.ctx) { try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} } if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume(); },
   tone(freq, dur, type = 'square', vol = 0.12, slide = 0, delay = 0) {
     if (this.muted || !this.ctx || type !== 'sine') return;
     const c = this.ctx, t = c.currentTime + delay;
