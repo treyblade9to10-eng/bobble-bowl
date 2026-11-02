@@ -9,6 +9,7 @@ const HL_PF = [
   [p => p.jump, (p, v) => p.jump = v, 50, 1], [p => p.spin, (p, v) => p.spin = v, 20, 1], [p => p.stiff, (p, v) => p.stiff = v, 20, 1],
   [p => p.throwAnim, (p, v) => p.throwAnim = v, 20, 1], [p => p.celebrate, (p, v) => p.celebrate = v, 10, 1], [p => p.dizzy, (p, v) => p.dizzy = v, 10, 1],
   [p => p.kneel, (p, v) => p.kneel = v, 20, 1], [p => p.sprinting ? 1 : 0, (p, v) => p.sprinting = !!v, 1, 0], [p => p.engaged ? 1 : 0, (p, v) => p.engaged = v ? true : null, 1, 0],
+  [p => p.mvK || 0, (p, v) => p.mvK = v, 1, 0], [p => p.mvT || 0, (p, v) => p.mvT = v, 50, 1], // hurdle / catch poses (moves.js)
   [p => p.head.ox, (p, v) => p.head.ox = v, 1, 1], [p => p.head.oy, (p, v) => p.head.oy = v, 1, 1], [p => p.head.rot, (p, v) => p.head.rot = v, 50, 1],
   [p => p.celly ? p.celly.t : 0, (p, v) => { if (p.celly) p.celly.t = v; }, 20, 1]
 ];
@@ -118,6 +119,9 @@ const Highlights = {
       ex = 14 + Math.min(30, gain * 0.7); title = `${gain}-YD ${rec ? 'CATCH' : 'RUN'}`; who = rec ? `${N(cr.passer && cr.passer.name)} TO ${N(cr.p.name)}` : N(cr.p.name);
       if (rec && c.catchI >= 0) key = c.catchI;
     }
+    const lc = G.lastCatch && G.lastCatch.t >= c.t0 - 1e-6 && cr && cr.kind === 'rec' && lr.type !== 'inc' ? G.lastCatch.k : null; // one-handed / diving / toe-tap (moves.js)
+    if (lc && !title) { ex = 18 + Math.max(0, gain) * 0.4 + (lc === 'dive' ? 0 : 6); title = lc === 'toe' ? 'TOE-TAP CATCH' : lc === 'dive' ? 'DIVING CATCH' : 'ONE-HANDED CATCH'; who = N(cr.p.name); if (c.catchI >= 0) key = c.catchI; }
+    else if (lc && /CATCH|PASS/.test(title)) ex += 8;
     if (c.boomI >= 0) { // hit stick / BOOM tackle
       if (!title) { title = 'BIG HIT'; who = G.lastTackler ? N(G.lastTackler.name) : ''; team = def; ex = 24; } else ex += 10;
       if (!/TD|PASS|PICK/.test(title)) key = c.boomI;

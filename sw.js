@@ -43,6 +43,7 @@ const FILES = [
   'js/celly.js',
   'js/teamcellys.js',
   'js/special.js',
+  'js/moves.js',
   'js/rules.js',
   'js/flow.js',
   'js/highlights.js',

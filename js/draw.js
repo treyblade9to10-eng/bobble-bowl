@@ -701,7 +701,7 @@ function limbBlit(g, key, x0, y0, x1, y1, paint) {
   g.drawImage(c, c.X0, c.Y0);
 }
 function paintLeg(g, p, look, ck, hx, hy, kx, ky, fxp, fyp) {
-  g.strokeStyle = OUT; g.lineWidth = 10; g.lineCap = 'round';
+  g.strokeStyle = OUT; g.lineWidth = 10; g.lineCap = 'round'; g.lineJoin = 'round'; // (round: a sharp knee bend, like a hurdle, can't spike)
   g.beginPath(); g.moveTo(hx, hy); g.lineTo(kx, ky); g.lineTo(fxp, fyp - 2); g.stroke();
   g.strokeStyle = look.pants; g.lineWidth = 7;
   g.beginPath(); g.moveTo(hx, hy); g.lineTo(kx, ky); g.stroke();
@@ -753,7 +753,7 @@ function drawPlayer(g, p, G, at) {
   const carrying = G.ball && G.ball.holder === p;
   const celebrate = p.celebrate > 0;
   const jumping = p.jump > 0;
-  const cel = p.celly, ct = cel ? cel.t : 0, pose = cel ? Celly.pose(p, cel.type, ct) : p.slideT > 0 && p.down > 0 ? slidePose(p, HIP0(p)) : null;
+  const cel = p.celly, ct = cel ? cel.t : 0, pose = cel ? Celly.pose(p, cel.type, ct) : p.slideT > 0 && p.down > 0 ? slidePose(p, HIP0(p)) : p.mvT > 0 && typeof movePose === 'function' ? movePose(p, HIP0(p)) : null; // (moves.js: hurdle / catches)
   if (pose && !cel) k = 0;
   let hop = (celebrate && !cel && !p.pinAt ? Math.abs(Math.sin(G.time * 10 + p.slot)) * 14 : 0) + (jumping ? Math.sin((0.55 - p.jump) / 0.55 * Math.PI) * 30 : 0);
   if (pose) hop = pose.hop;
@@ -805,7 +805,7 @@ function drawPlayer(g, p, G, at) {
     if (pose.lie) { g.translate(0, -6); g.rotate(pose.lie * dir); }
     if (pose.sy !== 1) g.scale(1 / Math.sqrt(pose.sy), pose.sy); // squash and stretch
   }
-  if (p.down > 0 && !(p.slideT > 0)) { g.translate(0, -6); g.rotate(p.downDir * 1.45); }
+  if (p.down > 0 && !(p.slideT > 0) && !(pose && pose.own)) { g.translate(0, -6); g.rotate(p.downDir * 1.45); }
   else if (p.dive > 0) { g.rotate(dir * 1.0); }
   const spinScale = p.spin > 0 ? Math.cos(p.spin * 20) : 1;
   g.scale(dir * (Math.abs(spinScale) < 0.15 ? 0.15 * Math.sign(spinScale || 1) : spinScale), 1);
@@ -909,6 +909,7 @@ function drawPlayer(g, p, G, at) {
     }
   }
   if (cel) Celly.overlay(g, p, x, y, hop);
+  if (p.nerve > 0.3 && typeof drawNerves === 'function') drawNerves(g, p, x, y - hop); // QB feeling the rush
   // labels
   const headTop = y - hop - (big ? 85 : 92);
   if (at) return;
@@ -1333,6 +1334,7 @@ function drawHUD(g, G) {
   const crowdOn = moOn && Crowd.show();
   if (crowdOn) drawCrowd(g, x0 + W - 126, y0 + H + (G.bcast === 'XMAS' ? 10 : 4), Crowd.level());
   if (typeof Flow !== 'undefined' && !G.mini) { Flow.drawDrill(g, x0 + W - 96, y0 + H + (G.bcast === 'XMAS' ? 10 : 4) + (crowdOn ? 26 : 0)); Flow.drawTag(g); } // 2:00 DRILL tag + MOMENTUM SWING (flow.js)
+  if (typeof drawWindTag === 'function') drawWindTag(g, G, x0, y0, W); // wind arrow + mph (moves.js)
   drawHUDRest(g, G, S, x0, y0, W, H);
 }
 // a picture of part of the scorebug, painted in screen pixels (keeps any half pixel of the centered bar)
