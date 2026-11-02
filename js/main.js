@@ -676,6 +676,7 @@ G.hooks.onGameOver = s => {
   $('btnAgain').style.display = $('btnNewTeams').style.display = inSeason || inCareer ? 'none' : '';
   if (G.online) $('btnAgain').style.display = 'none';
   if (inSeason && G.playoff && won) $('overTitle').textContent = Season.data.phase === 'done' ? 'CHAMPIONS' : 'YOU ADVANCE!';
+  if (G.tourney) Tourney.gameOver(s); // couch tournament: bracket result + BRACKET button
   // the Bobble Bowl: trophy ceremony for the winners first (a Quick Game Bobble Bowl win goes in the Trophy Case too)
   if (G.bigGame && won && !inSeason && !G.career && !G.versus && !G.coop && !G.online) Career.addTitle(s.teams[me].id, G.bigGame.year);
   if (G.bigGame && !tie && !G.demo) {
@@ -743,8 +744,8 @@ function hlMenu(from) {
   show('hlMenu');
 }
 screens.push('hlMenu');
-$('btnAgain').onclick = () => { const c = G.challenge; show(null); if (c) runChallenge(c.type); else startGame(); };
-$('btnNewTeams').onclick = () => { if (G.online) { Net.leave(); G.teams = null; G.online = false; show('title'); return; } const c = G.challenge; G.teams = null; G.challenge = null; if (c) openModes(); else { renderSelect(); show('select'); } };
+$('btnAgain').onclick = () => { if (G.tourney) return Tourney.back(); const c = G.challenge; show(null); if (c) runChallenge(c.type); else startGame(); };
+$('btnNewTeams').onclick = () => { if (G.tourney) return Tourney.back(); if (G.online) { Net.leave(); G.teams = null; G.online = false; show('title'); return; } const c = G.challenge; G.teams = null; G.challenge = null; if (c) openModes(); else { renderSelect(); show('select'); } };
 
 // ---------- pause ----------
 // pause menu: every X-Factor in the game, both teams
@@ -769,6 +770,7 @@ $('btnQuit').onclick = () => {
   if (G.online) { Net.leave(); G.online = false; G.teams = null; G.phase = 'idle'; show('title'); return; }
   SaveGame.clear();
   G.paused = false; G.teams = null; G.phase = 'idle';
+  if (G.tourney) return Tourney.open(); // match doesn't count, play it again from the bracket
   if (G.career) { G.season = false; G.career = false; CareerUI.open(); } else if (G.season) { G.season = false; openSeason(); } else if (G.challenge || G.mini) { G.challenge = null; G.mini = null; openModes(); } else show('title');
 };
 window.addEventListener('keydown', e => { if (e.code === 'Escape' || e.code === 'KeyP') togglePause(); });
@@ -904,6 +906,7 @@ function openModes() {
   $('mdWeekly').innerHTML = weeklyHtml(true);
   $('mdCards').innerHTML = cards.map(([k, i, tt, dd, rr]) => `<div class="mdcard" tabindex="0" data-k="${k}"><div class="mi">${i}</div><div class="mt">${tt}</div><div class="md">${dd}</div><div class="mr">${rr}</div></div>`).join('');
   document.querySelectorAll('.mdcard').forEach(c => c.onclick = () => runChallenge(c.dataset.k));
+  Boards.tab('ch');
   show('modes');
 }
 function runChallenge(k) {

@@ -34,6 +34,7 @@
 <link rel="stylesheet" href="css/trade.css">
 <link rel="stylesheet" href="css/careerlife.css">
 <link rel="stylesheet" href="css/gamepad.css">
+<link rel="stylesheet" href="css/modes2.css">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#0c1016">
 <link rel="icon" type="image/png" sizes="48x48" href="icons/favicon-48.png">
@@ -292,11 +293,30 @@
   <!-- Challenges & mini-games -->
   <div id="modes" class="screen">
     <h2>Challenges</h2>
-    <div id="mdTeam"><button class="pgbtn" id="mdPrev">‹</button><span id="mdTeamName"></span><button class="pgbtn" id="mdNext">›</button></div>
+    <div id="mdTop">
+      <div id="mdTeam"><button class="pgbtn" id="mdPrev">‹</button><span id="mdTeamName"></span><button class="pgbtn" id="mdNext">›</button></div>
+      <div id="mdTabs"><button data-t="ch" class="on">CHALLENGES</button><button data-t="lb">LEADERBOARD</button><button data-t="tn">TOURNAMENT</button></div>
+    </div>
     <div id="mdWeekly"></div>
     <div id="mdCards"></div>
+    <div id="mdBoard" style="display:none"></div>
     <button id="mdBack">BACK</button>
   </div>
+  <!-- Couch Tournament (tourney.js) -->
+  <div id="tourney" class="screen">
+    <h2>Couch Tournament</h2>
+    <div id="tnBody"></div>
+    <div id="tnBtns"></div>
+  </div>
+  <!-- online leaderboard: the opt-in box (boards.js) -->
+  <div id="lbAsk"><div class="lbBox">
+    <b>ONLINE LEADERBOARD</b>
+    <p>Post your score to the online leaderboard? First name or nickname only.</p>
+    <input id="lbName" maxlength="12" placeholder="First name or nickname" autocomplete="off" spellcheck="false">
+    <div id="lbErr"></div>
+    <div class="row"><button id="lbNo">NO THANKS</button><button class="big gold" id="lbYes">POST IT</button></div>
+    <small>Off any time on the Challenges LEADERBOARD tab (that deletes your scores from it).</small>
+  </div></div>
   <div id="miniOver" class="screen">
     <h2 id="moTitle"></h2>
     <div id="moBig"></div>
@@ -444,6 +464,8 @@
 <script src="js/net.js"></script>
 <script src="js/themes.js"></script>
 <script src="js/main.js"></script>
+<script src="js/boards.js"></script>
+<script src="js/tourney.js"></script>
 <script src="js/practice.js"></script>
 <script src="js/draftchamps.js"></script>
 <script src="js/locker.js"></script>
