@@ -384,7 +384,7 @@ const OSN = {
 
   // ---------- screens ----------
   open(msg) {
-    Sound.init(); CT.useAll();
+    Sound.init(); CT.useAll(); onlineWait(null); // (the matchup's "waiting for..." banner)
     if (msg) this.msg = msg;
     this.loadMe();
     if (this.me) { this.listen(); if (this.L) this.view = this.L.st.ph === 'lobby' ? 'lobby' : 'hub'; } else this.view = 'setup';
