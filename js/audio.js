@@ -28,9 +28,23 @@ const Sound = {
       const k = order.shift(); if (!k) return;
       fetch(this.FILES[k]).then(r => r.ok ? r.arrayBuffer() : Promise.reject(r.status))
         .then(ab => new Promise((ok, no) => { const p = this.ctx.decodeAudioData(ab, ok, no); if (p && p.catch) p.catch(no); }))
-        .then(b => { this.buf[k] = { b, at: k.startsWith('st') ? 0 : this.marker(b) }; }, () => {}).then(next);
+        .then(b => { b = this.slim(k, b); this.buf[k] = { b, at: k.startsWith('st') ? 0 : this.marker(b) }; }, () => {}).then(next);
     };
     next();
+  },
+  // slow / low-memory devices (gfx.js): every file kept in mono, and the crowd + hits at half the sample rate.
+  // Decoded sound is big (about 56 MB in stereo at 48 kHz): this brings it to about 18 MB
+  slim(k, b) {
+    if (typeof Gfx === 'undefined' || !(Gfx.fast || Gfx.hint.some) || !this.ctx.createBuffer) return b;
+    const half = !['theme', 'hub', 'stTd', 'stKick'].includes(k) && b.sampleRate >= 32000, ch = b.numberOfChannels;
+    if (ch === 1 && !half) return b;
+    const n = b.length, L = b.getChannelData(0), R = ch > 1 ? b.getChannelData(1) : L, m = half ? n >> 1 : n;
+    try {
+      const o = this.ctx.createBuffer(1, m, half ? b.sampleRate / 2 : b.sampleRate), d = o.getChannelData(0);
+      if (!half) for (let i = 0; i < n; i++) d[i] = (L[i] + R[i]) * 0.5;
+      else for (let i = 0; i < m; i++) { const j = i * 2, p = j ? j - 1 : 0, q = j + 1 < n ? j + 1 : j; d[i] = (L[p] + R[p] + 2 * (L[j] + R[j]) + L[q] + R[q]) * 0.125; } // (smoothed, then every other sample)
+      return o;
+    } catch (e) { return b; }
   },
   // every loop / sprite file starts with a one-sample click, then 0.25 s of silence: works out the decoder's start delay on any browser
   marker(b) { const d = b.getChannelData(0), n = Math.min(d.length, Math.floor(b.sampleRate * 0.12)); let k = 0, m = 0; for (let i = 0; i < n; i++) if (Math.abs(d[i]) > m) { m = Math.abs(d[i]); k = i; } return k / b.sampleRate + 0.25; },

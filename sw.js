@@ -28,6 +28,7 @@ const FILES = [
   'js/audio.js',
   'js/plays.js',
   'js/draw.js',
+  'js/gfx.js',
   'js/logos.js',
   'js/stadiums.js',
   'js/fields.js',

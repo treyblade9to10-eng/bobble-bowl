@@ -24,6 +24,8 @@ const VY = 34; // screen offset so the HUD doesn't cover the play
 // uiK = name tags / meters / floating words get scaled back up by this so they stay readable
 const CAM_ZOOMS = { normal: 1, far: 0.84, farthest: 0.7 };
 let camZoom = 'normal', viewZ = 1, vk = 1, uiK = 1;
+// RS = GRAPHICS: FAST draws everything on a smaller canvas (gfx.js); screen pixels = RS x game pixels
+let RS = 1;
 function sx(x) { return (x - cam.x) * PX * vk + CW / 2; }
 function sy(y) { return (y - cam.y) * PY * vk + CH / 2 + VY * vk / viewZ; }
 function wx(px) { return (px - CW / 2) / (PX * vk) + cam.x; }
@@ -33,8 +35,8 @@ function uiAt(g, x, y) { if (uiK !== 1) { g.translate(x, y); g.scale(uiK, uiK); 
 // zoomed out: run f at screen size (rain, snow, night lights are on the camera, not the field). false = not zoomed out (or celly cam)
 function onScreen(g, f) {
   const m = g.getTransform(), z = viewZ, cw = CW, ch = CH, uk = uiK;
-  if (z === 1 || vk !== 1 || Math.abs(m.a - z) > 1e-6 || Math.abs(m.d - z) > 1e-6 || m.b || m.c) return false;
-  g.save(); g.setTransform(1, 0, 0, 1, m.e, m.f); CW = Math.round(cw * z); CH = Math.round(ch * z); vk = z; uiK = 1;
+  if (z === 1 || vk !== 1 || Math.abs(m.a - z * RS) > 1e-6 || Math.abs(m.d - z * RS) > 1e-6 || m.b || m.c) return false;
+  g.save(); g.setTransform(RS, 0, 0, RS, m.e, m.f); CW = Math.round(cw * z); CH = Math.round(ch * z); vk = z; uiK = 1;
   try { f(); } finally { CW = cw; CH = ch; vk = 1; uiK = uk; g.restore(); }
   return true;
 }
@@ -184,7 +186,7 @@ function drawField(g, G) {
   const pat = edge ? crowdPat : null;
   if (pat) {
     // zoomed-out camera: filled on the screen with a shrunk tile (copies straight instead of resampling)
-    const m = g.getTransform(), z = viewZ, flat = z !== 1 && Math.abs(m.a - z) < 1e-6 && Math.abs(m.d - z) < 1e-6 && !m.b && !m.c && crowdTile(z);
+    const m = g.getTransform(), z = viewZ * RS, flat = z !== 1 && Math.abs(m.a - z) < 1e-6 && Math.abs(m.d - z) < 1e-6 && !m.b && !m.c && crowdTile(z);
     const k = flat ? z : 1, tw = flat ? crowdZ.width : 156, th = flat ? crowdZ.height : 72, ex = flat ? m.e : 0, ey = flat ? m.f : 0;
     const tx = ((-cam.x * PX * k) % tw + tw) % tw - tw, ty = ((-cam.y * PY * k) % th + th) % th - th;
     // only around the field picture (it covers the rest): the zoomed-out camera always sees some of this
@@ -203,7 +205,7 @@ function drawField(g, G) {
   if (typeof Flow !== 'undefined') Flow.drawBench(g); // the bench jumps up on big plays (flow.js)
   // jumping fans when hyped (mostly home colors: it's their crowd), both stands
   if (G.crowdHype > 0.05) {
-    const top = sy(-FIELD_PAD_TOP), bot = sy(FIELD_W + 3.4), n = G.crowdHype > 1 ? 56 : 40;
+    const top = sy(-FIELD_PAD_TOP), bot = sy(FIELD_W + 3.4), n = (G.crowdHype > 1 ? 56 : 40) >> (RS < 1 ? 1 : 0); // (GRAPHICS: FAST = half)
     for (let i = 0; i < n; i++) {
       const x = (i * 97 + G.time * 20) % (CW + 40) - 20, j = Math.abs(Math.sin(G.time * 11 + i)) * 10 * Math.min(1.6, G.crowdHype);
       g.fillStyle = i % 4 === 3 ? G.teams[1].c1 : i % 3 ? G.teams[0].c1 : G.teams[0].c2;
@@ -299,7 +301,7 @@ function slidePose(p, HIP) {
 
 // draw a canvas laid out like the field canvas (same padding + scale) under the current camera
 function blitWorld(g, cv) {
-  if (viewZ !== 1 && (cv === fieldCv || (typeof wxMix !== 'undefined' && cv === wxMix)) && blitShrunk(g, cv)) return;
+  if (viewZ * RS !== 1 && (cv === fieldCv || (typeof wxMix !== 'undefined' && cv === wxMix)) && blitShrunk(g, cv)) return;
   // draw a bit past the screen edges too, so the zoomed celly cam never runs off the painted area
   const z = cam.zoom > 1.001, mx = z ? CW * 0.75 : 40, my = z ? CH * 0.75 : 40; // 40px covers screen shake
   let srcX = (wx(-mx) + FIELD_PAD_X) * PX, srcY = (wy(-my) + FIELD_PAD_TOP) * PY;
@@ -316,7 +318,7 @@ function blitWorld(g, cv) {
 let zoomPic = null;
 const zoomMargins = z => [Math.round(6 * PX * z), Math.round(6 * PY * z)];
 function blitShrunk(g, cv) {
-  const m = g.getTransform(), z = viewZ, [mx, my] = zoomMargins(z);
+  const m = g.getTransform(), z = viewZ * RS, [mx, my] = zoomMargins(z);
   if (Math.abs(m.a - z) > 1e-6 || Math.abs(m.d - z) > 1e-6 || m.b || m.c) return false; // celly cam: the normal way
   let zp = zoomPic;
   if (!zp || zp.src !== cv || zp.z !== z || zp.ver !== cv.ver || zp.field !== cv.field) {
@@ -611,7 +613,7 @@ const rotSprites = new Map(); let rotSpriteId = 0;
 function blitRot(g, c, dx, dy, dw, dh) {
   if (G.demo) return g.drawImage(c, dx, dy, dw, dh); // (the menu demo changes teams every play: nothing would get reused)
   const m = g.getTransform(), a = m.a, b = m.b, cc = m.c, d = m.d;
-  const z = Math.abs(a * a + b * b - viewZ * viewZ) < 1e-6 ? viewZ : 1;
+  const vz = viewZ * RS, z = Math.abs(a * a + b * b - vz * vz) < 1e-6 ? vz : 1;
   if (Math.abs(b) < 1e-9 && Math.abs(cc) < 1e-9 || Math.abs(a * a + b * b - z * z) > 1e-6 || Math.abs(cc * cc + d * d - z * z) > 1e-6 || Math.abs(a * cc + b * d) > 1e-6) return g.drawImage(c, dx, dy, dw, dh);
   const flip = a * d - b * cc < 0, q = Math.round((flip ? Math.atan2(-b, -a) : Math.atan2(b, a)) / 0.02), th = q * 0.02, co = Math.cos(th) * z, si = Math.sin(th) * z;
   if (!q && z === 1) { g.save(); g.setTransform(flip ? -1 : 1, 0, 0, 1, m.e, m.f); g.drawImage(c, dx, dy, dw, dh); g.restore(); return; } // tilted less than half a step: straight
@@ -685,7 +687,7 @@ function kickPose(p, G, HIP) {
 // arms and legs: the lines for one pose are painted once into a big sheet and copied from there after that
 // (16 players x 4 limbs x ~6 lines a frame was the slowest thing on phones). Only for straight-up players at normal zoom
 const LIMB_STEP = Math.PI * 2 / 48, limbCache = new Map();
-const q4 = v => Math.round(v * 4) / 4;
+const q4 = v => RS < 1 ? Math.round(v * 2) / 2 : Math.round(v * 4) / 4; // (GRAPHICS: FAST = coarser steps, fewer new pictures to paint)
 function limbBlit(g, key, x0, y0, x1, y1, paint) {
   let c = limbCache.get(key);
   if (c) { limbCache.delete(key); limbCache.set(key, c); } // (most recently used last)
@@ -798,7 +800,7 @@ function drawPlayer(g, p, G, at) {
   // plain standing/running (most of the time): the player goes on whole pixels and his arms/legs come from the limb sheet
   const m0 = !at && !G.demo && !pose && !kn && !kp && p.down <= 0 && !(p.dive > 0) && !(p.spin > 0) && g.globalAlpha === 1 ? g.getTransform() : null;
   const ms = m0 ? m0.a : 1; // (CAMERA zoomed out: the same, just shrunk)
-  const fast = !!m0 && (ms === 1 || Math.abs(ms - viewZ) < 1e-6) && m0.b === 0 && m0.c === 0 && m0.d === ms && m0.e === Math.round(m0.e) && m0.f === Math.round(m0.f);
+  const fast = !!m0 && (ms === 1 || Math.abs(ms - viewZ * RS) < 1e-6) && m0.b === 0 && m0.c === 0 && m0.d === ms && m0.e === Math.round(m0.e) && m0.f === Math.round(m0.f);
   g.save(); g.translate(fast ? Math.round(x) : x, fast ? Math.round(y - hop) : y - hop);
   if (pose) {
     if (pose.rot) { g.translate(0, -32); g.rotate(pose.rot * dir); g.translate(0, 32); } // spin around his belly, not his feet
@@ -823,7 +825,7 @@ function drawPlayer(g, p, G, at) {
 
   // legs (two segments) + cleats
   const gc = p.gear && p.gear.cleats, ck = gc && gc !== 'auto' ? (gc === 'team' ? look.jersey : GEAR_COL[gc]) : textOn(look.pants) === '#111' ? '#f2f2f2' : '#151515';
-  const dk = p.dirt >= 0.04 ? Math.round(p.dirt * 20) : 0, dirtKey = dk ? dk + p.name + G.weather : '';
+  const dk = p.dirt >= 0.04 ? Math.round(p.dirt * (RS < 1 ? 5 : 20)) : 0, dirtKey = dk ? dk + (RS < 1 ? p.side : p.name) + G.weather : '';
   const leg = (side, ph) => {
     const s = Math.sin(anim + ph) * kL, lift = Math.max(0, Math.cos(anim + ph)) * kL * 5;
     const hx = side * (W * 0.18), hy = -HIP;

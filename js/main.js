@@ -3,8 +3,9 @@ const cv = document.getElementById('game');
 const ctx = cv.getContext('2d');
 // widen the canvas on wide screens (phones) so the field fills it instead of black bars
 function fitCanvas() {
-  const w = Math.round(Math.min(Math.max(innerWidth / innerHeight, 16 / 9), 2.2) * CH);
-  if (cv.width !== w) { cv.width = w; CW = w; }
+  const w = Math.round(Math.min(Math.max(innerWidth / innerHeight, 16 / 9), 2.2) * CH), bw = Math.round(w * RS), bh = Math.round(CH * RS); // (GRAPHICS: FAST = smaller canvas, gfx.js)
+  if (cv.width !== bw || cv.height !== bh) { cv.width = bw; cv.height = bh; }
+  CW = w;
   document.documentElement.style.setProperty('--ar', w / CH);
 }
 fitCanvas();
@@ -277,7 +278,7 @@ const MU_GROUPS = [
   ['GAME', [['optQtr', 'QUARTERS'], ['optDiff', 'CPU'], ['optPlayers', 'PLAYERS'], ['optGame', 'GAME']]],
   ['CONDITIONS', [['optWeather', 'WEATHER'], ['optNight', 'TIME'], ['optBcast', 'BROADCAST'], ['sliders', 'SLIDERS']]],
   ['CONTROLS', [['optMeter', 'PASS METER'], ['optMeterSpd', 'METER SPEED'], ['optCatchM', 'CATCH METER'], ['optDefM', 'DEFENSE METER'], ['optCoach', 'COACH'], ['optCoachMode', 'COACH MODE']]],
-  ['LOOK', [['optLogos', 'LOGOS'], ['optNameTags', 'NAME TAGS'], ['uni', 'UNIFORMS'], ['stad', 'STADIUM']]]
+  ['LOOK', [['optLogos', 'LOGOS'], ['optNameTags', 'NAME TAGS'], ['optGfx', 'GRAPHICS'], ['uni', 'UNIFORMS'], ['stad', 'STADIUM']]]
 ];
 const muRows = []; // [select id, paint fn]
 function muSetShow(on) { $('muSet').classList.toggle('show', on); if (on) muPaint(); }
@@ -360,7 +361,7 @@ $('optPlayers').onchange = () => renderSelect(); fillSel('optUni1', UNIFORMS, 'a
 try { const o = JSON.parse(localStorage.getItem('bobbleOpts') || 'null'); if (o && !o.m100) { o.optCatchM = '1'; o.m100 = 1; o.m93 = 1; localStorage.setItem('bobbleOpts', JSON.stringify(o)); } } catch (e) {}
 try { const o = JSON.parse(localStorage.getItem('bobbleOpts') || 'null'); if (o && !o.m93) { o.optCatchM = '0'; o.optDefM = '0'; o.m93 = 1; localStorage.setItem('bobbleOpts', JSON.stringify(o)); } } catch (e) {}
 try { const o = JSON.parse(localStorage.getItem('bobbleOpts') || 'null'); if (o) for (const k in o) if ($(k)) $(k).value = o[k]; } catch (e) {}
-function saveOpts() { const o = {}; for (const k of ['optUni0', 'optUni1', 'optWeather', 'optNight', 'optBcast', 'optGame', 'optLogos', 'optQtr', 'optDiff', 'optCoach', 'optCoachMode', 'optPlayers', 'optMeter', 'optMeterSpd', 'optCatchM', 'optDefM', 'optNameTags', 'optZoom']) o[k] = $(k).value; o.m93 = 1; o.m100 = 1; if (Sliders.changed()) o.sliders = { ...Sliders.v }; try { localStorage.setItem('bobbleOpts', JSON.stringify(o)); } catch (e) {} }
+function saveOpts() { const o = {}; for (const k of ['optUni0', 'optUni1', 'optWeather', 'optNight', 'optBcast', 'optGame', 'optLogos', 'optQtr', 'optDiff', 'optCoach', 'optCoachMode', 'optPlayers', 'optMeter', 'optMeterSpd', 'optCatchM', 'optDefM', 'optNameTags', 'optZoom', 'optGfx']) o[k] = $(k).value; o.m93 = 1; o.m100 = 1; if (Sliders.changed()) o.sliders = { ...Sliders.v }; try { localStorage.setItem('bobbleOpts', JSON.stringify(o)); } catch (e) {} }
 buildMuSet(); // after the weather/uniform lists are filled
 $('optLogos').addEventListener('change', () => { Logo.setStyle($('optLogos').value); renderSelect(); });
 // NAME TAGS: ALL / KEY PLAYERS / OFF (draw.js reads nameTagMode every frame)
@@ -378,6 +379,15 @@ $('btnZoomOpt').onclick = () => {
   if (G.paused && G.teams && !G.demo) { render(); updateCamera(5); } // new zoom now, then put the camera where it would be (paused = it isn't moving)
 };
 $('btnSlidersOpt').onclick = () => { if (G.online) return; Sound.click(); Sliders.open(); };
+// GRAPHICS: AUTO / HIGH / FAST (gfx.js). FAST = smaller canvas + simpler effects for slow computers
+Gfx.init($('optGfx').value);
+$('optGfx').addEventListener('change', () => { Gfx.set($('optGfx').value); gfxLabel(); });
+function gfxLabel() { $('btnGfxOpt').textContent = 'GRAPHICS: ' + Gfx.label(); }
+gfxLabel();
+$('btnGfxOpt').onclick = () => {
+  Sound.click(); $('optGfx').value = { auto: 'high', high: 'fast', fast: 'auto' }[Gfx.pref]; Gfx.set($('optGfx').value); saveOpts(); gfxLabel();
+  if (G.paused && G.teams && !G.demo) render();
+};
 Logo.onReady(() => { if ($('select').classList.contains('show')) renderSelect(); });
 // Coach Mode (you call the plays, the CPU plays them): one saved setting shared by Quick Game, Season and the pause menu
 function setCoachMode(on) {
@@ -756,9 +766,9 @@ function renderPauseXF() {
 function togglePause() {
   if (!G.teams || G.phase === 'over' || G.demo || Highlights.on || $('hlMenu').classList.contains('show')) return;
   $('btnSlidersOpt').style.display = G.online ? 'none' : '';
-  if (G.online) { const on = !$('pause').classList.contains('show'); if (on) { zoomLabel(); $('pausePbp').innerHTML = '<div class="pbpHead">ONLINE GAME KEEPS GOING WHILE THIS IS OPEN</div>' + pbpHtml(6); show('pause'); } else show(null); return; }
+  if (G.online) { const on = !$('pause').classList.contains('show'); if (on) { zoomLabel(); gfxLabel(); $('pausePbp').innerHTML = '<div class="pbpHead">ONLINE GAME KEEPS GOING WHILE THIS IS OPEN</div>' + pbpHtml(6); show('pause'); } else show(null); return; }
   G.paused = !G.paused;
-  if (G.paused) { G.pauseFrom = $('playcall').classList.contains('show') ? 'playcall' : null; coachLabel(); tagsLabel(); zoomLabel(); $('btnCoachOpt').style.display = G.versus || G.coop || G.lock || G.mini || G.challenge ? 'none' : ''; $('pausePbp').innerHTML = pbpHtml(8); renderPauseXF(); show('pause'); }
+  if (G.paused) { G.pauseFrom = $('playcall').classList.contains('show') ? 'playcall' : null; coachLabel(); tagsLabel(); zoomLabel(); gfxLabel(); $('btnCoachOpt').style.display = G.versus || G.coop || G.lock || G.mini || G.challenge ? 'none' : ''; $('pausePbp').innerHTML = pbpHtml(8); renderPauseXF(); show('pause'); }
   else show(G.pauseFrom);
 }
 $('btnPause').onclick = togglePause;
@@ -943,10 +953,11 @@ function demoSetup() {
 // ---------- main loop ----------
 const menuScreens = ['title', 'how', 'select', 'mode', 'seasonNew', 'seasonHub', 'modes', 'miniOver', 'cap', 'trophies'];
 let last = performance.now();
-let errRun = 0, errPhase = '', menuSkip = false;
+let errRun = 0, errPhase = '', menuSkip = false, lastWork = 0;
 function frame(now) {
   requestAnimationFrame(frame); // schedule first so one bad frame can't freeze the game
-  try { step(now); errRun = 0; } catch (e) {
+  const t0 = performance.now();
+  try { step(now); errRun = 0; lastWork = performance.now() - t0; } catch (e) {
     if (errRun++ % 120 === 0) console.error(e);
     if (G.demo) G.phase = 'over';
     try { render(); } catch (e2) {} // keep the picture up even if the game logic tripped
@@ -959,20 +970,23 @@ cv.addEventListener('contextlost', () => resetGfx());
 cv.addEventListener('contextrestored', () => resetGfx());
 // a slow frame on a phone used to turn into slow motion (dt was capped at 1/30s). Now the game catches up in
 // small 1/60s steps so it keeps real speed and the physics stay steady. Taps/keys only count in the first step.
+// (up to 0.15s a frame: a slow Chromebook at ~10 fps still plays at real speed)
 function stepUpdate(raw) {
-  const n = Math.min(6, Math.max(1, Math.ceil(raw / (1 / 60) - 0.05))), h = raw / n;
+  const n = Math.min(9, Math.max(1, Math.ceil(raw / (1 / 60) - 0.05))), h = raw / n;
   for (let i = 0; i < n; i++) {
     if (i === 1) { Input.pressed = {}; Input.taps.length = 0; Input.release = null; if (G.online) Net.usedOneShots(); }
     update(h);
   }
 }
 function step(now) {
-  const raw = clamp((now - last) / 1000, 0, 0.1); last = now;
+  const gap = now - last, raw = clamp(gap / 1000, 0, 0.15); last = now;
   const dt = Math.min(raw, 0.033);
   if (Input.pointer.down) Input.pointer.t += dt;
   Pad.poll(dt);
   Input.versus = (!!G.versus || (!!G.coop && !G.online)) && !G.demo; if (!Input.versus) Input.ctl = 0; // (local co-op splits the keyboard too)
   const inMenu = menuScreens.some(id => $(id).classList.contains('show')) && !(G.mini && $('miniOver').classList.contains('show'));
+  const onTitle = $('title').classList.contains('show');
+  Gfx.sample(gap, lastWork, inMenu ? onTitle : !!G.teams && !G.demo && !G.paused && !Highlights.on && G.phase !== 'over' && !document.querySelector('.screen.show')); // (AUTO graphics)
   if (Highlights.on) Highlights.update(raw); // the highlight reel drives the picture by itself
   else if (inMenu) {
     if (!G.demo || G.phase === 'over') demoSetup();
@@ -992,8 +1006,8 @@ function step(now) {
   }
   updateMobileButtons();
   Review.ui();
-  // behind a menu the demo game is mostly covered: draw it at 30fps so the phone has time for the menu itself (the title keeps 60)
-  if (!(inMenu && !Highlights.on && !$('title').classList.contains('show') && (menuSkip = !menuSkip))) render();
+  // behind a menu the demo game is mostly covered: draw it at 30fps so the phone has time for the menu itself (the title keeps 60, not on FAST graphics)
+  if (!(inMenu && !Highlights.on && (!onTitle || Gfx.fast) && (menuSkip = !menuSkip))) render();
   Input.endFrame();
 }
 
@@ -1001,13 +1015,14 @@ function render() {
   // CAMERA zoomed out (pause menu): the world is drawn scaled down, sized as if the screen were bigger (draw.js CAM_ZOOMS)
   const z = G.teams && !G.demo ? (CAM_ZOOMS[camZoom] || 1) * (typeof Flow !== 'undefined' ? Flow.camK() : 1) : 1, cel = cam.zoom > 1.001 && cam.focus && G.phase !== 'replay';
   scrW = CW; scrH = CH; viewZ = vk = z; // (taps + the camera use viewZ until the next frame)
+  ctx.setTransform(RS, 0, 0, RS, 0, 0); // GRAPHICS: FAST paints the whole frame shrunk onto a smaller canvas (gfx.js)
   if (z !== 1) { CW = scrW / z; CH = scrH / z; vk = 1; uiK = lerp(1 / z, 1, cel ? clamp((cam.zoom - 1) / (1.6 / z - 1), 0, 1) : 0); }
   // draw with the camera on whole pixels: the big field picture then copies straight over instead of being resampled
   // every frame (3x cheaper on phones). Everything moves together, so nothing shifts against the field
   const camX = cam.x, camY = cam.y;
-  if (!cel && z === 1) { cam.x = (Math.round(cam.x * PX - CW / 2) + CW / 2) / PX; cam.y = Math.round(cam.y * PY) / PY; }
-  else if (!cel) { // zoomed out: the shrunk field picture's corner on a whole screen pixel
-    const ax = z * PX, ay = z * PY, ox = scrW / 2, oy = scrH / 2 + VY;
+  if (!cel && z === 1 && RS === 1) { cam.x = (Math.round(cam.x * PX - CW / 2) + CW / 2) / PX; cam.y = Math.round(cam.y * PY) / PY; }
+  else if (!cel) { // zoomed out (or a smaller FAST canvas): the shrunk field picture's corner on a whole screen pixel
+    const ax = z * RS * PX, ay = z * RS * PY, ox = RS * scrW / 2, oy = RS * (scrH / 2 + VY);
     cam.x = (Math.round(ax * (cam.x + FIELD_PAD_X) - ox) + ox) / ax - FIELD_PAD_X; cam.y = (Math.round(ay * (cam.y + FIELD_PAD_TOP) - oy) + oy) / ay - FIELD_PAD_TOP;
   }
   try { renderFrame(z); } finally { cam.x = camX; cam.y = camY; zoomDone(); }

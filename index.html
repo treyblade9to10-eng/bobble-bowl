@@ -141,6 +141,7 @@
         <label>Broadcast <select id="optBcast" data-seg="1"><option value="auto">Auto</option><option value="sun">Sunday</option><option value="TNF">TNF</option><option value="SNF">SNF</option><option value="MNF">MNF</option><option value="TGV">Turkey Day</option><option value="XMAS">Christmas</option><option value="HWN">Halloween</option></select></label>
         <label>Game <select id="optGame"><option value="reg">Regular</option><option value="bowl">Bobble Bowl</option></select></label>
         <label>Name tags <select id="optNameTags"><option value="all">All</option><option value="key" selected>Key Players</option><option value="off">Off</option></select></label>
+        <label>Graphics <select id="optGfx"><option value="auto" selected>Auto</option><option value="high">High</option><option value="fast">Fast</option></select></label>
         <label>Camera <select id="optZoom"><option value="normal" selected>Normal</option><option value="far">Far</option><option value="farthest">Farthest</option></select></label>
         <label>Logos <select id="optLogos"><option value="real">Real</option><option value="cartoon">Cartoon</option></select></label>
         <label>Pass meter <select id="optMeter"><option value="1">On</option><option value="0">Off</option></select></label>
@@ -380,7 +381,7 @@
   <div id="pause" class="screen">
     <h2>Paused</h2>
     <button class="big" id="btnResume">RESUME</button>
-    <div class="row"><button id="btnReplayOpt">INSTANT REPLAYS: ON</button><button id="btnCoachOpt">COACH MODE: OFF</button><button id="btnQuit">QUIT GAME</button></div>
+    <div class="row"><button id="btnReplayOpt">INSTANT REPLAYS: ON</button><button id="btnCoachOpt">COACH MODE: OFF</button><button id="btnGfxOpt">GRAPHICS: AUTO</button><button id="btnQuit">QUIT GAME</button></div>
     <div id="pauseXF"></div>
     <div class="row"><button id="btnZoomOpt">CAMERA: NORMAL</button><button id="btnTagsOpt">NAME TAGS: KEY PLAYERS</button><button id="btnSlidersOpt">SLIDERS</button><button id="btnPadOpt">CONTROLLER</button></div>
     <div id="pausePbp"></div>
@@ -437,6 +438,7 @@
 <script src="js/audio.js"></script>
 <script src="js/plays.js"></script>
 <script src="js/draw.js"></script>
+<script src="js/gfx.js"></script>
 <script src="js/logos.js"></script>
 <script src="js/stadiums.js"></script>
 <script src="js/fields.js"></script>

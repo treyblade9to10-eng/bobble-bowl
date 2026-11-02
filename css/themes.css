@@ -137,3 +137,6 @@ body.th-winter .muCard, body.th-christmas .muCard { background-image: radial-gra
 @media (prefers-reduced-motion: reduce) { .thFx *, .thFx { animation: none !important; } }
 .thFx.mini .thBranch { width: min(17vw, 170px); }
 .thFx.mini .thTop { opacity: .85; }
+/* GRAPHICS: FAST (gfx.js): the menu decorations stand still (slow computers spend the time on the game), falling bits hidden */
+body.gfxFast .thFx, body.gfxFast .thFx *, body.gfxFast .spook * { animation: none !important; }
+body.gfxFast .thP, body.gfxFast .spook .bat, body.gfxFast .spook .ghost { display: none; }

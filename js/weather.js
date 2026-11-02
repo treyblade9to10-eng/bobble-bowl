@@ -93,7 +93,17 @@ function buildWxGround(G) {
   }
 }
 // a footprint / slide mark on the ground (snow gets packed down to the grass, rain churns up mud)
+// GRAPHICS: FAST saves them up and paints a batch every 0.3 s (each paint makes the browser copy the whole field picture again)
+const markQ = [];
 function groundMark(x, y, r, big) {
+  if (!wxCv || wxCv.owner !== G.dirt || wxCv.kind !== G.weather) return;
+  if (RS < 1) { if (!markQ.length) markQ.t = G.time; markQ.push([x, y, r, big]); return; }
+  paintMark(x, y, r, big);
+}
+function flushMarks() {
+  if (markQ.length && (RS === 1 || G.time - markQ.t > 0.3 || G.time < markQ.t)) for (const m of markQ.splice(0)) paintMark(...m);
+}
+function paintMark(x, y, r, big) {
   if (!wxCv || wxCv.owner !== G.dirt || wxCv.kind !== G.weather) return;
   const g = wxCv.getContext('2d'), px = wxGx(x + rand(-0.25, 0.25)), py = wxGy(y + rand(-0.2, 0.2));
   // the same mark goes straight onto the field + ground picture too (never read the ground canvas back: that copies it every time)
@@ -119,6 +129,7 @@ function wxMixed(G) {
   if (!wet() || G.demo || !fieldCv || typeof document === 'undefined') return null;
   if (!wxCv || wxCv.owner !== G.dirt || wxCv.kind !== G.weather) buildWxGround(G);
   if (!wxCv) return null;
+  flushMarks();
   if (!wxMix || wxMix.field !== fieldCv || wxMix.src !== wxCv || wxMix.ver !== wxCv.ver) {
     const c = wxMix && wxMix.width === fieldCv.width && wxMix.height === fieldCv.height ? wxMix : document.createElement('canvas');
     if (c !== wxMix) { c.width = fieldCv.width; c.height = fieldCv.height; }
@@ -141,12 +152,12 @@ function windLean() { return G.wind ? G.wind.dir * Math.min(1, G.wind.mph / 14) 
 function drawWeather(g, G) {
   if (G.demo) return;
   if (onScreen(g, () => drawWeather(g, G))) return; // (CAMERA zoomed out: still screen size)
-  const t = G.time, lean = windLean();
+  const t = G.time, lean = windLean(), lo = typeof Gfx !== 'undefined' && Gfx.fast; // GRAPHICS: FAST = about half the drops, no sky haze (gfx.js)
   if (G.weather === 'rain') {
     // gloomy sky + mist rolling off the stands
-    g.drawImage(skyLayer(), 0, 0, CW, CH);
+    if (!lo) g.drawImage(skyLayer(), 0, 0, CW, CH);
     // rings in the puddles
-    if (wxCv && wxCv.puddles) for (const pd of wxCv.puddles) {
+    if (wxCv && wxCv.puddles && !lo) for (const pd of wxCv.puddles) {
       const x = sx(pd.x), y = sy(pd.y); if (x < -pd.rx || x > CW + pd.rx) continue;
       for (let k = 0; k < 3; k++) {
         const u = (t * 1.6 + k * 0.33 + pd.x * 0.13) % 1, ox = Math.sin(pd.y * 7 + k * 2 + Math.floor(t * 1.6 + k * 0.33 + pd.x * 0.13) * 3.1) * pd.rx * 0.45;
@@ -156,7 +167,7 @@ function drawWeather(g, G) {
     }
     // splashes hitting the turf
     g.strokeStyle = 'rgba(210,225,245,0.55)'; g.lineWidth = 1.2; g.beginPath();
-    for (let i = 0; i < 46; i++) {
+    for (let i = 0; i < (lo ? 20 : 46); i++) {
       const cyc = t * 3 + i * 0.37, u = cyc % 1, n = Math.floor(cyc), h = hashStr(i + ':' + n);
       const x = (h % 1000) / 1000 * CW, y = CH * 0.25 + ((h >> 10) % 1000) / 1000 * CH * 0.75, s = 2 + u * 6;
       if (u > 0.6) continue;
@@ -164,7 +175,7 @@ function drawWeather(g, G) {
     }
     g.stroke();
     // two layers of rain: thin far-off sheets + fat close drops, both pushed by the wind (a storm dumps twice as much)
-    const heavy = G.storm ? 1.8 : 1;
+    const heavy = (G.storm ? 1.8 : 1) * (lo ? 0.5 : 1);
     for (const [n, len, w, a, sp] of [[150 * heavy, 13, 1, 0.26, 760], [70 * heavy, 30, 2, 0.45, 1300]]) {
       g.strokeStyle = `rgba(200,220,255,${a})`; g.lineWidth = w; g.beginPath();
       const dx = len * (0.25 + lean * 0.4);
@@ -176,9 +187,9 @@ function drawWeather(g, G) {
       g.stroke();
     }
   } else if (G.weather === 'snow') {
-    g.drawImage(skyLayer(), 0, 0, CW, CH); // soft white haze + fog off the stands
+    if (!lo) g.drawImage(skyLayer(), 0, 0, CW, CH); // soft white haze + fog off the stands
     // far flakes, mid flakes, then a few big soft ones right in front of the camera
-    for (const [n, r0, r1, a, sp, drift] of [[160, 1.1, 1.8, 0.75, 34, 18], [80, 2.2, 3.4, 0.9, 62, 32]]) {
+    for (const [n, r0, r1, a, sp, drift] of lo ? [[80, 1.1, 1.8, 0.75, 34, 18], [40, 2.2, 3.4, 0.9, 62, 32]] : [[160, 1.1, 1.8, 0.75, 34, 18], [80, 2.2, 3.4, 0.9, 62, 32]]) {
       g.fillStyle = `rgba(255,255,255,${a})`; g.beginPath();
       for (let i = 0; i < n; i++) {
         const r = r0 + (i % 4) / 3 * (r1 - r0), s = sp + (i % 5) * 8;
@@ -187,27 +198,29 @@ function drawWeather(g, G) {
       }
       g.fill();
     }
-    for (let i = 0; i < 14; i++) {
+    for (let i = 0; i < (lo ? 0 : 14); i++) {
       const r = 6 + (i % 4) * 2.5, x = (((i * 211.3 + Math.sin(t * 0.9 + i) * 40 + t * (70 + lean * 90)) % (CW + 80)) + CW + 80) % (CW + 80) - 40, y = ((i * 149.1 + t * (120 + i * 6)) % (CH + 40)) - 20;
       const fg = g.createRadialGradient(x, y, 0, x, y, r); fg.addColorStop(0, 'rgba(255,255,255,0.55)'); fg.addColorStop(1, 'rgba(255,255,255,0)');
       g.fillStyle = fg; g.fillRect(x - r, y - r, r * 2, r * 2);
     }
   }
-  if (G.fog) drawFog(g, G);
+  if (G.fog) drawFog(g, G, lo);
   if (G.storm) drawLightning(g, G);
   if (G.night) {
     // real night game: everything outside the lights goes dark blue, the field is lit by banks of stadium lights
     g.save();
     // the field stays bright under the lights (you have to see the play); the stands and sky go dark
-    g.globalCompositeOperation = 'multiply'; g.fillStyle = 'rgb(150,164,210)'; g.fillRect(-CW, -CH, CW * 3, CH * 3);
+    g.globalCompositeOperation = 'multiply'; g.fillStyle = lo ? 'rgb(176,188,228)' : 'rgb(150,164,210)'; g.fillRect(-CW, -CH, CW * 3, CH * 3); // (FAST: no light pools, so a bit less dark)
     g.fillStyle = 'rgb(58,68,110)'; g.beginPath(); g.rect(-CW, -CH, CW * 3, CH * 3); g.rect(sx(-1), sy(-1.5), sx(121) - sx(-1), sy(FIELD_W + 1.5) - sy(-1.5)); g.fill('evenodd');
     g.globalCompositeOperation = 'source-over';
     // the vignette, light pools and light banks only depend on the screen size, so they're painted once into pictures.
     // The pools used to be 8 full-screen soft-light gradients every frame (by far the slowest thing in the game on phones);
     // now it's one 'screen' pass with the color tuned to light the grass the same way
     const L = nightLayers(), xs = L.xs;
-    g.drawImage(L.vig, 0, 0, CW, CH);
-    g.globalCompositeOperation = 'screen'; g.drawImage(L.pool, 0, 0, CW, CH);
+    if (!lo) { // (FAST: no vignette + light pools, two full-screen passes less)
+      g.drawImage(L.vig, 0, 0, CW, CH);
+      g.globalCompositeOperation = 'screen'; g.drawImage(L.pool, 0, 0, CW, CH);
+    }
     g.globalCompositeOperation = 'lighter'; g.drawImage(L.bank, 0, 0, CW, L.bank.height);
     g.restore();
     for (const lx of xs) { g.fillStyle = '#fffef2'; g.fillRect(lx - 26, 0, 52, 5); g.fillStyle = '#ffffffaa'; for (let k = -2; k <= 2; k++) g.fillRect(lx + k * 10 - 3, 6, 6, 3); }
@@ -277,14 +290,14 @@ function drawLightning(g, G) {
   }
 }
 // ---------- fog: you can only see so far from the ball ----------
-function drawFog(g, G) {
+function drawFog(g, G, lo) {
   const b = G.ball, fx = b ? sx(b.x) : CW / 2, fy = b ? sy(b.y) - 20 : CH / 2;
   const col = G.night ? '120,128,140' : '214,220,226';
   const fg = g.createRadialGradient(fx, fy, 230, fx, fy, 700);
   fg.addColorStop(0, `rgba(${col},0.08)`); fg.addColorStop(0.45, `rgba(${col},0.6)`); fg.addColorStop(1, `rgba(${col},0.88)`);
   g.fillStyle = fg; g.fillRect(0, 0, CW, CH);
   // wisps drifting across
-  for (let i = 0; i < 9; i++) {
+  for (let i = 0; i < (lo ? 0 : 9); i++) {
     const w = 260 + (i % 3) * 120, x = ((i * 337 + G.time * (14 + i * 3)) % (CW + w * 2)) - w, y = (i * 131) % CH;
     const wg = g.createRadialGradient(x, y, 0, x, y, w / 2); wg.addColorStop(0, `rgba(${col},0.22)`); wg.addColorStop(1, `rgba(${col},0)`);
     g.fillStyle = wg; g.save(); g.translate(x, y); g.scale(1, 0.35); g.translate(-x, -y); g.fillRect(x - w / 2, y - w / 2, w, w); g.restore();
