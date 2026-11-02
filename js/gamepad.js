@@ -4,7 +4,7 @@
 //  Before the snap, offense: A snap, X motion, Y audible, hold LB + A B X Y = hot route that receiver
 //  Before the snap, defense: B or LB switch player, X press coverage, RB show blitz, Y audible
 //  Passing: A B X Y = the receiver with that button (tap = lob, hold = power bar), LT lob / RT bullet, RB throw it away, LB or L3 = QB run
-//  Ball carrier: Y juke, B spin, A stiff arm, X slide, LB tuck. Right stick flick: up / down = juke that way, toward the goal = truck, back = spin
+//  Ball carrier: Y juke, B spin, A stiff arm, RB hurdle, X slide, LB tuck. Right stick flick: up / down = juke that way, toward the goal = truck, back = spin
 //  Defense: A dive (jump for the pick while the ball is in the air), Y jump, B switch to the guy closest to the ball, X swim, RB / right stick = hit stick
 //  Kicks: A stops the meter. Punt coming down: A fair catch. After a TD: d-pad / A B X Y / LB RB celebrate
 //  Menus: stick / d-pad move the gold box, A pick, B back, LB / RB pages (play call) or teams (matchup), Y last play
@@ -134,7 +134,7 @@ const Pad = {
       map[8] = 'KeyT';
     } else if (cx === 'preD') Object.assign(map, { 1: 'KeyQ', 4: 'KeyQ', 2: 'KeyV', 5: 'KeyB', 3: 'KeyZ', 8: 'KeyT' });
     else if (cx === 'throw') Object.assign(map, { 0: 'Digit1', 1: 'Digit2', 2: 'Digit3', 3: 'Digit4', 5: 'KeyU', 4: 'KeyX', 10: 'KeyX' });
-    else if (cx === 'carrier') Object.assign(map, { 3: 'KeyE', 1: 'KeyF', 0: 'KeyR', 2: 'KeyX', 4: 'KeyG' });
+    else if (cx === 'carrier') Object.assign(map, { 3: 'KeyE', 1: 'KeyF', 0: 'KeyR', 5: 'KeyV', 2: 'KeyX', 4: 'KeyG' });
     else if (cx === 'def') Object.assign(map, { 0: 'Space', 3: 'Space', 1: 'KeyQ', 4: 'KeyQ', 2: 'KeyE', 5: 'KeyC' });
     else if (cx === 'off') Object.assign(map, { 0: 'Space', 3: 'Space' });
     else if (cx === 'celly') Object.assign(map, { 12: 'ArrowUp', 13: 'ArrowDown', 14: 'ArrowLeft', 15: 'ArrowRight', 0: 'Digit1', 1: 'Digit2', 2: 'Digit3', 3: 'Digit4', 4: 'KeyE', 5: 'KeyF', 6: 'KeyC', 7: 'KeyR', 11: 'KeyG' });
@@ -369,7 +369,7 @@ const Pad = {
       if (!meterOn()) H.push([[PB.LT], 'LOB'], [[PB.RT], 'BULLET']);
       H.push([[PB.RB], 'THROW AWAY'], [[PB.LB], 'QB RUN']);
     } else if (cx === 'carrier') {
-      H.push([[PB.MOVE], 'MOVE'], [[PB.RT], 'SPRINT'], [[PB.Y], 'JUKE'], [[PB.B], 'SPIN'], [[PB.A], 'STIFF ARM'], [[PB.X], 'SLIDE'], [[PB.LB], h && h.tuck ? 'ONE HAND' : 'TUCK']);
+      H.push([[PB.MOVE], 'MOVE'], [[PB.RT], 'SPRINT'], [[PB.Y], 'JUKE'], [[PB.B], 'SPIN'], [[PB.A], 'STIFF ARM'], [[PB.RB], 'HURDLE'], [[PB.X], 'SLIDE'], [[PB.LB], h && h.tuck ? 'ONE HAND' : 'TUCK']);
     } else if (cx === 'def') {
       if (b.flight && b.flight.kick === 'punt' && b.flight.intended === h && !G.fair) H.push([[PB.A], 'FAIR CATCH']);
       else if (b.flight && !b.flight.pitch) H.push([[PB.A], 'JUMP FOR THE PICK']);
@@ -431,7 +431,7 @@ const Pad = {
     const cols = [
       ['BEFORE THE SNAP', [[[PB.A], 'Snap'], [[PB.LB, PB.A], 'Hot route: hold this bumper, press his button'], [[PB.X], 'Motion'], [[PB.Y], 'Audible'], [[PB.VIEW], 'Timeout'], [[PB.B], 'Defense: switch player'], [[PB.X], 'Defense: press coverage'], [[PB.RB], 'Defense: show blitz']]],
       ['PASSING', [[[PB.A, PB.B, PB.X, PB.Y], 'Throw to the receiver with that button'], [[], 'Tap = lob. Hold = power bar, let go in the green'], [[PB.LT], 'Hold for a lob'], [[PB.RT], 'Hold for a bullet'], [[PB.RB], 'Throw it away'], [[PB.LB], 'QB takes off running']]],
-      ['RUNNING', [[[PB.MOVE], 'Move. Push a little to jog'], [[PB.RT], 'Sprint'], [[PB.Y], 'Juke'], [[PB.B], 'Spin'], [[PB.A], 'Stiff arm'], [[PB.FLICK], 'Flick: up / down juke, forward truck, back spin'], [[PB.X], 'Slide, give yourself up'], [[PB.LB], 'Tuck the ball (fewer fumbles)']]],
+      ['RUNNING', [[[PB.MOVE], 'Move. Push a little to jog'], [[PB.RT], 'Sprint'], [[PB.Y], 'Juke'], [[PB.B], 'Spin'], [[PB.A], 'Stiff arm'], [[PB.RB], 'Hurdle (beats a diving tackle)'], [[PB.FLICK], 'Flick: up / down juke, forward truck, back spin'], [[PB.X], 'Slide, give yourself up'], [[PB.LB], 'Tuck the ball (fewer fumbles)']]],
       ['DEFENSE', [[[PB.B], 'Switch to the guy closest to the ball'], [[PB.A], 'Dive tackle'], [[PB.A], 'Ball in the air: jump for the pick'], [[PB.RB], 'Hit stick (or flick the right stick)'], [[PB.X], 'Swim past a blocker'], [[PB.RT], 'Sprint']]],
       ['KICKS + MORE', [[[PB.A], 'Stop the kick meter'], [[PB.A], 'Punt coming down: fair catch'], [[PB.MENU], 'Pause'], [[PB.VIEW], 'Red flag after a close call'], [[PB.DPAD], 'Celebrate after a TD (or the face buttons)'], [[PB.DPAD], `Menus: move. ${N[0]} pick, ${N[1]} back, bumpers flip pages`]]]
     ];

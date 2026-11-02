@@ -73,7 +73,7 @@ function buildHow() {
       <p><b>RUN</b> button = QB takes off.</p></div>
     <div><h3>Running</h3>
       <p>Your runner <b>runs on his own</b>. <b>Hold your finger</b> where you want him to go.</p>
-      <p><b>Tap</b> = juke. <b>SPIN</b> and <b>STIFF</b> arm buttons break tackles.</p></div>
+      <p><b>Tap</b> = juke. <b>SPIN</b> and <b>STIFF</b> arm buttons break tackles. <b>HURDLE</b> jumps a guy diving at your legs.</p></div>
     <div><h3>Defense</h3>
       <p><b>Hold</b> to move your player (yellow ring). Let go and he plays on his own.</p>
       <p><b>Tap near the runner</b> = dive tackle. <b>Tap a teammate</b> to switch to him.</p></div>`
@@ -84,7 +84,7 @@ function buildHow() {
       <p>Move the QB with <b>WASD</b>; run past the line to scramble.</p></div>
     <div><h3>Running</h3>
       <p><b>WASD</b> move, <b>SHIFT</b> sprint.</p>
-      <p><b>E</b> juke, <b>F</b> spin, <b>R</b> stiff arm, <b>X</b> slide (ends the play, no fumble).</p></div>
+      <p><b>E</b> juke, <b>F</b> spin, <b>R</b> stiff arm, <b>V</b> hurdle, <b>X</b> slide (ends the play, no fumble).</p></div>
     <div><h3>Defense</h3>
       <p>You control the player with the <b>yellow ring</b>.</p>
       <p><b>Q</b> switch to the guy closest to the ball, <b>SPACE</b> dive tackle, <b>SHIFT</b> sprint.</p></div>
@@ -114,7 +114,7 @@ function buildHow() {
       <p>Pick colors, a badge, a stadium and a roster, and set every player's rating. Play it in <b>Quick Game</b>, or start a <b>Season</b> where it takes over an NFL team's spot.</p>
       <p>Set it to <b>PUBLIC</b> to share it in the <b>Team Database</b>, and grab teams other players made.</p></div>
     <div><h3>Controller</h3>
-      <p>Plug in an Xbox or PlayStation controller. Stick moves, <b>RT</b> sprint, <b>A</b> snap / dive. Passing: each receiver gets a button (<b>A B X Y</b>). Running: <b>Y</b> juke, <b>B</b> spin, <b>A</b> stiff arm, <b>X</b> slide. Every button: <b>CONTROLLER</b> below.</p></div>`;
+      <p>Plug in an Xbox or PlayStation controller. Stick moves, <b>RT</b> sprint, <b>A</b> snap / dive. Passing: each receiver gets a button (<b>A B X Y</b>). Running: <b>Y</b> juke, <b>B</b> spin, <b>A</b> stiff arm, <b>RB</b> hurdle, <b>X</b> slide. Every button: <b>CONTROLLER</b> below.</p></div>`;
 }
 
 // ---------- title ----------
@@ -874,6 +874,7 @@ function updateMobileButtons() {
   document.querySelectorAll('#mbtns button').forEach(x => x.classList.toggle('on', x.dataset.show === st && (!x.dataset.side || x.dataset.side === side) && (x.dataset.k !== 'KeyM' || canMotion) && (!x.dataset.wx || x.dataset.wx === G.weather) && (!x.dataset.lock || Unlocks.has(x.dataset.lock)) && (!coach || x.dataset.k === 'KeyZ' || x.dataset.k === 'KeyT') && !(cc && (x.dataset.k === 'KeyZ' || x.dataset.k === 'KeyT'))));
   $('mbtns').classList.toggle('pre', st === 'presnap');
   $('mbtns').classList.toggle('cel', st === 'celly');
+  $('mbtns').classList.toggle('car', st === 'carrier'); // 4 runner buttons: a bit shorter so they fit
   $('mbClub').classList.toggle('on', !!club); if (club) $('mbClub').textContent = club.name; // team signature celly
   $('mbDive').textContent = b && b.flight ? 'JUMP' : 'DIVE';
   $('mbSwim').style.display = st === 'def' && h && h.engaged ? 'block' : 'none';

@@ -11,7 +11,7 @@ const Replay = {
     const b = G.ball;
     this.frames.push({
       ps: G.players.map(p => [p.x, p.y, p.vx, p.vy, p.anim, p.speedNow, p.face.dir, p.down, p.downDir, p.dive, p.jump || 0, p.spin, p.stiff, p.throwAnim, p.celebrate,
-        p.engaged ? 1 : 0, p.head.ox, p.head.oy, p.head.rot, p.mouth, p.dizzy, p.sprinting, p.hit || 0]),
+        p.engaged ? 1 : 0, p.head.ox, p.head.oy, p.head.rot, p.mouth, p.dizzy, p.sprinting, p.hit || 0, p.mvK || 0, p.mvT || 0]),
       b: [b.x, b.y, b.z, b.spin || 0, G.players.indexOf(b.holder), b.flight ? { ...b.flight } : null],
       refs: (G.refs || []).map(r => [r.x, r.y, r.face, r.anim, r.moving, r.throwT]),
       cam: [cam.x, cam.y], time: G.time
@@ -31,7 +31,7 @@ const Replay = {
     fr.ps.forEach((a, i) => {
       const p = G.players[i]; if (!p) return;
       [p.x, p.y, p.vx, p.vy, p.anim, p.speedNow, p.face.dir, p.down, p.downDir, p.dive, p.jump, p.spin, p.stiff, p.throwAnim, p.celebrate] = a;
-      p.engaged = a[15] ? (p.engaged || true) : null; p.head.ox = a[16]; p.head.oy = a[17]; p.head.rot = a[18]; p.mouth = a[19]; p.dizzy = a[20]; p.sprinting = a[21]; p.hit = a[22];
+      p.engaged = a[15] ? (p.engaged || true) : null; p.head.ox = a[16]; p.head.oy = a[17]; p.head.rot = a[18]; p.mouth = a[19]; p.dizzy = a[20]; p.sprinting = a[21]; p.hit = a[22]; p.mvK = a[23] || 0; p.mvT = a[24] || 0; // hurdle / catch poses
     });
     const b = G.ball; [b.x, b.y, b.z, b.spin] = fr.b; b.holder = fr.b[4] >= 0 ? G.players[fr.b[4]] : null; b.flight = fr.b[5];
     fr.refs.forEach((a, i) => { const r = G.refs && G.refs[i]; if (r) [r.x, r.y, r.face, r.anim, r.moving, r.throwT] = a; });

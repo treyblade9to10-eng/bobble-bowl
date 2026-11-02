@@ -11,7 +11,7 @@ const NET_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 const NET_KEYS = ['Space', 'ShiftLeft', 'ControlLeft', 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyE', 'KeyF', 'KeyR', 'KeyQ', 'Tab', 'KeyC',
   'Digit1', 'Digit2', 'Digit3', 'Digit4', 'Numpad1', 'Numpad2', 'Numpad3', 'Numpad4', 'KeyT', 'KeyX', 'KeyM', 'KeyV', 'KeyB', 'Enter', 'Escape', 'KeyY', 'KeyG', 'KeyU'];
 const MOVE_KEYS = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ShiftLeft'];
-const PSTAT = ['x', 'y', 'vx', 'vy', 'anim', 'speedNow', 'down', 'downDir', 'dive', 'jump', 'spin', 'stiff', 'throwAnim', 'celebrate', 'dizzy', 'hit', 'stamina', 'juke', 'slideT'];
+const PSTAT = ['x', 'y', 'vx', 'vy', 'anim', 'speedNow', 'down', 'downDir', 'dive', 'jump', 'spin', 'stiff', 'throwAnim', 'celebrate', 'dizzy', 'hit', 'stamina', 'juke', 'slideT', 'mvK', 'mvT', 'nerve'];
 
 // Backup route (relay): when a direct connection can't get through (phone data, school Wi-Fi, two different houses),
 // both devices talk through a Firebase database instead. Slower than direct, but it works on any network.
@@ -456,7 +456,7 @@ const Net = {
     const opts = { qtr: +$('optQtr').value, diff: coop ? +$('optDiff').value : 1, humanSide: 0, versus: !coop, coop, weather: typeof bcWeather === 'function' ? bcWeather(bc, pickWeather($('optWeather').value), $('optWeather').value) : pickWeather($('optWeather').value), night: $('optNight').value === '1', bcast: bc };
     newGame(mine, theirs, opts);
     if (this.relayRoom) this.relayRoom.child('host/busy').set(1); // nobody else can join now
-    this.send(this.startMsg = { t: 'start', v: NET_VERSION, teams: G.teams, opts: { qtr: opts.qtr, weather: G.storm ? 'storm' : G.fog ? 'fog' : G.weather, night: G.night, bcast: G.bcast, coop: coop ? 1 : 0, diff: G.diff }, modes: G.netModes });
+    this.send(this.startMsg = { t: 'start', v: NET_VERSION, teams: G.teams, opts: { qtr: opts.qtr, weather: G.storm ? 'storm' : G.fog ? 'fog' : G.weather, night: G.night, bcast: G.bcast, coop: coop ? 1 : 0, diff: G.diff, wind: gameWind() }, modes: G.netModes });
   },
   // after the engine used the guest's one-shot inputs (this frame / first catch-up step), clear them
   usedOneShots() {
@@ -640,6 +640,7 @@ const Net = {
     G.online = true; G.netModes = m.modes; G.demo = false; G.season = false; G.challenge = null; G.mini = null; show(null);
     const coop = !!m.opts.coop; // co-op: same team as the host (home), vs the CPU
     initGame(m.teams[0], m.teams[1], { qtr: m.opts.qtr, diff: coop ? m.opts.diff : 1, humanSide: coop ? 0 : 1, versus: !coop, coop, weather: m.opts.weather, night: m.opts.night, bcast: m.opts.bcast });
+    G.wind = m.opts.wind || null; // the host's wind (scorebug arrow)
     G.phase = 'idle'; G.players = []; G.ball = null;
   },
   applyRoster(m) {
