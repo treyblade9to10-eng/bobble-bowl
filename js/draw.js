@@ -560,8 +560,10 @@ function shadowSprite(r) {
 // 2 people playing: the P1 (red) / P2 (blue) square tag. Painted once per look (October = spooky drips + glow), also used by the menus
 const PTAG_W = 34, PTAG_H = 36, ptagSprites = {};
 const ptagSpooky = () => typeof document !== 'undefined' && document.body.classList.contains('spooky');
+const ptagSnowy = () => typeof document !== 'undefined' && /\bth-(winter|christmas)\b/.test(document.body.className); // winter looks: snow on top
+const ptagKey = n => n + (ptagSpooky() ? 's' : ptagSnowy() ? 'w' : '') + (document.fonts && document.fonts.status);
 function ptagSprite(n, spooky = ptagSpooky()) {
-  const id = n + (spooky ? 's' : '') + (document.fonts && document.fonts.status);
+  const id = ptagKey(n);
   if (ptagSprites[id]) return ptagSprites[id];
   const s = 3, c = document.createElement('canvas'); c.width = PTAG_W * s; c.height = PTAG_H * s;
   const g = c.getContext('2d'); if (!g) return null;
@@ -582,6 +584,12 @@ function ptagSprite(n, spooky = ptagSpooky()) {
     g.fillStyle = '#00000066'; g.save(); g.translate(1.5, 2); body(); g.fill(); g.restore();
     body(); g.fillStyle = n ? '#1f63e0' : '#e0222b'; g.fill();
     g.strokeStyle = '#ffffff'; g.lineWidth = 1.8; g.stroke();
+    if (ptagSnowy()) { // a lumpy cap of snow along the top edge
+      g.beginPath(); g.moveTo(x0 + k - 2, y0 + 1.5); g.quadraticCurveTo(x0 + k - 1, y0 - 3.5, x0 + k + 5, y0 - 2.5); g.quadraticCurveTo(x0 + k + 9, y0 - 5, x0 + k + 14, y0 - 2.8);
+      g.quadraticCurveTo(x1 + k - 2, y0 - 4.5, x1 + k + 2, y0 + 1); g.lineTo(x1 + k, y0 + 2.6); g.quadraticCurveTo(x1 + k - 5, y0 + 1.6, x1 + k - 7, y0 + 4.4);
+      g.quadraticCurveTo(x1 + k - 9, y0 + 2, x0 + k + 4, y0 + 2.4); g.quadraticCurveTo(x0 + k, y0 + 3.6, x0 + k - 2, y0 + 1.5); g.closePath();
+      g.fillStyle = '#f4faff'; g.fill(); g.strokeStyle = '#9cc4e4'; g.lineWidth = 0.8; g.stroke();
+    }
   }
   g.font = 'italic 900 15px "Barlow Condensed", "Arial Narrow", Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
   g.fillStyle = '#00000080'; g.fillText('P' + (n + 1), 1, 2);
@@ -589,7 +597,7 @@ function ptagSprite(n, spooky = ptagSpooky()) {
   return (ptagSprites[id] = c);
 }
 const ptagURLs = {};
-function ptagURL(n) { const c = ptagSprite(n), id = n + (ptagSpooky() ? 's' : '') + (document.fonts && document.fonts.status); return ptagURLs[id] || (ptagURLs[id] = c ? c.toDataURL() : ''); }
+function ptagURL(n) { const c = ptagSprite(n), id = ptagKey(n); return ptagURLs[id] || (ptagURLs[id] = c ? c.toDataURL() : ''); }
 function ptagImg(n, cls = '') { return `<img class="ptag ${cls}" src="${ptagURL(n)}" alt="P${n + 1}">`; }
 // which tag a human player gets: 2 people playing only (online: the host is P1 on both screens)
 function ptagOf(p) {

@@ -56,6 +56,7 @@ function challengeResult(s) {
     const ok = me > op;
     R.twoMin = R.twoMin || { wins: 0, tries: 0 }; R.twoMin.tries++; if (ok) R.twoMin.wins++;
     Records.set(R);
+    if (ok) Boards.add('2min', R.twoMin.wins);
     return { ok, text: ok ? `DRIVE COMPLETE! 2-minute record: ${R.twoMin.wins}/${R.twoMin.tries}` : `Came up short. 2-minute record: ${R.twoMin.wins}/${R.twoMin.tries}` };
   }
   if (c.type === 'daily') {
@@ -66,6 +67,7 @@ function challengeResult(s) {
       R.daily.streak = R.daily.last === ys ? R.daily.streak + 1 : 1; R.daily.last = c.date; R.daily.done[c.date] = true;
     }
     Records.set(R);
+    if (ok) Boards.add('daily', me - op);
     return { ok, text: ok ? `Goal complete: ${c.goal.text}. Streak: ${R.daily.streak} day${R.daily.streak === 1 ? '' : 's'}` : `Goal missed: ${c.goal.text}. Try again.` };
   }
   return null;
@@ -241,6 +243,7 @@ function miniFinish() {
     best = t < prev ? 'NEW PERSONAL BEST' : `Best: ${prev.toFixed(2)}s`;
   }
   Records.set(R);
+  Boards.add(m.type, m.type === 'kick' ? m.best : m.type === 'qb' ? m.score : m.done[0]);
   G.hooks.onMiniOver && G.hooks.onMiniOver({ type: m.type, title, big, sub, best });
 }
 
@@ -311,7 +314,7 @@ const Weekly = {
   daysLeft() { const d = new Date(), wd = (d.getDay() + 6) % 7; return 7 - wd; },
   // after a normal game vs the CPU; returns lines for the game-over screen
   afterGame(s) {
-    if (G.versus || G.coop || G.online || G.mini || (G.challenge && G.challenge.type !== 'daily') || s.human < 0) return null;
+    if (G.versus || G.coop || G.online || G.mini || G.tourney || (G.challenge && G.challenge.type !== 'daily') || s.human < 0) return null;
     const R = this.state(), w = R.weekly, me = s.human, them = 1 - me, out = [];
     for (const [k, text, n, kind, f] of this.goals(w.wk)) {
       const before = w.prog[k] || 0; if (before >= n) continue;
@@ -326,6 +329,7 @@ const Weekly = {
       if (Career.cap && Career.cap.phase !== 'retired') { Career.gainXP(250); Career.save(); }
     }
     Records.set(R);
+    if (out.length) Boards.add('weekly', this.list().reduce((a, g) => a + Math.round(100 * g.have / g.need), 0), true);
     return out.length || champ ? { out, champ, total: w.total } : null;
   }
 };
