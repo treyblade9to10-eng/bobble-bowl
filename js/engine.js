@@ -1707,6 +1707,7 @@ function cpuQB(dt) {
     if (G.rpoKeep && s === 4) sc += 1.5;
     if (r.motionMan) sc += 0.9; // the play is built for the man in motion: look there first
     if (G.lock && r.cap && G.poss === G.human) sc += G.callBall > 0 ? 0.9 : 0; // your QB looks for you (more when you call for it)
+    if (r.cap && G.career && typeof CareerLife !== 'undefined') sc += CareerLife.look(); // team trust: a few more (or fewer) looks your way
     if (op < 1.2) sc -= 2.5; // don't throw into a defender
     sc += [-0.6, 0, 0.3, 0.6][G.diff] * (op > 2 ? 1 : 0);
     if (G.down >= 3 || G.twoPt) { // 3rd/4th down: where he'll catch it (end of a sit route, or ahead of a runner) + a step after the catch vs the sticks

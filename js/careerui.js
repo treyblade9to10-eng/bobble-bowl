@@ -54,7 +54,7 @@ function capPreview(tuple, team, cvId = 'capCv') {
 }
 const teamById = id => TEAMS.find(t => t.id === id) || COLLEGES.find(t => t.id === id);
 const tFull = id => { const t = teamById(id); return t ? `${t.city} ${t.name}` : id; };
-const money = m => `$${m >= 10 ? Math.round(m) : m.toFixed(1)} million`;
+const money = m => `${m >= 10 ? Math.round(m) : m.toFixed(1)}M Bobble Bucks`; // in-game play money only
 
 const CareerUI = {
   open() {
