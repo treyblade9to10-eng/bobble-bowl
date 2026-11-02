@@ -1,0 +1,133 @@
+/* ---- Challenges: tabs, online leaderboard, opt-in box (boards.js) + Couch Tournament (tourney.js) ---- */
+#mdTop { display: flex; align-items: center; justify-content: center; gap: 18px; flex-wrap: wrap; margin-bottom: 12px; }
+#mdTop #mdTeam { margin-bottom: 0; }
+#mdTabs { display: flex; gap: 3px; }
+#mdTabs button { margin: 0; padding: 7px 14px; font-size: 15px; background: var(--panel2); }
+#mdTabs button.on { background: var(--gold); color: #111; }
+#modes.lbOn #mdTeam { display: none; }
+
+#mdBoard { display: flex; gap: 10px; width: min(900px, 96vw); height: min(400px, 52vh); margin-bottom: 12px; }
+#lbSide { display: flex; flex-direction: column; gap: 3px; width: 220px; flex: none; overflow-y: auto; }
+.lbPick { margin: 0; clip-path: none; text-align: left; padding: 6px 12px; display: flex; flex-direction: column; background: var(--panel); border-left: 4px solid transparent; }
+.lbPick b { font-style: italic; font-weight: 900; font-size: 16px; }
+.lbPick span { font-size: 12px; color: var(--gold); letter-spacing: .06em; }
+.lbPick.on { background: var(--panel2); border-left-color: var(--gold); }
+#lbMain { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--panel); border-top: 4px solid var(--red); }
+#lbHead { display: flex; align-items: baseline; gap: 12px; padding: 6px 12px; border-bottom: 1px solid var(--line); }
+#lbHead b { font-family: var(--hd); font-style: italic; font-weight: 900; font-size: 22px; letter-spacing: .02em; }
+#lbHead span { font-size: 12px; color: var(--dim); }
+#lbList { flex: 1; overflow-y: auto; padding: 4px 0; }
+.lbRow { display: flex; align-items: center; gap: 10px; padding: 3px 12px; font-size: 15px; }
+.lbRow:nth-child(even) { background: #ffffff06; }
+.lbRow i { width: 28px; font-style: normal; font-family: var(--hd); font-weight: 900; text-align: right; color: var(--dim); }
+.lbRow b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lbRow span { font-family: var(--hd); font-weight: 800; font-size: 17px; font-variant-numeric: tabular-nums; }
+.lbRow.r1 i, .lbRow.r1 span { color: var(--gold); } .lbRow.r2 i { color: #d7dde5; } .lbRow.r3 i { color: #d88a4a; }
+.lbRow.you { background: #f6c31c26; } .lbRow.you b::after { content: '  (YOU)'; color: var(--gold); font-size: 12px; }
+.lbRow.me { background: none; border-bottom: 1px solid var(--line); margin-bottom: 3px; color: var(--gold); }
+.lbRow.me b { font-family: var(--hd); font-weight: 800; letter-spacing: .06em; font-size: 14px; }
+.lbMsg { padding: 14px 12px; color: var(--dim); font-size: 14px; }
+.lbGap { height: 1px; margin: 4px 12px; border-top: 2px dashed var(--line2); }
+#lbBar { display: flex; align-items: center; gap: 6px; padding: 4px 6px 4px 12px; border-top: 1px solid var(--line); font-size: 13px; color: var(--dim); }
+#lbBar span { flex: 1; } #lbBar b { color: var(--text); }
+#lbBar button { margin: 0; padding: 6px 12px; font-size: 14px; }
+#lbBar button.gold { background: var(--gold); color: #111; }
+
+#lbAsk { position: absolute; inset: 0; z-index: 60; display: none; align-items: center; justify-content: center; background: #000a; }
+#lbAsk.on { display: flex; }
+.lbBox { background: var(--panel); border-top: 4px solid var(--gold); padding: 16px 22px 12px; width: min(460px, 92vw); text-align: center; }
+.lbBox > b { font-family: var(--hd); font-style: italic; font-weight: 900; font-size: 26px; color: var(--gold); letter-spacing: .02em; }
+.lbBox p { margin: 6px 0 10px; font-size: 15px; line-height: 1.35; }
+#lbName { width: 100%; font-family: var(--bd); font-weight: 700; font-size: 20px; padding: 8px 10px; background: var(--ink); color: #fff; border: 1px solid var(--line2); border-radius: 0; text-align: center; user-select: text; -webkit-user-select: text; }
+#lbName:focus { outline: 2px solid var(--gold); }
+#lbErr { min-height: 18px; color: #ff8a8a; font-size: 13px; margin-top: 4px; }
+.lbBox .row { display: flex; justify-content: center; align-items: center; gap: 6px; }
+.lbBox small { display: block; color: var(--dim); font-size: 11.5px; margin-top: 4px; }
+
+/* ---- Couch Tournament ---- */
+#tourney { justify-content: flex-start; padding-top: 18px; }
+#tnBody { flex: 1; min-height: 0; width: min(1150px, 96vw); display: flex; flex-direction: column; align-items: center; }
+#tnBtns { display: flex; align-items: center; justify-content: center; gap: 6px; flex: none; margin-top: 8px; width: min(1150px, 96vw); }
+.tnOpts { display: flex; flex-wrap: wrap; gap: 6px 16px; justify-content: center; }
+.tnOpts label { display: flex; align-items: center; gap: 6px; font-family: var(--hd); font-weight: 800; font-size: 14px; letter-spacing: .08em; color: var(--dim); }
+.tnSeg { display: flex; gap: 2px; }
+.tnSeg button { margin: 0; clip-path: none; padding: 6px 10px; font-size: 14px; }
+.tnSeg button.on { background: var(--gold); color: #111; }
+.tnRule { font-size: 13px; color: var(--dim); max-width: 760px; text-align: center; margin: 8px 0; line-height: 1.35; }
+.tnSlots { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 14px; width: min(900px, 96vw); }
+.tnSlots.n4 { width: min(900px, 96vw); }
+.tnSlot { display: flex; align-items: center; gap: 4px; background: var(--panel); border-left: 5px solid var(--c1); padding: 4px 6px; }
+.tnSlot > i { font-style: italic; font-family: var(--hd); font-weight: 900; font-size: 20px; color: #ffffff40; width: 22px; text-align: center; }
+.tnName { flex: 1 1 0; min-width: 0; font-family: var(--bd); font-weight: 700; font-size: 16px; padding: 6px 8px; background: var(--ink); color: #fff; border: 1px solid var(--line2); border-radius: 0; user-select: text; -webkit-user-select: text; }
+.tnName:focus { outline: 2px solid var(--gold); }
+.tnArr { margin: 0; clip-path: none; padding: 4px 11px; font-size: 20px; background: var(--gold); color: #111; }
+.tnTeam { width: 150px; text-align: center; font-family: var(--hd); font-weight: 800; font-size: 15px; letter-spacing: .03em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tnTeam b { color: var(--gold); }
+.tnErr { min-height: 18px; color: #ff8a8a; font-size: 14px; margin-top: 6px; }
+
+.tnBracket { flex: 1; min-height: 0; width: 100%; display: flex; gap: 12px; }
+.tnCol { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; }
+.tnCol.champ { flex: 0.7 1 0; }
+.tnRound { font-family: var(--hd); font-weight: 900; font-style: italic; font-size: 15px; letter-spacing: .08em; color: var(--gold); text-align: center; margin-bottom: 4px; }
+.tnMs { flex: 1; display: flex; flex-direction: column; justify-content: space-around; gap: 6px; }
+.tnM { background: var(--panel); border: 1px solid var(--line); position: relative; }
+.tnM.next { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold); }
+.tnP { display: flex; align-items: center; gap: 6px; padding: 4px 8px 4px 0; font-size: 15px; }
+.tnP + .tnP { border-top: 1px solid var(--line); }
+.tnP > i { width: 5px; align-self: stretch; background: var(--c1, #333); }
+.tnP em { font-style: normal; font-size: 11px; color: var(--dim); width: 12px; text-align: right; }
+.tnP b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tnP span { font-family: var(--hd); font-weight: 800; font-size: 13px; color: var(--dim); }
+.tnP u { text-decoration: none; font-family: var(--hd); font-weight: 900; font-size: 17px; min-width: 26px; text-align: right; font-variant-numeric: tabular-nums; }
+.tnP.w b, .tnP.w u { color: var(--gold); }
+.tnP.l { opacity: .55; } .tnP.l b, .tnP.l u { color: var(--dim); }
+.tnP.tbd b { color: var(--dim); font-weight: 500; }
+.tnCoin { position: absolute; right: 4px; top: -9px; font-size: 10px; background: var(--ink); color: var(--dim); padding: 0 4px; }
+.tnCh { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.tnCh b { font-family: var(--hd); font-style: italic; font-weight: 900; font-size: 22px; text-align: center; }
+.tnTrophy { width: 64px; height: 64px; fill: var(--gold); stroke: var(--gold); }
+.tnNext { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; background: var(--panel); border-left: 4px solid var(--gold); padding: 3px 12px; }
+.tnNext span { font-family: var(--hd); font-weight: 900; font-style: italic; font-size: 13px; letter-spacing: .08em; color: var(--gold); }
+.tnNext b { font-size: 15px; text-align: center; }
+.tnNext b small { font-family: var(--hd); color: var(--dim); font-size: 13px; }
+.tnNext em { font-style: normal; font-family: var(--hd); font-weight: 900; font-size: 12px; padding: 0 5px; margin: 0 5px 0 8px; color: #fff; }
+.tnNext em.p1 { background: #e0222b; margin-left: 0; } .tnNext em.p2 { background: #1f63e0; }
+#tnBtns > button { flex: none; }
+
+.tnChamp { position: relative; flex: 1; width: 100%; display: flex; align-items: center; justify-content: center; gap: 30px; overflow: hidden; }
+.tnConf { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.tnConf i { position: absolute; top: -20px; width: 10px; height: 16px; animation: fall linear infinite; }
+.tnTro .tnTrophy { width: 180px; height: 180px; filter: drop-shadow(0 6px 0 #0008); }
+.tnCT { display: flex; flex-direction: column; position: relative; }
+.tnCT span { font-family: var(--hd); font-weight: 800; letter-spacing: .2em; color: var(--dim); font-size: 15px; }
+.tnCT b { font-family: var(--hd); font-style: italic; font-weight: 900; font-size: 84px; line-height: 1; color: var(--gold); text-transform: uppercase; }
+.tnCT em { font-family: var(--hd); font-weight: 800; font-style: normal; font-size: 22px; text-transform: uppercase; border-left: 6px solid var(--c1); padding-left: 10px; margin: 6px 0; }
+.tnCT small { font-size: 15px; color: var(--dim); }
+
+@media (max-height: 500px) {
+  #mdTop { margin-bottom: 6px; gap: 10px; }
+  #mdTabs button { padding: 5px 10px; font-size: 13px; }
+  #mdTeam { font-size: 16px; }
+  #mdBoard { height: calc(100vh - 140px); margin-bottom: 4px; }
+  #lbSide { width: 170px; gap: 2px; } .lbPick { padding: 2px 8px; } .lbPick b { font-size: 13px; } .lbPick span { font-size: 10px; }
+  #lbHead { padding: 3px 10px; } #lbHead b { font-size: 17px; } #lbHead span { font-size: 11px; }
+  .lbRow { font-size: 13px; padding: 1px 10px; } .lbRow span { font-size: 15px; }
+  #lbBar { font-size: 11.5px; padding: 2px 4px 2px 10px; } #lbBar button { padding: 4px 8px; font-size: 12px; }
+  .lbBox { padding: 10px 16px 8px; } .lbBox > b { font-size: 20px; } .lbBox p { font-size: 13px; margin: 3px 0 6px; } #lbName { font-size: 17px; padding: 5px 8px; }
+  #tourney { padding: 6px 12px; } #tourney h2 { margin-bottom: 6px; }
+  #tnBtns { margin-top: 4px; } #tnBtns button { margin: 0; } #tnBtns button.big { padding: 7px 22px; font-size: 19px; }
+  .tnOpts { gap: 4px 10px; } .tnOpts label { font-size: 12px; } .tnSeg button { padding: 4px 7px; font-size: 12px; }
+  .tnRule { font-size: 11px; margin: 4px 0; }
+  .tnSlots { gap: 3px 10px; } .tnSlot { padding: 2px 4px; } .tnSlot > i { font-size: 15px; width: 16px; }
+  .tnName { font-size: 14px; padding: 3px 6px; } .tnArr { padding: 1px 8px; font-size: 17px; } .tnTeam { width: 120px; font-size: 13px; }
+  .tnErr { margin-top: 2px; font-size: 12px; }
+  .tnRound { font-size: 12px; margin-bottom: 2px; } .tnMs { gap: 3px; }
+  .tnP { font-size: 12.5px; padding: 1px 6px 1px 0; gap: 4px; } .tnP u { font-size: 14px; } .tnP span { font-size: 11px; }
+  .tnTrophy { width: 40px; height: 40px; } .tnCh b { font-size: 16px; }
+  .tnNext { padding: 1px 8px; } .tnNext span { font-size: 11px; } .tnNext b { font-size: 12px; } .tnNext b small { font-size: 11px; }
+  .tnTro .tnTrophy { width: 110px; height: 110px; } .tnCT b { font-size: 50px; } .tnCT em { font-size: 17px; } .tnCT span { font-size: 12px; } .tnCT small { font-size: 12px; }
+}
+
+@media (max-height: 400px) and (max-width: 720px) { /* small phones: the tabs say where you are */
+  #modes h2 { display: none; } #mdTop { padding-right: 46px; gap: 8px; } #modes #mdTeam { font-size: 14px; gap: 6px; } #modes #mdTabs button { padding: 5px 8px; font-size: 12px; }
+}
