@@ -870,7 +870,7 @@ const Net = {
 };
 
 // the host's sounds get replayed on the guest's device
-['tone', 'noise'].forEach(k => {
+['tone', 'noise', 'sfx'].forEach(k => {
   const f = Sound[k].bind(Sound);
   Sound[k] = (...a) => { if (Net.role === 'host' && Net.ready) Net.sounds.push([k, a]); return f(...a); };
 });

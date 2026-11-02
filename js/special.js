@@ -766,7 +766,7 @@ function kickerHit(L, kp) {
     if (p !== L.hot ? !chance((hard ? 0.035 : 0.03) * Sliders.mul('pen')) : !Sliders.call('pen')) continue;
     L.flag = hard ? 'ROUGHK' : 'RIK';
     throwFlag(L.flag, p.side, kp.x, kp.y, p);
-    if (hard) { kp.down = 1.1; kp.downDir = dirOf(p.side); kp.dizzy = 1; kp.kickT = null; Sound.tackle(); cam.shake = 7; }
+    if (hard) { kp.down = 1.1; kp.downDir = dirOf(p.side); kp.dizzy = 1; kp.kickT = null; Sound.tackle('big'); cam.shake = 7; }
     else { kp.stun = 0.35; kp.head.vx += 220; Sound.boing(); }
     return;
   }
@@ -880,7 +880,7 @@ function spikeBall(cpu) {
   if (!(G.phase === 'playcall' || G.phase === 'presnap') || (!cpu && !isHumanSide(G.poss)) || G.down >= 4 || G.patSide != null) return;
   burnHuddleClock();
   G.clock = Math.max(0, G.clock - 1);
-  showBanner('SPIKED!', 'Clock stopped', '#fff', 1.1); Sound.tackle();
+  showBanner('SPIKED!', 'Clock stopped', '#fff', 1.1); Sound.tackle('spike');
   G.down++;
   G.next = null;
   G.phase = 'dead'; G.deadT = 0.9; G.ball = G.ball || { x: G.los, y: G.ballY, z: 0 };

@@ -16,25 +16,14 @@ const Flow = {
     const m1 = G.mo || 0, s = side === 0 ? 1 : -1;
     this.stats.swings++;
     this.bench[side] = Math.max(this.bench[side], amt >= 20 ? 2.2 : 1.4);
-    if (side === 0) { G.crowdHype = Math.max(G.crowdHype || 0, amt >= 20 ? 1.4 : 0.9); this.roar(amt >= 20 ? 1 : 0.6); }
-    else { G.crowdHype = Math.min(G.crowdHype || 0, 0.2); this.roar(0.25); } // the road team made it: the place groans
+    if (side === 0) G.crowdHype = Math.max(G.crowdHype || 0, amt >= 20 ? 1.4 : 0.9);
+    else G.crowdHype = Math.min(G.crowdHype || 0, 0.2); // the road team made it: the place groans
+    CrowdFX.react(side, amt);
     // a real swing (it changed hands, and by a lot): a small tag, not more than once in a while
     if (flip && m0 * s < 5 && m1 * s >= 20) {
       this.surge = { side, n: 2 }; // riding it: a touch of the momentum edge for the next 2 snaps (Momentum.of)
       if (G.time - this.swingT > 40) { this.swingT = G.time; this.tag = { side, t: G.time }; this.stats.tags++; }
     }
-  },
-  // crowd sound: filtered noise that swells and fades (louder = more)
-  roar(k) {
-    const c = Sound.ctx; if (Sound.muted || !c) return;
-    try {
-      const t = c.currentTime, dur = 1.2 + k * 1.4, buf = c.createBuffer(1, Math.floor(c.sampleRate * dur), c.sampleRate), d = buf.getChannelData(0);
-      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-      const s = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain();
-      f.type = 'bandpass'; f.frequency.value = 900; f.Q.value = 0.6;
-      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.05 + 0.13 * k, t + 0.25); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-      s.buffer = buf; s.connect(f); f.connect(g); g.connect(c.destination); s.start(t); s.stop(t + dur + 0.05);
-    } catch (e) {}
   },
   // the bench along the near sideline: home on the left half, road team on the right. They jump when their team makes a play
   drawBench(g) {
@@ -115,32 +104,17 @@ const Flow = {
     g.fillStyle = '#ffd23f'; g.font = 'italic 900 15px "Barlow Condensed", "Arial Black", sans-serif'; g.textAlign = 'left'; g.textBaseline = 'middle';
     g.fillText('2:00 DRILL', x + 12, y + h / 2 + 1);
   },
-  // the drum bed: stadium drums (boom boom clap) over a low crowd rumble. Only real-sounding parts (no beeps)
+  // the drum bed: stadium drums (boom boom clap), real drum + crowd clap recordings (crowdfx.js turns the crowd up)
   bed: null,
-  bedOn() {
-    const c = Sound.ctx; if (!c || this.bed) return;
-    try {
-      const len = c.sampleRate * 2, buf = c.createBuffer(1, len, c.sampleRate), d = buf.getChannelData(0);
-      for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
-      const src = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain(), lfo = c.createOscillator(), lg = c.createGain();
-      src.buffer = buf; src.loop = true; f.type = 'lowpass'; f.frequency.value = 520;
-      g.gain.setValueAtTime(0.0001, c.currentTime); g.gain.exponentialRampToValueAtTime(0.045, c.currentTime + 1.2);
-      lfo.frequency.value = 0.18; lg.gain.value = 0.015; lfo.connect(lg); lg.connect(g.gain); // the crowd swells and settles
-      src.connect(f); f.connect(g); g.connect(c.destination); src.start(); lfo.start();
-      this.bed = { src, g, lfo, next: c.currentTime + 0.4, i: 0 };
-    } catch (e) { this.bed = null; }
-  },
-  bedStop() {
-    const b = this.bed; this.bed = null; if (!b) return;
-    try { const t = Sound.ctx.currentTime; b.g.gain.cancelScheduledValues(t); b.g.gain.setValueAtTime(Math.max(0.0001, b.g.gain.value), t); b.g.gain.exponentialRampToValueAtTime(0.0001, t + 0.6); b.src.stop(t + 0.7); b.lfo.stop(t + 0.7); } catch (e) {}
-  },
+  bedOn() { const c = Sound.ctx; if (!c || this.bed) return; this.bed = { next: c.currentTime + 0.4, i: 0 }; },
+  bedStop() { this.bed = null; },
   bedTick() {
     const b = this.bed, c = Sound.ctx; if (!b || !c) return;
     const beat = 0.36;
     while (b.next < c.currentTime + 0.25) {
       const dl = Math.max(0, b.next - c.currentTime), k = b.i % 4;
-      if (k === 0 || k === 1) Sound.tone(78, 0.28, 'sine', 0.2, -36, dl);          // boom, boom
-      else if (k === 2) { Sound.noise(0.06, 0.07, 1400, dl); Sound.noise(0.05, 0.05, 1800, dl + 0.012); } // clap
+      if (k === 0 || k === 1) Sound.sfx('drum', 0.75, dl); // boom, boom
+      else if (k === 2) Sound.sfx('clap', 0.9, dl);         // clap
       b.next += beat; b.i++;
     }
   },

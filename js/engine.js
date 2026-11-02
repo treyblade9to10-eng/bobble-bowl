@@ -969,7 +969,7 @@ function checkFouls() {
       if (df.engaged || df.down > 0 || df.side === off || dist(df, qb) > 0.9 || df.speedNow < 4) continue;
       if ((df.isHuman && df.humanDriven && Sliders.call('pen')) || (!df.rtpChecked && !df.isHuman && chance(0.03 * Sliders.mul('pen')))) {
         throwFlag('RTP', df.side, qb.x, qb.y, df);
-        qb.down = 1.1; qb.downDir = dirOf(df.side); qb.dizzy = 1; df.down = 0.6; Sound.tackle(); cam.shake = 8;
+        qb.down = 1.1; qb.downDir = dirOf(df.side); qb.dizzy = 1; df.down = 0.6; Sound.tackle('big'); cam.shake = 8;
       }
       df.rtpChecked = true;
     }
@@ -2398,9 +2398,10 @@ function checkTackles() {
 
 function tackle(car, df, hitters) {
   const b = G.ball;
-  Sound.tackle(); cam.shake = 7; G.lastTackler = df;
+  cam.shake = 7; G.lastTackler = df;
   const stick = df.hit > 0;
   const boom = stick || hurdleBoom(car) || ((df.speedNow > 11 || (df.dive > 0 && df.speedNow > 10.5)) && chance(0.35));
+  Sound.tackle(boom ? 'big' : car === G.O[0] && G.bstate === 'snap' && !G.play.off.qbRun ? 'sack' : hitters > 1 ? 'gang' : 'hit');
   Pad.buzz(boom ? 'hit' : 'tackle', car.side); if (boom) Pad.buzz('hit', df.side);
   if (boom) { cam.shake = 15; G.slowmo = 0.45; car.dizzy = 1; addText(car.x, car.y, pick(['BOOM!', 'WHAM!', 'CRUNCH!', 'POW!']), '#ff7a3d', 30, 0.9); Sound.boing(); }
   Injury.hit(car, boom ? 'boom' : car === G.O[0] && G.bstate === 'snap' ? 'sack' : 'tackle');

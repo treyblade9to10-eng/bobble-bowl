@@ -1,0 +1,45 @@
+Bobble Bowl sound credits
+=========================
+Every sound file in this folder was built from recordings that are public domain (CC0 1.0):
+https://creativecommons.org/publicdomain/zero/1.0/
+CC0 means no permission or credit is needed; the sources are listed anyway so anyone can check them.
+Freesound sounds were taken from their HQ preview files and cut, mixed, levelled and re-encoded to MP3.
+
+MUSIC: theme.mp3 (title / menus), hub.mp3 (Season hub), sting_td.mp3, sting_kick.mp3
+  Original composition written for Bobble Bowl (not based on any TV theme), sequenced in code and rendered offline.
+  Instrument samples: VS Chamber Orchestra 2: Community Edition (VSCO 2 CE) by Versilian Studios
+  (recorded by Sam Gossner & Simon Dalzell), license CC0 1.0
+  https://github.com/sgossner/VSCO-2-CE   (license file: https://github.com/sgossner/VSCO-2-CE/blob/master/LICENSE)
+  Used: Trumpet (sus, stac), F Horn (sus, stac), Tenor Trombone (sus, stac), Tuba (sus, stac), Violin Section spiccato,
+  Cello Section spiccato, Timpani hits + rolls, concert bass drum, marching snare + tenor drums (VSCO 1 Percussion),
+  snare roll, crash cymbals, suspended cymbal hit + crescendo.
+
+CROWD: crowd_bed.mp3 (stadium murmur loop)
+  "stadium.wav" by cognito perceptu, CC0 - https://freesound.org/people/cognito%20perceptu/sounds/31150/
+
+CROWD: crowd_hype.mp3 (excited cheering loop)
+  "AF Crowd Cheer Loop.wav" by mglennsound, CC0 - https://freesound.org/people/mglennsound/sounds/678545/
+
+CROWD: crowd_fx.mp3 (one-shot reactions, claps, whistle, stadium drum)
+  cheers:  "AF Crowd Cheer Nat End .wav" by mglennsound, CC0 - https://freesound.org/people/mglennsound/sounds/678546/
+           "Crowd screaming GOAL during the soccer game Mexico-Holland" by felix.blume, CC0 - https://freesound.org/people/felix.blume/sounds/241630/
+           "Crowd Cheer" by FoolBoyMedia, CC0 - https://freesound.org/people/FoolBoyMedia/sounds/397434/
+           "AF Crowd Cheer  Natural Ending.wav" by mglennsound, CC0 - https://freesound.org/people/mglennsound/sounds/678541/
+  ooh:     "Crowd yelling huuuuu (60k persons) during a soccer game in Brazil" by felix.blume, CC0 - https://freesound.org/people/felix.blume/sounds/612131/
+  groan:   "aww.wav" by phmiller42, CC0 - https://freesound.org/people/phmiller42/sounds/124996/
+           "crowd `oh - - disappointed.mp3" by mrrap4food, CC0 - https://freesound.org/people/mrrap4food/sounds/619007/
+  boos:    "AF Crowd Boo Hiss Nat end .wav" by mglennsound, CC0 - https://freesound.org/people/mglennsound/sounds/678539/
+           "crowd booing" by HowardV, CC0 - https://freesound.org/people/HowardV/sounds/264378/
+  claps:   "clapping group unisono" by Yuval, CC0 - https://freesound.org/people/Yuval/sounds/197435/
+  whistle: "Referee whistle blow, gymnasium.wav" by SpliceSound, CC0 - https://freesound.org/people/SpliceSound/sounds/218318/
+           "Referee whistle sound.wav" by Rosa-Orenes256, CC0 - https://freesound.org/people/Rosa-Orenes256/sounds/538422/
+  drum:    VSCO 2 CE concert bass drum (see MUSIC)
+
+HITS: hits.mp3 (tackle layers: thuds, bodies, helmet clack, ground, impacts)
+  "boxing mitt punches strike thud whack.wav" by rsellick, CC0 - https://freesound.org/people/rsellick/sounds/545523/
+  "[ MPooman ] Soccer Tackle Sounds (SE462) (High Quality)" by MPooman, CC0 - https://freesound.org/people/MPooman/sounds/662107/
+  "helmet clash" by Luisa_Sanchez, CC0 - https://freesound.org/people/Luisa_Sanchez/sounds/816987/
+  "BODY FALL - V HVY - DIRT" by leonelmail, CC0 - https://freesound.org/people/leonelmail/sounds/504626/
+  "Hard impact hit.wav" by npeng, CC0 - https://freesound.org/people/npeng/sounds/482267/
+  "body_hit.wav" by insanity54, CC0 - https://freesound.org/people/insanity54/sounds/276600/
+  low thump: VSCO 1 Percussion muted bass drum (VSCO 2 CE, see MUSIC)
