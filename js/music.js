@@ -12,7 +12,8 @@ const ShowOpts = (() => {
 
 const Music = {
   VOL: { off: 0, low: 0.22, med: 0.42, high: 0.7 },
-  LOOP: { theme: 30.9677, hub: 38.4 }, // loop length (s) of each file, after its marker
+  LOOP: { theme: 28.23529, hub: 35.55556 }, // loop length (s) of each file, after its marker (and intro)
+  INTRO: { theme: 3.52942 }, // the theme opens with a 2-bar build (cymbal swell -> hit) that plays once, then the loop
   cur: null, src: null, g: null,
   // who should be playing right now
   want() {
@@ -33,7 +34,7 @@ const Music = {
     if (this.src) { const { src, g } = this, t = c.currentTime; try { g.gain.cancelScheduledValues(t); g.gain.setValueAtTime(g.gain.value, t); g.gain.linearRampToValueAtTime(0, t + 1.2); src.stop(t + 1.3); } catch (e) {} this.src = this.g = null; }
     if (!w) return;
     const B = Sound.buf[w], t = c.currentTime + 0.05, src = c.createBufferSource(), g = c.createGain();
-    src.buffer = B.b; src.loop = true; src.loopStart = B.at; src.loopEnd = B.at + this.LOOP[w];
+    src.buffer = B.b; src.loop = true; src.loopStart = B.at + (this.INTRO[w] || 0); src.loopEnd = src.loopStart + this.LOOP[w];
     g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(this.VOL[ShowOpts.music], t + 1.5);
     src.connect(g); g.connect(Sound.out); src.start(t, B.at);
     this.src = src; this.g = g;

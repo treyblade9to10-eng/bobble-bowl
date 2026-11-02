@@ -4,7 +4,7 @@
 // stadium drums when the home defense needs a stop on 3rd down. Reactions + drums go through Sound.sfx, so the online
 // guest hears the host's; the loops run on each device from the game state.
 const CrowdFX = {
-  L: { bed: 20, hype: 16 }, // loop lengths (s) after the file marker
+  L: { bed: 36, hype: 20 }, // loop lengths (s) after the file marker
   bed: null, hype: null, sc: null, lastR: -99, lastP: 0, chant: null,
   stats: { cheerBig: 0, cheer: 0, groan: 0, boo: 0, ooh: 0, drum: 0 },
   host() { return !(typeof Net !== 'undefined' && Net.role === 'guest' && G.online); },

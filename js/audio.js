@@ -8,8 +8,8 @@ const Sound = {
   // sprite slots: [start, length] in seconds, counted from 0.25 s after the marker click at the top of the file
   HITS: { thud1: [0, 0.323], thud2: [0.383, 0.323], thud3: [0.766, 0.323], thud4: [1.149, 0.323], body1: [1.532, 0.504], body2: [2.096, 0.504], body3: [2.66, 0.504], body4: [3.224, 0.504], body5: [3.788, 0.504],
     clack: [4.352, 0.452], fall: [4.864, 1.205], impact1: [6.129, 0.604], impact2: [6.793, 0.604], impact3: [7.457, 0.604], bodyhit: [8.121, 0.503], sub: [8.684, 0.502] },
-  FX: { cheerBig: [0, 7], cheer: [7.06, 4.5], cheer2: [11.62, 4.5], ooh: [16.18, 5], groan: [21.24, 1.997], boo: [23.297, 5.5], boo2: [28.857, 5],
-    clap1: [33.917, 0.324], clap2: [34.301, 0.324], clap3: [34.685, 0.324], whistle: [35.069, 1.4], whistle2: [36.529, 0.53], drum: [37.119, 1] },
+  FX: { cheerBig: [0, 8.15], cheer: [8.21, 4.8], cheer2: [13.07, 4.8], ooh: [17.93, 5], groan: [22.99, 3], boo: [26.05, 6], boo2: [32.11, 5.5],
+    clap1: [37.67, 0.324], clap2: [38.054, 0.324], clap3: [38.438, 0.324], whistle: [38.822, 1.4], whistle2: [40.282, 0.53], drum: [40.872, 1] },
   init() {
     // iPhone: the silent switch mutes web game sound unless we ask for 'playback' (iOS 17+), older iOS: a silent <audio> loop does the same
     if (!this.unlocked) { this.unlocked = true;
