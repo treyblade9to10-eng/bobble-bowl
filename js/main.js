@@ -929,7 +929,7 @@ $('moBack').onclick = () => { G.mini = null; G.teams = null; openModes(); };
 // ---------- title screen background: a fake game ----------
 function demoSetup() {
   const a = pick(TEAMS); let b; do { b = pick(TEAMS); } while (b === a);
-  Object.assign(G, { teams: [a, b], human: -1, diff: 1, poss: 0, los: rand(30, 70), ballY: MID, down: 1, score: [0, 0], quarter: 1, clock: 180, demo: true, fx: [], weather: 'clear', night: typeof spookyNow === 'function' && spookyNow(), bcast: null, uni: null, versus: false, coop: false, xf: null,
+  Object.assign(G, { teams: [a, b], human: -1, diff: 1, poss: 0, los: rand(30, 70), ballY: MID, down: 1, score: [0, 0], quarter: 1, clock: 180, demo: true, fx: [], weather: 'clear', night: false, ...(typeof themeDemo === 'function' ? themeDemo() : {}), bcast: null, uni: null, versus: false, coop: false, xf: null,
     pstats: {}, tstats: [{ pass: 0, rush: 0, to: 0 }, { pass: 0, rush: 0, to: 0 }], patSide: null, twoPt: false, next: null, paused: false, slowmo: 0, banner: null, practice: null });
   setFirstDown();
   setupPlay(pick(OFF_PLAYS.filter(p => !p.custom)), pick(DEF_PLAYS));
