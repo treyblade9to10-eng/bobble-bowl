@@ -1,0 +1,56 @@
+/* ---- Play of the Week vote + Trophy Case box (potw.js), Combine drills (combine.js) ---- */
+#potw { padding: 14px 16px 10px; }
+.pwHead { display: flex; align-items: baseline; justify-content: center; gap: 14px; flex-wrap: wrap; flex-shrink: 0; text-align: center; }
+.pwHead b { font-family: var(--hd); font-style: italic; font-weight: 900; font-size: 38px; line-height: 1; text-transform: uppercase; text-shadow: 2px 2px 0 #0008; }
+.pwHead span { font-family: var(--hd); font-weight: 800; font-size: 13px; letter-spacing: .16em; color: var(--gold); }
+#pwBody { width: min(1000px, 96vw); margin-top: 12px; min-height: 0; }
+.pwRow { display: flex; gap: 10px; justify-content: center; }
+.pwCard { flex: 1 1 0; min-width: 0; max-width: 320px; background: var(--panel); border-top: 4px solid var(--tc); padding: 10px 12px 8px; display: flex; flex-direction: column; gap: 3px;
+  background-image: linear-gradient(170deg, color-mix(in srgb, var(--tc) 30%, transparent) 0%, transparent 55%); }
+.pwN { font-family: var(--hd); font-weight: 800; font-size: 12px; letter-spacing: .2em; color: var(--dim); }
+.pwT { font-family: var(--hd); font-style: italic; font-weight: 900; font-size: 26px; line-height: 1.02; text-transform: uppercase; min-height: 2.04em; }
+.pwW { font-family: var(--hd); font-weight: 800; font-size: 15px; letter-spacing: .04em; color: #c9d3df; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pwQ { font-size: 12px; color: var(--dim); font-variant-numeric: tabular-nums; }
+.pwB { display: flex; gap: 4px; margin-top: 6px; align-items: center; }
+.pwB button { margin: 0; }
+.pwB button.big { font-size: 20px; padding: 6px 22px; }
+.pwB .pwWatch { padding: 7px 14px; font-size: 14px; }
+.pwBtns { display: flex; justify-content: center; margin-top: 10px; flex-shrink: 0; }
+.pwBtns button { margin: 0; }
+.pwDone { display: flex; justify-content: center; }
+.pwWin { display: flex; align-items: center; gap: 18px; background: var(--panel); padding: 14px 26px 14px 18px; border-left: 5px solid var(--gold); }
+.pwWin .tsvg { width: 72px; height: 72px; flex-shrink: 0; } .pwWin svg { width: 100%; height: 100%; fill: var(--gold); stroke: var(--gold); }
+.pwWin span { display: block; font-family: var(--hd); font-weight: 800; font-size: 12px; letter-spacing: .2em; color: var(--dim); }
+.pwWin b { display: block; font-family: var(--hd); font-style: italic; font-weight: 900; font-size: 34px; line-height: 1.05; text-transform: uppercase; }
+.pwWin i { display: block; font-style: normal; color: #c9d3df; font-family: var(--hd); font-weight: 800; font-size: 16px; }
+.pwWin em { display: block; font-style: normal; color: #4fe08a; font-family: var(--hd); font-weight: 800; letter-spacing: .06em; font-size: 13px; margin-top: 4px; }
+.pwBox { flex-basis: 100%; width: min(1000px, 94vw); margin: 0 auto 12px; }
+.pwList { max-height: 190px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.pwRowT b { font-style: italic; }
+@media (max-height: 500px) {
+  #potw { padding: 8px 12px 6px; }
+  .pwHead b { font-size: 28px; } .pwHead span { font-size: 11px; letter-spacing: .1em; }
+  #pwBody { margin-top: 8px; }
+  .pwT { font-size: 21px; } .pwW { font-size: 13px; } .pwCard { padding: 7px 10px 6px; }
+  .pwB button.big { font-size: 17px; padding: 5px 16px; }
+  .pwWin b { font-size: 26px; } .pwWin .tsvg { width: 54px; height: 54px; }
+}
+
+#cbDrill { padding: 12px 16px 8px; justify-content: flex-start; }
+.cdHead { display: flex; align-items: baseline; gap: 14px; width: min(1000px, 96vw); flex-shrink: 0; flex-wrap: wrap; }
+.cdHead b { font-family: var(--hd); font-style: italic; font-weight: 900; font-size: 34px; line-height: 1; text-transform: uppercase; text-shadow: 2px 2px 0 #0008; }
+.cdHead span { flex: 1 1 260px; font-size: 14px; color: #c9d3df; line-height: 1.3; }
+.cdHead em { font-style: normal; font-family: var(--hd); font-weight: 800; font-size: 12px; letter-spacing: .2em; color: var(--gold); }
+.cdStage { position: relative; flex: 1 1 auto; min-height: 0; width: min(1000px, 96vw); margin-top: 8px; background: var(--panel); }
+#cdCv { position: absolute; inset: 0; width: 100%; height: 100%; background: #0e1420; }
+button.cdTap { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; padding: 0; background: transparent; clip-path: none; touch-action: none; }
+button.cdTap:hover, button.cdTap:active { background: transparent; transform: none; }
+.cdBtns { display: flex; gap: 6px; justify-content: center; margin-top: 8px; flex-shrink: 0; min-height: 44px; align-items: center; }
+.cdBtns button { margin: 0; }
+@media (max-height: 500px) {
+  #cbDrill { padding: 6px 12px 4px; }
+  .cdHead b { font-size: 24px; } .cdHead span { font-size: 12px; }
+  .cdHead, .cdStage { width: calc(100vw - 120px); } /* (clear of the sound button) */
+  .cdStage { margin-top: 4px; } .cdBtns { margin-top: 4px; min-height: 36px; }
+  .cdBtns button.big { font-size: 19px; padding: 6px 24px; } .cdBtns button { padding: 6px 14px; font-size: 14px; }
+}

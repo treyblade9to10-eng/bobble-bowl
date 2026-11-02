@@ -995,7 +995,7 @@ function step(now) {
 
 function render() {
   // CAMERA zoomed out (pause menu): the world is drawn scaled down, sized as if the screen were bigger (draw.js CAM_ZOOMS)
-  const z = G.teams && !G.demo ? CAM_ZOOMS[camZoom] || 1 : 1, cel = cam.zoom > 1.001 && cam.focus && G.phase !== 'replay';
+  const z = G.teams && !G.demo ? (CAM_ZOOMS[camZoom] || 1) * (typeof Flow !== 'undefined' ? Flow.camK() : 1) : 1, cel = cam.zoom > 1.001 && cam.focus && G.phase !== 'replay';
   scrW = CW; scrH = CH; viewZ = vk = z; // (taps + the camera use viewZ until the next frame)
   if (z !== 1) { CW = scrW / z; CH = scrH / z; vk = 1; uiK = lerp(1 / z, 1, cel ? clamp((cam.zoom - 1) / (1.6 / z - 1), 0, 1) : 0); }
   // draw with the camera on whole pixels: the big field picture then copies straight over instead of being resampled

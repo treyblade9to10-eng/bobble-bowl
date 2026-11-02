@@ -200,13 +200,15 @@ function drawField(g, G) {
   fieldBlit = (typeof wxMixed === 'function' && wxMixed(G)) || fieldCv;
   blitWorld(g, fieldBlit);
   drawGoalPosts(g, G, false);
-  // jumping fans when hyped
+  if (typeof Flow !== 'undefined') Flow.drawBench(g); // the bench jumps up on big plays (flow.js)
+  // jumping fans when hyped (mostly home colors: it's their crowd), both stands
   if (G.crowdHype > 0.05) {
-    const top = sy(-FIELD_PAD_TOP);
-    for (let i = 0; i < 40; i++) {
-      const x = (i * 97 + G.time * 20) % (CW + 40) - 20, j = Math.abs(Math.sin(G.time * 11 + i)) * 10 * G.crowdHype;
-      g.fillStyle = i % 2 ? G.teams[0].c1 : G.teams[1].c1;
+    const top = sy(-FIELD_PAD_TOP), bot = sy(FIELD_W + 3.4), n = G.crowdHype > 1 ? 56 : 40;
+    for (let i = 0; i < n; i++) {
+      const x = (i * 97 + G.time * 20) % (CW + 40) - 20, j = Math.abs(Math.sin(G.time * 11 + i)) * 10 * Math.min(1.6, G.crowdHype);
+      g.fillStyle = i % 4 === 3 ? G.teams[1].c1 : i % 3 ? G.teams[0].c1 : G.teams[0].c2;
       g.fillRect(x, top + 12 + (i % 5) * 12 - j, 6, 10);
+      if (i % 2 === 0 && bot < CH + 40) g.fillRect((x * 1.37 + 50) % (CW + 40) - 20, bot + 16 + (i % 3) * 12 - j, 6, 10);
     }
   }
 }
@@ -733,7 +735,7 @@ function paintArm(g, p, look, sl, shx, shy, ex, ey, hx, hy) {
   g.beginPath(); g.arc(hx, hy, 3.8, 0, 7); g.fill(); g.stroke();
 }
 function drawPlayer(g, p, G, at) {
-  const x = at ? at.x : sx(p.x), y = at ? at.y : sy(p.y);
+  const x = (at ? at.x : sx(p.x)) + (p.shiver ? Math.sin(G.time * 70) * 1.3 : 0), y = at ? at.y : sy(p.y); // (shiver: an iced kicker, flow.js)
   if (!at && (x < -80 - CW * 0.4 || x > CW * 1.4 + 80 || y < -40 || y > CH + 140)) return; // a bit wide so the zoomed celly cam never loses anyone
   const team = G.teams[p.side], look = teamLook(team, p.side === 0, G.uni && G.uni[p.side]);
   const big = p.pos === 'OL' || p.pos === 'DL';
@@ -1320,7 +1322,9 @@ function drawHUD(g, G) {
   // momentum bar under the two team cells + the road crowd meter on the big downs (rules.js)
   const moOn = !G.mini && !G.demo && G.mo != null;
   if (moOn) drawMomentum(g, bx + 5, y0 + H + (G.bcast === 'XMAS' ? 7 : 1), 405);
-  if (moOn && Crowd.show()) drawCrowd(g, x0 + W - 126, y0 + H + (G.bcast === 'XMAS' ? 10 : 4), Crowd.level());
+  const crowdOn = moOn && Crowd.show();
+  if (crowdOn) drawCrowd(g, x0 + W - 126, y0 + H + (G.bcast === 'XMAS' ? 10 : 4), Crowd.level());
+  if (typeof Flow !== 'undefined' && !G.mini) { Flow.drawDrill(g, x0 + W - 96, y0 + H + (G.bcast === 'XMAS' ? 10 : 4) + (crowdOn ? 26 : 0)); Flow.drawTag(g); } // 2:00 DRILL tag + MOMENTUM SWING (flow.js)
   drawHUDRest(g, G, S, x0, y0, W, H);
 }
 // a picture of part of the scorebug, painted in screen pixels (keeps any half pixel of the centered bar)
@@ -1455,13 +1459,14 @@ function drawRef(g, r, G) {
 // ---------- field goal / punt meter (simple: power bar, then aim slider) ----------
 function drawKickMeter(g, G) {
   const km = G.km; if (!km || G.phase !== 'kickmeter' || !isHumanSide(km.side) || km.cpuT != null) return;
-  const W = 560, H = 176, x0 = (CW - W) / 2, y0 = CH - H - 40;
+  const W = 560, H = 176, x0 = (CW - W) / 2 + (km.iced && km.stage < 2 ? Math.sin(G.time * 55) * 1.6 : 0), y0 = CH - H - 40; // (iced: the box shivers a little)
   const fg = km.kind === 'fg' || km.kind === 'xp', st = km.stage;
   g.fillStyle = '#0b0f16f0'; g.fillRect(x0, y0, W, H);
   g.fillStyle = '#f6c31c'; g.fillRect(x0, y0, 6, H);
   g.textAlign = 'left'; g.fillStyle = '#fff'; g.font = 'italic 900 26px "Barlow Condensed", "Arial Black", sans-serif';
   const title = km.kind === 'punt' ? 'PUNT' : km.kind === 'ko' ? 'KICKOFF' : km.kind === 'onside' ? 'ONSIDE KICK' : km.kind === 'xp' ? 'EXTRA POINT' : `${km.yds}-YARD FIELD GOAL`;
   g.fillText(title, x0 + 22, y0 + 32);
+  if (km.iced) { const ix = x0 + 32 + g.measureText(title).width; g.fillStyle = '#9fdcff'; g.fillRect(ix, y0 + 16, 50, 20); g.fillStyle = '#0b0f16'; g.font = 'italic 900 15px "Barlow Condensed", Arial, sans-serif'; g.fillText('ICED', ix + 9, y0 + 31); }
   g.fillStyle = '#9aa6b5'; g.font = '600 13px Barlow, Arial, sans-serif'; g.textAlign = 'right';
   g.fillText(`${km.kk.name}  ·  ${km.kk.ovr} OVR`, x0 + W - 20, y0 + 30);
   const bx = x0 + 96, bw = W - 118, bh = 26;
