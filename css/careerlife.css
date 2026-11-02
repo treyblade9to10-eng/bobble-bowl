@@ -1,0 +1,71 @@
+/* ---- career life: agent, contract, morale + team trust, press conferences ---- */
+.clStrip { display: flex; gap: 4px; }
+.clCell { flex: 1 1 0; min-width: 0; background: var(--panel); border-left: 3px solid var(--line2); padding: 3px 8px 4px; display: flex; flex-direction: column; }
+.clCell > span { font-family: var(--hd); font-weight: 800; letter-spacing: .1em; font-size: 11px; color: var(--dim); }
+.clCell > b { font-family: var(--hd); font-style: italic; font-weight: 900; font-size: 20px; line-height: 1; color: #fff; }
+.clCell > b.clNm { font-size: 16px; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 1px 0; }
+.clCell em { font-style: normal; font-family: var(--hd); font-weight: 800; font-size: 10px; letter-spacing: .08em; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.clM { display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: 8px; align-items: center; }
+.clM > span { grid-column: 1 / 3; } .clM > b { grid-row: 2; } .clM .clBar { grid-row: 2; grid-column: 2; } .clM em { grid-column: 1 / 3; }
+.clBar { height: 7px; background: var(--panel2); } .clBar i { display: block; height: 100%; background: linear-gradient(90deg, #8a96a6, #dfe5ec); }
+.clM.mo { border-left-color: #5cdd8a; } .clM.mo .clBar i { background: linear-gradient(90deg, #2f9e5c, #7cf0a8); }
+.clM.tt { border-left-color: var(--gold); } .clM.tt .clBar i { background: linear-gradient(90deg, var(--gold), #ffdd66); }
+.clText { background: var(--panel2); border-left: 3px solid #5aa9ff; padding: 3px 10px; font-size: 12px; line-height: 1.3; color: #dfe5ec; }
+.clFrom { display: block; font-family: var(--hd); font-weight: 800; letter-spacing: .1em; font-size: 10px; color: #5aa9ff; }
+.clNote { font-size: 11px; color: var(--dim); margin-top: 4px; }
+/* contract tab */
+.clTab { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 12px; }
+.clTab .lbl { color: var(--gold); font-family: var(--hd); font-weight: 800; letter-spacing: .08em; }
+.clRow { display: flex; justify-content: space-between; gap: 8px; border-bottom: 1px solid var(--line); padding: 1px 0; } .clRow span { color: var(--dim); } .clRow b.gold { color: var(--gold); }
+.clQuote { margin-top: 5px; font-style: italic; color: #dfe5ec; } .clQuote span { display: block; font-style: normal; font-family: var(--hd); font-weight: 800; font-size: 10px; letter-spacing: .1em; color: var(--dim); }
+/* game over line */
+.clOver { display: flex; gap: 14px; justify-content: center; font-family: var(--hd); font-weight: 800; letter-spacing: .08em; font-size: 12px; color: var(--dim); margin-top: 2px; }
+.clOver b { color: #fff; } .clOver em { font-style: italic; color: var(--gold); }
+/* agent pick */
+.clAgents { width: min(980px, 96vw); display: flex; flex-direction: column; gap: 8px; }
+.clAgRow { display: flex; gap: 10px; }
+.clAg { flex: 1 1 0; display: flex; flex-direction: column; align-items: flex-start; text-align: left; margin: 0; padding: 12px 16px; background: var(--panel); border-top: 4px solid var(--line2); clip-path: none; gap: 2px; }
+.clAg:hover { background: var(--panel2); transform: translateY(-2px); }
+.clAg em { font-style: italic; font-weight: 900; font-size: 13px; letter-spacing: .12em; color: var(--dim); }
+.clAg b { font-style: italic; font-weight: 900; font-size: 28px; line-height: 1; letter-spacing: .01em; }
+.clAg span { font-family: var(--bd); font-weight: 500; font-size: 13px; text-transform: none; letter-spacing: 0; color: var(--dim); }
+.clAg .p { color: #9cf0b8; margin-top: 6px; } .clAg .m { color: #ff9a8a; }
+.clAg.shark { border-top-color: var(--red); } .clAg.shark em { color: var(--red); }
+.clAg.even { border-top-color: #5aa9ff; } .clAg.even em { color: #5aa9ff; }
+.clAg.pal { border-top-color: var(--gold); } .clAg.pal em { color: var(--gold); }
+/* press conference */
+.pcWrap { width: min(900px, 96vw); background: linear-gradient(170deg, color-mix(in srgb, var(--tc) 55%, #000) 0%, var(--panel) 45%); border-bottom: 4px solid var(--gold); padding: 12px 18px; display: flex; flex-direction: column; gap: 6px; }
+.pcTop { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.pcTag { font-family: var(--hd); font-style: italic; font-weight: 900; font-size: 26px; letter-spacing: .02em; color: var(--gold); }
+.pcGame { font-family: var(--hd); font-weight: 800; letter-spacing: .08em; font-size: 13px; color: #dfe5ec; } .pcGame b.w { color: #5cdd8a; } .pcGame b.l { color: #ff7a6a; }
+.pcRep { font-size: 12px; color: var(--dim); } .pcRep b { color: #fff; }
+.pcQ { font-family: var(--hd); font-style: italic; font-weight: 800; font-size: 26px; line-height: 1.1; color: #fff; text-shadow: 0 1px 3px #000a; }
+.pcAns { display: flex; flex-direction: column; gap: 5px; }
+.pcA { display: grid; grid-template-columns: 110px 1fr auto; align-items: center; gap: 10px; text-align: left; margin: 0; padding: 8px 14px; background: #0c1016cc; border-left: 4px solid var(--line2); clip-path: none; }
+.pcA:hover { background: var(--panel2); transform: translateX(3px); }
+.pcA em { font-style: italic; font-weight: 900; font-size: 17px; letter-spacing: .06em; }
+.pcA span { font-family: var(--bd); font-weight: 600; font-size: 14px; text-transform: none; letter-spacing: 0; color: #eef1f5; }
+.pcA i { font-style: normal; font-size: 10px; letter-spacing: .1em; color: var(--dim); white-space: nowrap; }
+.pcA.t0 { border-left-color: #5aa9ff; } .pcA.t0 em { color: #5aa9ff; }
+.pcA.t1 { border-left-color: var(--gold); } .pcA.t1 em { color: var(--gold); }
+.pcA.t2 { border-left-color: var(--red); } .pcA.t2 em { color: #ff6a4a; }
+.pcFoot { display: flex; justify-content: space-between; align-items: center; font-family: var(--hd); font-weight: 800; letter-spacing: .08em; font-size: 12px; color: var(--dim); }
+.pcFoot button { font-size: 13px; padding: 5px 14px; margin: 0; }
+.pcRes { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; font-size: 15px; color: #dfe5ec; }
+.pcD { display: flex; gap: 16px; font-family: var(--hd); font-weight: 800; letter-spacing: .08em; font-size: 15px; color: var(--dim); } .pcD b { color: var(--gold); font-size: 20px; font-style: italic; }
+.pcRes button.big { margin: 4px 0 0; }
+/* contract talks */
+.clTalk { display: flex; flex-direction: column; gap: 6px; }
+.clOffer { background: var(--panel); border-left: 5px solid var(--tc); padding: 6px 12px; font-size: 14px; }
+.clOffer span { font-family: var(--hd); font-weight: 800; letter-spacing: .1em; font-size: 12px; color: var(--dim); } .clOffer b { color: var(--gold); font-size: 18px; }
+@media (max-height: 500px) {
+  .clCell { padding: 2px 6px 3px; } .clCell > b { font-size: 16px; } .clCell > b.clNm { font-size: 13px; } .clCell > span { font-size: 10px; } .clCell em { font-size: 9px; }
+  .clText { font-size: 11px; padding: 2px 8px; }
+  .clAg { padding: 8px 10px; } .clAg b { font-size: 22px; } .clAg span { font-size: 12px; }
+  .pcWrap { padding: 6px 12px; gap: 4px; } .pcTag { font-size: 20px; } .pcQ { font-size: 20px; }
+  .pcA { padding: 5px 10px; grid-template-columns: 90px 1fr auto; } .pcA em { font-size: 14px; } .pcA span { font-size: 12px; }
+  .pcRes { font-size: 13px; } .pcRes button.big { font-size: 20px; padding: 6px 24px; }
+}
+@media (max-width: 700px) { .pcA i { display: none; } .pcA { grid-template-columns: 80px 1fr; } }
+.pcWrap, .clAgents { margin-top: auto; margin-bottom: auto; }
+.pcTop { padding-right: 52px; }

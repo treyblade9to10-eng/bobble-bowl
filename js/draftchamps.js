@@ -120,7 +120,7 @@ const DC = {
     if (won) {
       r.wins++; r.game++;
       R.draft.best = Math.max(R.draft.best, r.wins);
-      if (r.wins >= this.GAMES) { R.draft.runs++; R.draft.titles++; Records.set(R); this.clear(); return { ok: true, done: true, text: `DRAFT CHAMPION! 3-0 run. Titles: ${R.draft.titles}` }; }
+      if (r.wins >= this.GAMES) { R.draft.runs++; R.draft.titles++; Records.set(R); Boards.add('draft', R.draft.titles); this.clear(); return { ok: true, done: true, text: `DRAFT CHAMPION! 3-0 run. Titles: ${R.draft.titles}` }; }
       Records.set(R); this.save();
       return { ok: true, next: true, text: `Win ${r.wins} of ${this.GAMES}. The next squad drafts tougher.` };
     }

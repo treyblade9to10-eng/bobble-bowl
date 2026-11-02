@@ -29,9 +29,12 @@
 <link rel="stylesheet" href="css/practice.css">
 <link rel="stylesheet" href="css/franchisehub.css">
 <link rel="stylesheet" href="css/spooky.css">
+<link rel="stylesheet" href="css/themes.css">
 <link rel="stylesheet" href="css/franchise3.css">
 <link rel="stylesheet" href="css/trade.css">
+<link rel="stylesheet" href="css/careerlife.css">
 <link rel="stylesheet" href="css/gamepad.css">
+<link rel="stylesheet" href="css/modes2.css">
 <link rel="stylesheet" href="css/onseason.css">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#0c1016">
@@ -67,7 +70,7 @@
       <button id="btnMode">MODE: <span id="modeLabel">?</span></button>
     </div>
     <button id="btnInstall" style="display:none">INSTALL APP</button>
-    <div class="ver">v13.1</div>
+    <div class="ver">v13.5</div>
   </div>
 
   <!-- Mode select -->
@@ -291,11 +294,30 @@
   <!-- Challenges & mini-games -->
   <div id="modes" class="screen">
     <h2>Challenges</h2>
-    <div id="mdTeam"><button class="pgbtn" id="mdPrev">‹</button><span id="mdTeamName"></span><button class="pgbtn" id="mdNext">›</button></div>
+    <div id="mdTop">
+      <div id="mdTeam"><button class="pgbtn" id="mdPrev">‹</button><span id="mdTeamName"></span><button class="pgbtn" id="mdNext">›</button></div>
+      <div id="mdTabs"><button data-t="ch" class="on">CHALLENGES</button><button data-t="lb">LEADERBOARD</button><button data-t="tn">TOURNAMENT</button></div>
+    </div>
     <div id="mdWeekly"></div>
     <div id="mdCards"></div>
+    <div id="mdBoard" style="display:none"></div>
     <button id="mdBack">BACK</button>
   </div>
+  <!-- Couch Tournament (tourney.js) -->
+  <div id="tourney" class="screen">
+    <h2>Couch Tournament</h2>
+    <div id="tnBody"></div>
+    <div id="tnBtns"></div>
+  </div>
+  <!-- online leaderboard: the opt-in box (boards.js) -->
+  <div id="lbAsk"><div class="lbBox">
+    <b>ONLINE LEADERBOARD</b>
+    <p>Post your score to the online leaderboard? First name or nickname only.</p>
+    <input id="lbName" maxlength="12" placeholder="First name or nickname" autocomplete="off" spellcheck="false">
+    <div id="lbErr"></div>
+    <div class="row"><button id="lbNo">NO THANKS</button><button class="big gold" id="lbYes">POST IT</button></div>
+    <small>Off any time on the Challenges LEADERBOARD tab (that deletes your scores from it).</small>
+  </div></div>
   <div id="miniOver" class="screen">
     <h2 id="moTitle"></h2>
     <div id="moBig"></div>
@@ -429,6 +451,7 @@
 <script src="js/customteams.js"></script>
 <script src="js/injury.js"></script>
 <script src="js/celly.js"></script>
+<script src="js/teamcellys.js"></script>
 <script src="js/special.js"></script>
 <script src="js/rules.js"></script>
 <script src="js/highlights.js"></script>
@@ -440,12 +463,17 @@
 <script src="js/gamepad.js"></script>
 <script src="js/lib/peerjs.min.js"></script>
 <script src="js/net.js"></script>
+<script src="js/themes.js"></script>
 <script src="js/main.js"></script>
+<script src="js/boards.js"></script>
+<script src="js/tourney.js"></script>
 <script src="js/practice.js"></script>
 <script src="js/draftchamps.js"></script>
 <script src="js/locker.js"></script>
 <script src="js/gear.js"></script>
 <script src="js/broadcast.js"></script>
+<script src="js/music.js"></script>
+<script src="js/flyover.js"></script>
 <script src="js/biggame.js"></script>
 <script src="js/seasonui.js"></script>
 <script src="js/primetime.js"></script>
@@ -455,6 +483,7 @@
 <script src="js/ages.js"></script>
 <script src="js/aging.js"></script>
 <script src="js/careerui.js"></script>
+<script src="js/careerlife.js"></script>
 <script src="js/unlocks.js"></script>
 <script src="js/tutorial.js"></script>
 <script src="js/teamlab.js"></script>
