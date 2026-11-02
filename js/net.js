@@ -5,8 +5,10 @@
 // and a "fast" one for the constant position updates, so one lost packet can't freeze everything behind it.
 // The guest plays the updates back ~0.1s behind and slides players smoothly between them, except its own guy:
 // he moves on the guest's screen right away and the host goes with where he is (predict / adopt).
+// Faster device hosts: both time a small bit of work when they connect; if the joining device is clearly faster it runs the game
+// instead (before kickoff, same line, nothing to redo). Net.link = who made the connection (code owner / joiner), Net.role = who runs the game.
 // CO-OP: both on the host's team vs the CPU. The host calls the plays and kicks, the guest plays his own guy (G.hp[1] in engine.js).
-const NET_VERSION = 7;
+const NET_VERSION = 8;
 const NET_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 const NET_KEYS = ['Space', 'ShiftLeft', 'ControlLeft', 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyE', 'KeyF', 'KeyR', 'KeyQ', 'Tab', 'KeyC',
   'Digit1', 'Digit2', 'Digit3', 'Digit4', 'Numpad1', 'Numpad2', 'Numpad3', 'Numpad4', 'KeyT', 'KeyX', 'KeyM', 'KeyV', 'KeyB', 'Enter', 'Escape', 'KeyY', 'KeyG', 'KeyU'];
@@ -34,7 +36,7 @@ const Relay = {
     if (this.dbp) return this.dbp;
     this.dbp = new Promise((res, rej) => {
       const add = (src, cb) => { const sc = document.createElement('script'); sc.src = src; sc.onload = cb; sc.onerror = () => rej(new Error('relay load')); document.head.appendChild(sc); };
-      const init = () => { try { const app = firebase.apps.find(a => a.name === 'bobble') || firebase.initializeApp(RELAY_CFG, 'bobble'); res(app.database()); } catch (e) { rej(e); } };
+      const init = () => { try { const app = firebase.apps.find(a => a.name === 'bobble') || firebase.initializeApp(RELAY_CFG, 'bobble'); res(this.db = app.database()); } catch (e) { rej(e); } };
       if (typeof firebase !== 'undefined' && firebase.database) init(); else add('js/lib/firebase-app-compat.js', () => add('js/lib/firebase-database-compat.js', init));
     });
     this.dbp.catch(() => { this.dbp = null; });
@@ -113,6 +115,7 @@ const Relay = {
 
 const Net = {
   peer: null, conn: null, fast: null, fastOk: false, role: null, code: null, side: null, status: '', ready: false,
+  link: null, sp: 0, swapped: false, hostOpts: null, slowHost: false, ftE: 16.7, gFt: 16.7, gapE: 0.02, lastTm: null, stE: 0, dbOffT: 0, kickT: 0,
   seq: 0, lastSeq: -1, inSeq: 0, lastIn: -1, buf: [], off: null, jit: 0.02,
   out: { pressed: [], taps: [] }, sendT: 0, snapT: 0, last: null, rosterRef: null, bannerRef: null, pbpRef: null, routeKey: '', sounds: [],
   picks: {}, callId: 0, pendingCall: null, callMsgs: [], overMsg: null, rSent: {}, rIds: 0, rCache: {},
@@ -126,15 +129,15 @@ const Net = {
   peerId(code) { return 'bobblebowl-' + code.toUpperCase(); },
   serverErr(e) { return e.type === 'network' || e.type === 'server-error' || e.type === 'socket-error' || e.type === 'socket-closed'; },
   host(onCode, onStatus) {
-    this.reset(); this.role = 'host'; this.side = 0; this.onStatus = onStatus;
+    this.reset(); this.role = this.link = 'host'; this.side = 0; this.onStatus = onStatus; this.bench();
     let shown = false;
     const ready = code => {
-      if (shown || this.role !== 'host') return; shown = true; this.code = code; onCode(code); this.hostRelay(onStatus);
-      this.expT = setTimeout(() => { if (this.role === 'host' && !G.online && this.code === code) { this.reset(); if (typeof onlineMsg === 'function') onlineMsg('Your code ran out after 30 minutes. Host again to get a new one.'); } }, CODE_LIFE);
+      if (shown || this.link !== 'host') return; shown = true; this.code = code; onCode(code); this.hostRelay(onStatus);
+      this.expT = setTimeout(() => { if (this.link === 'host' && !G.online && this.code === code) { this.reset(); if (typeof onlineMsg === 'function') onlineMsg('Your code ran out after 30 minutes. Host again to get a new one.'); } }, CODE_LIFE);
     };
     // the direct-connect server can't be reached (blocked network) or is slow: host on the relay only
     const relayOnly = () => {
-      if (shown || this.role !== 'host') return;
+      if (shown || this.link !== 'host') return;
       Relay.load().then(db => {
         const pick = () => { const c = this.makeCode(); return db.ref('bobble/rooms/' + c + '/host').once('value').then(sn => sn.val() ? pick() : c); };
         return db.ref('bobble/rooms/' + this.code + '/host').once('value').then(sn => sn.val() ? pick() : this.code);
@@ -171,7 +174,7 @@ const Net = {
   hostRelay(onStatus) {
     const code = this.code;
     Relay.load().then(db => {
-      if (this.code !== code || this.role !== 'host' || this.relayRoom) return;
+      if (this.code !== code || this.link !== 'host' || this.relayRoom) return;
       const room = this.relayRoom = this.rroom = db.ref('bobble/rooms/' + code);
       this.relayOffs.push(Relay.presence(db, room, 'host', () => ({ t: firebase.database.ServerValue.TIMESTAMP, v: NET_VERSION, busy: G.online ? 1 : 0, coop: onCoop() ? 1 : 0 }), ['h2g']));
       const g = room.child('guest'), cb = g.on('value', sn => {
@@ -179,7 +182,7 @@ const Net = {
         // a guest came in the relay way (before the game, or a direct game that dropped)
         this.dropDirect();
         this.useRelayLanes(room, 'h2g', 'g2h', onStatus);
-        if (G.online) this.resync();
+        if (G.online && this.role === 'host') this.resync();
       });
       this.relayOffs.push(() => g.off('value', cb));
     }).catch(() => {});
@@ -204,9 +207,9 @@ const Net = {
   join(code, onStatus) {
     code = code.toUpperCase();
     if ([...code].some(ch => !NET_CHARS.includes(ch))) { onStatus('Codes never use O, 0, I, 1 or L. Look at the code again.'); return; }
-    this.reset(); this.role = 'guest'; this.side = 1; this.code = code; this.onStatus = onStatus;
+    this.reset(); this.role = this.link = 'guest'; this.side = 1; this.code = code; this.onStatus = onStatus; this.bench();
     this.gid = Math.random().toString(36).slice(2, 10);
-    const alive = () => this.role === 'guest' && this.code === code;
+    const alive = () => this.link === 'guest' && this.code === code;
     let hostSeen = null, noGame = false, noDirect = false, waitT = null; // hostSeen: null = still checking, true/false = the database answered
     onStatus(`CONNECTING TO GAME ${code}...`);
     // the direct line is out (blocked, or it failed): go the relay way as soon as we know the game is there
@@ -261,12 +264,12 @@ const Net = {
   // guest: move to the relay (before the game when the direct line can't get through, or in the middle of a game when it drops)
   toRelay() {
     const room = this.rroom, code = this.code, onStatus = this.onStatus || (() => {});
-    if (this.role !== 'guest' || this.onRelay || this.swapping || !room) return;
+    if (this.link !== 'guest' || this.onRelay || this.swapping || !room) return;
     this.swapping = true;
     if (!this.ready) onStatus('NO DIRECT LINE BETWEEN YOUR NETWORKS. CONNECTING THROUGH THE RELAY...');
     room.child('guest').transaction(cur => cur && cur.id !== this.gid ? undefined : { t: firebase.database.ServerValue.TIMESTAMP, id: this.gid }, (err, ok) => {
       this.swapping = false;
-      if (this.role !== 'guest' || this.code !== code || this.onRelay) return;
+      if (this.link !== 'guest' || this.code !== code || this.onRelay) return;
       if (err || !ok) { if (!this.ready) onStatus(err ? "Can't reach the online server. Check your internet." : 'That game already has two players.'); return; }
       const mid = this.ready && G.online;
       this.dropDirect(); this.ready = false;
@@ -276,12 +279,41 @@ const Net = {
       this.rxT = performance.now();
     }, false);
   },
+  hello() { return { t: 'hello', team: TEAMS[sel.idx[sel.you]].id, ct: this.myTeam(), mode: Pad.ui ? 'computer' : G.mode, v: NET_VERSION, on: G.online ? 1 : 0, sp: this.sp }; },
+  // how fast this device is: the same small bit of game-like work a few times (best try, in ms: lower = faster)
+  bench() {
+    this.sp = 0; let best = Infinity, n = 0;
+    const o = { ps: [] }; for (let i = 0; i < 24; i++) o.ps.push(PSTAT.concat(PSTAT).map((k, j) => Math.sin(i * 7 + j) * 60));
+    const run = () => {
+      if (!this.link || G.online) return;
+      const t = performance.now(); let a = 0;
+      for (let r = 0; r < 8; r++) { a += JSON.parse(JSON.stringify(o)).ps[r][r]; for (let i = 0; i < 4000; i++) a += Math.hypot(Math.sin(i + r), Math.cos(i * a % 7)); }
+      best = Math.min(best, performance.now() - t); this.sp = Math.round(best * 100) / 100 + (a > 1e300 ? 1 : 0);
+      if (++n < 6) setTimeout(run, 120);
+    };
+    setTimeout(run, 30);
+  },
+  // the friend's device is clearly faster: let it run the game (not in co-op, where the host calls the plays, or an Online Season match)
+  canSwap(h) {
+    if (this.swapped || window.__noSwap || !(h.sp > 0) || !(this.sp > 0)) return false;
+    const slow = this.sp > h.sp * 1.6 && this.sp - h.sp > 2;
+    if (!slow) return false;
+    if (onCoop() || (typeof OSN !== 'undefined' && OSN.match)) { this.slowHost = true; return false; } // (just tell them)
+    return true;
+  },
+  swapRoles() {
+    this.swapped = true; this.role = 'guest'; this.side = 1;
+    this.send({ t: 'swap', o: { qtr: +$('optQtr').value, weather: $('optWeather').value, night: $('optNight').value } });
+    this.send(this.hello());
+    if (this.onStatus) this.onStatus("YOUR FRIEND'S DEVICE IS FASTER, SO IT RUNS THE GAME. STARTING...");
+  },
   errText(e) { return this.serverErr(e) ? "Can't reach the online server. Check your internet." : 'Connection problem (' + (e.type || 'unknown') + '). Try again.'; },
   wire(c, onStatus) {
     c.on('open', () => {
       if (c !== this.conn) return;
       this.ready = true; this.okT = this.rxT = this.inT = this.snapRxT = performance.now();
-      if (this.role === 'guest') c.send({ t: 'hello', team: TEAMS[sel.idx[sel.you]].id, ct: this.myTeam(), mode: Pad.ui ? 'computer' : G.mode, v: NET_VERSION, on: G.online ? 1 : 0 });
+      if (this.role === 'guest') c.send(this.hello());
+      else if (G.online && this.link === 'guest') this.resync(); // (we run the game but joined: the friend's side doesn't send a hello we could answer)
       onStatus(this.onRelay ? 'CONNECTED (RELAY)' : 'CONNECTED (DIRECT)');
     });
     c.on('data', m => { if (c === this.conn) this.recv(m); });
@@ -293,12 +325,12 @@ const Net = {
     if (!this.role) return;
     if (G.online && G.teams && G.phase !== 'over') { // mid-game: keep the game, the relay brings the friend back
       this.dropDirect();
-      if (this.role === 'guest') this.toRelay(); // the host waits for them (tick pauses the game, gives up after a while)
+      if (this.link === 'guest') this.toRelay(); // the host waits for them (tick pauses the game, gives up after a while)
       return;
     }
     if (!G.online) { // still connecting: the guest tries the relay, the host keeps its code up for the next try
       this.dropDirect(); this.ready = false;
-      if (this.role === 'guest' && this.directOut) this.directOut();
+      if (this.link === 'guest' && this.directOut) this.directOut();
       return;
     }
     this.lost();
@@ -308,15 +340,15 @@ const Net = {
     if (this.conn && this.ready) try { this.conn.send(m); } catch (e) {}
   },
   reset() {
-    const fa = this.fast, co = this.conn, pe = this.peer, room = this.relayRoom, role = this.role;
+    const fa = this.fast, co = this.conn, pe = this.peer, room = this.relayRoom, link = this.link;
     this.conn = null; this.fast = null; this.relayRoom = null; this.onRelay = false;
     if (this.heldPause) G.paused = false;
     if (this.expT) clearTimeout(this.expT);
     try { fa && fa.close(); } catch (e) {} try { co && co.close(); } catch (e) {} try { if (pe) { pe._bye = true; pe.destroy(); } } catch (e) {}
     for (const f of this.relayOffs.splice(0)) try { f(); } catch (e) {}
-    if (room) try { if (role === 'host') room.remove(); else for (const k of ['guest', 'g2h']) room.child(k).remove(); } catch (e) {}
+    if (room) try { if (link === 'host') room.remove(); else for (const k of ['guest', 'g2h']) room.child(k).remove(); } catch (e) {}
     Object.assign(this, { peer: null, conn: null, fast: null, fastOk: false, seq: 0, lastSeq: -1, inSeq: 0, lastIn: -1, buf: [], off: null, jit: 0.02, role: null, ready: false, last: null, rosterRef: null, bannerRef: null, pbpRef: null, routeKey: '', picks: {}, pendingCall: null, sounds: [], out: { pressed: [], taps: [] }, relayPrev: null, relayBase: null,
-      rroom: null, rdb: null, startMsg: null, callMsgs: [], overMsg: null, rSent: {}, rIds: 0, rCache: {}, held: false, heldPause: false, waitWas: null, swapping: false, rtt: null, onStatus: null, directOut: null, expT: null, inKey: '', gRep: null, gOff: null, ga: false, pr: null, prOff: 0, meT: null });
+      rroom: null, rdb: null, startMsg: null, callMsgs: [], overMsg: null, rSent: {}, rIds: 0, rCache: {}, held: false, heldPause: false, waitWas: null, swapping: false, rtt: null, onStatus: null, link: null, swapped: false, hostOpts: null, slowHost: false, tipT: 0, gFt: 16.7, gapE: 0.02, lastTm: null, stE: 0, inDeaf: false, directOut: null, expT: null, inKey: '', gRep: null, gOff: null, ga: false, pr: null, prOff: 0, meT: null });
     G.online = false; Input.online = false; Input.use(0); Input.store[1] = null;
   },
   lost(link) {
@@ -332,11 +364,15 @@ const Net = {
   // 4x a second: pings, a direct line that went quiet moves to the relay, the host pauses while the guest is away
   tick() {
     this.badge();
+    if (this.relayRoom) this.dbKick();
+    // waiting for a friend with nothing going over the relay: a tiny write now and then so strict (school) networks don't close the idle line
+    if (this.relayRoom && this.link === 'host' && !G.online && this.dbOn && performance.now() - (this.kaT || 0) > 20000) { this.kaT = performance.now(); this.relayRoom.child('host/k').set(Math.round(this.kaT)).catch(() => {}); }
     if (!this.role || !this.ready || !G.online) return;
     const now = performance.now(), quiet = now - this.rxT, playing = G.teams && G.phase !== 'over';
+    // the line is down, or only works one way (the joiner is the one who moves it to the relay)
+    if (this.link === 'guest' && !this.onRelay && playing && (quiet > LINK_DEAD || (this.role === 'guest' ? this.last && this.last.deaf : this.inDeaf))) this.toRelay();
     if (this.role === 'guest') {
-      if (now - this.pingT > 1000) { this.pingT = now; this.send({ t: 'pg', c: Math.round(now), r: this.rtt }); }
-      if (!this.onRelay && playing && (quiet > LINK_DEAD || (this.last && this.last.deaf))) this.toRelay(); // the line is down, or only works one way
+      if (now - this.pingT > 1000) { this.pingT = now; this.send({ t: 'pg', c: Math.round(now), r: this.rtt, f: Math.round(this.ftE) }); } // (f: how long our frames take, the host sends updates to match)
       const away = playing && now - this.snapRxT > HOLD_AFTER * (this.onRelay ? 1.5 : 1); // no game updates: the host switched apps or the line is down
       if (away) {
         if (!this.held) { this.held = true; this.waitWas = $('onWait').style.display === 'block' ? $('onWait').textContent : null; }
@@ -361,6 +397,13 @@ const Net = {
     }
     if (playing && quiet > GIVE_UP) this.lost(true);
   },
+  // the relay's line to the database dropped (school / phone Wi-Fi): the database waits longer and longer between tries
+  // on its own, so after 2s we tell it to try again now (and every 5s after that)
+  dbKick(now = performance.now(), force) {
+    if (this.dbOn && !force) { this.dbOffT = 0; return; }
+    if (!this.dbOffT) this.dbOffT = now;
+    if ((force || now - this.dbOffT > 2000) && now - this.kickT > 5000 && Relay.db) { this.kickT = now; try { Relay.db.goOffline(); Relay.db.goOnline(); } catch (e) {} }
+  },
   // small corner tag in an online game: which way you're connected and how fast
   badge() {
     let el = $('netBadge');
@@ -370,14 +413,29 @@ const Net = {
       const w = $('onWait'); if (!w) return; w.parentNode.appendChild(el);
     }
     const on = G.online && this.role && G.teams && typeof menuScreens !== 'undefined' && !menuScreens.some(id => $(id) && $(id).classList.contains('show'));
-    let t = '';
+    let t = '', q = 0, col = '#f6c31c';
     if (on) {
       const now = performance.now(), bad = !this.ready || now - this.rxT > LINK_DEAD || (this.onRelay && !this.dbOn);
       const lane = this.onRelay ? 'RELAY' : 'DIRECT';
-      t = bad ? 'RECONNECTING...' : now - this.okT < 4000 ? `CONNECTED (${lane})` : lane + (this.rtt != null ? ' ' + this.rtt + ' MS' : '');
-      el.style.color = bad ? '#ff6b5b' : '#f6c31c';
+      t = bad ? 'RECONNECTING...' : this.tipT && now - this.tipT < 8000 ? 'TIP: LET THE FASTER DEVICE HOST' : now - this.okT < 4000 ? `CONNECTED (${lane})` : lane + (this.rtt != null ? ' ' + this.rtt + ' MS' : '');
+      // signal bars: round trip, relay or direct, and (guest) how often the updates ran dry
+      const r = this.rtt;
+      q = bad ? 0 : r == null ? 3 : r < 90 ? 4 : r < 180 ? 3 : r < 350 ? 2 : 1;
+      if (this.onRelay) q = Math.min(q, 3);
+      if (q > 1 && (this.role === 'guest' ? this.stE > 0.15 : now - this.inT > 400)) q--;
+      col = bad || q < 2 ? '#ff6b5b' : '#f6c31c';
     }
-    if (el.textContent !== t) el.textContent = t;
+    const key = t + q;
+    if (el._k !== key) {
+      el._k = key; el.style.color = col;
+      el.innerHTML = '';
+      el.appendChild(document.createTextNode(t));
+      if (t) {
+        const bars = document.createElement('span'); bars.style.cssText = 'display:inline-flex;align-items:flex-end;gap:1px;height:10px;margin-left:7px;vertical-align:-1px';
+        for (let i = 0; i < 4; i++) { const k = document.createElement('i'); k.style.cssText = `display:block;width:3px;height:${3 + i * 2.3}px;background:${i < q ? col : '#ffffff38'}`; bars.appendChild(k); }
+        el.appendChild(bars);
+      }
+    }
     el.style.display = t ? 'block' : 'none';
   },
   // came back to the tab: a direct line that died while we were away goes to the relay right away
@@ -385,7 +443,7 @@ const Net = {
     if (document.visibilityState !== 'visible' || !this.role || !G.online) return;
     const now = performance.now();
     this.rxT = Math.max(this.rxT, now - 1000); this.inT = Math.max(this.inT, now - 1000); // give their updates a moment to arrive
-    if (this.role !== 'guest' || this.onRelay) return;
+    if (this.link !== 'guest' || this.onRelay) return;
     const pc = this.conn && this.conn.peerConnection, st = pc && pc.iceConnectionState;
     if (!this.conn || !this.conn.open || !pc || st === 'failed' || st === 'closed' || st === 'disconnected') this.toRelay();
   },
@@ -394,12 +452,12 @@ const Net = {
   recv(m, fast) {
     if (!m || !m.t) return;
     const now = performance.now(); this.rxT = now;
-    if (m.t === 'pg') { this.send({ t: 'po', c: m.c }); if (m.r != null) this.rtt = m.r; return; }
+    if (m.t === 'pg') { this.send({ t: 'po', c: m.c }); if (m.r != null) this.rtt = m.r; if (m.f > 0) this.gFt = Math.min(200, m.f); return; }
     if (m.t === 'po') { this.rtt = Math.round(now - m.c); return; }
     if (this.role === 'host') {
       if (m.t === 'in' || m.t === 'in1' || m.t === 'pick' || m.t === 'tool') this.inT = now;
       // (a hello in the middle of a game = the guest moved lanes; resend the start if it never got there)
-      if (m.t === 'hello') { if (G.online) { if (!m.on && this.startMsg) { this.send(this.startMsg); this.resync(); } return; } if (m.v !== NET_VERSION) { this.send({ t: 'old' }); return setTimeout(() => this.reset(), 300); } return this.startHost(m); }
+      if (m.t === 'hello') { if (G.online) { if (!m.on && this.startMsg) { this.send(this.startMsg); this.resync(); } return; } if (m.v !== NET_VERSION) { this.send({ t: 'old' }); return setTimeout(() => this.reset(), 300); } return this.canSwap(m) ? this.swapRoles() : this.startHost(m); }
       if (m.t === 'in') return this.mergeInput(m);
       if (m.t === 'in1') return this.mergeOneShots(m);
       if (m.t === 'pick') return this.pick(1, m.mode, m.key, m.id);
@@ -407,6 +465,7 @@ const Net = {
       if (m.t === 'kf') { this.relayPrev = null; return; } // guest missed a relay update: next one is a full one
       if (m.t === 'rr') { this.rSent = {}; this.rosterRef = null; return; } // guest is missing a player: send the whole roster
     } else {
+      if (m.t === 'swap') { if (G.online || this.swapped) return; this.swapped = true; this.role = 'host'; this.side = 0; this.hostOpts = m.o; return; } // our device is faster: we run the game (their hello comes next)
       if (m.t === 'start') return this.startGuest(m);
       if (m.t === 'roster') return this.applyRoster(m);
       if (m.t === 's' || m.t === 'sd') {
@@ -446,18 +505,21 @@ const Net = {
   startHost(hello) {
     let mine = TEAMS[sel.idx[sel.you]];
     if (mine.custom) mine = this.myTeam() ? CT.clean(this.myTeam()) : { ...mine, logo: undefined }; // no big logo in the start message
-    const coop = onCoop(); // co-op: the host picked both teams, the guest's pick doesn't matter
+    const ho = this.hostOpts, coop = !ho && onCoop(); // co-op: the host picked both teams, the guest's pick doesn't matter
+    const qtr = ho ? ho.qtr : +$('optQtr').value, wth = ho ? ho.weather : $('optWeather').value, night = ho ? ho.night : $('optNight').value; // (took over hosting: the friend's settings)
     let theirs = coop ? onCpuTeam() : (hello.ct && this.theirTeam(hello.ct, mine.id)) || CT.NFL.find(t => t.id === hello.team) || CT.NFL[(sel.idx[sel.you] + 1) % 32];
     if (theirs.id === mine.id) theirs = CT.NFL[(CT.NFL.findIndex(t => t.id === mine.id) + 1) % 32] || CT.NFL[0]; // can't both be the same team
     Input.online = true; Input.store[1] = Input.remote(); Input.use(0);
     G.online = true; G.netModes = [G.mode, hello.mode === 'mobile' ? 'mobile' : 'computer'];
     G.demo = false; G.season = false; G.challenge = null; G.mini = null; show(null);
     const bc = typeof quickBcast === 'function' ? quickBcast() : null;
-    const opts = { qtr: +$('optQtr').value, diff: coop ? +$('optDiff').value : 1, humanSide: 0, versus: !coop, coop, weather: typeof bcWeather === 'function' ? bcWeather(bc, pickWeather($('optWeather').value), $('optWeather').value) : pickWeather($('optWeather').value), night: $('optNight').value === '1', bcast: bc };
+    const opts = { qtr, diff: coop ? +$('optDiff').value : 1, humanSide: 0, versus: !coop, coop, weather: typeof bcWeather === 'function' ? bcWeather(bc, pickWeather(wth), wth) : pickWeather(wth), night: night === '1', bcast: bc };
     newGame(mine, theirs, opts);
-    if (this.relayRoom) this.relayRoom.child('host/busy').set(1); // nobody else can join now
-    this.send(this.startMsg = { t: 'start', v: NET_VERSION, teams: G.teams, opts: { qtr: opts.qtr, weather: G.storm ? 'storm' : G.fog ? 'fog' : G.weather, night: G.night, bcast: G.bcast, coop: coop ? 1 : 0, diff: G.diff, wind: gameWind() }, modes: G.netModes });
+    this.busy();
+    this.send(this.startMsg = { t: 'start', v: NET_VERSION, teams: G.teams, opts: { qtr: opts.qtr, weather: G.storm ? 'storm' : G.fog ? 'fog' : G.weather, night: G.night, bcast: G.bcast, coop: coop ? 1 : 0, diff: G.diff, wind: gameWind(), slow: this.slowHost ? 1 : 0 }, modes: G.netModes });
+    if (this.slowHost) this.tipT = performance.now();
   },
+  busy() { if (this.relayRoom && this.link === 'host') this.relayRoom.child('host/busy').set(1); }, // nobody else can join now
   // after the engine used the guest's one-shot inputs (this frame / first catch-up step), clear them
   usedOneShots() {
     const R = Input.store[1];
@@ -468,6 +530,7 @@ const Net = {
     const R = Input.store[1]; if (!R) return;
     if (m.n != null) { if (m.n <= this.lastIn) return; this.lastIn = m.n; } // fast lane: skip old ones that arrive late
     if (m.me) this.takeRep(m.me); else this.gRep = null;
+    this.inDeaf = !!m.df; // they hear nothing from us
     if (m.md != null && G.netModes) G.netModes[1] = m.md ? 'mobile' : 'computer'; // picked up / put down a controller mid-game
     R.down = {}; for (const k of m.held || []) R.down[k] = true;
     this.mergeOneShots(m);
@@ -484,13 +547,18 @@ const Net = {
     for (const t of m.taps || []) R.taps.push({ wx: t[0], wy: t[1] });
     if (m.rel) { R.release = { x: m.rel[0], y: m.rel[1] }; R.flick = !!m.rel[2]; if (m.p) { const P = R.pointer; P.wx = m.p[1]; P.wy = m.p[2]; P.wx0 = m.p[3]; P.wy0 = m.p[4]; P.t = m.p[5]; P.moved = !!m.p[6]; } }
   },
+  // real time since the last frame (s), and a running average of it in ms
+  frameMs() { const n = performance.now(), d = n - (this.fT || n); this.fT = n; if (d > 0 && d < 500) this.ftE += (d - this.ftE) * 0.05; return clamp(d / 1000, 0, 0.1); },
   hostFrame(dt) {
+    this.frameMs();
     if (!this.ready || !G.teams) return;
     this.usedOneShots();
     this.adopt(dt);
     this.snapT -= dt;
     if (this.snapT <= 0) {
-      this.snapT = Math.max(0, this.snapT + (this.held ? 0.25 : this.onRelay ? 1 / RELAY_HZ : 1 / NET_HZ)); // carry the leftover so 60fps really gives 50 a second
+      // a slow guest device can't show 50 a second: send about as many as it draws (fewer to unpack on a weak Chromebook)
+      const hz = this.onRelay ? RELAY_HZ : clamp(1250 / this.gFt, 25, NET_HZ);
+      this.snapT = Math.max(0, this.snapT + (this.held ? 0.25 : 1 / hz)); // carry the leftover so 60fps really gives 50 a second
       // relay line backed up: skip this one so old updates never pile up (the next one goes out when it clears)
       if (!(this.onRelay && this.fast && this.fast.backed && this.fast.backed())) this.sendSnap();
     }
@@ -641,6 +709,7 @@ const Net = {
     const coop = !!m.opts.coop; // co-op: same team as the host (home), vs the CPU
     initGame(m.teams[0], m.teams[1], { qtr: m.opts.qtr, diff: coop ? m.opts.diff : 1, humanSide: coop ? 0 : 1, versus: !coop, coop, weather: m.opts.weather, night: m.opts.night, bcast: m.opts.bcast });
     G.wind = m.opts.wind || null; // the host's wind (scorebug arrow)
+    this.busy(); if (m.opts.slow) this.tipT = performance.now();
     G.phase = 'idle'; G.players = []; G.ball = null;
   },
   applyRoster(m) {
@@ -662,6 +731,8 @@ const Net = {
     const clk = s.tm - performance.now() / 1000;
     if (this.off == null || clk > this.off) this.off = clk; else this.off -= 0.0002;
     this.jit += (Math.min(0.25, this.off - clk) - this.jit) * 0.05;
+    if (this.lastTm != null) { const g = s.tm - this.lastTm; if (g > 0 && g < 0.5) this.gapE += (g - this.gapE) * 0.1; } // how far apart updates are (slow host / fewer sent / lost ones)
+    this.lastTm = s.tm;
     this.buf.push({ tm: s.tm, p: s.ps.map(a => [a[0], a[1], a[2], a[3]]), b: s.b ? [s.b[0], s.b[1], s.b[2], s.b[4], s.b[5] ? s.b[5][4] : null] : null, rf: s.rf.map(r => [r[0], r[1]]) });
     if (this.buf.length > 20) this.buf.shift();
     const P = G.players, relay = this.onRelay;
@@ -714,10 +785,11 @@ const Net = {
   },
   // the guest just draws: smooth players toward the latest positions, run the camera / fx locally
   guestFrame(dt) {
+    const raw = this.frameMs();
     G.time += dt;
     if (G.slowmo > 0) G.slowmo -= dt;
     this.playback();
-    this.predict(dt);
+    this.predict(raw || dt); // (real time: a slow frame on a weak device mustn't slow your own guy down)
     if (this.onRelay) { // the relay doesn't send leg swing / running speed: work them out here like the engine does
       for (const p of G.players) { p.speedNow = Math.hypot(p.vx, p.vy); p.anim += Math.min(p.speedNow, 12) * dt * 1.45; }
       for (const r of G.refs || []) r.anim += (r.moving || 0) * dt * 1.5;
@@ -729,12 +801,15 @@ const Net = {
   playback() {
     this.meT = null;
     const B = this.buf; if (!B.length || this.off == null) return;
-    const delay = clamp((this.onRelay ? 0.06 : 0.03) + this.jit * 1.4, this.onRelay ? 0.07 : 0.035, 0.3);
+    // (always at least one update ahead: a slow host sends them further apart)
+    const delay = clamp(Math.max((this.onRelay ? 0.06 : 0.03) + this.jit * 1.4, this.gapE * 1.3 + 0.01), this.onRelay ? 0.07 : 0.035, 0.3);
     const rt = performance.now() / 1000 + this.off - delay;
     let a = B[0], c = null;
     for (let i = 0; i < B.length - 1; i++) if (B[i].tm <= rt && B[i + 1].tm >= rt) { a = B[i]; c = B[i + 1]; break; }
     if (!c) { a = B[B.length - 1]; if (rt < B[0].tm) a = B[0]; }
     const u = c ? (rt - a.tm) / Math.max(1e-4, c.tm - a.tm) : 0;
+    this.pbStarve = !c; this.pbDelay = Math.round(delay * 1000); // (ran out of updates this frame / how far behind we draw: for the badge + tests)
+    if (G.phase === 'live') this.stE += ((c ? 0 : 1) - this.stE) * 0.02;
     const ex = c ? 0 : clamp(rt - a.tm, 0, 0.1); // ran out of updates: keep them moving a tiny bit
     const P = G.players, now = performance.now() / 1000 + this.off;
     const me = G.phase === 'live' && G.humanPlayer && !G.humanPlayer.celly ? G.humanPlayer : null; // the guy you're steering
@@ -847,6 +922,7 @@ const Net = {
       this.inKey = k; this.inSentT = now;
     }
     this.sendT = this.onRelay ? 1 / RELAY_HZ : 0; // direct: your controls go out every frame
+    if (this.link === 'host' && performance.now() - this.rxT > LINK_DEAD) m.df = 1; // (we own the code but don't run the game: tell the other side to move the line)
     m.t = 'in'; m.n = ++this.inSeq;
     this.send(m, true);
   },
@@ -877,3 +953,4 @@ const Net = {
 
 setInterval(() => Net.tick(), 250);
 document.addEventListener('visibilitychange', () => Net.onVisible());
+window.addEventListener('online', () => { if (Net.relayRoom && !Net.dbOn) Net.dbKick(performance.now(), true); }); // (the device's network came back)
