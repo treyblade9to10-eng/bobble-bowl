@@ -1,0 +1,144 @@
+/* ---- ONLINE SEASON (js/onseason.js): setup + lobby look like the Online screen, the league hub like the Season hub ---- */
+#onSeason { width: 100%; margin: 0; padding: 7px 10px; font-size: 15px; background: transparent; border: 2px solid var(--gold); color: var(--gold); font-style: italic; }
+#onSeason i { font-style: normal; font-size: 11px; letter-spacing: .14em; color: var(--dim); margin-left: 6px; }
+#onSeason:hover { background: #f6c31c1c; }
+
+#osn.screen { justify-content: center; padding: 14px max(16px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); overflow: hidden; }
+#osn.os-hub { justify-content: flex-start; }
+#osTop { display: flex; flex-direction: column; align-items: center; margin-bottom: 12px; font-family: var(--hd); line-height: 1; text-align: center; flex: none; }
+#osTop > span { font-weight: 800; font-size: 13px; letter-spacing: .34em; color: var(--dim); padding-left: .34em; }
+#osTop > b { font-style: italic; font-weight: 900; font-size: 34px; letter-spacing: .02em; position: relative; padding-bottom: 7px; }
+#osTop > b::after { content: ''; position: absolute; left: 50%; bottom: 0; width: 44px; height: 3px; margin-left: -22px; background: var(--gold); transform: skewX(-20deg); }
+#osTop .big1 { font-style: italic; font-size: 34px; font-weight: 900; -webkit-text-stroke: 1px #fff; }
+#osTop .rec { font-size: 18px; color: var(--gold); font-weight: 800; letter-spacing: .1em; margin-top: 4px; }
+.osLoad { margin: 20px; color: var(--dim); }
+
+/* setup + lobby: info card on the left, the form on the right */
+#osSetup { display: grid; grid-template-columns: minmax(0, 420px) minmax(0, 420px); gap: 26px; justify-content: center; width: 100%; min-height: 0; }
+.osCard { background: var(--panel); border-bottom: 4px solid var(--line2); padding: 16px 18px; display: flex; flex-direction: column; gap: 8px; min-height: 0; overflow-y: auto; }
+.osH { font-family: var(--hd); font-weight: 800; font-size: 14px; letter-spacing: .25em; color: var(--gold); }
+.osStep { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; line-height: 1.35; }
+.osStep b { flex: none; width: 24px; height: 24px; display: grid; place-items: center; background: var(--gold); color: #111; font-family: var(--hd); font-weight: 900; font-style: italic; }
+.osFine { font-size: 12px; color: var(--dim); line-height: 1.35; }
+.osForm { display: flex; flex-direction: column; gap: 6px; padding: 14px 16px; background: #0b0f16cc; border-left: 4px solid var(--gold); min-width: 0; min-height: 0; overflow-y: auto; }
+.osForm .muL { width: 92px; font-size: 13px; }
+.osForm .muC { min-height: 32px; }
+.osForm .muC button { padding: 6px 4px; font-size: 13px; }
+#osName { flex: 1; min-width: 0; font-family: var(--bd); font-weight: 700; font-size: 16px; padding: 6px 8px; background: #0b0f16; color: #fff; border: 2px solid var(--line2); border-radius: 0; }
+#osName:focus, #osCodeIn:focus { border-color: var(--gold); outline: none; }
+.osForm > button.big { margin: 4px 0 0; width: 100%; font-size: 24px; padding: 9px 20px; }
+.osJoin { display: flex; gap: 8px; align-items: stretch; }
+#osCodeIn { flex: 1; min-width: 0; font-family: var(--hd); font-weight: 900; font-size: 30px; letter-spacing: .2em; text-align: center; text-transform: uppercase; background: #0b0f16; color: var(--gold); border: 2px solid var(--line2); padding: 2px; border-radius: 0; }
+.osJoin button.big { margin: 0; font-size: 22px; padding: 6px 24px; }
+#osMsg { font-size: 13px; color: #dfe6ee; text-align: center; min-height: 16px; }
+#osMsg:empty { display: none; }
+.osForm > #osBack { align-self: center; margin: 2px 0 0; padding: 6px 22px; font-size: 14px; }
+.osCodeCard { justify-content: center; align-items: center; text-align: center; }
+#osCode { font-family: var(--hd); font-weight: 900; font-style: italic; font-size: 84px; letter-spacing: .12em; color: var(--gold); line-height: 1; user-select: all; }
+.osSet { font-family: var(--hd); font-weight: 800; font-size: 13px; letter-spacing: .12em; color: var(--dim); }
+.osPl { display: flex; align-items: center; gap: 10px; padding: 8px 10px; background: var(--panel); border-left: 4px solid var(--line2); }
+.osPl.me { border-left-color: var(--gold); }
+.osPn { flex: 0 0 110px; font-family: var(--hd); font-weight: 900; font-style: italic; font-size: 18px; line-height: 1.05; overflow: hidden; text-overflow: ellipsis; }
+.osPn i { display: block; font-style: normal; font-weight: 800; font-size: 10px; letter-spacing: .16em; color: var(--dim); }
+.osPl button { margin: 0 0 0 auto; padding: 6px 12px; font-size: 13px; flex: none; }
+.osPl button.gold { background: var(--gold); color: #111; }
+.osTm { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 11px; line-height: 1.1; color: var(--dim); }
+.osTm .badge { width: 30px; height: 34px; flex: none; }
+.osTm b { display: block; font-family: var(--hd); font-size: 16px; font-weight: 900; font-style: italic; text-transform: uppercase; color: #fff; }
+.osTm.none { font-family: var(--hd); font-weight: 800; letter-spacing: .1em; }
+.osForm #osStart { margin-top: 6px; }
+.osWait { text-align: center; color: var(--gold); font-family: var(--hd); font-weight: 800; letter-spacing: .06em; padding: 8px 0; }
+.osBtnRow { display: flex; justify-content: center; gap: 8px; }
+.osBtnRow button { margin: 0; padding: 6px 18px; font-size: 14px; }
+
+/* team grid */
+#osGrid { position: absolute; inset: 0; z-index: 25; background: #0c1016f7; display: flex; flex-direction: column;
+  padding: 12px max(18px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left)); }
+#osGHead { display: flex; align-items: center; gap: 14px; margin-bottom: 8px; padding-right: 64px; }
+#osGHead span { font-family: var(--hd); font-style: italic; font-weight: 900; font-size: 26px; } #osGHead span b { color: var(--gold); }
+#osGClose { margin: 0 0 0 auto; font-size: 13px; padding: 5px 14px; }
+#osGList { overflow-y: auto; flex: 1; display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 10px 14px; align-content: start; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
+
+/* the league hub (same pieces as the Season hub) */
+#osMain { display: flex; gap: 16px; width: min(1150px, 96vw); flex: 0 1 auto; min-height: 0; max-height: 560px; align-items: stretch; }
+#osLeft { flex: 1 1 47%; display: flex; flex-direction: column; gap: 6px; min-width: 0; min-height: 0; }
+#osRight { flex: 1 1 53%; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+#osNext { padding: 10px 12px; text-align: center; border-bottom: 5px solid #0006; flex: none; }
+#osNext .lbl { font-family: var(--hd); font-size: 14px; font-weight: 800; letter-spacing: .22em; opacity: .9; }
+#osNext .mu { font-family: var(--hd); font-style: italic; font-size: 30px; font-weight: 900; text-shadow: 2px 2px 0 #0008; margin: 2px 0; text-transform: uppercase; line-height: 1.05; }
+#osNext .sub { font-size: 13px; text-shadow: 1px 1px 0 #0008; }
+.osH2H { color: #fff; background: var(--red); padding: 0 6px; letter-spacing: .12em; }
+.osDone { margin-top: 4px; font-family: var(--hd); font-weight: 900; font-style: italic; font-size: 20px; text-shadow: 1px 1px 0 #0008; }
+.osDone .W { color: #7dffad; } .osDone .L { color: #ffb0a8; }
+#osBtns { display: flex; justify-content: center; gap: 6px; flex: none; }
+#osBtns button { margin: 0; }
+#osBtns button.big { padding: 8px 34px; font-size: 26px; }
+#osSimIt.on { color: var(--gold); }
+.osLive { display: flex; align-items: center; gap: 10px; background: #0b0f16e0; border-left: 4px solid var(--gold); padding: 6px 10px; font-size: 13px; width: 100%; }
+.osLive div { flex: 1; min-width: 0; }
+.osLive button { margin: 0; padding: 5px 12px; font-size: 13px; flex: none; }
+#osInfo { background: var(--panel); padding: 5px 10px; font-size: 12.5px; line-height: 1.35; flex: none; }
+#osInfo:empty { display: none; }
+.osOn { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #5a6575; margin-right: 6px; vertical-align: 1px; }
+.osOn.y { background: #4fe08a; box-shadow: 0 0 6px #4fe08a; }
+.osOff { color: #ff8a7a; } .osGo { color: var(--gold); }
+#osLeft #osMsg { text-align: left; font-size: 12px; color: #ffcf6b; flex: none; }
+#osSched, #olBody { background: var(--panel); padding: 6px 10px; font-size: 13px; overflow-y: auto; -webkit-overflow-scrolling: touch; touch-action: pan-y; min-height: 0; }
+#osSched { flex: 1 1 auto; max-height: 260px; }
+#olBody { flex: 1 1 auto; }
+#osTabs { display: flex; gap: 4px; margin-bottom: 4px; flex: none; }
+#osTabs button { margin: 0; padding: 5px 12px; font-size: 14px; clip-path: none; background: var(--panel); color: var(--dim); }
+#osTabs button.on { background: var(--gold); color: #111; }
+#olBody table { width: 100%; border-collapse: collapse; }
+#olBody th { text-align: left; color: var(--dim); font-family: var(--hd); font-weight: 800; letter-spacing: .1em; font-size: 13px; padding: 2px 4px; }
+#olBody td { padding: 3px 4px; border-bottom: 1px solid var(--line); }
+#olBody tr.me td { background: #f6c31c26; font-weight: 700; }
+#olBody tr.fr td { background: #e8401c22; font-weight: 700; }
+#olBody tr.cut td { border-bottom: 2px dashed var(--gold); }
+#olBody .note { opacity: .6; font-size: 11px; margin-top: 4px; }
+.osWho { font-family: var(--hd); font-size: 10px; letter-spacing: .1em; padding: 0 4px; margin-left: 3px; vertical-align: 1px; }
+.osWho.me { background: var(--gold); color: #111; } .osWho.fr { background: var(--red); color: #fff; }
+.leadRow.fr { color: #ff8a6a; }
+.osConf { display: flex; gap: 4px; margin-bottom: 4px; }
+.osConf button { margin: 0; padding: 2px 12px; font-size: 12px; background: var(--panel2); color: var(--dim); }
+.osConf button.on { background: var(--line2); color: #fff; }
+.osWk { display: flex; align-items: center; justify-content: center; gap: 12px; font-family: var(--hd); font-weight: 800; letter-spacing: .14em; color: var(--gold); }
+.osWk button { margin: 0; padding: 0 14px; font-size: 22px; line-height: 1.2; }
+.osScores .bgame, #olBody .bgame { min-width: 132px; }
+.bgame.osHum { box-shadow: inset 3px 0 0 var(--gold); }
+.osBye { color: var(--dim); font-size: 11px; letter-spacing: .04em; }
+.osChamp { margin-top: 10px; text-align: center; font-family: var(--hd); font-weight: 900; font-style: italic; font-size: 20px; color: var(--gold); }
+#osRow { flex: none; margin-top: 6px; }
+#osRow button { margin: 0 4px; padding: 8px 20px; font-size: 15px; }
+
+/* phones (landscape): everything on one screen, lists scroll inside their boxes */
+@media (max-height: 560px) {
+  #osn.screen { padding-top: 6px; }
+  #osTop { margin-bottom: 6px; } #osTop > span { display: none; } #osTop > b { font-size: 24px; padding-bottom: 5px; }
+  #osTop .big1 { font-size: 20px; } #osTop .rec { font-size: 12px; margin-top: 2px; }
+  #osSetup { gap: 12px; grid-template-columns: minmax(0, 380px) minmax(0, 400px); flex: 0 1 auto; max-height: calc(100% - 40px); }
+  .osCard { padding: 10px 12px; gap: 6px; } .osStep { font-size: 12px; gap: 8px; } .osStep b { width: 20px; height: 20px; font-size: 13px; } .osFine { font-size: 11px; }
+  .osForm { padding: 8px 12px; gap: 4px; } .osForm .muRow { padding: 1px 0; } .osForm .muC { min-height: 27px; } .osForm .muC button { padding: 3px 3px; font-size: 12px; } .osForm .muL { width: 74px; font-size: 12px; }
+  #osName { font-size: 14px; padding: 3px 6px; }
+  .osForm > button.big { font-size: 19px; padding: 6px 16px; margin-top: 2px; }
+  #osCodeIn { font-size: 22px; } .osJoin button.big { font-size: 18px; padding: 4px 18px; }
+  #osMsg { font-size: 12px; } .osForm > #osBack { padding: 4px 18px; font-size: 13px; }
+  #osCode { font-size: 56px; } .osPl { padding: 5px 8px; } .osPn { font-size: 15px; flex-basis: 96px; } .osTm b { font-size: 14px; } .osTm .badge { width: 24px; height: 27px; }
+  #osMain { flex: 1 1 auto; max-height: none; gap: 10px; }
+  #osLeft { flex-basis: 44%; gap: 4px; } #osRight { flex-basis: 56%; }
+  #osNext { padding: 4px 8px; border-bottom-width: 3px; } #osNext .lbl { font-size: 11px; } #osNext .mu { font-size: 19px; } #osNext .sub { font-size: 11px; }
+  .osDone { font-size: 15px; margin-top: 1px; }
+  #osBtns button.big { font-size: 19px; padding: 5px 22px; } #osBtns button { padding: 5px 14px; font-size: 14px; }
+  #osInfo { font-size: 11px; padding: 3px 8px; line-height: 1.3; }
+  #osSched, #olBody { font-size: 11px; padding: 4px 8px; max-height: none; }
+  #osSched .wkrow { padding: 2px 4px; }
+  #osTabs button { padding: 3px 9px; font-size: 12px; }
+  #olBody th { font-size: 11px; } #olBody td { padding: 2px 4px; }
+  .osLive { font-size: 11px; padding: 4px 8px; }
+  #osRow { margin-top: 4px; } #osRow button { padding: 5px 14px; font-size: 13px; }
+  #osGrid { padding: 6px 10px; } #osGHead span { font-size: 18px; } #osGHead { margin-bottom: 4px; }
+}
+@media (max-height: 560px) and (max-width: 700px) {
+  .osCard .osStep:nth-child(5), .osCard .osFine { display: none; }
+  #osTabs button { padding: 3px 6px; font-size: 11px; }
+}
