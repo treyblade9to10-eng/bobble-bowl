@@ -1,0 +1,139 @@
+/* ---- Seasonal looks (js/themes.js puts body.themed.th-<name> on): fall, thanksgiving, winter, christmas, valentine (test only) ---- */
+body.th-fall { --thA: #f2a51a; --thB: #d9531e; --thBh: #ee6a2c; --thG: #f2a51a; --thGh: #ffbb3a; --thGt: #1a0b05;
+  --thL1: #fff1dc; --thL2: linear-gradient(180deg, #ffc24a 0%, #f07a1e 55%, #a3271f 100%); --thSh: #ff6a0070; --thTag: #f2a51a; --thTag2: #ff8a4a;
+  --thBg: linear-gradient(180deg, #140b08e8, #120a08f5); }
+body.th-thanksgiving { --thA: #f2c14e; --thB: #a8322a; --thBh: #c2423a; --thG: #e8862a; --thGh: #f29a42; --thGt: #1a0b05;
+  --thL1: #fdf1dc; --thL2: linear-gradient(180deg, #ffe08a 0%, #f2c14e 40%, #d9761a 100%); --thSh: #f2a03a66; --thTag: #e8b46a; --thTag2: #f2c14e;
+  --thBg: linear-gradient(180deg, #150d07e8, #130b06f5); }
+body.th-winter { --thA: #9fdcff; --thB: #2a7fd0; --thBh: #3d93e6; --thG: #e6f6ff; --thGh: #ffffff; --thGt: #0b2238;
+  --thL1: #ffffff; --thL2: linear-gradient(180deg, #ffffff 0%, #bfe8ff 45%, #4a9ee6 100%); --thSh: #8fd4ff77; --thTag: #bfe8ff; --thTag2: #ffffff;
+  --thBg: linear-gradient(180deg, #08131fe8, #07111cf5); }
+body.th-christmas { --thA: #f3d36b; --thB: #c8102e; --thBh: #e0253f; --thG: #1f8a4c; --thGh: #27a25a; --thGt: #fff;
+  --thL1: #ffffff; --thL2: linear-gradient(180deg, #ff6a6a 0%, #e0182e 50%, #9a0a1e 100%); --thSh: #ff3b3b55; --thTag: #f3d36b; --thTag2: #7fe0a4;
+  --thBg: linear-gradient(180deg, #08130ee8, #07100cf5); }
+body.th-valentine { --thA: #ff8fb1; --thB: #e8336b; --thBh: #ff4d7d; --thG: #ffc2d4; --thGh: #ffd6e2; --thGt: #4a0f2e;
+  --thL1: #ffffff; --thL2: linear-gradient(180deg, #ffc2d4 0%, #ff4d7d 50%, #c20a44 100%); --thSh: #ff4d7d66; --thTag: #ffb3c7; --thTag2: #ff6f9a;
+  --thBg: linear-gradient(180deg, #170812e8, #14070ff5); }
+
+/* title screen */
+body.th-fall #title { background: radial-gradient(ellipse at 68% 100%, #ff7a1a3a 0%, #0000 48%), linear-gradient(100deg, #150805f5 0%, #26100ae3 55%, #2e120a99 100%); }
+body.th-thanksgiving #title { background: radial-gradient(ellipse at 50% 100%, #e8862a30 0%, #0000 50%), linear-gradient(100deg, #170c06f5 0%, #2a170ae3 55%, #341b0c99 100%); }
+body.th-winter #title { background: radial-gradient(ellipse at 50% 0%, #9fdcff26 0%, #0000 55%), linear-gradient(100deg, #06101cf5 0%, #0b1d33e3 55%, #12304f99 100%); }
+body.th-christmas #title { background: radial-gradient(ellipse at 50% 0%, #f3d36b1c 0%, #0000 45%), linear-gradient(100deg, #04140cf5 0%, #0a2215e3 55%, #2a0a1099 100%); }
+body.th-valentine #title { background: radial-gradient(ellipse at 50% 40%, #ff4d7d26 0%, #0000 55%), linear-gradient(100deg, #1a0612f5 0%, #2e0a1ee3 55%, #3c0c2899 100%); }
+body.themed #title .logo .l1 { color: var(--thL1); text-shadow: 0 0 18px var(--thSh), 5px 5px 0 #00000080; }
+body.themed #title .logo .l2 { background: var(--thL2); -webkit-background-clip: text; background-clip: text; color: transparent;
+  text-shadow: none; filter: drop-shadow(0 0 14px var(--thSh)) drop-shadow(6px 6px 0 #00000090); }
+body.themed #title .tag { color: var(--thTag); border-color: color-mix(in srgb, var(--thA) 45%, transparent); }
+body.themed #title .tag::after { color: var(--thTag2); }
+body.th-fall #title .tag::after { content: '  ·  FALL CLASSIC'; }
+body.th-thanksgiving #title .tag::after { content: '  ·  THANKSGIVING FOOTBALL'; }
+body.th-winter #title .tag::after { content: '  ·  WINTER SEASON'; }
+body.th-christmas #title .tag::after { content: '  ·  HOLIDAY BOWL'; }
+body.th-valentine #title .tag::after { content: '  ·  SWEETHEART SHOWDOWN'; }
+body.themed #title button.big { background: var(--thB); }
+body.themed #title button.big:hover { background: var(--thBh); }
+body.themed #title button.big.gold { background: var(--thG); color: var(--thGt); }
+body.themed #title button.big.gold:hover { background: var(--thGh); }
+body.themed #title button:not(.big) { border-bottom: 2px solid color-mix(in srgb, var(--thA) 45%, transparent); }
+body.themed #title #btnTut { background: var(--thA); color: #111; }
+/* frost / snow sitting on the big buttons */
+body.th-winter #title button.big, body.th-christmas #title button.big { background-image: linear-gradient(180deg, #ffffff3d 0, #ffffff14 5px, #0000 9px); }
+
+/* the rest of the menus: accent colors, tinted panels */
+body.themed .screen { background: var(--thBg); }
+body.themed .screen:not(#title) button.big:not(.gold) { background: var(--thB); }
+body.themed .screen:not(#title) button.big:not(.gold):hover { background: var(--thBh); }
+body.themed h2::after, body.themed #muTop b::after { background: var(--thA); }
+body.themed #muTop span { color: var(--thTag); }
+body.themed #muMid .vs { background: var(--thL2); -webkit-background-clip: text; background-clip: text; color: transparent; text-shadow: none; filter: drop-shadow(4px 4px 0 #00000080); }
+body.th-fall #select.screen { background: radial-gradient(ellipse at 50% 45%, #1a0c08de, #140906f7 75%); }
+body.th-thanksgiving #select.screen { background: radial-gradient(ellipse at 50% 45%, #1c1008de, #150c06f7 75%); }
+body.th-winter #select.screen { background: radial-gradient(ellipse at 50% 45%, #0a1828de, #08121ef7 75%); }
+body.th-christmas #select.screen { background: radial-gradient(ellipse at 50% 45%, #0a1a10de, #08120cf7 75%); }
+body.th-valentine #select.screen { background: radial-gradient(ellipse at 50% 45%, #1e0a16de, #160812f7 75%); }
+body.th-winter .muHead, body.th-christmas .muHead { box-shadow: inset 0 2px 0 #e6f6ffcc; }
+body.th-winter .muCard, body.th-christmas .muCard { background-image: radial-gradient(ellipse at 0 0, #e8f7ff40, #0000 30%), radial-gradient(ellipse at 100% 0, #e8f7ff33, #0000 26%), linear-gradient(155deg, var(--c1) 0%, var(--c1) 48%, var(--c2) 135%); }
+
+/* ---- decoration layer: behind the screen's own content, never takes taps ---- */
+.thFx { position: absolute; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; }
+.thFx svg { position: absolute; display: block; height: auto; }
+.thFx .thGlow { position: absolute; inset: 0; }
+.th-fall .thGlow { background: radial-gradient(ellipse 60% 40% at 66% 100%, #ff8a2a30, #0000 70%); }
+.th-thanksgiving .thGlow { background: radial-gradient(ellipse 70% 45% at 50% 100%, #f2a03a26, #0000 70%); }
+.th-winter .thGlow { background: radial-gradient(ellipse 80% 35% at 50% 100%, #cfeaff1f, #0000 70%); }
+.th-christmas .thGlow { background: radial-gradient(ellipse 50% 40% at 85% 100%, #f3d36b22, #0000 70%), radial-gradient(ellipse 50% 40% at 12% 100%, #ff3b3b1a, #0000 70%); }
+.th-valentine .thGlow { background: radial-gradient(ellipse 40% 50% at 15% 85%, #ff4d7d22, #0000 70%), radial-gradient(ellipse 40% 50% at 88% 80%, #ff8fb11c, #0000 70%); }
+
+/* falling leaves / rising hearts */
+.thP { position: absolute; top: 0; width: calc(24px * var(--s)); height: calc(24px * var(--s)); margin-left: -12px; will-change: transform;
+  animation: thFall var(--d) linear var(--dl) infinite; }
+.thP svg { position: static; width: 100%; height: 100%; animation: thFlut var(--fl) ease-in-out infinite alternate; }
+.thP.rise { top: auto; bottom: 0; animation-name: thRise; opacity: .8; }
+.thP.rise svg { animation-name: thSway; }
+.thFx.mini .thP { opacity: .7; }
+@keyframes thFall { 0% { transform: translate3d(0, -40px, 0) rotate(0); } 25% { transform: translate3d(3vw, 24vh, 0) rotate(80deg); } 50% { transform: translate3d(-2vw, 50vh, 0) rotate(170deg); }
+  75% { transform: translate3d(4vw, 76vh, 0) rotate(250deg); } 100% { transform: translate3d(1vw, calc(100vh + 40px), 0) rotate(340deg); } }
+@keyframes thFlut { from { transform: scaleX(1) rotate(-18deg); } to { transform: scaleX(.35) rotate(22deg); } }
+@keyframes thRise { 0% { transform: translate3d(0, 40px, 0); opacity: 0; } 10% { opacity: .85; } 50% { transform: translate3d(3vw, -50vh, 0); } 85% { opacity: .7; } 100% { transform: translate3d(-1vw, calc(-100vh - 40px), 0); opacity: 0; } }
+@keyframes thSway { from { transform: rotate(-14deg) translateX(-6px); } to { transform: rotate(14deg) translateX(6px); } }
+
+/* snow: small flakes drifting down */
+.thP.sn { width: calc(12px * var(--s)); height: calc(12px * var(--s)); margin-left: -6px; animation-name: thSnowF; animation-duration: calc(var(--d) * .9); }
+.thP.sn svg { animation-name: thSpin; animation-duration: calc(var(--fl) * 4); animation-timing-function: linear; }
+@keyframes thSnowF { 0% { transform: translate3d(0, -20px, 0); } 33% { transform: translate3d(2.5vw, 33vh, 0); } 66% { transform: translate3d(-1.5vw, 66vh, 0); } 100% { transform: translate3d(1.5vw, calc(100vh + 20px), 0); } }
+
+/* ropes along the top: lights, pennants, hearts */
+.thTop { position: absolute; left: -2%; right: -2%; top: 0; height: 60px; }
+.thTop .thRope { position: absolute; left: 0; top: 0; width: 100%; }
+.thH { position: absolute; width: 14px; margin-left: -7px; }
+.thH svg { position: static; width: 100%; }
+.thH.bulb { width: 14px; margin-left: -7px; margin-top: -1px; }
+.thH.bulb.k0 svg { filter: drop-shadow(0 0 4px #ff3b3b); } .thH.bulb.k1 svg { filter: drop-shadow(0 0 4px #2fe07a); }
+.thH.bulb.k2 svg { filter: drop-shadow(0 0 4px #ffd34a); } .thH.bulb.k3 svg { filter: drop-shadow(0 0 4px #4fb4ff); }
+.thH.bulb.k0, .thH.bulb.k2 { animation: thTw 1.7s ease-in-out infinite alternate; } .thH.bulb.k1 { animation: thTw 2.3s ease-in-out -1s infinite alternate; }
+@keyframes thTw { from { opacity: 1; } to { opacity: .45; } }
+.thH.flag { width: 20px; margin-left: -10px; margin-top: -1px; transform-origin: 50% 0; }
+.thH.hrt { width: 15px; margin-left: -7.5px; margin-top: 1px; transform-origin: 50% 0; animation: thSwing 3s ease-in-out infinite alternate; }
+.thH.hrt.k1, .thH.hrt.k3 { animation-delay: -1.5s; }
+@keyframes thSwing { from { transform: rotate(-8deg); } to { transform: rotate(8deg); } }
+
+/* fall: branches in the top corners, stadium + sunset along the bottom */
+.thBranch { top: 0; width: min(24vw, 240px); }
+.thBranch.l { left: 0; } .thBranch.r { right: 0; transform: scaleX(-1); }
+.thStadium { left: 0; bottom: 0; width: 100%; height: 21% !important; opacity: .92; }
+/* thanksgiving: a wood table edge, cornucopia + pumpkin pie on it */
+.thTable { position: absolute; left: 0; right: 0; bottom: 0; height: 7%; min-height: 22px; border-top: 3px solid #8a5a2e;
+  background: repeating-linear-gradient(90deg, #0000 0 160px, #00000040 160px 162px), linear-gradient(180deg, #6b3f1e, #3e2210); opacity: .9; }
+.thHorn { left: 62px; bottom: 3%; width: min(19vw, 190px); filter: drop-shadow(0 4px 6px #0008); }
+.thPie { right: 3%; bottom: 3.5%; width: min(13vw, 130px); filter: drop-shadow(0 4px 6px #0008); }
+/* winter: frost corners, big flakes, pines + drift */
+.thFrost { top: 0; width: min(22vw, 210px); }
+.thFrost.l { left: 0; } .thFrost.r { right: 0; transform: scaleX(-1); }
+.thFx.mini .thFrost { width: min(16vw, 150px); opacity: .7; }
+.thFlake { width: 54px; opacity: .55; animation: thSpin 26s linear infinite; }
+.thFlake.f1 { right: 13%; top: 12%; } .thFlake.f2 { left: 9%; top: 40%; width: 34px; animation-duration: 34s; animation-direction: reverse; } .thFlake.f3 { right: 7%; top: 46%; width: 26px; animation-duration: 20s; }
+@keyframes thSpin { to { transform: rotate(360deg); } }
+.thDrift { left: 0; bottom: 0; width: 100%; height: 9% !important; min-height: 26px; opacity: .92; }
+.thPine { bottom: 2%; width: min(9vw, 86px); }
+.thPine.l { left: 62px; } .thPine.l2 { left: calc(62px + min(7vw, 66px)); width: min(6vw, 58px); bottom: 3%; } .thPine.r { right: 4%; width: min(10vw, 96px); }
+/* christmas: lights, ornaments under them, presents + a tree */
+.thOrn { top: 8px; width: min(11vw, 104px); }
+.thOrn.l { left: 1%; } .thOrn.r { right: 5%; transform: scaleX(-1); }
+.thOrn .orn { animation: thSwing 3.4s ease-in-out infinite alternate; } .thOrn .orn:nth-child(2) { animation-delay: -1.2s; } .thOrn .orn:nth-child(3) { animation-delay: -2.3s; }
+.thGifts { left: 62px; bottom: 3%; width: min(15vw, 150px); filter: drop-shadow(0 4px 6px #0008); }
+.thTree { right: 3%; bottom: 3%; width: min(12vw, 120px); filter: drop-shadow(0 0 14px #f3d36b33); }
+.thTree .star { animation: thTw 1.5s ease-in-out infinite alternate; }
+/* valentine: candy hearts in the bottom corners */
+.thCandy { bottom: 2%; width: min(17vw, 170px); filter: drop-shadow(0 3px 4px #0007); }
+.thCandy.l { left: 58px; } .thCandy.r { right: 3%; }
+
+@media (max-height: 500px) {
+  .thBranch { width: 180px; } .thFx.mini .thBranch { width: 120px; } .thFrost { width: 130px; } .thOrn { width: 70px; top: 4px; }
+  .thHorn { width: 120px; } .thPie { width: 86px; } .thGifts { width: 96px; } .thTree { width: 76px; } .thCandy { width: 112px; }
+  .thPine { width: 56px; } .thPine.l2 { width: 38px; left: 114px; } .thH.bulb { width: 11px; margin-left: -5.5px; } .thPine.r { width: 62px; }
+  .thFlake.f2 { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .thFx *, .thFx { animation: none !important; } }
+.thFx.mini .thBranch { width: min(17vw, 170px); }
+.thFx.mini .thTop { opacity: .85; }

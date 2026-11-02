@@ -10,7 +10,7 @@ function holidayToday(d = new Date()) {
   if (m === 11 && day === 25) return 'XMAS';
   return null;
 }
-function spookyNow(d = new Date()) { if (typeof location !== 'undefined' && /[?&]spooky=1/.test(location.search)) return true; return d.getMonth() === 9; }
+function spookyNow(d) { return typeof themeNow === 'function' ? themeNow(d) === 'spooky' : (d || new Date()).getMonth() === 9; } // themes.js (?spooky=1 / ?theme=spooky)
 const BCAST = {
   TNF: { name: 'THURSDAY NIGHT FOOTBALL', short: 'TNF', night: true, bar: ['#2c1156', '#150a2c'], acc: '#1fd6c4', acc2: '#8e52ff', down: '#3fe6d5', to: '#1fd6c4', slant: 9 },
   SNF: { name: 'SUNDAY NIGHT FOOTBALL', short: 'SNF', night: true, bar: ['#142a57', '#0a1631'], acc: '#e2b43b', acc2: '#e2b43b', down: '#f0c75a', to: '#e2b43b', frame: '#e2b43b' },
