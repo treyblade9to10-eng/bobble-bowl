@@ -892,6 +892,8 @@ function livePlay(dt) {
 
   if (G.phase !== 'live') return;
   checkFouls();
+  if (G.phase === 'live' && G.ball.holder && G.ball.holder.side === G.poss && !G.special) checkBounds(); // ball already in the end zone = TD before anyone can tackle him
+  if (G.phase !== 'live') return;
   if (!G.play.off.kneel) checkTackles();
   if (G.phase !== 'live') return;
   checkBounds();
@@ -2522,6 +2524,10 @@ function endPlay(res) {
   G.flagNote = null; G.pendingRunoff = 0;
   if (G.special) { const fl = G.flags; G.flags = []; return endReturn(res, fl); } // (a punt can carry a roughing-the-kicker flag)
   const d0 = G.down;
+  // the offense is down (or out) with the ball already in the end zone: that's a touchdown, not a spot at the 1
+  // (a catch in the end zone with a defender on him got tackled the same frame, before checkBounds saw it)
+  if (res.carrier && res.carrier.side === G.poss && !res.kneel && (res.type === 'tackle' || res.type === 'oob' || res.type === 'fumble')
+    && G.ball.holder === res.carrier && res.x != null && dirOf(G.poss) * (res.x - goalX(G.poss)) >= 0) res = { ...res, type: 'td' };
   if (G.flags && G.flags.length) G.rv = null; else res = Review.call(res); // close calls: the officials can miss one (rules.js)
   G.lastResult = pbpPlay(res);
   if (!G.reviewing) xfAfterPlay(res, G.lastResult); // (an overturned call already counted the play once)

@@ -170,7 +170,8 @@ const Review = {
     if (G.rv || !this.on() || G.intBy || res.kneel) return res;
     const off = G.poss, d = dirOf(off), car = res.carrier; if (!car || car.side !== off) return res;
     const gx = goalX(off);
-    if (res.type === 'td' && G.ball.holder === car && d * (car.x - gx) < 1) { // just got over the line (not a catch deep in the end zone)
+    const caughtIn = G.credit && G.credit.kind === 'rec' && G.credit.p === car && G.catchX != null && d * (G.catchX - gx) >= 0; // caught it in the end zone: no plane to break
+    if (res.type === 'td' && G.ball.holder === car && d * (car.x - gx) < 1 && !caughtIn) { // just got over the line (not a catch deep in the end zone)
       const traffic = G.D.some(p => p.down <= 0 && dist(p, car) < 1.3), pylon = car.y < 1.8 || car.y > FIELD_W - 1.8;
       if (!traffic && !pylon) return res;
       const wrong = this.miss();
