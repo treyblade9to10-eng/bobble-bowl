@@ -1359,7 +1359,7 @@ function mobileControl(p, dt, isCarrier) {
   if (qbHolding && Input.hit('KeyX')) qbTakeOff(p);
   if (qbHolding && !G.humanScramble) { // QB moves himself in the pocket unless you slide him with the stick; you aim + throw on the field
     const st = Input.stick;
-    if (st.m > 0.15 && isFinite(st.x) && isFinite(st.y)) { p.dvx = st.x * p.spd * 0.75; p.dvy = st.y * p.spd * 0.75; pocketStep(p, st.m > 0.9); return true; }
+    if (st.m > 0.15 && isFinite(st.x) && isFinite(st.y)) { p.dvx = st.x * p.spd * 0.75; p.dvy = st.y * p.spd * 0.75; pocketStep(p, st.m > 0.9); return true; } // pushing up at the line = takes off (pocketStep)
     if (G.meter) { p.dvx = 0; p.dvy = 0; return true; } // charging a throw: he plants his feet (only the stick moves him)
     // hold to steer slides him too, like every other player (not a finger that started on a receiver's icon: that one throws).
     // The finger keeps him behind the line so a hold that just misses an icon can't take away the pass (RUN / the stick for that)

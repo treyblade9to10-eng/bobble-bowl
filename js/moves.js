@@ -76,8 +76,10 @@ function cpuHurdle(p, foes) {
 function pocketStep(p, sprint) {
   const b = G.ball;
   if (sprint || p !== curPasser() || b.holder !== p || G.bstate !== 'snap' || G.humanScramble || !humanCanThrow()) return;
-  const d = dirOf(p.side), fwd = d * p.dvx; if (fwd <= 0) return;
+  const d = dirOf(p.side), fwd = d * p.dvx; if (fwd <= 0) { p.wallT = 0; return; }
   const room = d * (G.los - d * 1.3 - p.x);
+  // still pushing up at the line = he wants to run: after a moment he tucks it and takes off past the line
+  if (room < 0.5 && fwd > p.spd * 0.3) { p.wallT = (p.wallT || 0) + 1 / 60; if (p.wallT > 0.3) { p.wallT = 0; qbTakeOff(p); return; } } else p.wallT = 0;
   p.dvx = d * (room <= 0 ? 0 : Math.min(fwd * 0.55, room * 5));
 }
 // CPU QB: a rusher coming off the edge (beside or behind him) with nobody in front = step up into the pocket
