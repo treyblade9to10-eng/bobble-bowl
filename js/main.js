@@ -865,6 +865,7 @@ function updateMobileButtons() {
     else if (h.side !== G.poss || (b.holder && b.holder.side !== h.side)) st = 'def';
     else if (G.lock && h !== G.O[0] && G.bstate === 'snap' && !b.flight) st = 'call';
     else if (b.flight && b.flight.kick === 'punt' && b.flight.intended === h && !h.fair) st = 'ret'; // punt coming down: FAIR CATCH button
+    else if (b.flight && !b.flight.pitch && !b.flight.kick && b.flight.intended === h && !b.flight.layout) st = 'rcv'; // ball coming to you: DIVE FOR IT
   }
   const myCelly = c => G.coop ? (G.online && Net.role === 'guest' ? c === G.humanPlayer : c !== G.hp[1]) : !G.online || c.side === G.human; // co-op: only the scorer's player
   if (G.phase === 'dead' && G.cellyGuy && !G.cellyGuy.celly && !G.cellyGuy.cellyNext && !G.demo && myCelly(G.cellyGuy)) st = 'celly'; // buttons hide once he's celebrating

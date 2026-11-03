@@ -1329,6 +1329,7 @@ function humanControl(p, dt) {
   const chasing = b.holder ? b.holder.side !== p.side : p.side !== G.poss;
   if (G.lock && !isCarrier && !chasing && p !== G.O[0] && G.bstate === 'snap' && !b.flight && Input.hit('Space')) callForBall(p);
   if (!isCarrier && !chasing && b.flight && !b.flight.pitch) catchHold(p, Input.held('Space'));
+  if (!isCarrier && !chasing && b.flight && !b.flight.pitch && !b.flight.kick && Input.hit('KeyX')) layOut(p, b.flight);
   if (!isCarrier && chasing && b.flight && !b.flight.pitch && Input.hit('Space')) { flightPress(p, 'def'); doJump(p); }
   else if (!isCarrier && chasing && Input.hit('Space') && p.dive <= 0) { doDive(p, ax); return true; }
   if (!isCarrier && p.engaged && Input.hit('KeyE')) doSwim(p);
@@ -1348,6 +1349,7 @@ function humanControl(p, dt) {
   }
   p.dvx = ax.x * p.spd * mul * ax.m; p.dvy = ax.y * p.spd * mul * ax.m;
   if (isCarrier) pocketStep(p, sprint); // QB: push up in the pocket without taking off
+  else catchAssist(p, b.flight);
   return true;
 }
 
@@ -1370,6 +1372,7 @@ function mobileControl(p, dt, isCarrier) {
   const onD = p.side !== G.poss || (b.holder && b.holder.side !== p.side);
   const inAir = !isCarrier && onD && b.flight && !b.flight.pitch;
   if (inAir && (Input.taps.length || Input.hit('Space'))) { flightPress(p, 'def'); doJump(p); Input.taps.length = 0; }
+  if (!isCarrier && !onD && b.flight && !b.flight.pitch && Input.hit('KeyX')) layOut(p, b.flight);
   if (!isCarrier && !onD && b.flight && !b.flight.pitch && b.flight.intended === p) {
     catchHold(p, Input.pointer.down || Input.held('Space')); Input.taps.length = 0;
     if (P.down && catchMeterOn()) P.noSteer = true; // that finger is the catch bar, not "run to here" (also after the catch until you lift it)
@@ -1404,6 +1407,7 @@ function mobileControl(p, dt, isCarrier) {
     if (p.sprinting) p.stamina = Math.max(0, p.stamina - dt * 0.42); else p.stamina = Math.min(1, p.stamina + dt * 0.18);
     const mul = (p.sprinting ? sprintBoost(p) : 1) * (p.spin > 0 ? 0.8 : 1);
     p.dvx = st.x * p.spd * mul; p.dvy = st.y * p.spd * mul;
+    if (!isCarrier) catchAssist(p, b.flight);
     return true;
   }
   if (p.jump > 0 && b.flight) { steer(p, b.flight.tx, b.flight.ty, 1.08, 0.2); return true; }
@@ -2149,6 +2153,31 @@ function deepLead(qb, arm) {
 }
 // the man the ball is thrown to tracks it down: runs to where it lands and times it so he gets there with it
 // (sprints if the ball is out in front, comes back for it if it's short)
+// DIVE FOR IT (your receiver, ball in the air): he lays out for the ball at the last moment. Press it early and he waits
+// for the right moment; the dive covers ~3 yds more than his reach, so an overthrow is catchable
+function layOut(p, f) {
+  if (!f || f.pitch || f.kick || f.intended !== p || f.layout || p.down > 0) return;
+  f.layout = p; addText(p.x, p.y - 1.2, 'DIVE!', '#9cff9c', 15, 0.6);
+}
+function layOutTick(p, f) { // called while the ball is coming: launch when it's about to get there
+  const left = f.T - f.t; if (left > 0.42 || f.layT) return;
+  f.layT = G.time;
+  const dx = f.tx - p.x, dy = f.ty - p.y, m = Math.hypot(dx, dy) || 1, v = Math.min(p.spd * 1.35 + 2, m / Math.max(0.15, left) + 1);
+  p.vx = dx / m * v; p.vy = dy / m * v; p.dvx = p.vx; p.dvy = p.vy;
+  if (Math.abs(dx) > 0.2) p.face.dir = Math.sign(dx);
+  p.dive = left + 0.2; addDust(p.x, p.y, 3); // airborne: keeps his momentum, still in the air when the ball gets there
+}
+// ball in the air to your guy and you're running about the right way: bend his run onto the ball's spot (like a catch assist),
+// so a led / slightly long ball isn't missed by a yard because the stick was a bit off
+function catchAssist(p, f) {
+  if (!f || f.pitch || f.kick || f.intended !== p) return;
+  const dx = f.tx - p.x, dy = f.ty - p.y, d = Math.hypot(dx, dy), v = Math.hypot(p.dvx, p.dvy);
+  if (d < 0.3 || v < 0.5) return;
+  const cos = (p.dvx * dx + p.dvy * dy) / (v * d); if (cos < 0.35) return; // pushing away from it: that's on purpose
+  const k = clamp((cos - 0.35) / 0.4, 0, 1), left = Math.max(0.1, f.T - f.t), need = d / left;
+  const sp = Math.max(v, Math.min(need, p.spd * sprintBoost(p))); // speed up a little if that's what it takes
+  p.dvx = lerp(p.dvx, dx / d * sp, k); p.dvy = lerp(p.dvy, dy / d * sp, k);
+}
 function chaseBall(p, f) {
   const d = Math.hypot(f.tx - p.x, f.ty - p.y), left = Math.max(0.08, f.T - f.t);
   // (only a ball led out in front makes him kick it up a gear; everything else = the same run to the spot as before)
@@ -2254,6 +2283,7 @@ function updateFlight(dt) {
   if (f.wdx || f.wdy) { b.x -= f.wdx * u * (1 - u); b.y -= f.wdy * u * (1 - u); } // wind: curves into the spot
   b.z = flightZ(f, u);
   b.spin = (b.spin || 0) + dt * 30;
+  if (f.layout && !f.pitch && !f.kick) layOutTick(f.layout, f);
   // the ball can be picked off on the way: a defender in the passing lane (jumping = higher reach)
   if (!f.pitch && !f.kick && !G.thrownAway && u > 0.12 && u < 0.88) {
     for (const p of G.players) {
@@ -2331,6 +2361,7 @@ function resolveCatch() {
     pc += 0.03 * Momentum.of(rcv.side);
     if (f.perfect) pc += 0.12; // a PERFECT meter throw is right in his hands
     if (f.cp === 'perfect') pc += 0.1; else if (f.cp === 'good') pc += 0.08; // timed catch
+    if (f.cp === 'perfect') pc = Math.max(pc, def && dd < 1.0 ? 0.86 : 0.96); // in the green = he catches it (a man draped on him can still knock it out)
     pc += abCatch(rcv, def, def && dd < 1.8, f, land); // superstar abilities: route Elites, contested catches, knockouts
     if (def && dd < 1.8) { pc -= ((hands ? 0.08 : 0.24) - (rat(rcv, 'CTH') - rat(def, 'COV')) / 150) * (scrToss ? 0.4 : 1); if (chance(((def.isHuman ? 0.03 : 0.015) + humanDefBonus * 0.5) * Sliders.side(def.side, 'cpuInt'))) return intercept(def); }
     if (scrToss) pc = lerp(pc, 0.97, 0.5);
@@ -2880,7 +2911,7 @@ function updateHint() {
     const h = G.humanPlayer;
     if (h && b.holder === h && h.side === G.human) G.hint = humanCanThrow() ? (meterOn() ? 'TAP 1-4 / click = lob  •  HOLD = power, let go in the green  •  X = QB run' : '1-4 or click a receiver to throw (SHIFT = bullet, CTRL = lob)  •  X = QB run') : 'WASD move  •  SHIFT sprint  •  E juke  •  F spin  •  R stiff arm  •  V hurdle  •  X slide';
     else if (h && (h.side !== G.poss || (b.holder && b.holder.side !== G.human))) G.hint = b.flight ? 'SPACE = JUMP for the pick!  •  WASD move' : h.engaged ? 'E = SWIM MOVE past the blocker!' : 'WASD move  •  SHIFT sprint  •  SPACE dive  •  C HIT STICK  •  Q switch';
-    else G.hint = catchMeterOn() ? `Steer to the ball  •  HOLD ${ctlMobile() ? 'your finger on the field' : 'SPACE'} and let go in the green to catch` : 'Steer to the ball marker to catch it!';
+    else G.hint = (catchMeterOn() ? `Steer to the ball  •  HOLD ${ctlMobile() ? 'your finger on the field' : 'SPACE'} and let go in the green to catch` : 'Steer to the ball marker to catch it!') + (ctlMobile() ? '  •  DIVE FOR IT if it\'s overthrown' : '  •  X = dive for it');
   } else G.hint = '';
 }
 

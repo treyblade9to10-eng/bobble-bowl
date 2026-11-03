@@ -169,12 +169,15 @@ function oneHandSave(rcv, rd, def, dd) {
 }
 // just out of reach: he lays out for it. Better hands = more of these come down with it
 function divingTry(rcv, f, land, rd, def, dd) {
-  if (G.special || rd > 2.0 || (def && dd < 1.0) || rcv.down > 0 || rcv.engaged) return false;
-  if (rcv.y < 0 || rcv.y > FIELD_W || rcv.x < 0 || rcv.x > 120) return false;
+  const lay = f.layout === rcv, green = f.cp === 'perfect'; // you hit DIVE FOR IT / timed it in the green: he goes all out for it
+  if (G.special || rd > (lay ? 3.4 : green ? 2.6 : 2.0) || (def && dd < (lay || green ? 0.7 : 1.0)) || rcv.down > 0 || rcv.engaged) return false;
+  if (rcv.y < -0.3 || rcv.y > FIELD_W + 0.3 || rcv.x < -0.3 || rcv.x > 120.3) return false;
   const front = rcv.speedNow > 2 ? ((land.x - rcv.x) * rcv.vx + (land.y - rcv.y) * rcv.vy) / (rcv.speedNow * rd) : 0;
   const toQB = ((f.sx - rcv.x) * (land.x - rcv.x) + (f.sy - rcv.y) * (land.y - rcv.y)) / ((Math.hypot(f.sx - rcv.x, f.sy - rcv.y) || 1) * rd);
-  if (front < 0.3 && toQB < 0.3) return false; // only balls out in front of him or thrown short
-  const pc = clamp(0.32 + (rat(rcv, 'CTH') - 78) / 70 - (rd - 1.45) * 0.4 - Weather.catchPenalty() + (f.cp === 'perfect' ? 0.15 : f.cp === 'good' ? 0.07 : 0), 0.08, 0.6);
+  if (!lay && front < 0.3 && toQB < 0.3) return false; // only balls out in front of him or thrown short (unless you dove for it)
+  let pc = clamp(0.32 + (rat(rcv, 'CTH') - 78) / 70 - (rd - 1.45) * 0.4 - Weather.catchPenalty() + (f.cp === 'perfect' ? 0.15 : f.cp === 'good' ? 0.07 : 0), 0.08, 0.6);
+  if (lay) pc = clamp(0.62 + (rat(rcv, 'CTH') - 78) / 60 - Math.max(0, rd - 2.2) * 0.3 - Weather.catchPenalty() + (green ? 0.2 : f.cp === 'good' ? 0.08 : 0), 0.3, 0.85);
+  else if (green) pc = Math.max(pc, 0.7);
   setCatchPose(rcv, 'dive', land);
   if (!chance(pc)) { // can't hang on
     rcv.mvK = MV.DIVE; G.catchStyle = 'diveMiss'; mvCount('diveMiss');

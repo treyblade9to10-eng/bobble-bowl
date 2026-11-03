@@ -136,7 +136,7 @@ const Pad = {
     else if (cx === 'throw') Object.assign(map, { 0: 'Digit1', 1: 'Digit2', 2: 'Digit3', 3: 'Digit4', 5: 'KeyU', 4: 'KeyX', 10: 'KeyX' });
     else if (cx === 'carrier') Object.assign(map, { 3: 'KeyE', 1: 'KeyF', 0: 'KeyR', 5: 'KeyV', 2: 'KeyX', 4: 'KeyG' });
     else if (cx === 'def') Object.assign(map, { 0: 'Space', 3: 'Space', 1: 'KeyQ', 4: 'KeyQ', 2: 'KeyE', 5: 'KeyC' });
-    else if (cx === 'off') Object.assign(map, { 0: 'Space', 3: 'Space' });
+    else if (cx === 'off') Object.assign(map, { 0: 'Space', 3: 'Space', 2: 'KeyX' }); // X = lay out for the ball
     else if (cx === 'celly') Object.assign(map, { 12: 'ArrowUp', 13: 'ArrowDown', 14: 'ArrowLeft', 15: 'ArrowRight', 0: 'Digit1', 1: 'Digit2', 2: 'Digit3', 3: 'Digit4', 4: 'KeyE', 5: 'KeyF', 6: 'KeyC', 7: 'KeyR', 11: 'KeyG' });
     else Object.assign(map, { 0: 'Space' });
     if (cx === 'celly' || cx === 'other') map[8] = G.rvWin ? 'KeyY' : 'KeyT'; // red flag after a close call
@@ -378,7 +378,7 @@ const Pad = {
       H.push([[PB.RT], 'SPRINT']); if (!(G.lock && lockedGuy())) H.push([[PB.B], 'SWITCH']);
     } else if (cx === 'off') {
       if (G.lock && h && h !== G.O[0] && G.bstate === 'snap' && !b.flight) H.push([[PB.A], 'CALL FOR IT']);
-      else if (b.flight && b.flight.intended === h && catchMeterOn()) H.push([[PB.A], 'HOLD, LET GO IN THE GREEN']);
+      else if (b.flight && b.flight.intended === h && !b.flight.pitch) { if (catchMeterOn()) H.push([[PB.A], 'HOLD, LET GO IN THE GREEN']); if (!b.flight.layout) H.push([[PB.X], 'DIVE FOR IT']); }
       else return false;
       H.push([[PB.MOVE], 'MOVE']);
     } else if (cx === 'celly') H.push([[PB.DPAD], 'OR'], [[PB.A, PB.B, PB.X, PB.Y], 'CELEBRATE']);
