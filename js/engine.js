@@ -1341,7 +1341,7 @@ function humanControl(p, dt) {
   if (ax.m < 0.1 && isCarrier && p === G.trickPasser && p !== G.O[0] && G.bstate === 'snap') return false; // trick passer keeps drifting on his path until you steer
   if (ax.m < 0.1) {
     if (!isCarrier && !(p === G.O[0] && G.bstate === 'snap')) { // idle defender / receiver: let AI help
-      if (b.flight && b.flight.intended === p) { steer(p, b.flight.tx, b.flight.ty, 1); return true; }
+      if (b.flight && b.flight.intended === p && !b.flight.pitch) { chaseBall(p, b.flight); return true; }
       return false;
     }
     p.dvx = 0; p.dvy = 0; return true;
@@ -1513,7 +1513,7 @@ function ai(p, dt) {
   if (b.loose) { const l = b.loose, k = l.blk ? 0.35 : 0; steer(p, b.x + l.vx * k, b.y + l.vy * k, 1.05); return; } // a bouncing blocked kick: go where it's headed
   if (b.flight && b.flight.kick) return aiKickFlight(p);
 
-  if (p.off && b.flight && b.flight.intended === p && !b.flight.pitch) { steer(p, b.flight.tx, b.flight.ty, 1, 0.25); return; }
+  if (p.off && b.flight && b.flight.intended === p && !b.flight.pitch) { chaseBall(p, b.flight); return; }
   if (p.off && p === carrier && p !== G.O[0] && G.qbScramble) return aiRunner(p, dt); // trick passer gives up on the throw and runs
   if (p.off) {
     switch (p.role) {
@@ -2141,6 +2141,21 @@ function qbArm(qb) {
   if (G.O && qb !== G.O[0] && qb.pos !== 'QB') { thp = Math.min(thp, 70); acc = Math.min(acc, 55); } // trick play: a RB / WR throwing it
   return { thp, acc, range: 18 + thp * 0.52 + (xfOn(qb, 'bazooka') ? 12 : 0), accF: Math.pow(clamp((100 - acc) / 30, 0, 4), 1.3) };
 }
+// how much an elite QB leads his deep balls (0 = normal, 1 = the best arms): big arm + touch, deep-ball X-Factors help
+function deepLead(qb, arm) {
+  let e = clamp((arm.thp - 86) / 10, 0, 1) * 0.5 + clamp((arm.acc - 84) / 10, 0, 1) * 0.5;
+  if (xfOn(qb, 'bazooka') || xfOn(qb, 'dimes') || xfOn(qb, 'dots')) e = Math.min(1, e + 0.3);
+  return e > 0.25 ? e : 0;
+}
+// the man the ball is thrown to tracks it down: runs to where it lands and times it so he gets there with it
+// (sprints if the ball is out in front, comes back for it if it's short)
+function chaseBall(p, f) {
+  const d = Math.hypot(f.tx - p.x, f.ty - p.y), left = Math.max(0.08, f.T - f.t);
+  // (only a ball led out in front makes him kick it up a gear; everything else = the same run to the spot as before)
+  const mul = f.lead ? clamp(d / left / (p.spd || 7), 1, 1 + (sprintBoost(p) - 1) * 0.5) : 1;
+  p.sprinting = mul > 1.01;
+  steer(p, f.tx, f.ty, mul, 0.25);
+}
 function throwTo(qb, r, pitch = false, aimed = null, style = 'normal', lead = null, mt = null) {
   const b = G.ball;
   const arm = qbArm(qb);
@@ -2166,6 +2181,12 @@ function throwTo(qb, r, pitch = false, aimed = null, style = 'normal', lead = nu
       const lp = r.route.pts[r.route.pts.length - 1], dd = dist(r, lp), go = Math.min(dd, Math.hypot(r.vx, r.vy) * T);
       if (dd > 0.1) { tx = r.x + (lp.x - r.x) / dd * go; ty = r.y + (lp.y - r.y) / dd * go; }
     }
+  }
+  // elite arms drop deep balls out in front so he runs under it in stride (not short, not making him wait)
+  if (!pitch && !aimed && !sitting && G.O && qb === G.O[0]) {
+    const sp = Math.hypot(r.vx || 0, r.vy || 0), down = (r.vx || 0) * dirOf(qb.side), far = Math.hypot(tx - qb.x, ty - qb.y);
+    const ed = deepLead(qb, arm);
+    if (ed > 0 && sp > 4 && down > 3 && far > 15) { const ex = lerp(0.4, 1.3, ed) * Math.min(1, (far - 15) / 10 + 0.4); tx += r.vx / sp * ex; ty += r.vy / sp * ex; G.deepLead = (G.deepLead || 0) + 1; var ledDeep = true; }
   }
   if (lead && lead.m > 0.1 && !pitch) { tx += lead.x * 2.6; ty += lead.y * 2.6; } // lead him away from the defender
   if (!aimed && !pitch) { tx = clamp(tx, 1.2, 118.8); ty = clamp(ty, 0.8, FIELD_W - 0.8); } // don't lead him out the back of the end zone or over the sideline
@@ -2214,7 +2235,7 @@ function throwTo(qb, r, pitch = false, aimed = null, style = 'normal', lead = nu
   ty = clamp(ty, -0.5, FIELD_W + 0.5);
   b.holder = null;
   const pk = pitch ? 0.4 : (0.6 + len * 0.1) * (style === 'bullet' ? 0.45 : style === 'lob' ? 1.9 : 1) + (style === 'lob' ? 1.5 : 0);
-  b.flight = { sx: qb.x, sy: qb.y, tx, ty, t: 0, T: Math.max(T, len / spd), peak: pk, intended: r, pitch, passer: qb, style, duck, perfect: !!(mt && mt.perfect), grnd: !pitch && pocketPressure(qb) };
+  b.flight = { sx: qb.x, sy: qb.y, tx, ty, t: 0, T: Math.max(T, len / spd), peak: pk, intended: r, pitch, passer: qb, style, duck, perfect: !!(mt && mt.perfect), grnd: !pitch && pocketPressure(qb), lead: typeof ledDeep !== 'undefined' && !!ledDeep };
   windPass(b.flight, style); // deep balls drift with the wind
   G.bstate = 'air'; G.intended = r;
   for (const p of G.players) { p.laneChecked = false; p.jumpTried = false; }
