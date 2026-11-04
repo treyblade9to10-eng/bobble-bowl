@@ -58,9 +58,9 @@ const Playbook = {
     } else if (m.carrier === 'qb') {
       p.qbRun = true;
       if (F.under) p.sneak = true;
-      else { p.draw = true; p.routes = { 2: { r: [[15, 0]], end: 'go' }, 3: { r: [[15, 0]], end: 'go' }, 4: { r: [[4, 0]], end: 'block' } }; }
+      else { p.draw = true; p.routes = { 2: { r: [[15, 0]], end: 'go' }, 3: { r: [[15, 0]], end: 'go' }, 4: { r: [[12, 0]], end: 'go' } }; }
     } else if (m.carrier === 'jet') {
-      Object.assign(p, { carrier: 4, jet: true, wr: 'block', rb: { path: [[-2.6, 0.5], [-1.9, 4.4], [-0.6, 7.8], [1.8, 10], [14, 11.5]], end: 'go' } });
+      Object.assign(p, { carrier: 4, jet: true, wr: 'block', rb: OFF_PLAYS.find(q => q.key === 'jet').rb }); // same motion + path as the stock Jet Sweep
     } else Object.assign(p, this.runPath(m));
     return p;
   },
@@ -242,7 +242,7 @@ Playbook.load();
     m.r[s] = pr[1].map(x => x.slice()); m.end[s] = pr[2]; m.tag[s] = name;
   }
   // a player's spot on the editor field: [yards downfield (negative = backfield), sideways yards]
-  const spotOf = s => { const F = FORMATIONS[S.m.form]; if (S.m.type === 'run' && S.m.carrier === 'jet' && s === 4) return [-2.6, -5]; const [b, w] = F.spots[s]; return [-b, w]; };
+  const spotOf = s => { const F = FORMATIONS[S.m.form]; if (S.m.type === 'run' && S.m.carrier === 'jet' && s === 4) return [-2, -9]; const [b, w] = F.spots[s]; return [-b, w]; };
   const outOf = s => Math.sign(spotOf(s)[1]) || 1;
   const toAbs = (s, [dd, oo]) => { const [d0, w] = spotOf(s); return [d0 + dd, w + oo * outOf(s)]; };
   const toRel = (s, [d, lat]) => { const [d0, w] = spotOf(s); return [d - d0, (lat - w) * outOf(s)]; };
@@ -378,7 +378,7 @@ Playbook.load();
       else {
         const c = play.carrier || 1, pts = [P(c)].concat(play.rb.path.map(([d, lat]) => [X(clamp(lat, -25.5, 25.5)), Y(Math.min(d, 29))]));
         path(pts, '#ff8a3d', 4.5, 'go');
-        if (play.jet) path([P(1), [X(11), Y(0.8)]], '#ffffffb0', 2.4, 'go', [6, 5]);
+        if (play.jet) path([P(1), [X(9), Y(0.6)]], '#ffffffb0', 2.4, 'go', [6, 5]);
       }
     }
     // linemen + players
