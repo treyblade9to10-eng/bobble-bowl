@@ -1,0 +1,57 @@
+/* ---- TRANSFER SAVES (js/xfer.js): looks like the Online screen, list of saves on the left, send / receive on the right ---- */
+#xfer.screen { justify-content: center; padding: 14px max(18px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left)); overflow: hidden;
+  background: radial-gradient(ellipse at 50% 45%, #0c1016de, #0c1016f7 75%); }
+#xfTop { display: flex; flex-direction: column; align-items: center; margin-bottom: 12px; font-family: var(--hd); line-height: 1; flex: none; }
+#xfTop span { font-weight: 800; font-size: 13px; letter-spacing: .34em; color: var(--dim); padding-left: .34em; }
+#xfTop b { font-style: italic; font-weight: 900; font-size: 34px; letter-spacing: .02em; position: relative; padding-bottom: 7px; }
+#xfTop b::after { content: ''; position: absolute; left: 50%; bottom: 0; width: 44px; height: 3px; margin-left: -22px; background: var(--gold); transform: skewX(-20deg); }
+#xfRow { display: grid; grid-template-columns: minmax(0, 440px) minmax(0, 380px); justify-content: center; gap: 26px; width: 100%; flex: 0 1 470px; min-height: 0; }
+.xfPanel { background: #0b0f16cc; padding: 14px 16px; min-height: 0; }
+#xfList { overflow-y: auto; border-bottom: 4px solid #ffffff26; }
+#xfSide { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; border-left: 4px solid var(--gold); }
+.xfHead { font-family: var(--hd); font-weight: 800; font-size: 14px; letter-spacing: .25em; color: var(--gold); margin-bottom: 6px; }
+.xfLine { font-family: var(--hd); font-weight: 700; font-size: 15px; letter-spacing: .03em; text-transform: uppercase; padding: 5px 8px; margin-bottom: 3px; background: #ffffff0d; border-left: 3px solid var(--gold); }
+.xfLine.dim { color: var(--dim); border-left-color: #444; }
+.xfAlso { font-family: var(--hd); font-weight: 700; font-size: 12px; letter-spacing: .06em; color: var(--dim); margin-top: 6px; }
+.xfNote { font-size: 12px; color: var(--dim); margin-top: 6px; }
+.xfGap { height: 12px; }
+#xfPick, #xfOk { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 300px; }
+#xfPick button, #xfOk button { width: 100%; margin: 0; }
+#xfOk button { font-size: 22px; padding: 12px 10px; }
+#xfCodeBox { text-align: center; }
+#xfCode { font-family: var(--hd); font-weight: 900; font-style: italic; font-size: 76px; letter-spacing: .1em; color: var(--gold); line-height: 1; }
+#xfInBox { display: flex; gap: 10px; align-items: center; }
+#xfCodeIn { width: 210px; font-family: var(--hd); font-weight: 900; font-size: 40px; letter-spacing: .14em; text-align: center; text-transform: uppercase; background: #0b0f16; color: var(--gold); border: 3px solid #ffffff40; padding: 4px; }
+#xfInBox .big { padding: 10px 22px; font-size: 24px; }
+#xfStatus { max-width: 340px; text-align: center; font-size: 15px; color: #dfe6ee; min-height: 20px; margin: 6px 0; }
+#xfBack { margin-top: 4px; }
+@media (max-height: 560px) {
+  #xfer.screen { padding-top: 8px; }
+  #xfTop { margin-bottom: 6px; } #xfTop span { display: none; } #xfTop b { font-size: 24px; padding-bottom: 5px; }
+  #xfRow { gap: 16px; grid-template-columns: minmax(0, 400px) minmax(0, 340px); }
+  .xfPanel { padding: 10px 12px; } .xfLine { font-size: 13px; padding: 3px 7px; } .xfHead { font-size: 12px; margin-bottom: 4px; }
+  #xfCode { font-size: 54px; } #xfCodeIn { width: 160px; font-size: 32px; } #xfInBox .big { padding: 8px 16px; font-size: 20px; }
+  #xfPick { gap: 8px; } #xfStatus { font-size: 13px; margin: 2px 0; } #xfOk button { font-size: 18px; padding: 9px 8px; }
+}
+
+/* ONLINE screen: BACK + TRANSFER SAVES on one row, JUST WATCH under the code box */
+#onBackRow { display: flex; gap: 10px; justify-content: center; margin-top: 8px; }
+#onBackRow button { margin: 0; }
+#onXfer { background: transparent; border: 2px solid #ffffff40; color: #dfe6ee; }
+#onXfer:hover { border-color: var(--gold); color: var(--gold); }
+#onJoinBox:not([style*="none"]) { display: grid; grid-template-columns: auto auto; justify-content: center; align-items: center; }
+#onWatch { grid-column: 1 / -1; margin: 0; padding: 6px 10px; font-size: 15px; background: transparent; border: 2px solid #ffffff40; color: #dfe6ee; font-style: italic; }
+#onWatch:hover { border-color: var(--gold); color: var(--gold); }
+@media (max-height: 560px) { #onBackRow { margin-top: 2px; } #onBackRow button { padding: 7px 14px; font-size: 15px; } #onWatch { padding: 4px 8px; font-size: 13px; }
+  #onJoinBox { gap: 6px 10px; } #onJoinBox #onCodeIn { width: 140px; font-size: 32px; padding: 2px; } #onJoinBox #onGo { padding: 8px 20px; font-size: 22px; } }
+
+/* ONLINE RANKED (js/ranked.js): tier + record in the top-left corner of the Online screen */
+#onRank { position: absolute; left: max(18px, env(safe-area-inset-left)); top: 12px; display: flex; align-items: center; gap: 8px; font-family: var(--hd); font-weight: 800; line-height: 1;
+  background: #0b0f16cc; border-left: 4px solid var(--gold); padding: 6px 12px 6px 10px; max-width: 38vw; white-space: nowrap; overflow: hidden; }
+#onRank .rkL { font-size: 11px; letter-spacing: .25em; color: var(--dim); }
+#onRank .rkT { font-style: italic; font-weight: 900; font-size: 16px; letter-spacing: .04em; padding: 2px 7px; background: #2a3442; color: #fff; transform: skewX(-8deg); }
+#onRank .rkT.rk2 { background: #3d6db5; } #onRank .rkT.rk3 { background: var(--red); } #onRank .rkT.rk4 { background: var(--gold); color: #111; } #onRank .rkT.rk5 { background: #fff; color: #111; }
+#onRank .rkN { font-size: 18px; color: var(--gold); font-style: italic; font-weight: 900; }
+#onRank .rkR { font-size: 13px; letter-spacing: .06em; color: #dfe6ee; overflow: hidden; text-overflow: ellipsis; }
+#onRank .rkP { color: var(--dim); }
+@media (max-height: 560px) { #onRank { top: 6px; padding: 4px 9px 4px 8px; gap: 6px; } #onRank .rkT { font-size: 13px; } #onRank .rkN { font-size: 14px; } #onRank .rkR { font-size: 11px; } #onRank .rkL, #onRank .rkP { display: none; } }

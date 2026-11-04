@@ -8,7 +8,7 @@
 // Faster device hosts: both time a small bit of work when they connect; if the joining device is clearly faster it runs the game
 // instead (before kickoff, same line, nothing to redo). Net.link = who made the connection (code owner / joiner), Net.role = who runs the game.
 // CO-OP: both on the host's team vs the CPU. The host calls the plays and kicks, the guest plays his own guy (G.hp[1] in engine.js).
-const NET_VERSION = 8;
+const NET_VERSION = 9; // 9: ranked ratings in hello/start, watchers, ICED kicker on the guest
 const NET_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 const NET_KEYS = ['Space', 'ShiftLeft', 'ControlLeft', 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyE', 'KeyF', 'KeyR', 'KeyQ', 'Tab', 'KeyC',
   'Digit1', 'Digit2', 'Digit3', 'Digit4', 'Numpad1', 'Numpad2', 'Numpad3', 'Numpad4', 'KeyT', 'KeyX', 'KeyM', 'KeyV', 'KeyB', 'Enter', 'Escape', 'KeyY', 'KeyG', 'KeyU'];
@@ -176,6 +176,7 @@ const Net = {
     Relay.load().then(db => {
       if (this.code !== code || this.link !== 'host' || this.relayRoom) return;
       const room = this.relayRoom = this.rroom = db.ref('bobble/rooms/' + code);
+      if (G.online) this.watchHost();
       this.relayOffs.push(Relay.presence(db, room, 'host', () => ({ t: firebase.database.ServerValue.TIMESTAMP, v: NET_VERSION, busy: G.online ? 1 : 0, coop: onCoop() ? 1 : 0 }), ['h2g']));
       const g = room.child('guest'), cb = g.on('value', sn => {
         if (this.relayRoom !== room || !sn.val() || this.onRelay) return;
@@ -239,6 +240,7 @@ const Net = {
     Relay.load().then(db => {
       if (!alive()) return;
       this.rdb = db; const room = this.rroom = db.ref('bobble/rooms/' + code);
+      if (G.online) this.watchHost(); // (we took over running the game before the database was up)
       const look = () => room.child('host').once('value');
       return look().then(sn => sn.val() || noDirect ? sn : new Promise(r => setTimeout(r, 1500)).then(look)).then(sn => { // just hosted: its room may be a moment behind
         if (!alive()) return;
@@ -279,7 +281,7 @@ const Net = {
       this.rxT = performance.now();
     }, false);
   },
-  hello() { return { t: 'hello', team: TEAMS[sel.idx[sel.you]].id, ct: this.myTeam(), mode: Pad.ui ? 'computer' : G.mode, v: NET_VERSION, on: G.online ? 1 : 0, sp: this.sp }; },
+  hello() { return { t: 'hello', team: TEAMS[sel.idx[sel.you]].id, ct: this.myTeam(), mode: Pad.ui ? 'computer' : G.mode, v: NET_VERSION, on: G.online ? 1 : 0, sp: this.sp, rk: typeof Ranked !== 'undefined' ? Ranked.rating() : undefined }; },
   // how fast this device is: the same small bit of game-like work a few times (best try, in ms: lower = faster)
   bench() {
     this.sp = 0; let best = Infinity, n = 0;
@@ -346,9 +348,11 @@ const Net = {
     if (this.expT) clearTimeout(this.expT);
     try { fa && fa.close(); } catch (e) {} try { co && co.close(); } catch (e) {} try { if (pe) { pe._bye = true; pe.destroy(); } } catch (e) {}
     for (const f of this.relayOffs.splice(0)) try { f(); } catch (e) {}
+    if (this.wOn && this.rroom && link !== 'host') try { this.rroom.child('w').remove(); } catch (e) {} // (we ran the game for watchers)
     if (room) try { if (link === 'host') room.remove(); else for (const k of ['guest', 'g2h']) room.child(k).remove(); } catch (e) {}
     Object.assign(this, { peer: null, conn: null, fast: null, fastOk: false, seq: 0, lastSeq: -1, inSeq: 0, lastIn: -1, buf: [], off: null, jit: 0.02, role: null, ready: false, last: null, rosterRef: null, bannerRef: null, pbpRef: null, routeKey: '', picks: {}, pendingCall: null, sounds: [], out: { pressed: [], taps: [] }, relayPrev: null, relayBase: null,
-      rroom: null, rdb: null, startMsg: null, callMsgs: [], overMsg: null, rSent: {}, rIds: 0, rCache: {}, held: false, heldPause: false, waitWas: null, swapping: false, rtt: null, onStatus: null, link: null, swapped: false, hostOpts: null, slowHost: false, tipT: 0, gFt: 16.7, gapE: 0.02, lastTm: null, stE: 0, inDeaf: false, directOut: null, expT: null, inKey: '', gRep: null, gOff: null, ga: false, pr: null, prOff: 0, meT: null });
+      rroom: null, rdb: null, startMsg: null, callMsgs: [], overMsg: null, rSent: {}, rIds: 0, rCache: {}, held: false, heldPause: false, waitWas: null, swapping: false, rtt: null, onStatus: null, link: null, swapped: false, hostOpts: null, slowHost: false, tipT: 0, gFt: 16.7, gapE: 0.02, lastTm: null, stE: 0, inDeaf: false, directOut: null, expT: null, inKey: '', gRep: null, gOff: null, ga: false, pr: null, prOff: 0, meT: null,
+      wc: 0, wq: [], wT: 0, wn: 0, wKf: 0, wPrev: null, wKeys: [], wOn: false, wDirty: false, wRo: null, wcIn: 0, watch: false, oppRk: null, rkDone: false });
     G.online = false; Input.online = false; Input.use(0); Input.store[1] = null;
   },
   lost(link) {
@@ -414,10 +418,14 @@ const Net = {
     }
     const on = G.online && this.role && G.teams && typeof menuScreens !== 'undefined' && !menuScreens.some(id => $(id) && $(id).classList.contains('show'));
     let t = '', q = 0, col = '#f6c31c';
-    if (on) {
+    if (on && this.watch) { // watching: no line of our own to show, just the tag
+      const n = this.wcIn, late = performance.now() - this.rxT > 4000;
+      t = late ? 'WATCHING  ·  WAITING FOR THE GAME...' : 'WATCHING' + (n > 1 ? `  ·  ${n} WATCHING` : ''); q = late ? 0 : 3; col = late ? '#ff6b5b' : '#f6c31c';
+    } else if (on) {
       const now = performance.now(), bad = !this.ready || now - this.rxT > LINK_DEAD || (this.onRelay && !this.dbOn);
       const lane = this.onRelay ? 'RELAY' : 'DIRECT';
       t = bad ? 'RECONNECTING...' : this.tipT && now - this.tipT < 8000 ? 'TIP: LET THE FASTER DEVICE HOST' : now - this.okT < 4000 ? `CONNECTED (${lane})` : lane + (this.rtt != null ? ' ' + this.rtt + ' MS' : '');
+      const n = this.role === 'host' ? this.wc : this.wcIn; if (n > 0 && !bad) t += `  ·  ${n} WATCHING`;
       // signal bars: round trip, relay or direct, and (guest) how often the updates ran dry
       const r = this.rtt;
       q = bad ? 0 : r == null ? 3 : r < 90 ? 4 : r < 180 ? 3 : r < 350 ? 2 : 1;
@@ -457,7 +465,7 @@ const Net = {
     if (this.role === 'host') {
       if (m.t === 'in' || m.t === 'in1' || m.t === 'pick' || m.t === 'tool') this.inT = now;
       // (a hello in the middle of a game = the guest moved lanes; resend the start if it never got there)
-      if (m.t === 'hello') { if (G.online) { if (!m.on && this.startMsg) { this.send(this.startMsg); this.resync(); } return; } if (m.v !== NET_VERSION) { this.send({ t: 'old' }); return setTimeout(() => this.reset(), 300); } return this.canSwap(m) ? this.swapRoles() : this.startHost(m); }
+      if (m.t === 'hello') { if (G.online) { if (!m.on && this.startMsg) { this.send(this.startMsg); this.resync(); } return; } if (m.v !== NET_VERSION) { this.send({ t: 'old' }); return setTimeout(() => { this.reset(); if (typeof onlineMsg === 'function') onlineMsg('You two are on different versions. Both of you: close the game all the way and reopen it.'); }, 300); } return this.canSwap(m) ? this.swapRoles() : this.startHost(m); }
       if (m.t === 'in') return this.mergeInput(m);
       if (m.t === 'in1') return this.mergeOneShots(m);
       if (m.t === 'pick') return this.pick(1, m.mode, m.key, m.id);
@@ -515,8 +523,8 @@ const Net = {
     const bc = typeof quickBcast === 'function' ? quickBcast() : null;
     const opts = { qtr, diff: coop ? +$('optDiff').value : 1, humanSide: 0, versus: !coop, coop, weather: typeof bcWeather === 'function' ? bcWeather(bc, pickWeather(wth), wth) : pickWeather(wth), night: night === '1', bcast: bc };
     newGame(mine, theirs, opts);
-    this.busy();
-    this.send(this.startMsg = { t: 'start', v: NET_VERSION, teams: G.teams, opts: { qtr: opts.qtr, weather: G.storm ? 'storm' : G.fog ? 'fog' : G.weather, night: G.night, bcast: G.bcast, coop: coop ? 1 : 0, diff: G.diff, wind: gameWind(), slow: this.slowHost ? 1 : 0 }, modes: G.netModes });
+    this.busy(); this.oppRk = hello.rk; this.rkDone = false; this.watchHost();
+    this.send(this.startMsg = { t: 'start', v: NET_VERSION, rk: typeof Ranked !== 'undefined' ? Ranked.rating() : undefined, teams: G.teams, opts: { qtr: opts.qtr, weather: G.storm ? 'storm' : G.fog ? 'fog' : G.weather, night: G.night, bcast: G.bcast, coop: coop ? 1 : 0, diff: G.diff, wind: gameWind(), slow: this.slowHost ? 1 : 0 }, modes: G.netModes });
     if (this.slowHost) this.tipT = performance.now();
   },
   busy() { if (this.relayRoom && this.link === 'host') this.relayRoom.child('host/busy').set(1); }, // nobody else can join now
@@ -627,16 +635,16 @@ const Net = {
       ps: P.map(p => PSTAT.map(k => typeof p[k] === 'number' ? Math.round(p[k] * 100) / 100 : 0).concat([p.face.dir, p.engaged ? 1 : 0, p.isHuman ? 1 : 0, p.mouth || '',
         Math.round(p.head.ox), Math.round(p.head.oy), p.sprinting ? 1 : 0, p.xf && p.xf.on ? 1 : 0, p.celly ? p.celly.type : 0, p.celly ? Math.round(p.celly.t * 100) / 100 : 0,
         p.throwKey || 0, p.openness == null ? -1 : Math.round(p.openness * 10) / 10,
-        p.kneel > 0 ? 1 : 0, p.kickT != null ? r2(p.kickT) : -1, p.kpose === 'hold' ? 1 : p.kpose === 'pc' ? 2 : 0, p.fair ? 1 : 0])), // kick poses (at the end: older guests just ignore them)
+        p.kneel > 0 ? 1 : 0, p.kickT != null ? r2(p.kickT) : -1, p.kpose === 'hold' ? 1 : p.kpose === 'pc' ? 2 : 0, p.fair ? 1 : 0, p.shiver ? 1 : 0])), // kick poses + iced kicker shiver (at the end: older guests just ignore them)
       b: b ? [r2(b.x), r2(b.y), r2(b.z), r2(b.spin || 0), idx(b.holder), b.flight ? [r2(b.flight.sx), r2(b.flight.sy), r2(b.flight.tx), r2(b.flight.ty), r2(b.flight.t), r2(b.flight.T), r2(b.flight.peak), b.flight.pitch ? 1 : 0, b.flight.kick || 0, b.flight.duck ? 1 : 0, idx(b.flight.intended), b.flight.style || ''] : null, b.loose ? 1 : 0, r2(b.hold || 0), b.snap || 0] : null,
       rf: (G.refs || []).map(r => [r2(r.x), r2(r.y), r.face, r2(r.anim || 0), r.moving, r2(r.throwT || 0)]),
       hp: [idx(G.hp && G.hp[0]), idx(G.hp && G.hp[1])], hd: G.coop ? [idx(G.humanDef), idx(G.hd2)] : [idx(G.hd && G.hd[0]), idx(G.hd && G.hd[1])], // (co-op: by player, like hp)
-      km: G.km && (G.phase === 'kickmeter' || G.phase === 'kick') ? { kind: G.km.kind, stage: G.km.stage, power: G.km.power, aim: G.km.aim, side: G.km.side, need: G.km.need, tol: G.km.tol, yds: G.km.yds, kk: G.km.kk, cpuT: G.km.cpuT != null ? 1 : null, wait: G.km.wait, needle: G.km.needle, wind: G.wind } : null,
+      km: G.km && (G.phase === 'kickmeter' || G.phase === 'kick') ? { kind: G.km.kind, stage: G.km.stage, power: G.km.power, aim: G.km.aim, side: G.km.side, need: G.km.need, tol: G.km.tol, yds: G.km.yds, kk: G.km.kk, cpuT: G.km.cpuT != null ? 1 : null, wait: G.km.wait, needle: G.km.needle, wind: G.wind, iced: G.km.iced ? 1 : 0 } : null,
       aim: G.aim, mv: G.meterV ? G.meterV.map(r2) : null, cv: G.chold ? r2(catchFill()) : null, cgw: G.chold && G.chold.g ? G.chold.g.map(r2) : null, cg: idx(G.cellyGuy), hy: Math.round(G.crowdHype * 100) / 100, sh: Math.round(cam.shake), sm: G.slowmo > 0 ? 1 : 0, flg: (G.flags || []).length,
       mo: Math.round(G.mo || 0), cw: G.rvWin ? [G.rvWin.side, r2(G.rvWin.t)] : 0, chl: G.chalLeft, rvs: G.phase === 'review' ? G.rvShow : 0, // momentum, challenge window, review overlay
       // for the guest moving its own guy: are we using its spot, his speed / burst, QB took off, game paused
       gt: this.gRep && G.hp && G.players[this.gRep.i] === G.hp[1] ? Math.round(this.gRep.gt + this.repAge(this.gRep, performance.now()) * 1000) : 0, // the guest's clock for this spot
-      ga: this.ga ? 1 : 0, gs: G.hp && G.hp[1] ? [r2(G.hp[1].spd || 0), r2(G.hp[1].acc || 0)] : 0, hs: G.humanScramble ? 1 : 0, pz: G.paused ? 1 : 0,
+      wc: this.wc || undefined, ga: this.ga ? 1 : 0, gs: G.hp && G.hp[1] ? [r2(G.hp[1].spd || 0), r2(G.hp[1].acc || 0)] : 0, hs: G.humanScramble ? 1 : 0, pz: G.paused ? 1 : 0,
       deaf: this.held && performance.now() - this.rxT > LINK_DEAD ? 1 : undefined // host hears nothing from the guest at all
     };
     // one-time stuff goes on the safe lane
@@ -649,7 +657,8 @@ const Net = {
       const rk = JSON.stringify(G.O.map(p => [p.role, p.route && p.route.pts, p.hot]).concat(G.D.map(p => p.assign)));
       if (rk !== this.routeKey) { this.routeKey = rk; e.rt = { o: G.O.map(p => ({ role: p.role, route: p.route ? { pts: p.route.pts, end: p.route.end, i: 0 } : null, hot: p.hot || null, hx: p.hx, hy: p.hy })), d: G.D.map(p => p.assign) }; }
     } else this.routeKey = '';
-    if (e.fx.length || e.snd.length || e.conf || e.bn !== undefined || e.pb || e.rt) this.send(e);
+    if (e.fx.length || e.snd.length || e.conf || e.bn !== undefined || e.pb || e.rt) { this.send(e); if (this.wc > 0) this.wq.push(e); }
+    if (this.wc > 0) this.watchOut(s); // (before the relay slims s)
     if (this.onRelay) {
       Relay.slim(s);
       const p = this.relayPrev, full = !p || s.n - this.relayKf >= RELAY_HZ * 5 || p.ps.length !== s.ps.length || p.rf.length !== s.rf.length;
@@ -660,14 +669,19 @@ const Net = {
   },
   // each player's fixed stuff (name, number, face...) only goes out the first time; after that just an id + this play's job
   sendRoster() {
+    this.send(this.rosterMsg());
+    if (this.wc > 0) this.wq.push(this.wRo = this.rosterMsg(true)); // watchers: everybody's fixed stuff every time (they may have just come in)
+  },
+  rosterMsg(all) {
     const P = G.players || [];
-    this.send({ t: 'roster', O: (G.O || []).map(p => P.indexOf(p)), D: (G.D || []).map(p => P.indexOf(p)),
+    return { t: 'roster', O: (G.O || []).map(p => P.indexOf(p)), D: (G.D || []).map(p => P.indexOf(p)),
       p: P.map(p => {
         const fix = { side: p.side, pos: p.pos, name: p.name, num: p.num, ovr: p.ovr, spdR: p.spdR, face: { ...p.face, dir: 0 }, headScale: p.headScale }, k = JSON.stringify(fix);
         const q = { off: p.off, slot: p.slot, role: p.role, assign: p.assign, xf: p.xf ? { kind: p.xf.kind, on: p.xf.on } : undefined, cap: p.cap || undefined };
         if (this.rSent[k] != null) q.i = this.rSent[k]; else { q.i = this.rSent[k] = ++this.rIds; q.f = fix; }
+        if (all) q.f = fix;
         return q;
-      }) });
+      }) };
   },
   // play calls: the offense and defense pick at the same time, each on their own screen
   // co-op: the host calls every play (the guest waits)
@@ -699,7 +713,101 @@ const Net = {
     if (side === 0) onlineWait('Waiting for your opponent to pick...');
   },
   done() { this.pendingCall = null; this.send({ t: 'call', ctx: { mode: 'close' } }); onlineWait(null); show(null); },
-  over(s) { this.overMsg = { t: 'over', s: { score: s.score, teams: s.teams.map(t => t.id), tstats: s.tstats, leaders: s.leaders } }; this.send(this.overMsg); },
+  over(s) { this.overMsg = { t: 'over', s: { score: s.score, teams: s.teams.map(t => t.id), tstats: s.tstats, leaders: s.leaders } }; this.send(this.overMsg); if (this.wc > 0) { this.wq.push(this.overMsg); this.wT = 0; } },
+
+  // ---------------- watchers ----------------
+  // A third device can watch with the game code (read-only). Whoever runs the game writes a slim copy of it to the database
+  // (bobble/rooms/CODE/w) 10x a second, only while somebody watches: one write for any number of watchers, changes only
+  // (a full one every 2s), the same packing the relay uses. w/st = start message, w/ro = full roster, w/q = the stream,
+  // watch/ID = one per watcher (gone when they leave or drop off).
+  wc: 0, wq: [], wT: 0, wn: 0, wKf: 0, wPrev: null, wKeys: [], wOn: false, wDirty: false, wRo: null, wcIn: 0, watch: false,
+  watchHost() {
+    const room = this.rroom; if (!room || this.wOn || this.role !== 'host') return;
+    this.wOn = true;
+    const wr = room.child('watch'), cb = wr.on('value', sn => { const n = Math.min(sn.numChildren(), 99); if (n && !this.wc) this.wDirty = true; this.wc = n; if (!n) this.wq = []; });
+    const info = room.root.child('.info/connected'), ic = info.on('value', sn => { if (sn.val()) this.wDirty = true; }); // (back on the database: write the start + roster again)
+    this.relayOffs.push(() => { wr.off('value', cb); info.off('value', ic); });
+  },
+  watchOut(s) {
+    const now = performance.now(), room = this.rroom;
+    if (!room || now - this.wT < 100) return;
+    this.wT = now;
+    const w = room.child('w');
+    if (this.wDirty && this.startMsg) {
+      this.wDirty = false; this.wPrev = null;
+      w.onDisconnect().remove();
+      w.child('st').set(JSON.stringify(this.startMsg)).catch(() => {});
+      this.wq = this.wq.filter(m => m.t !== 'roster'); this.wq.unshift(this.wRo = this.rosterMsg(true));
+    }
+    if (this.wq.some(m => m.t === 'roster')) w.child('ro').set(JSON.stringify(this.wRo)).catch(() => {});
+    const c = Relay.slim(JSON.parse(JSON.stringify(s))); c.n = ++this.wn; delete c.gt; delete c.gs; delete c.ga;
+    const p = this.wPrev, full = !p || c.n - this.wKf >= 20 || p.ps.length !== c.ps.length || p.rf.length !== c.rf.length;
+    if (full) this.wKf = c.n;
+    const out = this.wq.splice(0); out.push(full ? c : Relay.pack(c, p)); this.wPrev = c;
+    const ref = w.child('q').push(JSON.stringify(out, Relay.rnd)); this.wKeys.push(ref.key);
+    if (this.wKeys.length > 40) { const d = {}; for (const k of this.wKeys.splice(0, 20)) d[k] = null; w.child('q').update(d).catch(() => {}); } // (keep the last few seconds)
+  },
+  // the watcher's side: find the game, say we're here, then play the stream back like a guest that never sends anything
+  watchGame(code, onStatus) {
+    code = code.toUpperCase();
+    if ([...code].some(ch => !NET_CHARS.includes(ch))) { onStatus('Codes never use O, 0, I, 1 or L. Look at the code again.'); return; }
+    this.reset(); this.role = 'guest'; this.link = 'watch'; this.watch = true; this.side = 1; this.code = code; this.onStatus = onStatus;
+    const alive = () => this.link === 'watch' && this.code === code;
+    onStatus(`LOOKING FOR GAME ${code}...`);
+    Relay.load().then(db => {
+      if (!alive()) return;
+      const room = this.rroom = db.ref('bobble/rooms/' + code);
+      const look = n => room.child('host').once('value').then(sn => sn.val() || n <= 0 ? sn : new Promise(r => setTimeout(r, 1500)).then(() => look(n - 1))); // (just hosted: its room may be a moment behind)
+      return look(3).then(sn => {
+        if (!alive()) return;
+        const h = sn.val();
+        if (!h) { onStatus('No game with that code. Check it with your friends.'); return; }
+        if (h.v !== NET_VERSION) { onStatus('You are on a different version than the players. Close the game all the way and reopen it.'); return; }
+        onStatus(h.busy ? `FOUND GAME ${code}. GETTING THE PICTURE...` : `FOUND GAME ${code}. IT STARTS WHEN THE SECOND PLAYER JOINS. KEEP THIS SCREEN OPEN.`);
+        const wid = Math.random().toString(36).slice(2, 10), me = room.child('watch/' + wid);
+        this.relayOffs.push(Relay.presence(db, room, 'watch/' + wid, () => ({ t: firebase.database.ServerValue.TIMESTAMP }), []));
+        this.relayOffs.push(() => me.remove().catch(() => {}));
+        // the players left (their room is gone for a while): the game is over
+        let goneT = null;
+        const hr = room.child('host'), hcb = hr.on('value', sn => {
+          clearTimeout(goneT);
+          if (!sn.val()) goneT = setTimeout(() => { if (alive()) this.watchEnd(G.online ? 'The game ended.' : 'That game is gone. Check the code with your friends.'); }, 12000);
+        });
+        this.relayOffs.push(() => { hr.off('value', hcb); clearTimeout(goneT); });
+        const st = room.child('w/st'), scb = st.on('value', sn => {
+          const v = sn.val(); if (typeof v !== 'string' || G.online || !alive()) return;
+          let m; try { m = JSON.parse(v); } catch (e) { return; }
+          if (m.v !== NET_VERSION) return;
+          this.startGuest(m); if (!G.online) return;
+          this.onRelay = true; this.ready = false; this.okT = performance.now();
+          room.child('w/ro').once('value').then(r => { try { if (alive() && typeof r.val() === 'string') this.applyRoster(JSON.parse(r.val())); } catch (e) {} })
+            .then(() => {
+              if (!alive()) return;
+              const q = room.child('w/q').limitToLast(8), qcb = q.on('child_added', x => this.watchIn(x.val()));
+              this.relayOffs.push(() => q.off('child_added', qcb));
+            });
+        });
+        this.relayOffs.push(() => st.off('value', scb));
+      });
+    }).catch(() => { if (alive()) onStatus("Can't reach the online server. Check your internet."); });
+  },
+  watchIn(v) {
+    if (!this.watch || !G.online || typeof v !== 'string') return;
+    let a; try { a = JSON.parse(v); } catch (e) { return; }
+    this.rxT = performance.now();
+    for (const m of a) {
+      if (!m || !m.t) continue;
+      if (m.t === 'over') { G.phase = 'over'; const s = m.s, t = G.teams; setTimeout(() => { if (this.watch) this.watchEnd(`FINAL: ${t[1].id} ${s.score[1]} - ${s.score[0]} ${t[0].id}. Thanks for watching.`); }, 2500); return; }
+      if (m.t === 'roster') this.applyRoster(m);
+      else if (m.t === 'e') this.applyEvents(m);
+      else if (m.t === 's' || m.t === 'sd') {
+        this.snapRxT = this.rxT;
+        const s = Relay.unpack(m, this.relayBase); if (!s) continue; // (missed one: the next full one fixes it)
+        this.relayBase = s; this.applySnap(JSON.parse(JSON.stringify(s)));
+      }
+    }
+  },
+  watchEnd(msg) { const was = G.online; this.reset(); if (was) { G.teams = null; G.phase = 'idle'; } if (typeof onlineMsg === 'function') onlineMsg(msg); },
 
   // ---------------- guest ----------------
   startGuest(m) {
@@ -710,6 +818,7 @@ const Net = {
     initGame(m.teams[0], m.teams[1], { qtr: m.opts.qtr, diff: coop ? m.opts.diff : 1, humanSide: coop ? 0 : 1, versus: !coop, coop, weather: m.opts.weather, night: m.opts.night, bcast: m.opts.bcast });
     G.wind = m.opts.wind || null; // the host's wind (scorebug arrow)
     this.busy(); if (m.opts.slow) this.tipT = performance.now();
+    this.oppRk = m.rk; this.rkDone = false;
     G.phase = 'idle'; G.players = []; G.ball = null;
   },
   applyRoster(m) {
@@ -740,6 +849,7 @@ const Net = {
       timeouts: s.to, pendingRunoff: s.pr, playClock: s.pc, special: s.sp, patSide: s.pat, twoPt: s.two, bstate: s.bs, koPending: s.kp, kickoffSide: s.ks, showTarget: s.st, aim: s.aim,
       crowdHype: s.hy, km: s.km, meterV: s.mv || null, catchV: s.cv != null ? s.cv : null, catchG: s.cgw || null, flags: new Array(s.flg).fill({}),
       mo: s.mo || 0, rvWin: s.cw ? { side: s.cw[0], t: s.cw[1] } : null, chalLeft: s.chl || [2, 2], rvShow: s.rvs || null });
+    this.wcIn = s.wc || 0; // how many are watching (for the badge)
     if (s.sh > cam.shake) cam.shake = s.sh;
     if (s.sm) G.slowmo = 0.05;
     const off = OFF_PLAYS.concat(FAKE_PLAYS, typeof SPECIAL_PLAYS !== 'undefined' ? SPECIAL_PLAYS : []).find(p => p.key === s.ok) || (s.ok ? { key: s.ok, name: s.ok, type: s.ok === 'ret' ? 'ret' : 'pass' } : null);
@@ -753,7 +863,7 @@ const Net = {
       p.face.dir = a[n]; p.engaged = a[n + 1] ? true : null; p.isHuman = !!a[n + 2]; p.mouth = a[n + 3]; p.head.ox = a[n + 4]; p.head.oy = a[n + 5];
       p.sprinting = !!a[n + 6]; if (p.xf) p.xf.on = !!a[n + 7]; p.celly = a[n + 8] ? { type: a[n + 8], t: a[n + 9] } : null;
       p.throwKey = a[n + 10]; p.openness = a[n + 11] < 0 ? null : a[n + 11];
-      p.kneel = a[n + 12] || 0; p.kickT = a[n + 13] >= 0 ? a[n + 13] : null; p.kpose = [null, 'hold', 'pc'][a[n + 14]] || null; p.fair = a[n + 15] || 0;
+      p.kneel = a[n + 12] || 0; p.kickT = a[n + 13] >= 0 ? a[n + 13] : null; p.kpose = [null, 'hold', 'pc'][a[n + 14]] || null; p.fair = a[n + 15] || 0; p.shiver = !!a[n + 16];
       p.ctl = p.side === G.human ? 0 : 1; // you = 0 on your own screen (draw.js ptagOf: the host is still P1 on both screens)
     });
     if (s.b) {
@@ -767,6 +877,7 @@ const Net = {
     G.refs = s.rf.map((r, i) => ({ x: oldRefs[i] ? oldRefs[i].x : r[0], y: oldRefs[i] ? oldRefs[i].y : r[1], face: r[2], anim: relay && oldRefs[i] ? oldRefs[i].anim : r[3], moving: r[4], throwT: r[5] }));
     const me = G.coop ? 1 : G.human; // (co-op: hp / hd are by player, the guest is player 2)
     G.hp = s.hp.map(i => P[i] || null); G.humanPlayer = G.hp[me]; G.humanDef = P[s.hd[me]] || null;
+    if (this.watch) G.humanPlayer = G.humanDef = null; // (watching: nobody is yours)
     if (G.coop) for (const p of G.hp) if (p) p.ctl = p === G.humanPlayer ? 0 : 1; // your guy 0, your friend's 1
     G.cellyGuy = P[s.cg] || null;
     // close a call screen only once the host's game has been in 'playcall' and moved on (updates can arrive after the call itself)
@@ -802,7 +913,8 @@ const Net = {
     this.meT = null;
     const B = this.buf; if (!B.length || this.off == null) return;
     // (always at least one update ahead: a slow host sends them further apart)
-    const delay = clamp(Math.max((this.onRelay ? 0.06 : 0.03) + this.jit * 1.4, this.gapE * 1.3 + 0.01), this.onRelay ? 0.07 : 0.035, 0.3);
+    const delay = this.watch ? clamp(Math.max(0.3 + this.jit * 2, this.gapE * 4), 0.5, 1) // (watching: 10 a second through the database, smooth beats quick)
+      : clamp(Math.max((this.onRelay ? 0.06 : 0.03) + this.jit * 1.4, this.gapE * 1.3 + 0.01), this.onRelay ? 0.07 : 0.035, 0.3);
     const rt = performance.now() / 1000 + this.off - delay;
     let a = B[0], c = null;
     for (let i = 0; i < B.length - 1; i++) if (B[i].tm <= rt && B[i + 1].tm >= rt) { a = B[i]; c = B[i + 1]; break; }
@@ -843,6 +955,7 @@ const Net = {
   // or too far off) he eases back to where the host has him.
   pr: null, prOff: 0, meT: null,
   predict(dt) {
+    if (this.watch) return;
     this.prOff = Math.max(0, this.prOff - dt);
     const s = this.last, p = G.humanPlayer, b = G.ball, T = this.meT, now = performance.now(), age = now - this.snapRxT;
     const dv = s && p && b && T && T[2] === p && G.phase === 'live' && !s.pz && s.gs && this.free(p) ? this.myVel(p, s) : null;
@@ -899,6 +1012,7 @@ const Net = {
     return [ax.x * spd * mul * ax.m, ax.y * spd * mul * ax.m];
   },
   guestSend(dt) {
+    if (this.watch) return;
     for (const c in Input.pressed) if (NET_KEYS.includes(c)) this.out.pressed.push(c);
     for (const t of Input.taps) this.out.taps.push([wx(t.x), wy(t.y)]);
     if (Input.release) this.out.rel = [Input.release.x, Input.release.y, Input.flick ? 1 : 0];

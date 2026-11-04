@@ -875,6 +875,7 @@ function updateMobileButtons() {
   if (G.phase === 'presnap' && !G.demo) st = G.coop && G.online && Net.role === 'guest' ? 'cpre' : 'presnap'; // co-op guest: just SWITCH (the host snaps)
   const coach = coachOn(); // Coach Mode: no stick or move buttons, just AUDIBLE / TIMEOUT before the snap
   if (coach && st !== 'presnap') st = '';
+  if (G.online && Net.watch) st = ''; // watching: no buttons
   // stays up the whole play so your thumb never loses it (+ rushing a field goal). Online guest: up before the snap too,
   // the snap reaches you a moment late and a thumb that lands before the stick shows up would miss it
   const joyOn = (G.phase === 'live' || fgRushing() || (G.online && Net.role === 'guest' && G.phase === 'presnap')) && !G.demo && !!h;
@@ -1180,7 +1181,7 @@ $('onHost').onclick = () => {
   Net.host(code => { $('onCode').textContent = code; $('onStatus').textContent = `Tell your friend this code. ${onCoop() ? 'They join your team. ' : ''}The game starts when they join. Keep this screen open.`; },
     st => { $('onStatus').textContent = st; });
 };
-$('onJoin').onclick = () => { Sound.click(); $('onPick').style.display = 'none'; $('onJoinBox').style.display = ''; $('onCodeIn').value = ''; $('onCodeIn').focus(); $('onStatus').textContent = 'Type the 4-letter code from your friend\'s screen.'; };
+$('onJoin').onclick = () => { Sound.click(); $('onPick').style.display = 'none'; $('onJoinBox').style.display = ''; $('onCodeIn').value = ''; $('onCodeIn').focus(); $('onStatus').textContent = 'Type the 4-letter code from your friend\'s screen. JUST WATCH follows their game without playing.'; };
 $('onGo').onclick = () => {
   const code = $('onCodeIn').value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
   if (code.length !== 4) { $('onStatus').textContent = 'Codes are 4 letters/numbers.'; return; }
@@ -1190,6 +1191,13 @@ $('onGo').onclick = () => {
   Net.join(code, st => { $('onStatus').textContent = st; });
 };
 $('onCodeIn').addEventListener('keydown', e => { if (e.code === 'Enter') $('onGo').onclick(); e.stopPropagation(); });
+// JUST WATCH: a third device follows a friends' game with its code (read-only, net.js watchGame)
+$('onWatch').onclick = () => {
+  const code = $('onCodeIn').value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (code.length !== 4) { $('onStatus').textContent = 'Type the 4-letter code of the game you want to watch.'; return; }
+  Sound.click(); if (G.mode === 'mobile') goFullscreen();
+  Net.watchGame(code, st => { $('onStatus').textContent = st; });
+};
 
 // play-call shortcuts on a keyboard: K = kneel, X = spike (only when they'd show as buttons)
 addEventListener('keydown', e => {
