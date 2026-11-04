@@ -212,8 +212,8 @@ const Highlights = {
   update(dt) {
     dt = Math.min(dt, 0.05);
     const P = Input.pressed, taps = Input.taps.splice(0), c = this.list[this.idx];
-    let next = P.Space || P.Enter || P.ArrowRight || P.KeyN, stop = P.Escape || P.Backspace, save = P.KeyS;
-    for (const t of taps) { const B = this.btns(); if (B.done.hit(t)) stop = true; else if (B.save.hit(t)) save = true; else next = true; }
+    let next = P.Space || P.Enter || P.ArrowRight || P.KeyN, stop = P.Escape || P.Backspace, save = P.KeyS && Clips.can();
+    for (const t of taps) { const B = this.btns(); if (B.done.hit(t)) stop = true; else if (B.save.hit(t) && Clips.can()) save = true; else next = true; }
     if (this.rec) next = stop = save = false; // filming a clip: it plays through on its own (CANCEL is on the bar up top)
     if (save) { const th = this.saved.then; this.saved.then = null; this.stop(); return Clips.highlight(c, th); }
     if (stop) return this.stop();
@@ -261,11 +261,10 @@ const Highlights = {
       g.fillStyle = gold ? '#111' : '#fff'; g.textAlign = 'center'; g.font = `italic 900 ${mob ? 28 : 24}px ${HD}`; g.fillText(label, b.x + b.w / 2, b.y + b.h / 2 + (mob ? 1 : -4));
       if (!mob) { g.font = `800 12px ${HD}`; g.fillStyle = gold ? '#111a' : '#9aa6b5'; g.fillText(key, b.x + b.w / 2, b.y + b.h - 8); }
     };
-    if (this.rec) { g.fillStyle = '#ffffffb0'; g.font = `italic 900 26px ${HD}`; g.textAlign = 'right'; g.fillText('BOBBLE BOWL', CW - 30, 42); } // filming: no buttons, a little watermark
-    else {
+    if (!this.rec) { // filming: no buttons (clips.js paints the watermark + score bug on the video)
       if (this.list.length > 1) btn(B.next, this.idx + 1 < this.list.length ? 'NEXT' : 'END', mob ? '' : 'SPACE');
       btn(B.done, 'DONE', 'ESC', true);
-      btn(B.save, 'SAVE CLIP', 'S');
+      if (Clips.can()) btn(B.save, 'SAVE CLIP', 'S');
     }
     // lower third: slides in, team color + gold edge, big italic caps
     const sl = 1 - Math.pow(1 - Math.min(1, this.age / 0.35), 3), w = Math.min(CW - 80, 860), h = 122, x = 40 - (1 - sl) * (w + 60), y = CH - h - 34;
