@@ -3,7 +3,7 @@ const Season = {
   data: null, // saved season (null = none)
   KEY: 'bobbleSeason',
 
-  load() { try { this.data = JSON.parse(localStorage.getItem(this.KEY) || 'null'); } catch (e) { this.data = null; } return this.data; },
+  load() { try { this.data = JSON.parse(localStorage.getItem(this.KEY) || 'null'); } catch (e) { this.data = null; } if (this.data && typeof fixRealSkins === 'function' && fixRealSkins(this.data)) this.save(); return this.data; }, // (real draft prospects: real skin tones)
   save() { try { localStorage.setItem(this.KEY, JSON.stringify(this.data)); } catch (e) {} },
   clear() { this.data = null; try { localStorage.removeItem(this.KEY); } catch (e) {} },
 

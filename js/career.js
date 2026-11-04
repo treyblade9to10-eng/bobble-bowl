@@ -90,6 +90,7 @@ const Career = {
     if (!this.tro) this.tro = { games: 0, w: 0, l: 0, t: 0, titles: [], awards: [], bestWin: null, seasons: 0 };
     if (!this.tro.legends) this.tro.legends = [];
     if (this.cap && !this.cap.v) this.migrate();
+    if (this.cap && typeof fixRealSkins === 'function' && fixRealSkins(this.cap)) this.save(); // real prospects in the college lineups: real skin tones
     if (this.cap && this.cap.trust == null) this.cap.trust = this.cap.phase === 'college' || this.cap.phase === 'combine' || this.cap.phase === 'draft' ? 18 + (this.cap.stars || 3) * 3
       : clamp(30 + 10 * this.cap.seasons.filter(s => s.lvl === 'NFL' && !s.open).length, 20, 70); // careers from before coach trust
     return this;
