@@ -40,8 +40,8 @@ const Replay = {
   // SAVE CLIP button in the top bar (clips.js films the replay from the start)
   saveBox() { const mob = G.mode === 'mobile', w = mob ? 170 : 150; return { x: 160, y: 4, w, h: 36 }; }, // next to REPLAY (the pause / sound buttons sit top right)
   update(dt) {
-    const sb = this.saveBox(), hitSave = Input.taps.some(t => t.x > sb.x - 12 && t.x < sb.x + sb.w + 12 && t.y < sb.y + sb.h + 16);
-    if (!this.recClip && (hitSave || Input.hit('KeyS'))) { Input.taps.length = 0; Clips.replay(); }
+    const sb = this.saveBox(), hitSave = Clips.can() && Input.taps.some(t => t.x > sb.x - 12 && t.x < sb.x + sb.w + 12 && t.y < sb.y + sb.h + 16);
+    if (!this.recClip && (hitSave || (Input.hit('KeyS') && Clips.can()))) { Input.taps.length = 0; Clips.replay(); }
     const skip = !this.recClip && (Input.hit('Space', 'Enter', 'Escape') || Input.taps.length > 0);
     this.t += dt * 60 * 0.55;
     G.time += dt * 0.55;
@@ -64,8 +64,8 @@ const Replay = {
     g.fillText('REPLAY', 52, 23);
     if (typeof bcBadge === 'function' && G.bcast) bcBadge(g, G.bcast, 148, 4, 56, 36); // primetime games: the show's badge next to REPLAY
     g.font = '800 15px "Barlow Condensed", Arial, sans-serif'; g.fillStyle = '#9aa6b5'; g.textAlign = 'right';
-    g.fillText(this.recClip ? 'BOBBLE BOWL' : G.mode === 'mobile' ? 'TAP TO SKIP' : 'SPACE TO SKIP', CW - 24, CH - 22);
-    if (!this.recClip && typeof Clips !== 'undefined') { // SAVE CLIP
+    if (!this.recClip) g.fillText(G.mode === 'mobile' ? 'TAP TO SKIP' : 'SPACE TO SKIP', CW - 24, CH - 22); // (filming: clips.js adds the watermark)
+    if (!this.recClip && typeof Clips !== 'undefined' && Clips.can()) { // SAVE CLIP (hidden where the browser can't record)
       const b = this.saveBox(); g.fillStyle = '#1c2430'; g.beginPath(); g.moveTo(b.x + 8, b.y); g.lineTo(b.x + b.w, b.y); g.lineTo(b.x + b.w - 8, b.y + b.h); g.lineTo(b.x, b.y + b.h); g.fill();
       g.fillStyle = '#fff'; g.textAlign = 'center'; g.font = 'italic 900 20px "Barlow Condensed", Arial, sans-serif'; g.fillText(G.mode === 'mobile' ? 'SAVE CLIP' : 'SAVE CLIP  (S)', b.x + b.w / 2, b.y + b.h / 2 + 1);
     }

@@ -739,10 +739,13 @@ function hlOver(s) {
   $('potgBox').style.setProperty('--tc', t.c1);
   $('potgTitle').innerHTML = (top.gw ? '<em>GAME-WINNING</em>' : '') + top.title.split(' ').map(w => `<span>${w}</span>`).join(' '); // spans: only wrap between words
   $('potgWho').textContent = [top.who, `${top.q}\u00a0${top.clock}`].filter(Boolean).join(' · ');
+  $('potgClip').style.display = Clips.can() ? '' : 'none';
   $('potgAll').textContent = `ALL HIGHLIGHTS (${list.length})`; $('potgAll').style.display = list.length > 1 ? '' : 'none';
 }
 $('potgWatch').onclick = () => { Sound.click(); Highlights.play([Highlights.best()], hlBack('over')); };
 $('potgAll').onclick = () => { Sound.click(); hlMenu('over'); };
+// SAVE CLIP right from the final screen: films the Play of the Game (clips.js), then back here with the share / download bar
+$('potgClip').onclick = () => { Sound.click(); Clips.highlight(Highlights.best(), hlBack('over')); };
 function hlMenu(from) {
   const list = Highlights.clips, top = Highlights.best(), T = G.teams;
   $('hlSub').textContent = `${from === 'half' ? 'HALFTIME' : 'FINAL'}  ·  ${T[1].id} ${G.score[1]} - ${G.score[0]} ${T[0].id}  ·  ${list.length} PLAY${list.length === 1 ? '' : 'S'}`;

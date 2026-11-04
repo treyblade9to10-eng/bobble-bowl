@@ -8,6 +8,7 @@
 #potgWho { font-family: var(--hd); font-weight: 600; font-size: 16px; color: #c9d3df; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 8px; }
 #potgBox button { width: 100%; margin: 3px 0; }
 #potgWatch { font-style: italic; font-weight: 900; font-size: 22px; }
+.potgRow { display: flex; gap: 6px; } #potgBox .potgRow button { width: auto; flex: 1 1 auto; min-width: 0; padding-left: 6px; padding-right: 6px; white-space: nowrap; }
 #hlMenu { justify-content: flex-start; padding-top: 24px; }
 #hlSub { font-family: var(--hd); font-weight: 800; letter-spacing: .14em; color: var(--dim); margin-bottom: 12px; }
 #hlList { width: min(760px, 94vw); overflow-y: auto; flex: 0 1 auto; min-height: 0; margin-bottom: 10px; -webkit-overflow-scrolling: touch; touch-action: pan-y; }

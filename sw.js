@@ -65,6 +65,7 @@ const FILES = [
   'js/net.js',
   'js/themes.js',
   'js/main.js',
+  'js/hurry.js',
   'js/boards.js',
   'js/tourney.js',
   'js/practice.js',
