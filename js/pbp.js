@@ -50,21 +50,36 @@ function pbpPlay(res) {
 }
 
 // little ticker under the scoreboard for the latest line
+const tickFit = { L: null, key: '', ft: '', w: 0, y: 76 };
 function drawTicker(g, G) {
   const L = G.pbpShow; if (!L || G.demo || G.mini) return;
   // the play-call cards cover the top of the screen, and a big banner is the same news: wait, then show the line for its full time
   const t0 = L.st != null ? L.st : L.t;
   if ((G.banner && G.banner.t < G.banner.dur) || $('playcall').classList.contains('show')) { if (G.time - t0 < 5) L.st = Math.max(t0, G.time - 0.2); return; }
   const age = G.time - t0; if (age > 5 || G.phase === 'live' || G.phase === 'replay') return;
-  const a = Math.min(1, age * 5, (5 - age) * 2);
-  g.save(); g.globalAlpha = a;
-  g.font = '600 17px "Barlow Condensed", Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-  const txt = L.text.length > 110 ? L.text.slice(0, 107) + '...' : L.text;
-  const w = Math.min(CW - 40, g.measureText(txt).width + 70), y = G.playClock > 0 || (typeof Crowd !== 'undefined' && Crowd.show()) ? 102 : 76;
-  g.fillStyle = '#0b0f16e8'; g.fillRect(CW / 2 - w / 2, y - 14, w, 28);
-  g.fillStyle = '#f6c31c'; g.fillRect(CW / 2 - w / 2, y - 14, 4, 28);
-  g.fillStyle = '#9aa6b5'; g.textAlign = 'left'; g.font = '800 13px "Barlow Condensed", Arial, sans-serif'; g.fillText(`${L.q} ${L.clock}`, CW / 2 - w / 2 + 12, y + 1);
-  g.fillStyle = '#fff'; g.textAlign = 'center'; g.font = '600 17px "Barlow Condensed", Arial, sans-serif'; g.fillText(txt, CW / 2 + 22, y + 1);
+  const a = Math.min(1, age * 5, (5 - age) * 2), K = typeof Pad !== 'undefined' ? Pad.scale(1.3) : 1; // (phones: a bit bigger)
+  // under whatever hangs off the scorebug: play clock / crowd meter, the 2:00 DRILL tag, the MOMENTUM SWING tag
+  const crowd = typeof Crowd !== 'undefined' && Crowd.show(), xm = G.bcast === 'XMAS' ? 6 : 0;
+  let top = G.playClock > 0 || crowd ? 88 + xm : 62;
+  if (typeof Flow !== 'undefined' && Flow.drill && Flow.on()) top = Math.max(top, 82 + (crowd ? 26 : 0) + xm);
+  if (typeof Flow !== 'undefined' && Flow.tag) top = Math.max(top, 80);
+  // fit the line once (kept in tickFit, not on the line: lines get saved + sent online), not a measureText every frame
+  const maxW = (CW - 40) / K, key = maxW + (document.fonts ? document.fonts.status : ''), F = tickFit, ty = top + 14 * K;
+  if (F.L !== L || F.key !== key) {
+    g.font = '600 17px "Barlow Condensed", Arial, sans-serif'; let txt = L.text;
+    while (txt.length > 12 && g.measureText(txt).width + 70 > maxW) { const i = txt.lastIndexOf(' ', txt.length - 5); txt = txt.slice(0, i > 0 ? i : txt.length - 4) + '...'; }
+    if (F.L !== L) F.y = ty;
+    Object.assign(F, { L, key, ft: txt, w: Math.min(maxW, g.measureText(txt).width + 70) });
+  }
+  F.y = lerp(F.y, ty, 0.25);
+  const txt = F.ft, w = F.w;
+  F.box = { x0: CW / 2 - w * K / 2, x1: CW / 2 + w * K / 2, y0: F.y - 14 * K, y1: F.y + 14 * K }; F.at = G.time; // (draw.js: name tags stay out from under it)
+  g.save(); g.globalAlpha = a; g.translate(CW / 2, F.y); if (K !== 1) g.scale(K, K);
+  g.textBaseline = 'middle';
+  g.fillStyle = '#0b0f16e8'; g.fillRect(-w / 2, -14, w, 28);
+  g.fillStyle = '#f6c31c'; g.fillRect(-w / 2, -14, 4, 28);
+  g.fillStyle = '#9aa6b5'; g.textAlign = 'left'; g.font = '800 13px "Barlow Condensed", Arial, sans-serif'; g.fillText(`${L.q} ${L.clock}`, -w / 2 + 12, 1);
+  g.fillStyle = '#fff'; g.textAlign = 'center'; g.font = '600 17px "Barlow Condensed", Arial, sans-serif'; g.fillText(txt, 22, 1);
   g.restore();
 }
 

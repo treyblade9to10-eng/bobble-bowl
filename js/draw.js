@@ -176,7 +176,7 @@ function resetGfx() {
 }
 let gfxCheck = 0, fieldBlit = null;
 function drawField(g, G) {
-  tagBoxes.length = 0;
+  tagBoxes.length = 0; labelQ.length = 0; defJobTag = null;
   if (++gfxCheck % 30 === 0 && fieldCv) { const fg = fieldCv.getContext('2d'); if (fg && fg.isContextLost && fg.isContextLost()) resetGfx(); }
   buildField(G);
   // past the edges of the field = more fans (scrolls with the camera)
@@ -388,11 +388,7 @@ function drawDefJob(g, G) {
   else if (a.type === 'rush') { const q = G.O[0]; g.beginPath(); g.moveTo(sx(h.x), sy(h.y)); g.lineTo(sx(q.x), sy(q.y)); g.stroke(); label = 'GET THE QB!'; }
   else { label = 'SPY THE QB'; }
   g.setLineDash([]); g.globalAlpha = 1;
-  if (G.phase === 'presnap') {
-    g.font = 'bold 13px Barlow, Arial, sans-serif'; g.textAlign = 'center'; const w = g.measureText(label).width + 14;
-    g.fillStyle = '#ffe14d'; roundRect(g, sx(h.x) - w / 2, sy(h.y) + 12, w, 20, 10); g.fill();
-    g.fillStyle = '#111'; g.fillText(label, sx(h.x), sy(h.y) + 26);
-  }
+  if (G.phase === 'presnap') defJobTag = { x: sx(h.x), y: sy(h.y) + 22, label }; // (drawn with the name tags, over the players)
   g.restore();
 }
 
@@ -912,67 +908,176 @@ function drawPlayer(g, p, G, at) {
   }
   if (cel) Celly.overlay(g, p, x, y, hop);
   if (p.nerve > 0.3 && typeof drawNerves === 'function') drawNerves(g, p, x, y - hop); // QB feeling the rush
-  // labels
+  // labels: queued here, laid out + drawn over everybody by drawLabels() once all the bodies are down (main.js)
   const headTop = y - hop - (big ? 85 : 92);
   if (at) return;
-  const pk = ptag >= 0 && typeof Pad !== 'undefined' ? Pad.scale(1.6) : 1; // (phones: the field is drawn small, so the square grows)
-  const ptagAt = (tx, ty) => { const c = ptagSprite(ptag); if (c) g.drawImage(c, tx - PTAG_W * pk / 2, ty - 15 * pk, PTAG_W * pk, PTAG_H * pk); };
-  if (G.phase === 'kick' || G.phase === 'kickmeter') { if (ptag >= 0) { g.save(); uiAt(g, x, headTop); ptagAt(x, headTop + 6); g.restore(); } return; }
-  const zs = uiK !== 1; if (zs) { g.save(); uiAt(g, x, headTop); } // (zoomed out: same screen size as normal)
-  const tagBox = b => tagBoxes.push(uiK === 1 ? b : { x0: x + (b.x0 - x) * uiK, x1: x + (b.x1 - x) * uiK, y0: headTop + (b.y0 - headTop) * uiK, y1: headTop + (b.y1 - headTop) * uiK });
-  if (p.xf && p.xf.on && p.down <= 0) { drawXFBadge(g, p, x, headTop - (p.isHuman || carrying ? 44 : 4)); }
-  else if (p.xf && G.phase === 'presnap' && !G.demo && p.down <= 0) drawXFPip(g, p, x + 24, headTop + 30);
-  const showName = !p.celly && p.down <= 0 && tagFor(p, G, carrying);
-  let ly = headTop;
-  if (showName) {
+  if (G.phase === 'kick' || G.phase === 'kickmeter') {
+    if (ptag >= 0) { const pk = typeof Pad !== 'undefined' ? Pad.scale(1.6) : 1; g.save(); uiAt(g, x, headTop); ptagDraw(g, ptag, pk, x, headTop + 6); g.restore(); }
+    return;
+  }
+  if (!(p.xf && p.xf.on) && p.xf && G.phase === 'presnap' && !G.demo && p.down <= 0) { g.save(); uiAt(g, x, headTop); drawXFPip(g, p, x + 24, headTop + 30); g.restore(); }
+  labelQ.push({ p, x, headTop, carrying, ptag, dy: 0 });
+}
+function ptagDraw(g, n, pk, tx, ty) { const c = ptagSprite(n); if (c) g.drawImage(c, tx - PTAG_W * pk / 2, ty - 15 * pk, PTAG_W * pk, PTAG_H * pk); }
+
+// ---- name tags: one layout pass a frame. Most important first (you, the ball carrier, the target, throw icons...);
+// a tag that hits one already placed slides up over it, and a bystander's name that still has no room is dropped (fades out)
+const labelQ = []; let labelFrame = 0, defJobTag = null;
+const tagWs = new Map(); let tagWsFont = '';
+// text widths are cached (a measureText per tag per frame adds up on Chromebooks)
+function tagW(g, t) {
+  const fs = document.fonts ? document.fonts.status : ''; if (fs !== tagWsFont) { tagWs.clear(); tagWsFont = fs; }
+  const k = g.font + '|' + t; let w = tagWs.get(k);
+  if (w == null) { w = g.measureText(t).width; if (tagWs.size > 400) tagWs.clear(); tagWs.set(k, w); }
+  return w;
+}
+function tagPrio(L, G) {
+  const p = L.p, f = G.ball && G.ball.flight;
+  if (p.isHuman || L.ptag >= 0) return 100;
+  if (L.carrying) return 90;
+  if (f && f.intended === p && !f.pitch && !f.kick) return 80;
+  if (p.throwKey) return G.aim && G.aim.target === p ? 75 : 60;
+  if (p.cap) return 55;
+  if (p.xf && p.xf.on) return 50;
+  if (L.hot || L.glyph) return 45;
+  if (p === G.lastTackler) return 40;
+  return p.side === G.poss ? 12 : 10;
+}
+// what this player's stack holds + its box around (x, headTop), unscaled (same spots drawTagStack uses)
+function tagMeasure(g, L, G) {
+  const p = L.p, ptag = L.ptag, pre = G.phase === 'presnap';
+  const pk = L.pk = ptag >= 0 && typeof Pad !== 'undefined' ? Pad.scale(1.6) / L.k : 1; // (phones: the P1 / P2 square is already grown)
+  let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9, ly = 0;
+  const add = (a, b, c, d) => { if (a < x0) x0 = a; if (b > x1) x1 = b; if (c < y0) y0 = c; if (d > y1) y1 = d; };
+  if (p.xf && p.xf.on && p.down <= 0) { const by = -(p.isHuman || L.carrying ? 44 : 4); add(-12, 12, by - 12, by + 12); }
+  L.name = null;
+  if (!p.celly && p.down <= 0 && tagFor(p, G, L.carrying)) {
+    L.full = p.isHuman || L.carrying;
+    L.name = L.full ? p.name : lastName(p.name) + (p.tw2 && pre ? '  ·  2-WAY' : '');
+    g.font = 'bold 13px Barlow, Arial, sans-serif'; L.w = tagW(g, L.name) + 14; L.pt = ptag >= 0 ? Math.round(28 * pk) : 0;
+    add(-L.w / 2 - L.pt - (p.xf && p.xf.on ? 24 : 0), L.w / 2, L.full ? -24 : -10, 10);
+    ly -= 30;
+  } else if (ptag >= 0) { add(-14 * pk, 14 * pk, -11 * pk, 12 * pk); ly -= 28 * pk; }
+  L.hot = p.hot && pre ? p.hot : null;
+  if (L.hot) { g.font = 'bold 11px Barlow, Arial, sans-serif'; L.hw = tagW(g, L.hot) + 12; add(-L.hw / 2, L.hw / 2, ly - 8, ly + 8); ly -= 22; }
+  L.glyph = !!(typeof Pad !== 'undefined' && Pad.hotShow && pre && p.side === G.poss && p.slot >= 1 && p.slot <= 4 && G.O && G.O.includes(p));
+  if (L.glyph) { add(-14, 14, ly - 14, ly + 14); ly -= 30; }
+  if (p.throwKey) { const r = G.aim && G.aim.target === p ? 17 : 14; add(-r - 2, r + 2, ly - r - 2, ly + r + (p.openness != null ? 10 : 2)); }
+  L.box = x0 < x1 ? { x0, x1, y0, y1 } : null;
+}
+// a screen box (HUD units) in this canvas' units (zoomed-out camera / celly cam)
+function scrBox(g, x0, y0, x1, y1) {
+  const m = g.getTransform(); if (!m.a || !m.d) return null;
+  return { x0: (x0 * RS - m.e) / m.a, x1: (x1 * RS - m.e) / m.a, y0: (y0 * RS - m.f) / m.d, y1: (y1 * RS - m.f) / m.d };
+}
+// the big banner (TOUCHDOWN!, FIRST DOWN!...): tags + floating words under it fade so both stay readable
+function bannerBox(g) {
+  const b = G.banner; if (!b || b.t >= b.dur || typeof scrW === 'undefined') return null;
+  const W = Math.max(b.w || 640, b.sw || 0) * 0.6 + 16, cx = scrW / 2, cy = scrH / 2 - 70;
+  return scrBox(g, cx - W, cy - 64, cx + W, cy + (b.sub ? 88 : 60));
+}
+const boxHit = (a, b) => a.x1 > b.x0 && a.x0 < b.x1 && a.y1 > b.y0 && a.y0 < b.y1;
+function drawLabels(g, G) {
+  const Q = labelQ, J = defJobTag; if (!Q.length && !J) return;
+  const fr = ++labelFrame, K = typeof Pad !== 'undefined' ? Pad.scale(1.3) : 1, s = uiK * K, bn = bannerBox(g); // (phones: the field is drawn small, so tags grow a bit)
+  const placed = [];
+  // the scorebug (+ play clock) and the ticker cover the top of the screen: tags can't go under them
+  if (typeof scrW !== 'undefined' && !G.mini) {
+    const hb = scrBox(g, scrW / 2 - 370, 0, scrW / 2 + 370, G.playClock > 0 && (G.phase === 'presnap' || G.phase === 'playcall') ? 92 : 58);
+    if (hb) placed.push(hb);
+    const T = typeof tickFit !== 'undefined' && tickFit.box && Math.abs(G.time - tickFit.at) < 0.2 ? tickFit.box : null, tb = T && scrBox(g, T.x0, T.y0, T.x1, T.y1);
+    if (tb) placed.push(tb);
+  }
+  const fixed = placed.length;
+  if (J) { // on defense: your job, under your player's feet
+    g.font = 'bold 13px Barlow, Arial, sans-serif'; const w = (tagW(g, J.label) + 14) * s;
+    placed.push({ x0: J.x - w / 2, x1: J.x + w / 2, y0: J.y - 10 * s, y1: J.y + 10 * s }); J.w = w / s;
+  }
+  for (const L of Q) { L.k = K; tagMeasure(g, L, G); L.pr = tagPrio(L, G); L.need = L.pr >= 45; if (L.p._tF === fr - 1 && L.p._tA > 0.5) L.pr += 5; } // (+5: shown last frame keeps its spot, no flicker)
+  Q.sort((a, b) => b.pr - a.pr || b.headTop - a.headTop);
+  for (const L of Q) {
+    const b = L.box; L.show = false; if (!b) continue;
+    const X0 = L.x + b.x0 * s, X1 = L.x + b.x1 * s, Y0 = L.headTop + b.y0 * s, Y1 = L.headTop + b.y1 * s;
+    let dy = 0, ok = false;
+    for (let k = 0; k < 6; k++) {
+      const o = placed.find(o => X1 > o.x0 && X0 < o.x1 && Y1 + dy > o.y0 && Y0 + dy < o.y1);
+      if (!o) { ok = true; break; }
+      dy = o.y0 - Y1 - 2; if (dy < -26 * s) break; // (a short slide only: no towers of names)
+    }
+    if (!ok) { if (!L.need) continue; dy = 0; } // (no room: a key player's tag stays put, on top)
+    L.show = true; L.dy = dy; placed.push({ x0: X0, x1: X1, y0: Y0 + dy, y1: Y1 + dy });
+  }
+  // least important first, so the ones that matter sit on top
+  for (let i = Q.length - 1; i >= 0; i--) {
+    const L = Q[i], p = L.p;
+    if (p._tF !== fr - 1) { p._tA = 0; p._tDy = L.dy; } // wasn't up last frame: start fresh
+    p._tF = fr;
+    if (L.show) { p._tDy = Math.abs(p._tDy - L.dy) < 0.5 ? L.dy : lerp(p._tDy, L.dy, 0.3); p._tA = L.need ? 1 : Math.min(1, p._tA + 0.2); }
+    else p._tA = Math.max(0, p._tA - 0.2);
+    if (p._tA <= 0.01 || !L.box) continue;
+    const hy = L.headTop + p._tDy, b = L.box, bx = { x0: L.x + b.x0 * s, x1: L.x + b.x1 * s, y0: hy + b.y0 * s, y1: hy + b.y1 * s };
+    g.save(); g.globalAlpha = p._tA * (bn && boxHit(bx, bn) ? 0.22 : 1);
+    g.translate(L.x, hy); if (s !== 1) g.scale(s, s);
+    drawTagStack(g, L, G);
+    g.restore();
+    if (L.show) tagBoxes.push(bx);
+  }
+  if (J) {
+    g.save(); g.translate(J.x, J.y); if (s !== 1) g.scale(s, s);
     g.font = 'bold 13px Barlow, Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-    const full = p.isHuman || carrying, label = full ? `${p.name}` : lastName(p.name) + (p.tw2 && G.phase === 'presnap' ? '  ·  2-WAY' : '');
-    const w = g.measureText(label).width + 14;
-    const you = p.isHuman && ptag < 0, pt = ptag >= 0 ? Math.round(28 * pk) : 0; // (2 people: dark tag with a red / blue edge, the P1 / P2 square on its left)
-    g.fillStyle = you ? '#ffe14d' : '#000000c0'; roundRect(g, x - w / 2, ly - 10, w, 20, 10); g.fill();
+    g.fillStyle = '#ffe14d'; roundRect(g, -J.w / 2, -10, J.w, 20, 10); g.fill();
+    g.fillStyle = '#111'; g.fillText(J.label, 0, 1);
+    g.restore(); tagBoxes.push(placed[fixed]);
+  }
+  Q.length = 0; defJobTag = null;
+}
+// one player's labels, drawn around (0, 0) = the top of his head (already moved + scaled by drawLabels)
+function drawTagStack(g, L, G) {
+  const p = L.p, ptag = L.ptag, pk = L.pk;
+  if (p.xf && p.xf.on && p.down <= 0) drawXFBadge(g, p, 0, -(p.isHuman || L.carrying ? 44 : 4));
+  let ly = 0;
+  if (L.name) {
+    g.font = 'bold 13px Barlow, Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    const w = L.w, full = L.full, you = p.isHuman && ptag < 0, pt = L.pt; // (2 people: dark tag with a red / blue edge, the P1 / P2 square on its left)
+    g.fillStyle = you ? '#ffe14d' : '#000000c0'; roundRect(g, -w / 2, ly - 10, w, 20, 10); g.fill();
     if (p.cap || pt) { g.strokeStyle = pt ? (ptagSpooky() ? (ptag ? '#7a5cff' : '#d01a28') : ptag ? '#4d8cff' : '#ff4a50') : '#f6c31c'; g.lineWidth = 2; g.stroke(); }
-    g.fillStyle = you ? '#111' : '#fff'; g.fillText(label, x, ly + 1);
-    if (full) { g.font = 'bold 10px Barlow, Arial, sans-serif'; g.fillStyle = '#fff'; g.strokeStyle = '#000'; g.lineWidth = 3; const r = `${p.tw2 ? '2-WAY ' : ''}${p.pos} • ${p.ovr} OVR`; g.strokeText(r, x, ly - 17); g.fillText(r, x, ly - 17); }
-    if (pt) ptagAt(x - w / 2 - pt / 2 + 1, ly);
-    if (p.xf && p.xf.on) drawXFBadge(g, p, x - w / 2 - 12 - pt, ly); // X-Factor badge sits next to his name
-    tagBox({ x0: x - w / 2 - pt - (p.xf && p.xf.on ? 24 : 0), x1: x + w / 2, y0: ly - (full ? 24 : 10), y1: ly + 10 });
+    g.fillStyle = you ? '#111' : '#fff'; g.fillText(L.name, 0, ly + 1);
+    if (full) { g.font = 'bold 10px Barlow, Arial, sans-serif'; g.fillStyle = '#fff'; g.strokeStyle = '#000'; g.lineWidth = 3; const r = `${p.tw2 ? '2-WAY ' : ''}${p.pos} • ${p.ovr} OVR`; g.strokeText(r, 0, ly - 17); g.fillText(r, 0, ly - 17); }
+    if (pt) ptagDraw(g, ptag, pk, -w / 2 - pt / 2 + 1, ly);
+    if (p.xf && p.xf.on) drawXFBadge(g, p, -w / 2 - 12 - pt, ly); // X-Factor badge sits next to his name
     ly -= 30;
   } else if (ptag >= 0) { // no name over him (down, celebrating, tags off): just the square
-    ptagAt(x, ly); tagBox({ x0: x - 14 * pk, x1: x + 14 * pk, y0: ly - 11 * pk, y1: ly + 12 * pk });
-    ly -= 28 * pk;
-  } else if (p.xf && p.xf.on && p.down <= 0) drawXFBadge(g, p, x, headTop - 4);
-  if (p.hot && G.phase === 'presnap') {
-    g.font = 'bold 11px Barlow, Arial, sans-serif'; g.textAlign = 'center'; const w = g.measureText(p.hot).width + 12;
-    g.fillStyle = '#ffe14d'; roundRect(g, x - w / 2, ly - 8, w, 16, 8); g.fill(); g.fillStyle = '#111'; g.fillText(p.hot, x, ly + 4);
-    tagBox({ x0: x - w / 2, x1: x + w / 2, y0: ly - 8, y1: ly + 8 }); ly -= 22;
+    ptagDraw(g, ptag, pk, 0, ly); ly -= 28 * pk;
+  }
+  if (L.hot) {
+    g.font = 'bold 11px Barlow, Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; const w = L.hw;
+    g.fillStyle = '#ffe14d'; roundRect(g, -w / 2, ly - 8, w, 16, 8); g.fill(); g.fillStyle = '#111'; g.fillText(L.hot, 0, ly + 1);
+    ly -= 22;
   }
   // controller: holding LB before the snap shows which button hot-routes each receiver
-  if (Pad.hotShow && G.phase === 'presnap' && p.side === G.poss && p.slot >= 1 && p.slot <= 4 && G.O && G.O.includes(p)) { Pad.drawGlyph(g, p.slot === 1 ? 3 : p.slot - 2, x, ly, 13); ly -= 30; }
+  if (L.glyph) { Pad.drawGlyph(g, p.slot === 1 ? 3 : p.slot - 2, 0, ly, 13); ly -= 30; }
   if (p.throwKey) {
     const col = ['#2f7bff', '#ff3b3b', '#2fd06b', '#ffb02e'][p.throwKey - 1];
     const tgt = G.aim && G.aim.target === p;
     const r = tgt ? 17 : 14;
-    tagBox({ x0: x - r - 2, x1: x + r + 2, y0: ly - r - 2, y1: ly + r + (p.openness != null ? 10 : 2) });
     if (Pad.ui) { // controller: the face button that throws to him
-      if (tgt) { g.strokeStyle = '#ffe14d'; g.lineWidth = 3; g.beginPath(); g.arc(x, ly, r + 3, 0, 7); g.stroke(); }
-      Pad.drawGlyph(g, p.throwKey - 1, x, ly, (r + 1) * Pad.scale(1.35));
+      if (tgt) { g.strokeStyle = '#ffe14d'; g.lineWidth = 3; g.beginPath(); g.arc(0, ly, r + 3, 0, 7); g.stroke(); }
+      Pad.drawGlyph(g, p.throwKey - 1, 0, ly, (r + 1) * Pad.scale(1.35) / L.k);
     } else {
     g.fillStyle = col; g.strokeStyle = tgt ? '#ffe14d' : '#fff'; g.lineWidth = tgt ? 4 : 2.5;
-    g.beginPath(); g.arc(x, ly, r, 0, 7); g.fill(); g.stroke();
+    g.beginPath(); g.arc(0, ly, r, 0, 7); g.fill(); g.stroke();
     g.fillStyle = '#fff'; g.font = '900 16px "Barlow Condensed", "Arial Black", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-    if (G.mode === 'mobile') { g.beginPath(); g.moveTo(x, ly - 7); g.lineTo(x + 7, ly + 6); g.lineTo(x - 7, ly + 6); g.closePath(); g.fill(); }
-    else g.fillText(p.throwKey, x, ly + 1);
+    if (G.mode === 'mobile') { g.beginPath(); g.moveTo(0, ly - 7); g.lineTo(7, ly + 6); g.lineTo(-7, ly + 6); g.closePath(); g.fill(); }
+    else g.fillText(p.throwKey, 0, ly + 1);
     }
     if (p.openness != null) {
       const o = clamp(p.openness / 5, 0.12, 1);
-      g.fillStyle = '#000a'; g.fillRect(x - 16, ly + r + 3, 32, 6);
+      g.fillStyle = '#000a'; g.fillRect(-16, ly + r + 3, 32, 6);
       g.fillStyle = p.openness > 3 ? '#2fd06b' : p.openness > 1.6 ? '#ffd23f' : '#ff4040';
-      g.fillRect(x - 15, ly + r + 4, 30 * o, 4);
+      g.fillRect(-15, ly + r + 4, 30 * o, 4);
     }
   }
-  if (zs) g.restore();
 }
-
 // NAME TAGS: who gets a name over his head. KEY PLAYERS = the ball carrier, the guy the pass is going to, the player you control,
 // your career player, X-Factors in the zone, two-way players before the snap, and the tackler for a moment after the whistle
 function tagFor(p, G, carrying) {
@@ -1245,6 +1350,7 @@ function roundRect(g, x, y, w, h, r) {
 
 // ---- particles & floating text ----
 function drawFx(g, G) {
+  let K = null, bn = null;
   for (const f of G.fx) {
     const a = clamp(f.life / f.max, 0, 1);
     if (f.kind === 'dust') { g.fillStyle = G.weather === 'snow' ? `rgba(246,250,255,${a * 0.85})` : G.weather === 'rain' ? `rgba(185,205,225,${a * 0.7})` : `rgba(225,215,180,${a * 0.6})`; g.beginPath(); g.arc(sx(f.x), sy(f.y) - f.z, f.r * (2 - a), 0, 7); g.fill(); }
@@ -1262,17 +1368,20 @@ function drawFx(g, G) {
     else if (f.kind === 'zzz') { g.globalAlpha = a; g.fillStyle = '#cfe3ff'; g.font = `italic 900 ${16 + (1 - a) * 14}px "Barlow Condensed", Arial, sans-serif`; g.textAlign = 'center'; g.fillText('Z', sx(f.x) + (1 - a) * 18 * (f.dx || 1), sy(f.y) - f.z - 20); g.globalAlpha = 1; }
     else if (f.kind === 'confetti') { g.fillStyle = f.color; g.globalAlpha = a; g.fillRect(f.px * vk / viewZ, f.py * vk / viewZ, 6, 9); g.globalAlpha = 1; } // (screen spots: spread over the bigger zoomed-out picture)
     else if (f.kind === 'text') {
-      const pop = Math.min(1, (f.max - f.life) * 8);
-      g.font = `900 ${f.size || 20}px "Barlow Condensed", "Arial Black", sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
+      const pop = Math.min(1, (f.max - f.life) * 8), fs = f.size || 20;
+      if (K == null) { K = typeof Pad !== 'undefined' ? Pad.scale(1.3) : 1; bn = bannerBox(g); } // (phones: a bit bigger, like the name tags)
+      g.font = `900 ${fs}px "Barlow Condensed", "Arial Black", sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
       // keep floating words off the name tags / throw icons and off each other: nudge up until it's clear (smoothed so it doesn't jump)
-      const X = sx(f.x), Y0 = sy(f.y) - 78 - f.z, hw = (g.measureText(f.text).width / 2 + 4) * uiK, hh = ((f.size || 20) / 2 + 3) * uiK;
+      const k = uiK * K, X = sx(f.x), Y0 = sy(f.y) - 78 - f.z, hw = (tagW(g, f.text) / 2 + 4) * k, hh = (fs / 2 + 3) * k;
       let Y = Y0;
       for (let k = 0; k < 8; k++) { const b = tagBoxes.find(b => X + hw > b.x0 && X - hw < b.x1 && Y + hh > b.y0 && Y - hh < b.y1); if (!b) break; Y = b.y0 - hh - 2; }
       f.lift = f.lift == null ? Y0 - Y : lerp(f.lift, Y0 - Y, 0.3);
-      const ty = Y0 - f.lift; tagBoxes.push({ x0: X - hw, x1: X + hw, y0: ty - hh, y1: ty + hh });
+      const ty = Y0 - f.lift, box = { x0: X - hw, x1: X + hw, y0: ty - hh, y1: ty + hh }; tagBoxes.push(box);
       g.save(); g.translate(X, ty);
-      g.scale((0.5 + pop * 0.5) * uiK, (0.5 + pop * 0.5) * uiK);
-      g.globalAlpha = a; g.lineWidth = 6; g.strokeStyle = '#000'; g.strokeText(f.text, 0, 0); g.fillStyle = f.color || '#fff'; g.fillText(f.text, 0, 0);
+      g.scale((0.5 + pop * 0.5) * k, (0.5 + pop * 0.5) * k);
+      // solid most of its life, then fades out (a word that fades the whole way is see-through and hard to read)
+      g.globalAlpha = clamp(f.life / (f.max * 0.35), 0, 1) * (bn && boxHit(box, bn) ? 0.22 : 1);
+      g.lineJoin = 'round'; g.lineWidth = 6; g.strokeStyle = '#000'; g.strokeText(f.text, 0, 0); g.fillStyle = f.color || '#fff'; g.fillText(f.text, 0, 0);
       g.restore(); g.globalAlpha = 1;
     }
   }
@@ -1284,6 +1393,7 @@ function drawBanner(g, G) {
   const fade = Math.min(1, (b.dur - t) * 4);
   g.save(); g.globalAlpha = fade; g.translate(CW / 2, CH / 2 - 70); g.scale(pop, pop); g.rotate(-0.03);
   g.font = 'italic 900 100px "Barlow Condensed", "Arial Black", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  if (b.w == null) { b.w = g.measureText(b.text).width; if (b.sub) { g.font = 'bold 28px Barlow, Arial, sans-serif'; b.sw = g.measureText(b.sub).width; g.font = 'italic 900 100px "Barlow Condensed", "Arial Black", sans-serif'; } } // (bannerBox: tags under it fade)
   g.lineWidth = 16; g.strokeStyle = '#000'; g.lineJoin = 'round'; g.strokeText(b.text, 0, 0);
   const gr = g.createLinearGradient(0, -40, 0, 40); gr.addColorStop(0, '#fff'); gr.addColorStop(0.5, b.color || '#ffd23f'); gr.addColorStop(1, shade(b.color || '#ffd23f', -0.3));
   g.fillStyle = gr; g.fillText(b.text, 0, 0);

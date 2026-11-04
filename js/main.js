@@ -1045,6 +1045,7 @@ function renderFrame(z) {
     safeDraw('lines', () => { drawLines(ctx, G); drawRoutes(ctx, G); });
     const ps = G.players.concat(G.refs || []).sort((a, b) => a.y - b.y);
     for (const p of ps) safeDraw('player', () => p.slot === undefined ? drawRef(ctx, p, G) : drawPlayer(ctx, p, G));
+    safeDraw('tags', () => drawLabels(ctx, G)); // name tags over everybody (draw.js layout pass)
     if (G.mini) safeDraw('mini', () => drawMini(ctx, G));
     safeDraw('ball', () => { if (G.ball) drawBallFree(ctx, G); drawAim(ctx, G); drawMeter(ctx, G); drawFlightMeter(ctx, G); });
     safeDraw('fx', () => { drawFx(ctx, G); drawWeather(ctx, G); });
