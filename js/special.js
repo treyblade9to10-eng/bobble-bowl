@@ -89,8 +89,9 @@ function launchReturnKick() {
     f.tx = b.x + dk * dist; f.ty = clamp(MID + km.aim * 20, 3, FIELD_W - 3); f.T = 2.5; f.peak = 13;
     f.touchback = dirOf(r) * (ownGoal(r) - f.tx) > 4; // deep in the end zone
   } else if (km.kind === 'onside') {
-    const dist = 9 + km.power * 7;
-    f.tx = b.x + dk * dist; f.ty = clamp(MID + km.aim * 18, 2, FIELD_W - 2); f.T = 0.85; f.peak = 1.2; f.onside = true;
+    const dist = 10.5 + km.power * 6; // it has to go 10 yards
+    f.tx = b.x + dk * dist; f.ty = clamp(MID + km.aim * 16, 5, FIELD_W - 5); f.T = 0.85; f.peak = 1.2; f.onside = true; f.spot = b.x;
+    f.hop = clamp(1 - Math.abs(km.power - 0.4) * 2.2, 0, 1); // a well-hit one (about 40% power) takes the big hop
   } else { // punt
     let dist = 30 + km.power * (18 + (km.kk.kp - 60) * 0.35);
     f.shank = Math.abs(km.aim) > 0.75; if (f.shank) dist *= 0.55;
@@ -118,7 +119,11 @@ function catchKick(f) {
   G.showTarget = false;
   if (f.oob) return endPlay({ type: 'kickdead', x: clamp(f.tx, 11, 109), why: 'OUT OF BOUNDS' });
   if (f.touchback) return endPlay({ type: 'kickdead', tb: true });
-  if (f.onside) { b.loose = { vx: dirOf(k) * 3, vy: rand(-2, 2), t: 0 }; b.x = f.tx; b.y = f.ty; G.bstate = 'loose'; return; }
+  if (f.onside) { // it hits the turf and takes crazy hops: a scramble (blkBounce). The kicking team can only touch it past 10 yards
+    b.x = f.tx; b.y = f.ty; b.z = 0.8; G.bstate = 'loose';
+    b.loose = { vx: dirOf(k) * rand(2, 4.5), vy: rand(-3, 3), vz: rand(2.6, 3.8), q: f.hop, t: 0, blk: true, onside: true, spot: f.spot, kside: k };
+    return;
+  }
   // closest return man grabs it
   let rt = null, rd = 99;
   for (const p of G.O) { const d = Math.hypot(p.x - f.tx, p.y - f.ty); if (d < rd && p.down <= 0) { rd = d; rt = p; } }
@@ -457,8 +462,12 @@ function blkBounce(dt) {
   if (l.t < 0.3 || b.z > 0.8) return;
   for (const p of G.players) {
     if (p.down > 0 || p.stun > 0 || (p.scoopT || 0) > G.play.t || dist(p, b) > (p.dive > 0 ? 1.3 : 0.9)) continue;
+    if (l.onside && p.side === l.kside && !l.rTouch && dirOf(l.kside) * (b.x - l.spot) < 10) continue; // not 10 yards yet: the kicking team can't touch it
+    if (l.onside && p.side !== l.kside) l.rTouch = true;
     const sp = Math.hypot(l.vx, l.vy) + Math.abs(l.vz) * 0.4;
-    if (chance(clamp(0.68 - sp * 0.06 - b.z * 0.35 - (p.speedNow || 0) * 0.02 + (rat(p, 'CTH') - 70) / 300, 0.2, 0.85))) return blkTouch(p); // a bouncing ball at a dead sprint is hard to pick up
+    // onside: a well-hit one (q = how good the kick was) is tough to field and kind to the guys running onto it
+    const om = !l.onside ? 1 : p.side === l.kside ? 0.2 + l.q * 0.7 : 1.3 - l.q * 0.45;
+    if (chance(clamp((0.68 - sp * 0.06 - b.z * 0.35 - (p.speedNow || 0) * 0.02 + (rat(p, 'CTH') - 70) / 300) * om, 0.08, 0.85))) return l.onside ? onsideTouch(p) : blkTouch(p); // a bouncing ball at a dead sprint is hard to pick up
     p.scoopT = G.play.t + 0.45; // it squirts right off his hands
     const a = rand(0, Math.PI * 2), k = rand(2, 5);
     l.vx = l.vx * 0.3 + Math.cos(a) * k + (p.vx || 0) * 0.3; l.vy = l.vy * 0.3 + Math.sin(a) * k + (p.vy || 0) * 0.3; l.vz = rand(1.5, 3.5);
@@ -468,6 +477,11 @@ function blkBounce(dt) {
 }
 // somebody comes up with a blocked kick: the defense can always scoop and score. The kicking team can pick it up and run
 // with it behind the line (short of the line to gain on 4th down = turnover on downs); past the line it's dead (defense ball).
+// somebody comes up with the onside kick
+function onsideTouch(p) {
+  const b = G.ball; b.loose = null; b.holder = p; b.fumbler = null; Sound.catch();
+  endPlay({ type: 'fumble', carrier: p, x: p.x, y: p.y });
+}
 function blkTouch(p) {
   if (p.side !== G.blk.side) return fgScoop(p);
   const b = G.ball, d = dirOf(G.blk.side);
