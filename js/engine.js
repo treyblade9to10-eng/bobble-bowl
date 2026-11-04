@@ -82,7 +82,7 @@ function newGame(home, away, opts) {
 }
 function initGame(home, away, opts) {
   Object.assign(G, {
-    tend: null, trickUsed: null, trickSeen: null, prevClock: null, rivalry: null, wind: null, teams: [home, away], human: opts.humanSide || 0, diff: opts.diff, flags: [], playClock: 0, playoff: !!opts.playoff, qtrLen: opts.qtr, score: [0, 0], quarter: 1, clock: opts.qtr,
+    tend: null, ot: null, trickUsed: null, trickSeen: null, prevClock: null, rivalry: null, wind: null, teams: [home, away], human: opts.humanSide || 0, diff: opts.diff, flags: [], playClock: 0, playoff: !!opts.playoff, qtrLen: opts.qtr, score: [0, 0], quarter: 1, clock: opts.qtr,
     fx: [], banner: null, players: [], ball: null, patSide: null, twoPt: false, next: null, firstPoss: 1, paused: false,
     pstats: {}, tstats: [{ pass: 0, rush: 0, to: 0 }, { pass: 0, rush: 0, to: 0 }], twFat: {},
     timeouts: [3, 3], special: null, pendingRunoff: 0, twoMinQ: 0, twoMinAfterPlay: false, runFrom: 0, mini: null, scenario: opts.scenario || null,
@@ -123,6 +123,7 @@ function stat(p) {
 
 // ---------------- play calling ----------------
 function toPlayCall() {
+  if (G.ot && G.patSide == null && OT.poss(G.poss)) return;
   G.phase = 'playcall'; G.sitOut = false; G.coachCallName = null; G.coachTok = null;
   G.ball = null;
   G.flags = [];
@@ -2570,6 +2571,7 @@ function endPlay(res) {
     showBanner('INCOMPLETE', G.flagNote || '', '#ffffff', 0.9);
     next = advanceDown(G.los, false);
   } else if (cs !== off) { // takeaway
+    if (G.ot) OT.ended(off); // OT: a turnover ends his possession (a pick-six on the first one wins it)
     const cd = dirOf(cs);
     if (cd * (x - ownGoal(cs)) <= 0) { x = ownGoal(cs) + cd * 20; addText(x, MID, 'TOUCHBACK', '#fff', 18, 1.2); }
     if (res.type !== 'fumble') showBanner('TURNOVER!', `${G.teams[cs].name} ball`, '#ff9a3d', 1.4);
@@ -2618,8 +2620,8 @@ function afterPlay() {
   if (G.practice && typeof Practice !== 'undefined') return Practice.afterPlay(n); // practice: back to the same spot
   if (G.twoMinAfterPlay) { G.pendingRunoff = 0; if (G.quarter === G.twoMinQ || G.clock <= 0) G.twoMinAfterPlay = false; else twoMinWarning(); }
   if (G.mini && typeof miniAfterPlay === 'function') return miniAfterPlay();
-  // overtime is sudden death
-  if (G.quarter >= 5 && G.score[0] !== G.score[1]) return gameOver();
+  // overtime: sudden death (regular games) or NFL playoff rules (online + playoffs: both teams get the ball, no ties)
+  if (G.quarter >= 5 && G.score[0] !== G.score[1] && (!G.ot || OT.decided(n))) return gameOver();
   if (n && n.pat != null) { G.patSide = n.pat; G.poss = n.pat; G.los = goalX(n.pat) - dirOf(n.pat) * 3; G.ballY = MID; return toPlayCall(); }
   if (G.clock <= 0 && G.quarter > 0 && endQuarter()) return;
   if (n && n.kickoff != null) return startKickoff(n.kickoff, n.from || 35);
@@ -2640,10 +2642,16 @@ function endQuarter() {
     if (G.hooks.onHalftime) G.hooks.onHalftime();
     return true;
   } else if (G.quarter >= 4) {
+    if (G.ot && G.quarter >= 5 && !OT.decided(G.next)) { // playoff rules: no ties. Next OT period, same drive keeps going (new timeouts every 2 periods)
+      G.quarter++; G.clock = G.qtrLen; if (G.quarter % 2 === 1) G.timeouts = [2, 2];
+      showBanner(`END OF ${G.quarter - 5 === 1 ? '' : ordinal(G.quarter - 5).toUpperCase() + ' '}OVERTIME`, OT.sub(), '#ffd23f', 2);
+      return false;
+    }
     if ((G.quarter === 4 || G.playoff) && G.score[0] === G.score[1]) {
       G.quarter = Math.max(5, G.quarter + 1); G.clock = G.qtrLen; G.timeouts = [2, 2];
       const s = chance(0.5) ? 0 : 1;
-      showBanner('OVERTIME!', `Next score wins • ${G.teams[s].name} get the ball`, '#ffd23f', 2.5);
+      G.ot = OT.playoffRules() ? { had: [false, false], last: null } : null;
+      showBanner('OVERTIME!', `${G.ot ? 'Both teams get the ball' : 'Next score wins'} • ${G.teams[s].name} get the ball`, '#ffd23f', 2.5);
       startKickoff(1 - s);
       return true;
     } else { gameOver(); return true; }
@@ -2653,6 +2661,37 @@ function endQuarter() {
   }
   return false;
 }
+
+// ---- NFL playoff overtime (online games + playoffs) ----
+// Both teams get a possession, even if the first one scores a TD. A defensive score (safety / pick-six) on the first one ends it.
+// Once both have had the ball, next score wins. Periods keep coming until somebody wins: no ties.
+const OT = {
+  playoffRules: () => !!(G.online || G.playoff) && !G.mini && !G.practice,
+  // a possession is over when the ball goes to the other team (or he kicks off after scoring)
+  ended(side) { if (G.ot && side != null && side >= 0) G.ot.had[side] = true; },
+  // new offense on the field: the last one's possession is over. Returns true if that ended the game
+  poss(side) {
+    const o = G.ot; if (!o) return false;
+    if (o.last != null && o.last !== side) this.ended(o.last);
+    o.last = side;
+    if (G.score[0] !== G.score[1] && this.decided(null)) { G.phase = 'dead'; gameOver(); return true; }
+    return false;
+  },
+  // is it over? the team behind has had its shot (n = what happens next: a try after a TD isn't over yet)
+  decided(n) {
+    if (!G.ot) return true;
+    if (G.score[0] === G.score[1]) return false;
+    const pat = n && n.pat != null ? n.pat : G.patSide;
+    if (pat != null && G.score[pat] <= G.score[1 - pat]) return false; // the try after a TD can still change it
+    const behind = G.score[0] < G.score[1] ? 0 : 1;
+    return G.ot.had[behind];
+  },
+  sub() {
+    const o = G.ot; if (!o) return 'Next score wins';
+    if (o.had[0] && o.had[1]) return 'Next score wins';
+    return 'Both teams get the ball';
+  }
+};
 
 function gameOver() {
   G.phase = 'over';

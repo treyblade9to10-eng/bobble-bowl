@@ -4,6 +4,7 @@
 // Kicking team = its defense players (coverage team). Receiving team = its offense players (return team).
 // During a return the receiving team is G.poss, so the normal "run" logic (blocking / tackling) just works.
 function startKickoff(k, from = 35) {
+  if (G.ot && G.ot.last != null) { OT.ended(G.ot.last); G.ot.last = null; if (OT.decided(null) && G.score[0] !== G.score[1]) { G.phase = 'dead'; return gameOver(); } } // a kickoff (after a score / a safety): whoever had the ball, that possession is over
   G.sitOut = false;
   G.special = null; G.patSide = null; G.twoPt = false;
   G.kickoffSide = k; G.kickFrom = from; G.poss = 1 - k;

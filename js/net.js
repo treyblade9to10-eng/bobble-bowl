@@ -621,7 +621,7 @@ const Net = {
     const idx = p => p ? P.indexOf(p) : -1, b = G.ball;
     const r2 = v => Math.round(v * 100) / 100;
     const s = {
-      t: 's', n: ++this.seq, tm: r2(performance.now() / 10) / 100, ph: G.phase, sc: G.score, q: G.quarter, cl: r2(G.clock), dn: G.down, los: G.los, fdx: G.firstDownX, gtg: G.goalToGo, by: G.ballY, poss: G.poss,
+      t: 's', n: ++this.seq, tm: r2(performance.now() / 10) / 100, ph: G.phase, sc: G.score, q: G.quarter, ot: G.ot, cl: r2(G.clock), dn: G.down, los: G.los, fdx: G.firstDownX, gtg: G.goalToGo, by: G.ballY, poss: G.poss,
       to: G.timeouts, pr: G.pendingRunoff > 0 ? 1 : 0, pc: r2(G.playClock), sp: G.special, pat: G.patSide, two: G.twoPt, bs: G.bstate, kp: G.koPending, ks: G.kickoffSide, st: G.showTarget,
       ok: G.play && G.play.off && G.play.off.key, dk: G.play && G.play.def && G.play.def.key, fm: G.play && G.play.form && G.play.form.name, pt: G.play && r2(G.play.t),
       ps: P.map(p => PSTAT.map(k => typeof p[k] === 'number' ? Math.round(p[k] * 100) / 100 : 0).concat([p.face.dir, p.engaged ? 1 : 0, p.isHuman ? 1 : 0, p.mouth || '',
@@ -736,7 +736,7 @@ const Net = {
     this.buf.push({ tm: s.tm, p: s.ps.map(a => [a[0], a[1], a[2], a[3]]), b: s.b ? [s.b[0], s.b[1], s.b[2], s.b[4], s.b[5] ? s.b[5][4] : null] : null, rf: s.rf.map(r => [r[0], r[1]]) });
     if (this.buf.length > 20) this.buf.shift();
     const P = G.players, relay = this.onRelay;
-    Object.assign(G, { phase: s.ph === 'replay' ? 'dead' : s.ph, score: s.sc, quarter: s.q, clock: s.cl, down: s.dn, los: s.los, firstDownX: s.fdx, goalToGo: s.gtg, ballY: s.by, poss: s.poss,
+    Object.assign(G, { phase: s.ph === 'replay' ? 'dead' : s.ph, score: s.sc, quarter: s.q, ot: s.ot || null, clock: s.cl, down: s.dn, los: s.los, firstDownX: s.fdx, goalToGo: s.gtg, ballY: s.by, poss: s.poss,
       timeouts: s.to, pendingRunoff: s.pr, playClock: s.pc, special: s.sp, patSide: s.pat, twoPt: s.two, bstate: s.bs, koPending: s.kp, kickoffSide: s.ks, showTarget: s.st, aim: s.aim,
       crowdHype: s.hy, km: s.km, meterV: s.mv || null, catchV: s.cv != null ? s.cv : null, catchG: s.cgw || null, flags: new Array(s.flg).fill({}),
       mo: s.mo || 0, rvWin: s.cw ? { side: s.cw[0], t: s.cw[1] } : null, chalLeft: s.chl || [2, 2], rvShow: s.rvs || null });

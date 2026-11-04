@@ -1299,7 +1299,7 @@ function crunchText(G) {
   const q = G.quarter, c = Math.max(0, Math.ceil(G.clock));
   const me = G.versus ? G.poss : G.human; if (me == null || me < 0) return null;
   const m = G.score[me] - G.score[1 - me], hasBall = G.poss === me;
-  if (q > 4) return ['OVERTIME', 'NEXT SCORE WINS', '#ffd23f'];
+  if (q > 4) return ['OVERTIME', typeof OT !== 'undefined' ? OT.sub().toUpperCase() : 'NEXT SCORE WINS', '#ffd23f'];
   const late = (q === 4 && c <= 120 && Math.abs(m) <= 24) || (q === 2 && c <= 40);
   if (!late) return null;
   const top = `${Math.floor(c / 60)}:${String(c % 60).padStart(2, '0')} LEFT  ·  ${G.timeouts ? G.timeouts[me] : 0} TO`;
