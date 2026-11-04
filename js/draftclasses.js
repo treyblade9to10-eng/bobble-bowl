@@ -195,14 +195,52 @@ for (const y in DRAFT_CLASSES) for (const r of DRAFT_CLASSES[y]) if (r[5] < 0) r
 // put the real one back, but only where it's still the old auto tone (a tone someone picked in the editor stays)
 const REAL_SKIN = {};
 for (const y in DRAFT_CLASSES) for (const r of DRAFT_CLASSES[y]) REAL_SKIN[r[1]] = r[5];
+// NFL starters, backups, kickers + college lineups checked against ESPN headshots too (2026-11-04).
+// NFL: 'old new' tone -> players whose tone changed. College: the old tone was the name hash (skin -1)
+const SKIN_FIX_NFL = {
+  '01': "Dylan Faircheld|Brenton Strenge|Kyle Van Noi",
+  '02': "Kadyn Proctur|Spencer Fanno|Justin Stranad|Zack Bawn|T.J. Edwardz|Sean Rhyen|Tommy Trumble|Tyler Allgire",
+  '03': "Matthew Bergerun",
+  '04': "Jared Wilsen|Jared Versey|Corliss Waitmann",
+  '10': "Jason Sandals|Fernando Mendosa|Cairo Santoz|Eddy Pineappleo",
+  '12': "Steve Avilla",
+  '20': "Tommy Doughman|Michael Taffy|Ryan Eckleberry|Jackson Powers-Johnsun|Drew Steevens",
+  '21': "Roy Lopes",
+  '24': "Caleb Duglass|R Mason Tomas|Kristian Harris",
+  '30': "Matt Hibnur|Sam Roosh|Monroe Freeleng|Brandon McManuz|Drake Thomaz",
+  '31': "Mason Taylur|Nick Herbeg|Travis Burk|Malcolm Rodrigues|Brian O'Neal|Jaelan Phillups|Ty Okeda",
+  '32': "Jonah Savainaea|Tommy Togiay|Jaylahn Tuimaloau|Kingsley Suamataya|Khyiris Tongah|Brevyn Span-Ford|Makai Lemun|Marcus Mariotta|Austin Ekelur|Sione Vahki|Evan Williamz|Bryce Lence|Jordan Whitington",
+  '34': "Kaleb Elarms-Ore|Chris Bel|Dylan Parhem|Trevin Walace|Carson Vinsen|Dylan Sampsen|A.J. Haulcie|Que Robinsen|Jaydon Blue|Savion Williamz|John Metchee III|Chau Smith-Wede|Ted Horst III|Desjuan Johnsen",
+  '35': "Chris Paol",
+  '40': "Foster Moreaux|Walker Littel|Cameron Thomaz",
+  '41': "Jalen Traviz|Elijah Moldun|Theo Johnsten|Marcus Epp|LaCale Londun|Brycen Tremeyne|Zyon McCollam|Miles Kilebrew",
+  '42': "Dane Beltun|Chase Browne|Denzel Bostun|Xavier Hutchinsen|Seth McGowen|Chris Rodrigez Jr.|Amani Hookerson|Evan Engrem|Brandon Jonez|Jalen Naylor|Taron Johnsen|Eric Stokez|Cody Whyte|Treydan Stukez|Terence Steal|Jermaine Eluemoonor|Brandon Colemen|Rome Odunzee|Darnell Right|Jonah Jaxon|Kalif Raymund|Christian Mahoganie|Joshua Dobbz|Christian Watsun|Jordan Morgen|Byron Murphee|Jessie Bayts|Bryce Younge|Jalen Coaker|Robert Hunts|Devaughn Veil|Erik McCoi|Noah Fent|Michael Willson|Zaven Collens|Alaric Jacksen|Blake Korum",
+  '43': "Dante Tradur Jr.|Harold Laundry|Cory Durdun|TreVeyon Hendersen|Braelon Alen|Travis Jonez|Nate Wigginz|Tacario Daviz|Ronnie Hikman|Yahya Blak|Sean Murfy-Bunting|Jalen Petre|Justin Fieldz|Oronde Gadsten|Rasul Douglaz|Montez Sweatt|D'Marco Jacksen|Tyleik Williamz|Avieon Turrell|Xavier Wattz|Anfernee Jenningz|Julian Blakmon|Antoine Winfeld Jr.|Elijah Wilkinsen|Kyren Williamz|Mike Evanz",
+  '45': "Malik Hering|Calvin Ridly|Jordan Eliott|Shelby Harriz|Jordan Daviz|Jeremy Reavez|Kyle Monangay|Olamide Zaccheauz|Lee Huntur|Calijah Kancee|Poona Forde|Kamren Kinchenz|Keion Whyte",
+  '53': "Cam Haywood|Elic Ayomanur|Princely Umanmellon|DeForest Bucknor",
+  '54': "Max Iheanachur|Eyioma Uwazureke|Otito Ogbonia|Donovan Ezeirueku|Arnold Ebiketee",
+};
+const SKIN_FIX = {};
+for (const k in SKIN_FIX_NFL) for (const n of SKIN_FIX_NFL[k].split('|')) SKIN_FIX[n] = [+k[0], +k[1]];
+if (typeof COLLEGE_ROSTERS !== 'undefined') for (const id in COLLEGE_ROSTERS) {
+  const R = COLLEGE_ROSTERS[id];
+  for (const p of [...R.off, ...R.def]) if (p[5] >= 0 && !(p[1] in REAL_SKIN)) SKIN_FIX[p[1]] = [hashStr(p[1]) % 6, p[5]];
+  for (const k of [R.k, R.p]) if (k && k[3] >= 0) SKIN_FIX[k[0]] = [hashStr(k[0]) % 6, k[3]];
+}
 function fixRealSkins(o, depth = 0) {
   if (!o || typeof o !== 'object' || depth > 8) return 0;
   let n = 0;
-  if (Array.isArray(o) && typeof o[0] === 'string' && typeof o[1] === 'string' && typeof o[5] === 'number' && o[1] in REAL_SKIN
-    && o[5] !== REAL_SKIN[o[1]] && o[5] === hashStr(o[1]) % 6) { o[5] = REAL_SKIN[o[1]]; n++; }
+  if (Array.isArray(o) && typeof o[0] === 'string' && typeof o[1] === 'string' && typeof o[5] === 'number') { // player [pos, name, num, ovr, spd, skin]
+    if (o[1] in REAL_SKIN) { if (o[5] !== REAL_SKIN[o[1]] && o[5] === hashStr(o[1]) % 6) { o[5] = REAL_SKIN[o[1]]; n++; } }
+    else if (SKIN_FIX[o[1]] && o[5] === SKIN_FIX[o[1]][0]) { o[5] = SKIN_FIX[o[1]][1]; n++; }
+  } else if (Array.isArray(o) && typeof o[0] === 'string' && typeof o[1] === 'number' && typeof o[3] === 'number' && o.length <= 5) { // kicker [name, num, ovr, skin]
+    if (SKIN_FIX[o[0]] && o[3] === SKIN_FIX[o[0]][0]) { o[3] = SKIN_FIX[o[0]][1]; n++; }
+  }
   for (const k in o) if (o[k] && typeof o[k] === 'object') n += fixRealSkins(o[k], depth + 1);
   return n;
 }
 // season.js / career.js already loaded their saves before this file: fix those now
 if (typeof Season !== 'undefined' && Season.data && fixRealSkins(Season.data)) Season.save();
 if (typeof Career !== 'undefined' && Career.cap && fixRealSkins(Career.cap)) Career.save();
+// roster edits saved on this device (benchedit.js / playeredit.js load after this)
+for (const k of ['bobbleBenches', 'bobbleStarters']) try { const s = JSON.parse(localStorage.getItem(k) || 'null'); if (s && fixRealSkins(s)) localStorage.setItem(k, JSON.stringify(s)); } catch (e) {}
