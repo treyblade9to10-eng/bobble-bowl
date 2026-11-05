@@ -170,7 +170,7 @@ function resetGfx() {
   fieldKey = ''; fieldCv = null; crowdCv = null; crowdPat = null; zoomPic = null;
   if (typeof headCache !== 'undefined') headCache.clear();
   if (typeof torsoCache !== 'undefined') torsoCache.clear();
-  if (typeof BodyAtlas !== 'undefined') { BodyAtlas.reset(); rotSprites.clear(); }
+  if (typeof BodyAtlas !== 'undefined') { BodyAtlas.reset(); rotSprites.clear(); refSprites.clear(); }
   for (const k in shadowSprites) delete shadowSprites[k];
   if (typeof Logo !== 'undefined' && Logo.reset) Logo.reset();
   if (typeof wxCv !== 'undefined') { wxCv = null; wxMix = null; nightL = null; skyL = null; }
@@ -508,6 +508,8 @@ function dirtSpots(g, p, n, x0, y0, w, h, a) {
 }
 
 const torsoCache = new Map();
+// full picture cache: drop the oldest few (clearing it all made every head/jersey repaint in the same frame: a big hitch)
+function cacheTrim(m, max) { if (m.size < max) return; let n = 8; for (const k of m.keys()) { m.delete(k); if (!--n) break; } }
 function drawTorso(g, p, G, look, W, TH, big, dir) {
   // torso
   const tg = g.createLinearGradient(-W / 2, 0, W / 2, 0);
@@ -628,7 +630,7 @@ function blitRot(g, c, dx, dy, dw, dh) {
     const rg = r.getContext('2d');
     if (!rg || !rg.setTransform) return g.drawImage(c, dx, dy, dw, dh);
     rg.setTransform(L[0], L[1], L[2], L[3], -ox, -oy); rg.drawImage(c, dx, dy, dw, dh);
-    if (rotSprites.size > 800) { let n = 80; for (const k of rotSprites.keys()) { rotSprites.delete(k); if (!--n) break; } } // keep graphics memory small: drop the oldest
+    if (rotSprites.size > 800) { let n = 16; for (const k of rotSprites.keys()) { rotSprites.delete(k); if (!--n) break; } } // keep graphics memory small: drop the oldest
     rotSprites.set(key, r);
   }
   g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.drawImage(r, Math.round(m.e) + r.ox, Math.round(m.f) + r.oy); g.restore();
@@ -732,13 +734,12 @@ function paintArm(g, p, look, sl, shx, shy, ex, ey, hx, hy) {
 // (thousands of little canvases were slow to make). A new pose is drawn the normal way that frame and painted into its
 // cell at the start of the next one: changing a sheet makes the browser copy it if this frame already used it
 const BodyAtlas = {
-  SZ: 512, z: 0, pages: [], keys: [], map: new Map(), q: new Map(), cur: -1, x: 0, y: 1e9, sh: 0,
+  SZ: 512, pages: [], keys: [], map: new Map(), q: new Map(), cur: -1, x: 0, y: 1e9, sh: 0,
   max: () => typeof Gfx !== 'undefined' && Gfx.fast ? 24 : 48, // sheets (1 MB each: ~2700 / ~3000 poses)
   reset() { this.pages = []; this.keys = []; this.map.clear(); this.q.clear(); this.cur = -1; this.x = 0; this.y = 1e9; this.sh = 0; },
   get(key) { return this.map.get(key); },
   want(key, ms, box, job) {
     if (this.q.has(key) || this.q.size > 60) return;
-    if (ms !== this.z) { this.reset(); this.z = ms; } // (a new zoom starts the sheets over)
     this.q.set(key, [box, job]);
   },
   flush() { // start of a frame: paint the poses that were missing last frame (a few at a time)
@@ -849,8 +850,8 @@ function drawPlayer(g, p, G, at) {
   // legs (two segments) + cleats
   const gc = p.gear && p.gear.cleats, ck = gc && gc !== 'auto' ? (gc === 'team' ? look.jersey : GEAR_COL[gc]) : textOn(look.pants) === '#111' ? '#f2f2f2' : '#151515';
   const dk = p.dirt >= 0.04 ? Math.round(p.dirt * (RS < 1 ? 5 : 20)) : 0, dirtKey = dk ? dk + (RS < 1 ? p.side : p.name) + G.weather : '';
-  const legAt = (side, ph) => {
-    const s = Math.sin(anim + ph) * kL, lift = Math.max(0, Math.cos(anim + ph)) * kL * 5;
+  const legAt = (side, ph, an = anim) => {
+    const s = Math.sin(an + ph) * kL, lift = Math.max(0, Math.cos(an + ph)) * kL * 5;
     const hx = side * (W * 0.18), hy = -HIP;
     let kx = hx + s * 7 + 2, ky = -HIP * 0.48 - lift * 0.6;
     let fxp = hx + s * 12, fyp = -lift;
@@ -863,10 +864,10 @@ function drawPlayer(g, p, G, at) {
   const legKey = L => 'L' + look.pants + look.trim + look.pstripe + look.sock + look.sockBand + ck + dirtKey + '|' + L.hx + '|' + L.hy + '|' + L.kx + '|' + L.ky + '|' + L.fxp + '|' + L.fyp;
   const leg = (gg, L) => paintLeg(gg, p, look, ck, L.hx, L.hy, L.kx, L.ky, L.fxp, L.fyp);
   // arms: back one behind the torso, front one over it
-  const sw = Math.sin(anim) * kL;
   const sl = p.gear && p.gear.sleeve && p.gear.sleeve !== 'none' ? (p.gear.sleeve === 'team' ? shade(look.jersey, -0.08) : GEAR_COL[p.gear.sleeve]) : null;
   const armKey0 = 'A' + look.jersey + look.trim + look.sleeve + sl + (p.gear && p.gear.band) + (p.teamGloves ? look.trim : p.gloves) + p.face.skin;
-  const armAt = (front) => {
+  const armAt = (front, an = anim) => {
+    const sw = Math.sin(an) * kL;
     const shx = front ? W * 0.3 : -W * 0.22, shy = -TH + 5;
     let ex, ey, hx, hy;
     const pa = pose && pose.arm ? pose.arm(front, shx, shy) : kp && kp.arm ? kp.arm(front, shx, shy, toT) : null;
@@ -898,11 +899,12 @@ function drawPlayer(g, p, G, at) {
   const tKey = [big ? 1 : 0, dir, look.jersey, look.trim, look.yoke ? 1 : 0, look.num, look.numOut, p.num, G.weather, tdk, tdk ? p.name : ''].join('|');
   const torso = gg => {
     let c = torsoCache.get(tKey);
-    if (!c) {
+    if (c) { torsoCache.delete(tKey); torsoCache.set(tKey, c); } // (most recently used last)
+    else {
       const S = 2, BX = Math.ceil(W * 0.75), BY = TH + 8;
       c = document.createElement('canvas'); c.width = BX * 2 * S; c.height = (BY + 6) * S; c.BX = BX; c.BY = BY;
       const tg2 = c.getContext('2d');
-      if (tg2 && tg2.save) { tg2.scale(S, S); tg2.translate(BX, BY); drawTorso(tg2, p, G, look, W, TH, big, dir); if (torsoCache.size > 160) torsoCache.clear(); torsoCache.set(tKey, c); }
+      if (tg2 && tg2.save) { tg2.scale(S, S); tg2.translate(BX, BY); drawTorso(tg2, p, G, look, W, TH, big, dir); cacheTrim(torsoCache, 240); torsoCache.set(tKey, c); }
       else { c = null; drawTorso(gg, p, G, look, W, TH, big, dir); }
     }
     if (c) blitRot(gg, c, -c.BX, -c.BY, c.BX * 2, c.BY + 6);
@@ -926,21 +928,29 @@ function drawPlayer(g, p, G, at) {
     gg.restore();
   };
   // plain standing/running: the whole body (all but the head) is one picture per pose, reused (GRAPHICS: FAST + Chromebooks)
-  const bkey = fast && !G.demo ? [tKey, legKey(legs[0]), legKey(legs[1]), armKey0, arms[0].q.join(','), arms[1].q.join(','), lean, carrying ? (p.tuck ? 2 : 1) : 0, ms, shIn ? 1 : 0].join('|') : '';
-  const bc = bkey && BodyAtlas.get(bkey);
+  // the box the body fills (player frame -> canvas pixels around his spot) + painting it there
+  const bodyBox = () => {
+    const BX = Math.ceil(W * 0.75), BY = TH + 8; let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+    const add = (ax, ay, bx, by) => { x0 = Math.min(x0, ax); y0 = Math.min(y0, ay); x1 = Math.max(x1, bx); y1 = Math.max(y1, by); };
+    for (const L of legs) add(Math.min(L.hx, L.kx, L.fxp) - L.pd, Math.min(L.hy, L.ky) - L.pd, Math.max(L.hx, L.kx, L.fxp + 5) + L.pd, Math.max(L.ky, L.fyp + 4) + 2);
+    for (const A of arms) add(Math.min(A.q[0], A.q[2], A.q[4]) - 6, Math.min(A.q[1], A.q[3], A.q[5]) - 6, Math.max(A.q[0], A.q[2], A.q[4]) + 6, Math.max(A.q[1], A.q[3], A.q[5]) + 6);
+    for (const [cx, cy] of [[-BX - 2, -BY - 2], [BX + 2, -BY - 2], [-BX - 2, 8], [BX + 2, 8]]) { const X = cx * lc - cy * ls, Y = cx * ls + cy * lc - HIP; add(X, Y, X, Y); }
+    if (carrying) { const h = arms[1], X = h.hx * lc - h.hy * ls, Y = h.hx * ls + h.hy * lc - HIP; add(X - 14, Y - 14, X + 14, Y + 14); }
+    if (shIn) add(-sw0 - 1, -sw0 * 0.36 - 1, sw0 + 1, sw0 * 0.36 + 1);
+    return [Math.floor(ms * (dir > 0 ? x0 : -x1)) - 1, Math.floor(ms * y0) - 1, Math.ceil(ms * (dir > 0 ? x1 : -x0)) + 1, Math.ceil(ms * y1) + 1];
+  };
+  const bodyJob = (sg, E, F) => { sg.setTransform(dir * ms, 0, 0, ms, E, F); body(sg, E, F); };
+  const keyOf = (L, A) => [tKey, legKey(L[0]), legKey(L[1]), armKey0, A[0].q.join(','), A[1].q.join(','), lean, carrying ? (p.tuck ? 2 : 1) : 0, ms, shIn ? 1 : 0].join('|');
+  const bkey = fast && !G.demo ? keyOf(legs, arms) : '';
+  let bc = bkey && BodyAtlas.get(bkey);
+  if (bkey && !bc && kL) for (const d of [-LIMB_STEP, LIMB_STEP]) { // new pose: for this one frame the one a step away will do (it gets painted for the next)
+    const an = anim + d; bc = BodyAtlas.get(keyOf([legAt(-1, Math.PI, an), legAt(1, 0, an)], [armAt(false, an), armAt(true, an)]));
+    if (bc) { BodyAtlas.want(bkey, ms, bodyBox(), bodyJob); break; }
+  }
   if (bc) { g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.drawImage(bc.pg, bc.cx, bc.cy, bc.w, bc.h, Math.round(PMe) - bc.ox, Math.round(PMf) - bc.oy, bc.w, bc.h); g.restore(); }
   else {
     body(g, PMe, PMf);
-    if (bkey) BodyAtlas.want(bkey, ms, (() => { // the box the body fills (player frame -> canvas pixels around his spot)
-      const BX = Math.ceil(W * 0.75), BY = TH + 8; let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
-      const add = (ax, ay, bx, by) => { x0 = Math.min(x0, ax); y0 = Math.min(y0, ay); x1 = Math.max(x1, bx); y1 = Math.max(y1, by); };
-      for (const L of legs) add(Math.min(L.hx, L.kx, L.fxp) - L.pd, Math.min(L.hy, L.ky) - L.pd, Math.max(L.hx, L.kx, L.fxp + 5) + L.pd, Math.max(L.ky, L.fyp + 4) + 2);
-      for (const A of arms) add(Math.min(A.q[0], A.q[2], A.q[4]) - 6, Math.min(A.q[1], A.q[3], A.q[5]) - 6, Math.max(A.q[0], A.q[2], A.q[4]) + 6, Math.max(A.q[1], A.q[3], A.q[5]) + 6);
-      for (const [cx, cy] of [[-BX - 2, -BY - 2], [BX + 2, -BY - 2], [-BX - 2, 8], [BX + 2, 8]]) { const X = cx * lc - cy * ls, Y = cx * ls + cy * lc - HIP; add(X, Y, X, Y); }
-      if (carrying) { const h = arms[1], X = h.hx * lc - h.hy * ls, Y = h.hx * ls + h.hy * lc - HIP; add(X - 14, Y - 14, X + 14, Y + 14); }
-      if (shIn) add(-sw0 - 1, -sw0 * 0.36 - 1, sw0 + 1, sw0 * 0.36 + 1);
-      return [Math.floor(ms * (dir > 0 ? x0 : -x1)) - 1, Math.floor(ms * y0) - 1, Math.ceil(ms * (dir > 0 ? x1 : -x0)) + 1, Math.ceil(ms * y1) + 1];
-    })(), (sg, E, F) => { sg.setTransform(dir * ms, 0, 0, ms, E, F); body(sg, E, F); });
+    if (bkey) BodyAtlas.want(bkey, ms, bodyBox(), bodyJob);
   }
 
   // bobble head
@@ -1084,18 +1094,40 @@ function drawLabels(g, G) {
   }
   Q.length = 0; defJobTag = null;
 }
+// a name tag (pill + name + the POS / OVR line over it): painted once per look at the real canvas size, copied on whole pixels
+// (text is slow to draw every frame on Chromebooks)
+const pillSprites = new Map();
+function tagPill(g, name, w, you, edge, info, ly) {
+  const paint = (g, ly) => {
+    g.font = 'bold 13px Barlow, Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillStyle = you ? '#ffe14d' : '#000000c0'; roundRect(g, -w / 2, ly - 10, w, 20, 10); g.fill();
+    if (edge) { g.strokeStyle = edge; g.lineWidth = 2; g.stroke(); }
+    g.fillStyle = you ? '#111' : '#fff'; g.fillText(name, 0, ly + 1);
+    if (info) { g.font = 'bold 10px Barlow, Arial, sans-serif'; g.fillStyle = '#fff'; g.strokeStyle = '#000'; g.lineWidth = 3; g.strokeText(info, 0, ly - 17); g.fillText(info, 0, ly - 17); }
+  };
+  const m = g.getTransform(), M = m.a;
+  if (G.demo || m.b || m.c || m.d !== M || !(M > 0)) return paint(g, ly);
+  const key = [name, w, you ? 1 : 0, edge, info, M, document.fonts ? document.fonts.status : ''].join('|');
+  let c = pillSprites.get(key);
+  if (!c) {
+    g.font = 'bold 10px Barlow, Arial, sans-serif'; const hw = Math.max(w, info ? g.measureText(info).width + 6 : 0) / 2 + 4, ox = Math.ceil(hw * M), oy = Math.ceil(30 * M);
+    c = document.createElement('canvas'); c.width = ox * 2; c.height = oy + Math.ceil(13 * M); c.ox = ox; c.oy = oy;
+    const cg = c.getContext('2d'); if (!cg || !cg.setTransform) return paint(g, ly);
+    cg.setTransform(M, 0, 0, M, ox, oy); paint(cg, 0);
+    if (pillSprites.size > 120) pillSprites.clear();
+    pillSprites.set(key, c);
+  }
+  g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.drawImage(c, Math.round(m.e) - c.ox, Math.round(m.f + M * ly) - c.oy); g.restore();
+}
 // one player's labels, drawn around (0, 0) = the top of his head (already moved + scaled by drawLabels)
 function drawTagStack(g, L, G) {
   const p = L.p, ptag = L.ptag, pk = L.pk;
   if (p.xf && p.xf.on && p.down <= 0) drawXFBadge(g, p, 0, -(p.isHuman || L.carrying ? 44 : 4));
   let ly = 0;
   if (L.name) {
-    g.font = 'bold 13px Barlow, Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
     const w = L.w, full = L.full, you = p.isHuman && ptag < 0, pt = L.pt; // (2 people: dark tag with a red / blue edge, the P1 / P2 square on its left)
-    g.fillStyle = you ? '#ffe14d' : '#000000c0'; roundRect(g, -w / 2, ly - 10, w, 20, 10); g.fill();
-    if (p.cap || pt) { g.strokeStyle = pt ? (ptagSpooky() ? (ptag ? '#7a5cff' : '#d01a28') : ptag ? '#4d8cff' : '#ff4a50') : '#f6c31c'; g.lineWidth = 2; g.stroke(); }
-    g.fillStyle = you ? '#111' : '#fff'; g.fillText(L.name, 0, ly + 1);
-    if (full) { g.font = 'bold 10px Barlow, Arial, sans-serif'; g.fillStyle = '#fff'; g.strokeStyle = '#000'; g.lineWidth = 3; const r = `${p.tw2 ? '2-WAY ' : ''}${p.pos} • ${p.ovr} OVR`; g.strokeText(r, 0, ly - 17); g.fillText(r, 0, ly - 17); }
+    const edge = p.cap || pt ? (pt ? (ptagSpooky() ? (ptag ? '#7a5cff' : '#d01a28') : ptag ? '#4d8cff' : '#ff4a50') : '#f6c31c') : '', info = full ? `${p.tw2 ? '2-WAY ' : ''}${p.pos} • ${p.ovr} OVR` : '';
+    tagPill(g, L.name, w, you, edge, info, ly);
     if (pt) ptagDraw(g, ptag, pk, -w / 2 - pt / 2 + 1, ly);
     if (p.xf && p.xf.on) drawXFBadge(g, p, -w / 2 - 12 - pt, ly); // X-Factor badge sits next to his name
     ly -= 30;
@@ -1150,13 +1182,14 @@ function drawHead(g, R, team, p, look) {
   const snow = G.weather === 'snow' && p.dirt > 0.1 ? Math.round(Math.min(1, p.dirt + 0.3) * 6) : 0;
   const key = [R.toFixed(1), mood, face.dir, face.skin, face.visor ? 1 : 0, face.beard ? 1 : 0, look.helmet, look.stripe, look.hstripe, look.matte ? 1 : 0, look.mask, p.num, gear.visor, gear.mask, look.decal ? look.decal + team.id : '', G.weather === 'rain' ? 'r' : '', snow].join('|');
   let c = headCache.get(key);
+  if (c) { headCache.delete(key); headCache.set(key, c); }
   if (!c) {
     const S = 2, B = Math.ceil(R * 1.3 + 4); // drawn at 2x so the zoomed celly cam stays sharp
     c = document.createElement('canvas'); c.width = c.height = B * 2 * S; c.B = B;
     const hg = c.getContext('2d');
     if (!hg || !hg.save) { drawHeadRaw(g, R, team, p, look); return; }
     hg.scale(S, S); hg.translate(B, B); drawHeadRaw(hg, R, team, p, look);
-    if (headCache.size > 160) headCache.clear(); // keep graphics memory small (Chromebooks)
+    cacheTrim(headCache, 320); // keep graphics memory small (Chromebooks)
     headCache.set(key, c);
   }
   blitRot(g, c, -c.B, -c.B, c.B * 2, c.B * 2);
@@ -1594,12 +1627,26 @@ function drawHUDRest(g, G, S, x0, y0, W, H) {
 }
 
 // ---------- referees ----------
+// refs: one picture per facing / leg step / flag arm, copied on whole pixels (vector + clip every frame was slow on Chromebooks)
+const refSprites = new Map();
 function drawRef(g, r, G) {
   const x = sx(r.x), y = sy(r.y);
   if (x < -60 || x > CW + 60) return;
-  g.fillStyle = '#00000055'; g.beginPath(); g.ellipse(x, y, 13, 5, 0, 0, 7); g.fill();
-  g.save(); g.translate(x, y); g.scale(r.face || 1, 1);
-  const k = Math.min(1, (r.moving || 0) / 4), s1 = Math.sin(r.anim) * k;
+  const k = Math.min(1, (r.moving || 0) / 4), m = g.getTransform(), ms = m.a, f = r.face || 1, up = r.throwT > 0;
+  if (G.demo || m.b || m.c || m.d !== ms || !(ms > 0)) { g.save(); g.translate(x, y); g.scale(f, 1); paintRef(g, Math.sin(r.anim) * k, up); g.restore(); return; }
+  const s1 = Math.round(Math.sin(r.anim) * k * 20) / 20, key = ms + '|' + f + '|' + s1 + (up ? 'u' : '');
+  let c = refSprites.get(key);
+  if (!c) {
+    const ox = Math.ceil(26 * ms), oy = Math.ceil(70 * ms); c = document.createElement('canvas'); c.width = ox * 2; c.height = oy + Math.ceil(8 * ms); c.ox = ox; c.oy = oy;
+    const rg = c.getContext('2d'); if (!rg || !rg.setTransform) return;
+    rg.setTransform(f * ms, 0, 0, ms, ox, oy); paintRef(rg, s1, up);
+    if (refSprites.size > 300) refSprites.clear();
+    refSprites.set(key, c);
+  }
+  g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.drawImage(c, Math.round(m.e + ms * x) - c.ox, Math.round(m.f + ms * y) - c.oy); g.restore();
+}
+function paintRef(g, s1, up) {
+  g.fillStyle = '#00000055'; g.beginPath(); g.ellipse(0, 0, 13, 5, 0, 0, 7); g.fill();
   // legs (white knickers, black socks)
   for (const [side, ph] of [[-1, s1], [1, -s1]]) {
     g.strokeStyle = OUT; g.lineWidth = 8; g.lineCap = 'round';
@@ -1616,7 +1663,7 @@ function drawRef(g, r, G) {
   // arms (one up when throwing a flag)
   g.strokeStyle = OUT; g.lineWidth = 6; g.lineCap = 'round';
   g.beginPath(); g.moveTo(-8, -34); g.lineTo(-12, -22); g.stroke();
-  g.beginPath(); g.moveTo(8, -34); r.throwT > 0 ? g.lineTo(14, -52) : g.lineTo(12, -22); g.stroke();
+  g.beginPath(); g.moveTo(8, -34); up ? g.lineTo(14, -52) : g.lineTo(12, -22); g.stroke();
   // head: cap + face
   const R = 15;
   g.fillStyle = SKIN[1]; g.strokeStyle = OUT; g.lineWidth = 2.2;
@@ -1628,7 +1675,6 @@ function drawRef(g, r, G) {
   g.strokeStyle = '#3a130a'; g.lineWidth = 1.8; g.beginPath(); g.moveTo(6, -43); g.lineTo(13, -43); g.stroke();
   // whistle
   g.fillStyle = '#ccc'; g.fillRect(12, -44, 5, 3);
-  g.restore();
 }
 
 // ---------- field goal / punt meter (simple: power bar, then aim slider) ----------
