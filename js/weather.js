@@ -155,7 +155,7 @@ function drawWeather(g, G) {
   const t = G.time, lean = windLean(), lo = typeof Gfx !== 'undefined' && Gfx.fast; // GRAPHICS: FAST = about half the drops, no sky haze (gfx.js)
   if (G.weather === 'rain') {
     // gloomy sky + mist rolling off the stands
-    if (!lo) g.drawImage(skyLayer(), 0, 0, CW, CH);
+    if (!lo) scrBlit(g, skyLayer(), CH);
     // rings in the puddles
     if (wxCv && wxCv.puddles && !lo) for (const pd of wxCv.puddles) {
       const x = sx(pd.x), y = sy(pd.y); if (x < -pd.rx || x > CW + pd.rx) continue;
@@ -187,7 +187,7 @@ function drawWeather(g, G) {
       g.stroke();
     }
   } else if (G.weather === 'snow') {
-    if (!lo) g.drawImage(skyLayer(), 0, 0, CW, CH); // soft white haze + fog off the stands
+    if (!lo) scrBlit(g, skyLayer(), CH); // soft white haze + fog off the stands
     // far flakes, mid flakes, then a few big soft ones right in front of the camera
     for (const [n, r0, r1, a, sp, drift] of lo ? [[80, 1.1, 1.8, 0.75, 34, 18], [40, 2.2, 3.4, 0.9, 62, 32]] : [[160, 1.1, 1.8, 0.75, 34, 18], [80, 2.2, 3.4, 0.9, 62, 32]]) {
       g.fillStyle = `rgba(255,255,255,${a})`; g.beginPath();
@@ -210,18 +210,26 @@ function drawWeather(g, G) {
     // real night game: everything outside the lights goes dark blue, the field is lit by banks of stadium lights
     g.save();
     // the field stays bright under the lights (you have to see the play); the stands and sky go dark
-    g.globalCompositeOperation = 'multiply'; g.fillStyle = lo ? 'rgb(176,188,228)' : 'rgb(150,164,210)'; g.fillRect(-CW, -CH, CW * 3, CH * 3); // (FAST: no light pools, so a bit less dark)
-    g.fillStyle = 'rgb(58,68,110)'; g.beginPath(); g.rect(-CW, -CH, CW * 3, CH * 3); g.rect(sx(-1), sy(-1.5), sx(121) - sx(-1), sy(FIELD_W + 1.5) - sy(-1.5)); g.fill('evenodd');
+    g.globalCompositeOperation = 'multiply'; // (FAST: no light pools, so a bit less dark)
+    // one pass: the field box gets the light tint, the boxes around it the tint x dark blue (was a 2nd full-screen evenodd fill)
+    const c1 = lo ? [176, 188, 228] : [150, 164, 210], c2 = [58, 68, 110];
+    const tm = g.getTransform(), px = v => (Math.round(v * tm.a + tm.e) - tm.e) / tm.a, py = v => (Math.round(v * tm.d + tm.f) - tm.f) / tm.d; // (edges on whole pixels: no seam)
+    const x0 = px(sx(-1)), y0 = py(sy(-1.5)), x1 = px(sx(121)), y1 = py(sy(FIELD_W + 1.5)), X0 = -CW, Y0 = -CH, X1 = CW * 2, Y1 = CH * 2;
+    const box = (a, b, c, d) => { if (c > a && d > b) g.fillRect(a, b, c - a, d - b); };
+    g.fillStyle = `rgb(${c1.map((v, i) => Math.round(v * c2[i] / 255))})`;
+    box(X0, Y0, X1, Math.min(y0, Y1)); box(X0, Math.max(y1, Y0), X1, Y1);
+    box(X0, Math.max(y0, Y0), Math.min(x0, X1), Math.min(y1, Y1)); box(Math.max(x1, X0), Math.max(y0, Y0), X1, Math.min(y1, Y1));
+    g.fillStyle = `rgb(${c1})`; box(x0, y0, x1, y1);
     g.globalCompositeOperation = 'source-over';
     // the vignette, light pools and light banks only depend on the screen size, so they're painted once into pictures.
     // The pools used to be 8 full-screen soft-light gradients every frame (by far the slowest thing in the game on phones);
     // now it's one 'screen' pass with the color tuned to light the grass the same way
     const L = nightLayers(), xs = L.xs;
     if (!lo) { // (FAST: no vignette + light pools, two full-screen passes less)
-      g.drawImage(L.vig, 0, 0, CW, CH);
-      g.globalCompositeOperation = 'screen'; g.drawImage(L.pool, 0, 0, CW, CH);
+      scrBlit(g, L.vig, CH);
+      g.globalCompositeOperation = 'screen'; scrBlit(g, L.pool, CH);
     }
-    g.globalCompositeOperation = 'lighter'; g.drawImage(L.bank, 0, 0, CW, L.bank.height);
+    g.globalCompositeOperation = 'lighter'; scrBlit(g, L.bank, L.bank.h);
     g.restore();
     for (const lx of xs) { g.fillStyle = '#fffef2'; g.fillRect(lx - 26, 0, 52, 5); g.fillStyle = '#ffffffaa'; for (let k = -2; k <= 2; k++) g.fillRect(lx + k * 10 - 3, 6, 6, 3); }
   }
@@ -230,22 +238,29 @@ function drawWeather(g, G) {
 // the rain / snow sky tint + mist over the top of the screen, painted once (one copy a frame instead of two big fills)
 let skyL = null;
 function skyLayer() {
-  const key = CW + 'x' + CH + G.weather;
+  const key = CW + 'x' + CH + G.weather + RS;
   if (skyL && skyL.key === key) return skyL;
-  const c = document.createElement('canvas'); c.width = CW; c.height = CH; c.key = key;
-  const g = c.getContext('2d'), rain = G.weather === 'rain';
+  const c = document.createElement('canvas'); c.width = Math.round(CW * RS); c.height = Math.round(CH * RS); c.key = key;
+  const g = c.getContext('2d'), rain = G.weather === 'rain'; g.scale(RS, RS);
   g.fillStyle = rain ? 'rgba(20,32,48,0.18)' : 'rgba(232,240,250,0.08)'; g.fillRect(0, 0, CW, CH);
   const h = CH * (rain ? 0.45 : 0.5), m = g.createLinearGradient(0, 0, 0, h), col = rain ? '170,185,205' : '235,242,250';
   m.addColorStop(0, `rgba(${col},${rain ? 0.32 : 0.4})`); m.addColorStop(1, `rgba(${col},0)`);
   g.fillStyle = m; g.fillRect(0, 0, CW, h);
   return (skyL = c);
 }
+// a full-screen picture painted at the real canvas size goes on 1:1 (GRAPHICS: FAST shrinks the canvas, and stretching
+// a screen-sized picture every frame was the slowest part of night games on Chromebooks)
+function scrBlit(g, c, h) {
+  const m = g.getTransform();
+  if (m.a !== RS || m.d !== RS || m.b || m.c) return g.drawImage(c, 0, 0, CW, h);
+  g.save(); g.setTransform(1, 0, 0, 1, Math.round(m.e), Math.round(m.f)); g.drawImage(c, 0, 0); g.restore();
+}
 // night lighting pictures: vignette, light pools (all the same color, so they stack into one picture) and the light banks
 let nightL = null;
 function nightLayers() {
-  const key = CW + 'x' + CH + (wet() ? 'w' : '');
+  const key = CW + 'x' + CH + (wet() ? 'w' : '') + RS;
   if (nightL && nightL.key === key) return nightL;
-  const mk = h => { const c = document.createElement('canvas'); c.width = CW; c.height = h; return c; };
+  const mk = h => { const c = document.createElement('canvas'); c.width = Math.round(CW * RS); c.height = Math.round(h * RS); c.h = h; c.getContext('2d').scale(RS, RS); return c; }; // (painted at the real canvas size: see scrBlit)
   const xs = [0.1, 0.37, 0.63, 0.9].map(f => CW * f), vig = mk(CH), pool = mk(CH), bank = mk(wet() ? Math.ceil(CH * 0.6) : 74);
   let g = vig.getContext('2d');
   const vg = g.createRadialGradient(CW / 2, CH / 2, CH * 0.45, CW / 2, CH / 2, CW * 0.75);

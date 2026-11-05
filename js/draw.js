@@ -170,6 +170,7 @@ function resetGfx() {
   fieldKey = ''; fieldCv = null; crowdCv = null; crowdPat = null; zoomPic = null;
   if (typeof headCache !== 'undefined') headCache.clear();
   if (typeof torsoCache !== 'undefined') torsoCache.clear();
+  if (typeof BodyAtlas !== 'undefined') { BodyAtlas.reset(); rotSprites.clear(); }
   for (const k in shadowSprites) delete shadowSprites[k];
   if (typeof Logo !== 'undefined' && Logo.reset) Logo.reset();
   if (typeof wxCv !== 'undefined') { wxCv = null; wxMix = null; nightL = null; skyL = null; }
@@ -177,6 +178,7 @@ function resetGfx() {
 let gfxCheck = 0, fieldBlit = null;
 function drawField(g, G) {
   tagBoxes.length = 0; labelQ.length = 0; defJobTag = null;
+  BodyAtlas.flush();
   if (++gfxCheck % 30 === 0 && fieldCv) { const fg = fieldCv.getContext('2d'); if (fg && fg.isContextLost && fg.isContextLost()) resetGfx(); }
   buildField(G);
   // past the edges of the field = more fans (scrolls with the camera)
@@ -680,24 +682,9 @@ function kickPose(p, G, HIP) {
   if (p.fair) return { arm: (front, shx, shy) => front ? { ex: shx + 10, ey: shy - 12, hx: shx + 18 + Math.sin(G.time * 14) * 3, hy: shy - 26 } : null }; // waving for a fair catch
   return null;
 }
-// arms and legs: the lines for one pose are painted once into a big sheet and copied from there after that
-// (16 players x 4 limbs x ~6 lines a frame was the slowest thing on phones). Only for straight-up players at normal zoom
-const LIMB_STEP = Math.PI * 2 / 48, limbCache = new Map();
+// arms and legs of the plain poses: in small steps, so the same poses repeat and the whole body can be reused as one picture (BodyAtlas)
+const LIMB_STEP = Math.PI * 2 / 48;
 const q4 = v => RS < 1 ? Math.round(v * 2) / 2 : Math.round(v * 4) / 4; // (GRAPHICS: FAST = coarser steps, fewer new pictures to paint)
-function limbBlit(g, key, x0, y0, x1, y1, paint) {
-  let c = limbCache.get(key);
-  if (c) { limbCache.delete(key); limbCache.set(key, c); } // (most recently used last)
-  else {
-    const X0 = Math.floor(x0), Y0 = Math.floor(y0), w = Math.ceil(x1) - X0, h = Math.ceil(y1) - Y0;
-    c = document.createElement('canvas'); c.width = w; c.height = h; c.X0 = X0; c.Y0 = Y0;
-    const sg = c.getContext('2d');
-    if (!sg || !sg.translate) return paint(g);
-    sg.translate(-X0, -Y0); paint(sg);
-    if (limbCache.size > 5000) { let n = 500; for (const k of limbCache.keys()) { limbCache.delete(k); if (!--n) break; } } // keep graphics memory small: drop the oldest
-    limbCache.set(key, c);
-  }
-  g.drawImage(c, c.X0, c.Y0);
-}
 function paintLeg(g, p, look, ck, hx, hy, kx, ky, fxp, fyp) {
   g.strokeStyle = OUT; g.lineWidth = 10; g.lineCap = 'round'; g.lineJoin = 'round'; // (round: a sharp knee bend, like a hurdle, can't spike)
   g.beginPath(); g.moveTo(hx, hy); g.lineTo(kx, ky); g.lineTo(fxp, fyp - 2); g.stroke();
@@ -740,6 +727,44 @@ function paintArm(g, p, look, sl, shx, shy, ex, ey, hx, hy) {
   g.fillStyle = p.teamGloves ? look.trim : p.gloves || '#f2f2f2'; g.strokeStyle = OUT; g.lineWidth = 2;
   g.beginPath(); g.arc(hx, hy, 3.8, 0, 7); g.fill(); g.stroke();
 }
+// whole-body pictures (legs, arms, jersey, ball, neck) for the plain poses: ~8 small copies + state changes a player become
+// one copy. They live in cells of small sheets that fill up in turn; when all are full the oldest sheet is wiped and reused
+// (thousands of little canvases were slow to make). A new pose is drawn the normal way that frame and painted into its
+// cell at the start of the next one: changing a sheet makes the browser copy it if this frame already used it
+const BodyAtlas = {
+  SZ: 512, z: 0, pages: [], keys: [], map: new Map(), q: new Map(), cur: -1, x: 0, y: 1e9, sh: 0,
+  max: () => typeof Gfx !== 'undefined' && Gfx.fast ? 24 : 48, // sheets (1 MB each: ~2700 / ~3000 poses)
+  reset() { this.pages = []; this.keys = []; this.map.clear(); this.q.clear(); this.cur = -1; this.x = 0; this.y = 1e9; this.sh = 0; },
+  get(key) { return this.map.get(key); },
+  want(key, ms, box, job) {
+    if (this.q.has(key) || this.q.size > 60) return;
+    if (ms !== this.z) { this.reset(); this.z = ms; } // (a new zoom starts the sheets over)
+    this.q.set(key, [box, job]);
+  },
+  flush() { // start of a frame: paint the poses that were missing last frame (a few at a time)
+    if (!this.q.size) return;
+    let k = 0;
+    for (const [key, [box, job]] of this.q) {
+      this.q.delete(key);
+      const [X0, Y0, X1, Y1] = box, w = X1 - X0, h = Y1 - Y0;
+      if (w > 120 || h > 120 || this.map.has(key)) continue;
+      // packed in rows: next spot in this row, else a new row, else the next sheet (wiped if it was used before)
+      if (this.x + w > this.SZ) { this.y += this.sh + 1; this.x = 0; this.sh = 0; }
+      if (this.y + h > this.SZ) {
+        this.cur = (this.cur + 1) % this.max(); this.x = this.y = this.sh = 0;
+        let pg = this.pages[this.cur];
+        if (!pg) { pg = this.pages[this.cur] = document.createElement('canvas'); pg.width = pg.height = this.SZ; }
+        else { for (const old of this.keys[this.cur]) this.map.delete(old); pg.getContext('2d').clearRect(0, 0, this.SZ, this.SZ); }
+        this.keys[this.cur] = [];
+      }
+      const pg = this.pages[this.cur], sg = pg.getContext('2d'); if (!sg || !sg.setTransform) return;
+      const cx = this.x, cy = this.y; this.x += w + 1; this.sh = Math.max(this.sh, h);
+      sg.save(); job(sg, cx - X0, cy - Y0); sg.restore(); // (the box covers everything he paints: no clip needed)
+      this.map.set(key, { pg, cx, cy, w, h, ox: -X0, oy: -Y0 }); this.keys[this.cur].push(key);
+      if (++k >= 10) break;
+    }
+  }
+};
 function drawPlayer(g, p, G, at) {
   const x = (at ? at.x : sx(p.x)) + (p.shiver ? Math.sin(G.time * 70) * 1.3 : 0), y = at ? at.y : sy(p.y); // (shiver: an iced kicker, flow.js)
   if (!at && (x < -80 - CW * 0.4 || x > CW * 1.4 + 80 || y < -40 || y > CH + 140)) return; // a bit wide so the zoomed celly cam never loses anyone
@@ -765,7 +790,6 @@ function drawPlayer(g, p, G, at) {
     g.beginPath(); g.ellipse(x, y, 22 * pulse, 9 * pulse, 0, 0, 7); g.stroke();
   }
   if (!at) drawXFRing(g, p, x, y);
-  { const sw0 = big ? 21 : 17, sh = shadowSprite(sw0); if (sh) g.drawImage(sh, x - sw0, y - sw0 * 0.36, sw0 * 2, sw0 * 0.72); }
   // stamina bar under the player you control: only while you're sprinting or getting your wind back, then it fades away
   if (p.isHuman && !at && G.phase === 'live' && p.stamina != null) {
     const st = clamp(p.stamina, 0, 1);
@@ -797,6 +821,9 @@ function drawPlayer(g, p, G, at) {
   const m0 = !at && !G.demo && !pose && !kn && !kp && p.down <= 0 && !(p.dive > 0) && !(p.spin > 0) && g.globalAlpha === 1 ? g.getTransform() : null;
   const ms = m0 ? m0.a : 1; // (CAMERA zoomed out: the same, just shrunk)
   const fast = !!m0 && (ms === 1 || Math.abs(ms - viewZ * RS) < 1e-6) && m0.b === 0 && m0.c === 0 && m0.d === ms && m0.e === Math.round(m0.e) && m0.f === Math.round(m0.f);
+  // soft round shadow under him (feet on the ground + plain pose: it's part of the body picture instead)
+  const sw0 = big ? 21 : 17, shIn = fast && !hop;
+  if (!shIn) { const sh = shadowSprite(sw0); if (sh) g.drawImage(sh, x - sw0, y - sw0 * 0.36, sw0 * 2, sw0 * 0.72); }
   g.save(); g.translate(fast ? Math.round(x) : x, fast ? Math.round(y - hop) : y - hop);
   if (pose) {
     if (pose.rot) { g.translate(0, -32); g.rotate(pose.rot * dir); g.translate(0, 32); } // spin around his belly, not his feet
@@ -815,37 +842,31 @@ function drawPlayer(g, p, G, at) {
     ? { kx: lerp(kx, hx + 10, kn), ky: lerp(ky, hy - 2, kn), fx: lerp(fx, hx + 11, kn), fy: lerp(fy, 0, kn) }      // front leg: thigh flat, shin straight down
     : { kx: lerp(kx, hx - 1, kn), ky: lerp(ky, -1, kn), fx: lerp(fx, hx - 13, kn), fy: lerp(fy, -2, kn) } : null; // back leg: knee on the grass, shin flat behind
   const legPose = kneelLeg || (pose && pose.leg) || (kp && kp.leg) || null;
-  let lean = (p.down > 0 ? 0 : k * 0.18) + (p.engaged ? 0.25 : 0) + kn * 0.12 + (kp && kp.lean || 0);
-  if (fast) lean = Math.round(lean / 0.02) * 0.02; // same steps as the turned jersey picture
+  let lean = (p.down > 0 ? 0 : (fast && RS < 1 ? kL : k) * 0.18) + (p.engaged ? 0.25 : 0) + kn * 0.12 + (kp && kp.lean || 0);
+  if (fast) lean = Math.round(lean / 0.02) * 0.02; // same steps as the turned jersey picture (FAST: the speed lean in the arm/leg steps too, poses repeat more)
   const lc = Math.cos(lean), ls = Math.sin(lean), toT = (x, y) => ({ x: x * lc + (y + HIP) * ls, y: -x * ls + (y + HIP) * lc }); // feet coords -> torso coords
 
   // legs (two segments) + cleats
   const gc = p.gear && p.gear.cleats, ck = gc && gc !== 'auto' ? (gc === 'team' ? look.jersey : GEAR_COL[gc]) : textOn(look.pants) === '#111' ? '#f2f2f2' : '#151515';
   const dk = p.dirt >= 0.04 ? Math.round(p.dirt * (RS < 1 ? 5 : 20)) : 0, dirtKey = dk ? dk + (RS < 1 ? p.side : p.name) + G.weather : '';
-  const leg = (side, ph) => {
+  const legAt = (side, ph) => {
     const s = Math.sin(anim + ph) * kL, lift = Math.max(0, Math.cos(anim + ph)) * kL * 5;
     const hx = side * (W * 0.18), hy = -HIP;
     let kx = hx + s * 7 + 2, ky = -HIP * 0.48 - lift * 0.6;
     let fxp = hx + s * 12, fyp = -lift;
     const lp = legPose && legPose(side, hx, hy, kx, ky, fxp, fyp); // kneeling / Heisman: the pose places this leg
     if (lp) ({ kx, ky, fx: fxp, fy: fyp } = lp);
-    if (!fast) return paintLeg(g, p, look, ck, hx, hy, kx, ky, fxp, fyp);
-    kx = q4(kx); ky = q4(ky); fxp = q4(fxp); fyp = q4(fyp);
-    const pd = dk ? 12 : 6;
-    limbBlit(g, 'L' + look.pants + look.trim + look.pstripe + look.sock + look.sockBand + ck + dirtKey + '|' + hx + '|' + hy + '|' + kx + '|' + ky + '|' + fxp + '|' + fyp,
-      Math.min(hx, kx, fxp) - pd, Math.min(hy, ky) - pd, Math.max(hx, kx, fxp + 5) + pd, Math.max(ky, fyp + 4) + 2,
-      sg => paintLeg(sg, p, look, ck, hx, hy, kx, ky, fxp, fyp));
+    if (fast) { kx = q4(kx); ky = q4(ky); fxp = q4(fxp); fyp = q4(fyp); }
+    return { hx, hy, kx, ky, fxp, fyp, pd: dk ? 12 : 6 };
   };
-  leg(-1, Math.PI); leg(1, 0);
-
-  g.save(); g.translate(0, -HIP); g.rotate(lean);
-  // pants top
-  g.fillStyle = look.pants; g.strokeStyle = OUT; g.lineWidth = 2.5;
-  roundRect(g, -W * 0.42, -4, W * 0.84, 9, 4); g.fill(); g.stroke();
-  dirtSpots(g, p, 3, -W * 0.36, -2, W * 0.72, 6, 1);
-  // back arm (behind torso)
+  const legs = [legAt(-1, Math.PI), legAt(1, 0)];
+  const legKey = L => 'L' + look.pants + look.trim + look.pstripe + look.sock + look.sockBand + ck + dirtKey + '|' + L.hx + '|' + L.hy + '|' + L.kx + '|' + L.ky + '|' + L.fxp + '|' + L.fyp;
+  const leg = (gg, L) => paintLeg(gg, p, look, ck, L.hx, L.hy, L.kx, L.ky, L.fxp, L.fyp);
+  // arms: back one behind the torso, front one over it
   const sw = Math.sin(anim) * kL;
-  const arm = (front) => {
+  const sl = p.gear && p.gear.sleeve && p.gear.sleeve !== 'none' ? (p.gear.sleeve === 'team' ? shade(look.jersey, -0.08) : GEAR_COL[p.gear.sleeve]) : null;
+  const armKey0 = 'A' + look.jersey + look.trim + look.sleeve + sl + (p.gear && p.gear.band) + (p.teamGloves ? look.trim : p.gloves) + p.face.skin;
+  const armAt = (front) => {
     const shx = front ? W * 0.3 : -W * 0.22, shy = -TH + 5;
     let ex, ey, hx, hy;
     const pa = pose && pose.arm ? pose.arm(front, shx, shy) : kp && kp.arm ? kp.arm(front, shx, shy, toT) : null;
@@ -857,45 +878,77 @@ function drawPlayer(g, p, G, at) {
     else if (p.stiff > 0 && front) { ex = shx + 9; ey = shy + 1; hx = shx + 19; hy = shy; }
     else if (p.engaged && front) { ex = shx + 8; ey = shy + 4; hx = shx + 15; hy = shy + 2; }
     else { const s = (front ? -sw : sw); ex = shx + s * 7; ey = shy + 9; hx = shx + s * 12 + 2; hy = shy + 16; }
-    const sl = p.gear && p.gear.sleeve && p.gear.sleeve !== 'none' ? (p.gear.sleeve === 'team' ? shade(look.jersey, -0.08) : GEAR_COL[p.gear.sleeve]) : null;
-    if (!fast) paintArm(g, p, look, sl, shx, shy, ex, ey, hx, hy);
-    else { // turn the arm with the body by hand so the picture copies over straight
-      const T = (x, y) => [q4(x * lc - y * ls), q4(x * ls + y * lc - HIP)], [a0, a1] = T(shx, shy), [b0, b1] = T(ex, ey), [c0, c1] = T(hx, hy);
-      g.save(); g.setTransform(dir * ms, 0, 0, ms, PMe, PMf);
-      limbBlit(g, 'A' + look.jersey + look.trim + look.sleeve + sl + (p.gear && p.gear.band) + (p.teamGloves ? look.trim : p.gloves) + p.face.skin + '|' + a0 + '|' + a1 + '|' + b0 + '|' + b1 + '|' + c0 + '|' + c1,
-        Math.min(a0, b0, c0) - 6, Math.min(a1, b1, c1) - 6, Math.max(a0, b0, c0) + 6, Math.max(a1, b1, c1) + 6,
-        sg => paintArm(sg, p, look, sl, a0, a1, b0, b1, c0, c1));
-      g.restore();
+    const A = { shx, shy, ex, ey, hx, hy };
+    if (fast) { // turned with the body by hand so the picture copies over straight
+      const T = (x, y) => [q4(x * lc - y * ls), q4(x * ls + y * lc - HIP)];
+      A.q = [...T(shx, shy), ...T(ex, ey), ...T(hx, hy)];
     }
-    return { hx, hy };
+    return A;
   };
-  arm(false);
+  const arms = [armAt(false), armAt(true)];
+  const arm = (gg, A, E, F) => {
+    if (!A.q) return paintArm(gg, p, look, sl, A.shx, A.shy, A.ex, A.ey, A.hx, A.hy);
+    const [a0, a1, b0, b1, c0, c1] = A.q; // (turned with the body by hand: no turned lines to paint)
+    gg.save(); gg.setTransform(dir * ms, 0, 0, ms, E, F);
+    paintArm(gg, p, look, sl, a0, a1, b0, b1, c0, c1);
+    gg.restore();
+  };
   // torso: drawn once per look and reused (number text + gradients are slow to redraw every frame)
-  { const dk = p.dirt >= 0.04 ? Math.round(p.dirt * 20) : 0;
-    const key = [big ? 1 : 0, dir, look.jersey, look.trim, look.yoke ? 1 : 0, look.num, look.numOut, p.num, G.weather, dk, dk ? p.name : ''].join('|');
-    let c = torsoCache.get(key);
+  const tdk = p.dirt >= 0.04 ? Math.round(p.dirt * 20) : 0;
+  const tKey = [big ? 1 : 0, dir, look.jersey, look.trim, look.yoke ? 1 : 0, look.num, look.numOut, p.num, G.weather, tdk, tdk ? p.name : ''].join('|');
+  const torso = gg => {
+    let c = torsoCache.get(tKey);
     if (!c) {
       const S = 2, BX = Math.ceil(W * 0.75), BY = TH + 8;
       c = document.createElement('canvas'); c.width = BX * 2 * S; c.height = (BY + 6) * S; c.BX = BX; c.BY = BY;
       const tg2 = c.getContext('2d');
-      if (tg2 && tg2.save) { tg2.scale(S, S); tg2.translate(BX, BY); drawTorso(tg2, p, G, look, W, TH, big, dir); if (torsoCache.size > 160) torsoCache.clear(); torsoCache.set(key, c); }
-      else { c = null; drawTorso(g, p, G, look, W, TH, big, dir); }
+      if (tg2 && tg2.save) { tg2.scale(S, S); tg2.translate(BX, BY); drawTorso(tg2, p, G, look, W, TH, big, dir); if (torsoCache.size > 160) torsoCache.clear(); torsoCache.set(tKey, c); }
+      else { c = null; drawTorso(gg, p, G, look, W, TH, big, dir); }
     }
-    if (c) blitRot(g, c, -c.BX, -c.BY, c.BX * 2, c.BY + 6);
+    if (c) blitRot(gg, c, -c.BX, -c.BY, c.BX * 2, c.BY + 6);
+  };
+  // everything but the head, in the player's frame (E, F = that frame's spot on the canvas, for the straight-copied arms)
+  const body = (gg, E, F) => {
+    if (shIn) { const sh = shadowSprite(sw0); if (sh) gg.drawImage(sh, -sw0, -sw0 * 0.36, sw0 * 2, sw0 * 0.72); }
+    leg(gg, legs[0]); leg(gg, legs[1]);
+    gg.save(); gg.translate(0, -HIP); gg.rotate(lean);
+    // pants top
+    gg.fillStyle = look.pants; gg.strokeStyle = OUT; gg.lineWidth = 2.5;
+    roundRect(gg, -W * 0.42, -4, W * 0.84, 9, 4); gg.fill(); gg.stroke();
+    dirtSpots(gg, p, 3, -W * 0.36, -2, W * 0.72, 6, 1);
+    arm(gg, arms[0], E, F);
+    torso(gg);
+    // front arm + ball
+    if (kp && kp.ball) kp.ball(gg, toT, lean); // the holder's ball goes under his hand
+    arm(gg, arms[1], E, F);
+    if (carrying && !(pose && pose.noBall)) drawFootball(gg, arms[1].hx - 2, arms[1].hy - 1, 0.95, 0.4);
+    gg.fillStyle = SKIN[p.face.skin]; gg.fillRect(-3, -TH - 9, 6, 9); // neck
+    gg.restore();
+  };
+  // plain standing/running: the whole body (all but the head) is one picture per pose, reused (GRAPHICS: FAST + Chromebooks)
+  const bkey = fast && !G.demo ? [tKey, legKey(legs[0]), legKey(legs[1]), armKey0, arms[0].q.join(','), arms[1].q.join(','), lean, carrying ? (p.tuck ? 2 : 1) : 0, ms, shIn ? 1 : 0].join('|') : '';
+  const bc = bkey && BodyAtlas.get(bkey);
+  if (bc) { g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.drawImage(bc.pg, bc.cx, bc.cy, bc.w, bc.h, Math.round(PMe) - bc.ox, Math.round(PMf) - bc.oy, bc.w, bc.h); g.restore(); }
+  else {
+    body(g, PMe, PMf);
+    if (bkey) BodyAtlas.want(bkey, ms, (() => { // the box the body fills (player frame -> canvas pixels around his spot)
+      const BX = Math.ceil(W * 0.75), BY = TH + 8; let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+      const add = (ax, ay, bx, by) => { x0 = Math.min(x0, ax); y0 = Math.min(y0, ay); x1 = Math.max(x1, bx); y1 = Math.max(y1, by); };
+      for (const L of legs) add(Math.min(L.hx, L.kx, L.fxp) - L.pd, Math.min(L.hy, L.ky) - L.pd, Math.max(L.hx, L.kx, L.fxp + 5) + L.pd, Math.max(L.ky, L.fyp + 4) + 2);
+      for (const A of arms) add(Math.min(A.q[0], A.q[2], A.q[4]) - 6, Math.min(A.q[1], A.q[3], A.q[5]) - 6, Math.max(A.q[0], A.q[2], A.q[4]) + 6, Math.max(A.q[1], A.q[3], A.q[5]) + 6);
+      for (const [cx, cy] of [[-BX - 2, -BY - 2], [BX + 2, -BY - 2], [-BX - 2, 8], [BX + 2, 8]]) { const X = cx * lc - cy * ls, Y = cx * ls + cy * lc - HIP; add(X, Y, X, Y); }
+      if (carrying) { const h = arms[1], X = h.hx * lc - h.hy * ls, Y = h.hx * ls + h.hy * lc - HIP; add(X - 14, Y - 14, X + 14, Y + 14); }
+      if (shIn) add(-sw0 - 1, -sw0 * 0.36 - 1, sw0 + 1, sw0 * 0.36 + 1);
+      return [Math.floor(ms * (dir > 0 ? x0 : -x1)) - 1, Math.floor(ms * y0) - 1, Math.ceil(ms * (dir > 0 ? x1 : -x0)) + 1, Math.ceil(ms * y1) + 1];
+    })(), (sg, E, F) => { sg.setTransform(dir * ms, 0, 0, ms, E, F); body(sg, E, F); });
   }
-  // front arm + ball
-  if (kp && kp.ball) kp.ball(g, toT, lean); // the holder's ball goes under his hand
-  const hand = arm(true);
-  if (carrying && !(pose && pose.noBall)) drawFootball(g, hand.hx - 2, hand.hy - 1, 0.95, 0.4);
 
-  // neck + bobble head
+  // bobble head
   const R = (big ? 19 : 21) * (p.headScale || 1);
   const hx = p.head.ox * dir, hy = -TH - R - 1 + p.head.oy; // head sits a little high so the jersey number shows
-  g.fillStyle = SKIN[p.face.skin]; g.strokeStyle = OUT; g.lineWidth = 2;
-  g.fillRect(-3, -TH - 9, 6, 9);
-  g.save(); g.translate(hx, hy); g.rotate(p.head.rot * dir + (p.down > 0 ? 0 : -lean * 0.4) + (pose ? pose.head : 0));
+  g.save(); g.translate(0, -HIP); g.rotate(lean);
+  g.translate(hx, hy); g.rotate(p.head.rot * dir + (p.down > 0 ? 0 : -lean * 0.4) + (pose ? pose.head : 0));
   drawHead(g, R, team, p, look);
-  g.restore();
   g.restore(); // torso
   g.restore(); // player
 
