@@ -54,3 +54,27 @@ button.cdTap:hover, button.cdTap:active { background: transparent; transform: no
   .cdStage { margin-top: 4px; } .cdBtns { margin-top: 4px; min-height: 36px; }
   .cdBtns button.big { font-size: 19px; padding: 6px 24px; } .cdBtns button { padding: 6px 14px; font-size: 14px; }
 }
+
+/* ---- NO HUDDLE bar (hurry.js): small, at the bottom, the field stays in view ---- */
+#hurry.screen { background: none; justify-content: flex-end; pointer-events: none; padding: 0 10px max(14px, env(safe-area-inset-bottom)); }
+#huBox { pointer-events: auto; background: #0c1016f0; border-left: 5px solid var(--gold); padding: 8px 10px 10px 14px; max-width: min(1100px, 100%); }
+#huHead { display: flex; align-items: baseline; gap: 14px; margin-bottom: 6px; font-family: var(--hd); }
+#huHead b { font-style: italic; font-weight: 900; font-size: 26px; line-height: 1; color: var(--gold); letter-spacing: .02em; }
+#huHead span { font-weight: 800; font-size: 14px; letter-spacing: .12em; color: var(--dim); white-space: nowrap; }
+#huHead em { font-style: normal; color: #ff6a52; }
+#huBtns { display: flex; flex-wrap: wrap; gap: 6px; align-items: stretch; }
+#huBtns button { margin: 0; padding: 8px 16px; font-size: 17px; display: flex; flex-direction: column; justify-content: center; position: relative; }
+#huBtns button i { position: absolute; top: 3px; right: 12px; font-style: normal; font-size: 11px; color: var(--dim); letter-spacing: .08em; }
+#huBtns button.gold { background: var(--gold); color: #111; font-style: italic; font-weight: 900; font-size: 20px; padding: 4px 30px 6px 18px; }
+#huBtns button.gold i { color: #111a; }
+#huBtns button small { font-style: normal; font-weight: 800; font-size: 10px; letter-spacing: .16em; opacity: .7; }
+#huBtns .huTool { background: #1c2430; color: #c9d3df; font-size: 15px; }
+@media (max-height: 500px) {
+  #hurry.screen { padding-bottom: max(6px, env(safe-area-inset-bottom)); }
+  #huBox { padding: 5px 8px 7px 10px; }
+  #huHead { margin-bottom: 4px; gap: 10px; } #huHead b { font-size: 20px; } #huHead span { font-size: 11px; }
+  #huBtns { gap: 5px; }
+  #huBtns button { padding: 6px 11px; font-size: 14px; min-height: 44px; white-space: nowrap; }
+  #huBtns button.gold { font-size: 16px; padding: 3px 16px 4px 12px; }
+  #huBtns .huTool { font-size: 13px; }
+}

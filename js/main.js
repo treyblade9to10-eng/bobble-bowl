@@ -739,10 +739,13 @@ function hlOver(s) {
   $('potgBox').style.setProperty('--tc', t.c1);
   $('potgTitle').innerHTML = (top.gw ? '<em>GAME-WINNING</em>' : '') + top.title.split(' ').map(w => `<span>${w}</span>`).join(' '); // spans: only wrap between words
   $('potgWho').textContent = [top.who, `${top.q}\u00a0${top.clock}`].filter(Boolean).join(' · ');
+  $('potgClip').style.display = Clips.can() ? '' : 'none';
   $('potgAll').textContent = `ALL HIGHLIGHTS (${list.length})`; $('potgAll').style.display = list.length > 1 ? '' : 'none';
 }
 $('potgWatch').onclick = () => { Sound.click(); Highlights.play([Highlights.best()], hlBack('over')); };
 $('potgAll').onclick = () => { Sound.click(); hlMenu('over'); };
+// SAVE CLIP right from the final screen: films the Play of the Game (clips.js), then back here with the share / download bar
+$('potgClip').onclick = () => { Sound.click(); Clips.highlight(Highlights.best(), hlBack('over')); };
 function hlMenu(from) {
   const list = Highlights.clips, top = Highlights.best(), T = G.teams;
   $('hlSub').textContent = `${from === 'half' ? 'HALFTIME' : 'FINAL'}  ·  ${T[1].id} ${G.score[1]} - ${G.score[0]} ${T[0].id}  ·  ${list.length} PLAY${list.length === 1 ? '' : 'S'}`;
@@ -872,6 +875,7 @@ function updateMobileButtons() {
   if (G.phase === 'presnap' && !G.demo) st = G.coop && G.online && Net.role === 'guest' ? 'cpre' : 'presnap'; // co-op guest: just SWITCH (the host snaps)
   const coach = coachOn(); // Coach Mode: no stick or move buttons, just AUDIBLE / TIMEOUT before the snap
   if (coach && st !== 'presnap') st = '';
+  if (G.online && Net.watch) st = ''; // watching: no buttons
   // stays up the whole play so your thumb never loses it (+ rushing a field goal). Online guest: up before the snap too,
   // the snap reaches you a moment late and a thumb that lands before the stick shows up would miss it
   const joyOn = (G.phase === 'live' || fgRushing() || (G.online && Net.role === 'guest' && G.phase === 'presnap')) && !G.demo && !!h;
@@ -1177,7 +1181,7 @@ $('onHost').onclick = () => {
   Net.host(code => { $('onCode').textContent = code; $('onStatus').textContent = `Tell your friend this code. ${onCoop() ? 'They join your team. ' : ''}The game starts when they join. Keep this screen open.`; },
     st => { $('onStatus').textContent = st; });
 };
-$('onJoin').onclick = () => { Sound.click(); $('onPick').style.display = 'none'; $('onJoinBox').style.display = ''; $('onCodeIn').value = ''; $('onCodeIn').focus(); $('onStatus').textContent = 'Type the 4-letter code from your friend\'s screen.'; };
+$('onJoin').onclick = () => { Sound.click(); $('onPick').style.display = 'none'; $('onJoinBox').style.display = ''; $('onCodeIn').value = ''; $('onCodeIn').focus(); $('onStatus').textContent = 'Type the 4-letter code from your friend\'s screen. JUST WATCH follows their game without playing.'; };
 $('onGo').onclick = () => {
   const code = $('onCodeIn').value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
   if (code.length !== 4) { $('onStatus').textContent = 'Codes are 4 letters/numbers.'; return; }
@@ -1187,6 +1191,13 @@ $('onGo').onclick = () => {
   Net.join(code, st => { $('onStatus').textContent = st; });
 };
 $('onCodeIn').addEventListener('keydown', e => { if (e.code === 'Enter') $('onGo').onclick(); e.stopPropagation(); });
+// JUST WATCH: a third device follows a friends' game with its code (read-only, net.js watchGame)
+$('onWatch').onclick = () => {
+  const code = $('onCodeIn').value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (code.length !== 4) { $('onStatus').textContent = 'Type the 4-letter code of the game you want to watch.'; return; }
+  Sound.click(); if (G.mode === 'mobile') goFullscreen();
+  Net.watchGame(code, st => { $('onStatus').textContent = st; });
+};
 
 // play-call shortcuts on a keyboard: K = kneel, X = spike (only when they'd show as buttons)
 addEventListener('keydown', e => {

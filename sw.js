@@ -1,5 +1,5 @@
 // ---- Offline support: network first (so updates show up right away), saved copy when there's no signal ----
-const CACHE = 'bobble-v15.1';
+const CACHE = 'bobble-v15.5';
 const FILES = [
   './',
   'index.html',
@@ -16,6 +16,7 @@ const FILES = [
   'css/flow.css',
   'css/modes2.css',
   'css/onseason.css',
+  'css/xfer.css',
   'manifest.webmanifest',
   'icons/icon-192.png',
   'icons/icon-512.png',
@@ -65,6 +66,7 @@ const FILES = [
   'js/net.js',
   'js/themes.js',
   'js/main.js',
+  'js/hurry.js',
   'js/boards.js',
   'js/tourney.js',
   'js/practice.js',
@@ -108,6 +110,8 @@ const FILES = [
   'js/combine.js',
   'js/welcome.js',
   'js/onseason.js',
+  'js/ranked.js',
+  'js/xfer.js',
   'fonts/barlow-500.woff2',
   'fonts/barlow-700.woff2',
   'fonts/bc-600.woff2',
