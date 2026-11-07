@@ -17,11 +17,15 @@ const Dilemma = {
     const p = shuffle(list.slice())[0]; if (p) this.rec[slot] = p[1]; return p;
   },
   // a rating change that lasts a few games (games = how many)
-  boost(p, delta, games) {
+  boost(p, delta, games, team) {
     const before = p[3]; p[3] = clamp(p[3] + delta, 40, 99);
     const dd = p[3] - before; if (!dd) return;
-    (Season.data.boosts || (Season.data.boosts = [])).push({ t: this.me(), n: p[1], d: dd, g: games });
+    (Season.data.boosts || (Season.data.boosts = [])).push({ t: team || this.me(), n: p[1], d: dd, g: games });
   },
+  // this week's opponent (and his starters)
+  opp() { const g = Season.myGame(); return g ? (g.home === this.me() ? g.away : g.home) : null; },
+  oppBoost(delta, games) { const o = this.opp(), R = o && Season.ensureRosters()[o]; if (!R) return; for (const p of R.off.concat(R.def)) if (p && !Season.hurt(p)) this.boost(p, delta, games, o); },
+  age(p) { return (p[6] && p[6].age) || 26; },
   teamBoost(delta, games) { for (const p of this.starters()) this.boost(p, delta, games); },
   // one game played: boosts tick down, the finished ones come off
   tick(all) {
@@ -121,6 +125,132 @@ const Dilemma = {
             if (chance(0.3)) { p[6].inj += 3; return `He tried, but it got worse. ${lastName(p[1])} is now out ${p[6].inj} weeks.`; }
             p[6].inj = 1; Season.injuryWeekHeal(p); Dilemma.boost(p, -4, 3); return `${lastName(p[1])} is back in the lineup, playing at less than 100%: -4 OVR for 3 games.`; } },
           { label: 'REST HIM', hint: 'Safe. He heals fully.', go() { p[3] = clamp(p[3] + 1, 40, 99); return `Smart. ${lastName(p[1])} rests and comes back stronger: +1 OVR when healthy.`; } }] };
+    },
+    weather() {
+      const d = Season.data, w = d.weather && d.weather[d.week] && d.weather[d.week].w; if (!['rain', 'snow', 'storm'].includes(w)) return null;
+      const qb = Dilemma.R().off[0]; if (!qb || Season.hurt(qb)) return null;
+      return { title: 'Bad Weather Week', text: `The forecast says ${w === 'snow' ? 'snow' : 'a big storm'} for Sunday. Do you practice outside in it all week?`,
+        opts: [
+          { label: 'PRACTICE OUTSIDE', hint: 'Ready for anything. Someone could get sick.', go() { Dilemma.teamBoost(1, 1); if (chance(0.2)) { const h = Dilemma.pk(Dilemma.starters(), 'a'); if (h) { Dilemma.sitOut(h, 1, 'sick'); return `The team is ready for the ${w}: everyone +1 next game. But ${Dilemma.nm(h)} caught a cold and misses 1 game.`; } } return `Cold hands, tough minds. Everyone +1 OVR next game.`; } },
+          { label: 'STAY INDOORS', hint: 'Sharp passing, softer team', go() { Dilemma.boost(qb, 2, 1); return `Perfect practice reps for ${lastName(qb[1])}: +2 OVR next game.`; } }] };
+    },
+    captain() {
+      const s = Dilemma.starters().sort((a, b) => b[3] - a[3]).slice(0, 4), a = Dilemma.pk(s, 'a'), b = a && Dilemma.pk(s.filter(p => p !== a), 'b'); if (!a || !b) return null;
+      return { title: 'Pick a Captain', text: `The team needs a new captain. ${Dilemma.nm(a)} and ${Dilemma.nm(b)} both want it.`,
+        opts: [
+          { label: `${lastName(a[1]).toUpperCase()}`, hint: 'He leads by example', go() { Dilemma.boost(a, 3, 3); Dilemma.boost(b, -1, 2); return `${lastName(a[1])} is fired up: +3 OVR for 3 games. ${lastName(b[1])} is a little hurt: -1 for 2 games.`; } },
+          { label: `${lastName(b[1]).toUpperCase()}`, hint: 'He leads with his voice', go() { Dilemma.boost(b, 3, 3); Dilemma.boost(a, -1, 2); return `${lastName(b[1])} is fired up: +3 OVR for 3 games. ${lastName(a[1])} is a little hurt: -1 for 2 games.`; } },
+          { label: 'LET THE TEAM VOTE', hint: 'Everyone has a say', go() { Dilemma.teamBoost(1, 2); return 'The players love having a say: everyone +1 OVR for 2 games.'; } }] };
+    },
+    extension() {
+      if (typeof Contracts === 'undefined') return null; Contracts.ensure();
+      const p = Dilemma.pk(Dilemma.starters().filter(p => Dilemma.age(p) <= 25 && p[3] >= 75 && Contracts.con(p)), 'a'); if (!p) return null;
+      const c = Contracts.con(p), want = Math.max(c.sal, Math.round(Contracts.value(p) * 0.9 * 10) / 10), can = Contracts.room(Dilemma.me()) >= want - c.sal;
+      return { title: 'Early Extension?', text: `Young ${Dilemma.nm(p)} (${p[3]}, age ${Dilemma.age(p)}) wants to lock in a long deal now: ${cmoney(want)} a year.`,
+        opts: [
+          { label: 'EXTEND HIM', hint: can ? `${cmoney(want)} a year, 4 more years` : 'Not enough cap room', off: !can, go() { c.sal = want; c.yrs = (c.yrs || 1) + 4; Dilemma.boost(p, 2, 3); return `${lastName(p[1])} is locked up long term and playing loose: +2 OVR for 3 games.`; } },
+          { label: 'WAIT AND SEE', hint: 'He might be annoyed', go() { if (chance(0.5)) { Dilemma.boost(p, -2, 2); return `${lastName(p[1])} feels disrespected: -2 OVR for 2 games.`; } return `${lastName(p[1])} shrugs it off. He wants to prove his worth.`; } }] };
+    },
+    rest() {
+      const p = Dilemma.pk(Dilemma.starters().filter(p => Dilemma.age(p) >= 31 && p[3] >= 75), 'a'); if (!p) return null;
+      return { title: 'Veteran Needs Rest', text: `${Dilemma.nm(p)} (age ${Dilemma.age(p)}) says his body is tired. The trainers want him to sit a game.`,
+        opts: [
+          { label: 'REST HIM', hint: 'Miss 1 game, fresher after', go() { Dilemma.sitOut(p, 1, 'rest'); Dilemma.boost(p, 3, 4); return `${lastName(p[1])} sits 1 game and comes back fresh: +3 OVR for his next games.`; } },
+          { label: 'PLAY HIM', hint: 'Need him now. Injury risk.', go() { if (chance(0.25)) { const w = 2 + Math.floor(rand(0, 2)); Dilemma.sitOut(p, w, 'hamstring'); return `His body gave out. ${lastName(p[1])} is out ${w} weeks.`; } Dilemma.boost(p, -1, 2); return `${lastName(p[1])} gutted it out, a step slow: -1 OVR for 2 games.`; } }] };
+    },
+    struggling() {
+      const p = Dilemma.pk(Dilemma.starters().filter(p => Dilemma.age(p) <= 24 && p[0] !== 'QB'), 'a'); if (!p) return null;
+      return { title: 'Young Player Struggling', text: `${Dilemma.nm(p)} (age ${Dilemma.age(p)}) has made big mistakes two weeks in a row. The coaches want to sit him.`,
+        opts: [
+          { label: 'SIT HIM A WEEK', hint: 'Reset his head', go() { Dilemma.sitOut(p, 1, 'benched'); Dilemma.boost(p, 2, 4); return `${lastName(p[1])} watches a week, then comes back focused: +2 OVR after.`; } },
+          { label: 'KEEP STARTING HIM', hint: 'He learns by playing. Big swing.', go() { if (chance(0.5)) { p[3] = clamp(p[3] + 2, 40, 99); return `It clicked! ${lastName(p[1])} figured it out: +2 OVR for good.`; } Dilemma.boost(p, -3, 2); return `More mistakes. ${lastName(p[1])}: -3 OVR for 2 games.`; } }] };
+    },
+    scouting() {
+      const o = Dilemma.opp(); if (!o) return null;
+      return { title: 'Scouting Tip', text: `Your scouts found a weakness in the ${tName(o)} defense. Using it means a whole week of special practice.`,
+        opts: [
+          { label: 'BUILD THE GAME PLAN', hint: 'Better next game, no reps for the young guys', go() { Dilemma.teamBoost(2, 1); return 'Everyone knows the plan: +2 OVR next game.'; } },
+          { label: 'NORMAL WEEK', hint: 'Young players get their reps', go() { const y = Season.bench(Dilemma.me()).filter(p => p && !Season.hurt(p) && Dilemma.age(p) <= 24).sort((a, b) => b[3] - a[3]).slice(0, 2); y.forEach(p => p[3] = clamp(p[3] + 1, 40, 99)); return y.length ? `${y.map(p => lastName(p[1])).join(' and ')} got good reps: +1 OVR for good.` : 'A normal week. Nothing new.'; } }] };
+    },
+    qbBattle() {
+      const R = Dilemma.R(), qb = R.off[0], bench = Season.bench(Dilemma.me()), b = bench.find(p => p && p[0] === 'QB' && !Season.hurt(p) && p[3] >= (qb ? qb[3] - 6 : 0));
+      if (!qb || !b || Season.hurt(qb)) return null;
+      Dilemma.rec = { a: qb[1], b: b[1] };
+      return { title: 'QB Controversy', text: `Backup ${Dilemma.nm(b)} (${b[3]}) has looked great in practice. Fans want him to start over ${Dilemma.nm(qb)} (${qb[3]}).`,
+        opts: [
+          { label: 'START THE BACKUP', hint: 'New energy. The starter will be upset.', go() { const j = bench.indexOf(b); if (j >= 0) { bench[j] = qb; R.off[0] = b; } b[3] = clamp(b[3] + 2, 40, 99); Dilemma.boost(qb, -2, 2); return `${lastName(b[1])} gets the start and +2 OVR for good. ${lastName(qb[1])} is not happy: -2 for 2 games.`; } },
+          { label: 'STICK WITH YOUR QB', hint: 'Show faith in him', go() { Dilemma.boost(qb, 2, 2); return `${lastName(qb[1])} hears it: +2 OVR for 2 games.`; } }] };
+    },
+    coordinator() {
+      return { title: 'Coordinator Interview', text: 'Your offensive coordinator has a head coaching interview with another team. He asks for your blessing.',
+        opts: [
+          { label: 'GIVE YOUR BLESSING', hint: 'Classy. Might lose him.', go() { if (chance(0.5)) { Dilemma.teamBoost(-1, 2); return 'He got the job! The offense is a little lost without him: everyone -1 OVR for 2 games.'; } Dilemma.teamBoost(1, 2); return 'He didn\'t get it, and he is grateful you backed him: everyone +1 OVR for 2 games.'; } },
+          { label: 'ASK HIM TO STAY', hint: 'Keep the staff together', go() { if (chance(0.6)) { Dilemma.teamBoost(1, 3); return 'He stays and the staff is fired up: everyone +1 OVR for 3 games.'; } Dilemma.teamBoost(-2, 2); return 'He took the interview anyway and things got awkward: everyone -2 OVR for 2 games.'; } }] };
+    },
+    bigHits() {
+      const p = Dilemma.pk(Dilemma.starters().filter(p => ['LB', 'S', 'CB'].includes(p[0]) && p[3] >= 74), 'a'); if (!p) return null;
+      return { title: 'Too Many Flags', text: `${Dilemma.nm(p)} keeps getting flagged for late hits. The league is watching him.`,
+        opts: [
+          { label: 'TEACH SAFER TACKLING', hint: 'Slower now, better later', go() { Dilemma.boost(p, -2, 2); p[3] = clamp(p[3] + 1, 40, 99); return `${lastName(p[1])} is learning: -2 OVR for 2 games, then +1 for good.`; } },
+          { label: 'LET HIM PLAY HIS WAY', hint: 'Could get suspended', go() { if (chance(0.35)) { Dilemma.sitOut(p, 1, 'suspended'); return `Another late hit. ${lastName(p[1])} is suspended 1 game.`; } Dilemma.boost(p, 2, 1); return `${lastName(p[1])} plays with fire: +2 OVR next game.`; } }] };
+    },
+    travel() {
+      const g = Season.myGame(); if (!g || g.home === Dilemma.me()) return null;
+      return { title: 'Long Road Trip', text: `It's a long flight to ${tName(g.home)}. Fly out a day early?`,
+        opts: [
+          { label: 'FLY OUT EARLY', hint: 'Rested, but a short practice week', go() { Dilemma.teamBoost(1, 1); const y = Dilemma.R().off[0]; if (y) Dilemma.boost(y, -1, 1); return 'The team is rested: everyone +1 OVR next game (QB -1, fewer practice reps).'; } },
+          { label: 'NORMAL SCHEDULE', hint: 'Full practice week, jet lag risk', go() { if (chance(0.4)) { Dilemma.teamBoost(-1, 1); return 'Jet lag hit hard: everyone -1 OVR next game.'; } return 'Smooth trip. No problems.'; } }] };
+    },
+    teamNight() {
+      return { title: 'Team Bowling Night', text: 'The players want a team bowling night to bond before a big stretch of games.',
+        opts: [
+          { label: 'GO BOWLING', hint: 'Team bonding. Tiny injury risk.', go() { Dilemma.teamBoost(1, 2); if (chance(0.1)) { const h = Dilemma.pk(Dilemma.starters(), 'a'); if (h) { Dilemma.sitOut(h, 1, 'wrist'); return `Great night: everyone +1 OVR for 2 games. ${Dilemma.nm(h)} hurt his wrist bowling and misses 1 game.`; } } return 'Great night: everyone +1 OVR for 2 games.'; } },
+          { label: 'PLAYBOOK NIGHT', hint: 'Study instead', go() { const qb = Dilemma.R().off[0]; if (qb) Dilemma.boost(qb, 2, 1); return 'Extra study: QB +2 OVR next game. Some players are grumbling.'; } }] };
+    },
+    contractYear() {
+      if (typeof Contracts === 'undefined') return null; Contracts.ensure();
+      const R = Dilemma.R(), p = Dilemma.pk(R.off.filter(p => p && !Season.hurt(p) && ['RB', 'WR', 'TE'].includes(p[0]) && Contracts.con(p) && Contracts.con(p).yrs <= 1), 'a'); if (!p) return null;
+      const other = R.off.filter(q => q && q !== p && ['RB', 'WR', 'TE'].includes(q[0]) && !Season.hurt(q)).sort((a, b) => b[3] - a[3])[0];
+      return { title: 'Contract Year', text: `${Dilemma.nm(p)} is in the last year of his deal and wants the ball more to prove he deserves a big contract.`,
+        opts: [
+          { label: 'FEED HIM', hint: 'He gets hot, someone else waits', go() { Dilemma.boost(p, 3, 3); if (other) Dilemma.boost(other, -2, 2); return `${lastName(p[1])} is rolling: +3 OVR for 3 games.${other ? ` ${lastName(other[1])} gets fewer touches: -2 for 2 games.` : ''}`; } },
+          { label: 'STICK TO THE PLAN', hint: 'Spread it around', go() { Dilemma.boost(p, -2, 2); return `${lastName(p[1])} sulks a little: -2 OVR for 2 games.`; } }] };
+    },
+    lateNight() {
+      const s = Dilemma.starters().filter(p => p[0] !== 'QB'), a = Dilemma.pk(s, 'a'), b = a && Dilemma.pk(s.filter(p => p !== a), 'b'); if (!a || !b) return null;
+      return { title: 'Missed Curfew', text: `${Dilemma.nm(a)} and ${Dilemma.nm(b)} got back to the team hotel way past curfew.`,
+        opts: [
+          { label: 'SIT THEM 1 GAME', hint: 'Rules are rules', go() { Dilemma.sitOut(a, 1, 'suspended'); Dilemma.sitOut(b, 1, 'suspended'); Dilemma.teamBoost(1, 2); return 'They sit 1 game. The team respects it: everyone +1 OVR for 2 games.'; } },
+          { label: 'WARNING ONLY', hint: 'They play tired', go() { Dilemma.boost(a, -3, 1); Dilemma.boost(b, -3, 1); return 'They play, but they are tired: -3 OVR each next game.'; } }] };
+    },
+    hype() {
+      const p = Dilemma.pk(Dilemma.starters().filter(p => Dilemma.age(p) <= 23), 'a'); if (!p) return null;
+      return { title: 'Rookie Hype', text: `TV can't stop talking about ${Dilemma.nm(p)}. Everyone wants an interview with him.`,
+        opts: [
+          { label: 'PROTECT HIM', hint: 'No media this week', go() { Dilemma.boost(p, 2, 2); return `${lastName(p[1])} stays focused: +2 OVR for 2 games.`; } },
+          { label: 'LET HIM SHINE', hint: 'Could go either way', go() { if (chance(0.5)) { Dilemma.boost(p, 4, 3); return `${lastName(p[1])} loves the spotlight: +4 OVR for 3 games!`; } Dilemma.boost(p, -3, 3); return `The hype got to him: -3 OVR for 3 games.`; } }] };
+    },
+    openPractice() {
+      const o = Dilemma.opp(); if (!o) return null;
+      return { title: 'Open Practice?', text: 'Fans are asking for an open practice this week. Thousands would come watch.',
+        opts: [
+          { label: 'OPEN IT UP', hint: 'Team loves it. Scouts might watch too.', go() { Dilemma.teamBoost(1, 1); if (chance(0.3)) { Dilemma.oppBoost(2, 1); return `Your players fed off the crowd: +1 OVR next game. But the ${tName(o)} saw your plays: they get +2 next game.`; } return 'Your players fed off the crowd: everyone +1 OVR next game.'; } },
+          { label: 'CLOSED DOORS', hint: 'Keep the plays secret', go() { const qb = Dilemma.R().off[0]; if (qb) Dilemma.boost(qb, 1, 1); return 'Quiet, focused week: QB +1 OVR next game.'; } }] };
+    },
+    charity() {
+      const top = Dilemma.starters().sort((a, b) => b[3] - a[3]).slice(0, 2); if (top.length < 2) return null;
+      Dilemma.rec = { a: top[0][1], b: top[1][1] };
+      return { title: 'Charity Game', text: `A celebrity softball game for the children's hospital wants your two biggest stars: ${Dilemma.nm(top[0])} and ${Dilemma.nm(top[1])}.`,
+        opts: [
+          { label: 'SEND YOUR STARS', hint: 'Great cause. Small injury risk.', go() { top.forEach(p => Dilemma.boost(p, 2, 2)); if (chance(0.15)) { Dilemma.sitOut(top[1], 1, 'sore back'); return `The city loves it and your stars feel great (+2 for 2 games). ${lastName(top[1][1])} tweaked his back and misses 1 game.`; } return 'The city loves it. Your stars feel great: +2 OVR for 2 games.'; } },
+          { label: 'SEND THE BACKUPS', hint: 'Young guys get the spotlight', go() { const y = Season.bench(Dilemma.me()).filter(p => p && !Season.hurt(p)).sort((a, b) => b[3] - a[3]).slice(0, 2); y.forEach(p => p[3] = clamp(p[3] + 1, 40, 99)); return y.length ? `${y.map(p => lastName(p[1])).join(' and ')} loved it: +1 OVR for good.` : 'The backups had fun.'; } }] };
+    },
+    lostPlaybook() {
+      const o = Dilemma.opp(); if (!o) return null;
+      return { title: 'Lost Playbook', text: `A player left his playbook on the team bus. It might have ended up with the ${tName(o)}.`,
+        opts: [
+          { label: 'CHANGE THE PLAYS', hint: 'Safe, but new plays to learn', go() { Dilemma.teamBoost(-1, 1); return 'New signals, new names: everyone -1 OVR next game while they learn them.'; } },
+          { label: 'KEEP THEM', hint: 'Probably nothing...', go() { if (chance(0.4)) { Dilemma.oppBoost(3, 1); return `They had it. The ${tName(o)} know your plays: +3 OVR for them next game.`; } return 'Nobody found it. Phew.'; } }] };
     }
   },
   // between weeks: about 1 in 3, never two weeks in a row
@@ -132,7 +262,7 @@ const Dilemma = {
     if (last && last.year === d.year && d.week - last.week < 2) return;
     if (!chance(0.45)) return;
     const used = (d.dilemmas || []).filter(x => x.year === d.year).map(x => x.kind);
-    const kinds = shuffle(Object.keys(this.KINDS)).sort((a, b) => used.includes(a) - used.includes(b)); // something new first
+    const kinds = shuffle(Object.keys(this.KINDS)).filter(k => !used.includes(k)); // no repeats in a season
     for (const k of kinds) if (this.make(k)) return;
   },
   make(k) {

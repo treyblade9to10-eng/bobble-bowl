@@ -447,8 +447,8 @@ const CareerUI = {
     this.set(`<div class="ccWrap">${this.card(team)}
       <div class="ccMain">
         <div class="ccHead">SKILL POINTS: <b class="gold">${c.sp}</b></div>
-        <div class="ccText">You get 2 points every level. Overall is the average of your two skills. Speed costs 2 points but makes you faster on every play.${tw ? ` Two-way: your ${tw.pos} skills are a second overall (${Career.ovr2()}), so split your points.` : ''}</div>
-        ${bar(0, sk[0], c.a[0], 1)}${bar(1, sk[1], c.a[1], 1)}${tw ? bar('t0', `${tw.pos} ${CAP_SKILLS[tw.pos][0]}`, tw.a[0], 1) + bar('t1', `${tw.pos} ${CAP_SKILLS[tw.pos][1]}`, tw.a[1], 1) : ''}${bar('spd', 'Speed', c.spd, 2)}
+        <div class="ccText">You get 2 points every level. Overall is the average of your two skills. The higher a skill is, the more a point costs (1 under 75, up to 4 in the 90s). Speed costs 2-3 but makes you faster on every play.${tw ? ` Two-way: your ${tw.pos} skills are a second overall (${Career.ovr2()}), so split your points.` : ''}</div>
+        ${bar(0, sk[0], c.a[0], Career.cost(c.a[0]))}${bar(1, sk[1], c.a[1], Career.cost(c.a[1]))}${tw ? bar('t0', `${tw.pos} ${CAP_SKILLS[tw.pos][0]}`, tw.a[0], Career.cost(tw.a[0])) + bar('t1', `${tw.pos} ${CAP_SKILLS[tw.pos][1]}`, tw.a[1], Career.cost(tw.a[1])) : ''}${bar('spd', 'Speed', c.spd, Career.spdCost(c.spd))}
         <div class="row"><button class="big" id="upDone">DONE</button></div>
       </div></div>`, 'Upgrade');
     this.wireCard(team);

@@ -130,8 +130,11 @@ const Career = {
   ovr(c = this.cap) { return Math.round((c.a[0] + c.a[1]) / 2); },
   ovr2(c = this.cap) { return c && c.tw ? Math.round((c.tw.a[0] + c.tw.a[1]) / 2) : null; }, // two-way: his defensive spot
   posLabel(c = this.cap) { return c.tw ? `${c.pos}/${c.tw.pos}` : c.pos; },
-  SP_PER_LVL: 2, XP_CAP: 240,
-  need(lvl) { return 200 + lvl * 5; }, // XP for the next level (each level = 2 skill points)
+  SP_PER_LVL: 2, XP_CAP: 200,
+  need(lvl) { return 200 + lvl * 6; }, // XP for the next level (each level = 2 skill points)
+  // +1 to a skill costs more the better it already is (stars are made, not handed out)
+  cost(v) { return v < 75 ? 1 : v < 85 ? 2 : v < 93 ? 3 : 4; },
+  spdCost(v) { return v < 88 ? 2 : 3; },
   tuple() {
     const c = this.cap; if (!c) return null;
     const gl = c.gear.gloves === 'team' ? null : c.gear.gloves === 'black' ? '#151515' : c.gear.gloves === 'gold' ? '#f6c31c' : '#f2f2f2';
@@ -163,12 +166,12 @@ const Career = {
     while (c.xp >= this.need(c.lvl)) { c.xp -= this.need(c.lvl); c.lvl++; c.sp += this.SP_PER_LVL; lv++; }
     return { lv, before };
   },
-  // spend skill points: +1 to a skill costs 1, +1 speed costs 2
+  // spend skill points: +1 to a skill costs 1-5 (by how high it is), +1 speed costs 2-3
   upgrade(k) {
     const c = this.cap;
-    if (k === 'spd') { if (c.sp < 2 || c.spd >= 99) return false; c.sp -= 2; c.spd = Math.min(99, c.spd + 1); }
-    else if (k === 't0' || k === 't1') { const i = +k[1]; if (!c.tw || c.sp < 1 || c.tw.a[i] >= 99) return false; c.sp -= 1; c.tw.a[i]++; } // two-way: defensive skills
-    else { if (c.sp < 1 || c.a[k] >= 99) return false; c.sp -= 1; c.a[k]++; }
+    if (k === 'spd') { const n = this.spdCost(c.spd); if (c.sp < n || c.spd >= 99) return false; c.sp -= n; c.spd = Math.min(99, c.spd + 1); }
+    else if (k === 't0' || k === 't1') { const i = +k[1], n = c.tw && this.cost(c.tw.a[i]); if (!c.tw || c.sp < n || c.tw.a[i] >= 99) return false; c.sp -= n; c.tw.a[i]++; } // two-way: defensive skills
+    else { const n = this.cost(c.a[k]); if (c.sp < n || c.a[k] >= 99) return false; c.sp -= n; c.a[k]++; }
     this.checkBadges(); this.save(); return true;
   },
   gearOk(k) { return this.ovr() >= CAP_GEAR[k]; },
@@ -186,14 +189,14 @@ const Career = {
   canCall() { const c = this.cap; return !!c && ((c.trust || 0) >= TRUST_CALL || this.vet()); },
   addTrust(d) { const c = this.cap, was = this.canCall(); c.trust = clamp(Math.round((c.trust || 0) + d), 0, 100); return { v: c.trust, d: Math.round(d), unlocked: !was && this.canCall() }; },
   // after a game you played: good grades, wins and goals earn it; bad games and turnovers lose it
-  trustDelta(grade, won, hit, tov) { return { 'A+': 5, A: 4, 'B+': 3, B: 2, 'C+': 1, C: 0, D: -2, F: -4 }[grade] + (won ? 1 : -1) + (hit === 3 ? 1 : 0) - 3 * (tov || 0); },
+  trustDelta(grade, won, hit, tov) { return { 'A+': 4, A: 3, 'B+': 2, B: 1, 'C+': 0, C: -1, D: -3, F: -5 }[grade] + (won ? 1 : -1) + (hit === 3 ? 1 : 0) - 3 * (tov || 0); },
   // new team: the new coach doesn't know you yet (draft round / stars set the first number)
   draftTrust(d) { return ({ 1: 32, 2: 26, 3: 21 }[d.round] || 26) + (d.pick && d.pick <= 10 ? 4 : 0); },
   changeTeam(id) { const c = this.cap; c.team = id; c.trust = clamp(Math.round(c.trust * 0.5 + 15), 20, 60); },
 
   // ---- game goals + grade ----
   goals() {
-    const c = this.cap, f = (c.qtr || 180) / 180, n = v => Math.max(1, Math.round(v * f / 5) * 5), k = v => Math.max(1, Math.round(v * f));
+    const c = this.cap, f = (c.qtr || 180) / 180 * this.expect(), n = v => Math.max(1, Math.round(v * f / 5) * 5), k = v => Math.max(1, Math.round(v * f));
     const G3 = {
       QB: [['pass', n(150), 'pass yds'], ['td', k(2), 'touchdowns'], ['win', 1, 'Win the game']],
       RB: [['rush', n(60), 'rush yds'], ['td', 1, 'touchdown'], ['tot', n(90), 'total yds']],
@@ -207,6 +210,8 @@ const Career = {
     const L = c.tw ? [G3[c.pos][0], G3[c.tw.pos][0], G3[c.pos][1]] : G3[c.pos]; // two-way: one goal is on defense
     return L.map(([key, v, txt]) => ({ key, v, text: key === 'win' ? txt : `${v} ${txt}` }));
   },
+  // the better you are, the more the coach expects (goals + grades)
+  expect() { return 1 + Math.max(0, this.ovr() - 72) * 0.01; },
   goalVal(key, st, won) { return key === 'win' ? (won ? 1 : 0) : key === 'tot' ? (st.rush || 0) + (st.rec || 0) : key === 'big' ? (st.sack || 0) + (st.int || 0) : st[key] || 0; },
   score(st, pos) {
     return SEASON_RT.includes(pos) ? (st.pass || 0) / 12 + (st.rush || 0) / 5 + (st.rec || 0) / 5 + (st.td || 0) * 7 : (st.tkl || 0) * 3 + (st.sack || 0) * 9 + (st.int || 0) * 11;
@@ -217,7 +222,7 @@ const Career = {
   par(T, c = this.cap) { return T[c.pos] + (c.tw ? T[c.tw.pos] * 0.6 : 0); },
   grade(st, won, goalsHit) {
     const c = this.cap, f = (c.qtr || 180) / 180;
-    const exp = this.par({ QB: 26, RB: 18, WR: 15, TE: 11, DL: 9, LB: 13, CB: 8, S: 10 }) * f;
+    const exp = this.par({ QB: 26, RB: 18, WR: 15, TE: 11, DL: 9, LB: 13, CB: 8, S: 10 }) * f * this.expect();
     const r = this.myScore(st) / exp + (won ? 0.15 : 0) + goalsHit * 0.12;
     return r >= 1.6 ? 'A+' : r >= 1.25 ? 'A' : r >= 1.0 ? 'B+' : r >= 0.8 ? 'B' : r >= 0.6 ? 'C+' : r >= 0.45 ? 'C' : r >= 0.3 ? 'D' : 'F';
   },
@@ -291,8 +296,8 @@ const Career = {
     st.tkl += Math.round(({ DL: 2.5, LB: 5, CB: 3, S: 4 }[pos] + q * 2) * r() * f); st.sack += pos === 'DL' || pos === 'LB' ? (chance((0.25 + q * 0.4) * f) ? 1 : 0) : 0; st.int += pos === 'CB' || pos === 'S' || pos === 'LB' ? (chance((0.12 + q * 0.2) * f) ? 1 : 0) : 0;
   },
   // simmed games give less XP than playing (playing is where you really get better)
-  simXP(st, won) { return Math.round(8 + (won ? 8 : 0) + Math.min(this.cap.tw ? 26 : 20, this.myScore(st) * 0.5)); },
-  simTrust(won) { return this.addTrust(won ? 1 : -1); },
+  simXP(st, won) { return Math.round(6 + (won ? 6 : 0) + Math.min(this.cap.tw ? 20 : 15, this.myScore(st) * 0.4)); },
+  simTrust(won) { return this.addTrust(won ? 1 : -2); },
 
   // ---------------- college ----------------
   collegeTeam(id) {
@@ -377,11 +382,14 @@ const Career = {
   fortyFromSpd() { return +(5.55 - (this.cap.spd - 60) * 0.03 + rand(-0.04, 0.04)).toFixed(2); },
   stock() {
     const c = this.cap, s = c.seasons.find(x => x.lvl === 'NCAA') || { g: 1 };
-    const pg = this.score(s, c.pos) / Math.max(1, s.g) * (180 / (c.qtr || 180)), twB = c.tw ? clamp((this.ovr2() - 58) * 0.9, 0, 14) + Math.min(8, this.score(s, c.tw.pos) / Math.max(1, s.g) * 0.8) : 0; // scouts love a two-way player
+    const T = c.tape, pg = (T ? T.p + T.s * 0.6 : this.score(s, c.pos)) / Math.max(1, s.g) * (180 / (c.qtr || 180)), twB = c.tw ? clamp((this.ovr2() - 58) * 0.9, 0, 14) + Math.min(8, this.score(s, c.tw.pos) / Math.max(1, s.g) * 0.8) : 0; // scouts love a two-way player
     const cl = c.college, pr = COLLEGES.find(x => x.id === cl.id).pr;
     const forty = c.combine ? c.combine.forty : this.fortyFromSpd();
     const fortyAvg = { QB: 4.85, RB: 4.5, WR: 4.48, TE: 4.7, DL: 4.85, LB: 4.65, CB: 4.45, S: 4.55 }[c.pos];
-    return (this.ovr() - 58) * 2.2 + Math.min(36, pg * 1.4) + cl.w * 2 + cl.sched.reduce((a, g) => a + (g.score && g.score[0] > g.score[1] ? (g.bowl ? 5 : g.cfp ? 4 : 0) : 0), 0) + (cl.inCfp ? 3 : 0) + (cl.champ ? 6 : 0) + (fortyAvg - forty) * 45 + pr * 3 + twB;
+    // production vs a normal game at his spot: scouts want numbers, not just ratings
+    const par = { QB: 26, RB: 18, WR: 15, TE: 11, DL: 9, LB: 13, CB: 8, S: 10 }[c.pos]; // same normal game as the grades
+    const prod = clamp((pg / par - 0.7) * 50, -12, 40), exp40 = 5.55 - (c.spd - 60) * 0.03; // the 40: beat what your speed says (a little extra for real speed at your spot)
+    return 8 + (this.ovr() - 58) * 2 + prod + cl.w * 2.5 + cl.sched.reduce((a, g) => a + (g.score && g.score[0] > g.score[1] ? (g.bowl ? 4 : g.cfp ? 4 : 0) : 0), 0) + (cl.inCfp ? 3 : 0) + (cl.champ ? 5 : 0) + (exp40 - forty) * 40 + (fortyAvg - exp40) * 15 + pr * 2 + twB + (c.stockAdj || 0);
   },
   projPick(stock = this.stock()) { return clamp(Math.round(97 - stock * 0.95), 1, 96); },
   projText(p = this.projPick()) { const r = Math.ceil(p / 32); const lo = clamp(p - 6, 1, 96), hi = clamp(p + 6, 1, 96); return `Round ${r} (picks ${lo}-${hi})`; },
@@ -389,7 +397,7 @@ const Career = {
   runDraft() {
     const c = this.cap;
     const order = TEAMS.map(t => t.id).map(id => ({ id, k: TEAMS.find(t => t.id === id).off.concat(TEAMS.find(t => t.id === id).def).reduce((a, p) => a + p[3], 0) + rand(-60, 60) })).sort((a, b) => a.k - b.k).map(o => o.id);
-    const myPick = clamp(this.projPick() + Math.round(rand(-5, 5)), 1, 96);
+    const myPick = clamp(this.projPick() + Math.round(rand(-8, 8)), 1, 96);
     const picks = [];
     for (let n = 1; n <= myPick; n++) {
       const team = order[(n - 1) % 32];
@@ -445,7 +453,7 @@ const Career = {
     const awards = nfl.reduce((a, s) => a + (s.awards || []).length, 0), titles = nfl.filter(s => s.champ).length;
     const peak = Math.max(this.ovr(), ...nfl.map(s => s.ovr || 0));
     const tot = nfl.reduce((a, s) => a + this.myScore(s), 0);
-    const pts = (peak - 75) * 3 + awards * 25 + titles * 15 + nfl.length * 4 + tot / (SEASON_RT.includes(c.pos) ? 60 : 30);
+    const pts = (peak - 80) * 3 + awards * 20 + titles * 12 + nfl.length * 2 + tot / (SEASON_RT.includes(c.pos) ? 90 : 45);
     const hof = pts >= 100;
     if (hof) this.badge('hof');
     const L = { name: c.name, pos: this.posLabel(c), num: c.num, college: c.college ? c.college.id : '', teams: [...new Set(nfl.map(s => s.team))], years: nfl.length, peak, awards, titles,
