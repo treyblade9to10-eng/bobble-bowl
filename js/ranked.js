@@ -1,7 +1,7 @@
 // ---- Online ranked: your record and rating in online versus games, kept on this device only (no public list) ----
 // Both devices send their rating when they connect (hello / start in net.js). At the end each side works out the same
 // change from the host's final score: a simple Elo (beat a higher-rated friend = more points). Co-op games don't count,
-// and neither does a game somebody left before the end.
+// and neither does a game somebody left before the end, or a CASUAL game (the host picks, net.js sends it in start).
 const Ranked = {
   KEY: 'bobbleRanked', START: 1000,
   TIERS: [[0, 'ROOKIE'], [1100, 'STARTER'], [1200, 'PRO'], [1300, 'ALL-PRO'], [1400, 'MVP'], [1550, 'HALL OF FAME']],
@@ -47,6 +47,7 @@ const Ranked = {
   G.hooks.onGameOver = s => {
     _over(s);
     if (!G.online || !G.versus || G.coop || G.demo || Net.watch || !Net.role) return;
+    if (!Net.ranked) { $('overChal').textContent = 'CASUAL GAME  ·  RANKED RATING AND RECORD STAY THE SAME'; $('overChal').style.color = '#dfe6ee'; return; }
     if (!Net.rkDone) { Net.rkDone = true; const me = s.human; Ranked.record(s.score[me], s.score[1 - me], Net.oppRk); }
     const L = Ranked.last; if (!L) return;
     $('overChal').innerHTML = `RANKED: <b>${L.tier}</b> ${L.r} (${L.ch >= 0 ? '+' : ''}${L.ch})  ·  ${Ranked.rec()}${Ranked.streak() ? '  ·  ' + Ranked.streak() : ''}` +

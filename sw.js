@@ -93,7 +93,7 @@ const FILES = [
   'js/franchise2.js',
   'js/contracts.js',
   'js/cputrades.js',
-  'js/benchedit.js',
+  'js/benchedit.js', 'js/collegeqg.js',
   'js/playeredit.js',
   'js/playoffpic.js',
   'js/slots.js',

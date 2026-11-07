@@ -1126,8 +1126,9 @@ function onMove(d) {
   sel.idx[sel.you] = list[(k + d + list.length) % list.length]; Sound.click(); renderOnlineTeam(true); renderOnlineMode();
 }
 // VERSUS = you vs your friend, CO-OP = you two on the same team vs the CPU (the host's choice counts: teams, CPU team, CPU level)
-let onMode = 'vs', onCpu = 1;
-try { const o = JSON.parse(localStorage.getItem('bobbleOnline') || '{}'); if (o.m === 'coop') onMode = 'coop'; if (o.cpu >= 0) onCpu = o.cpu; } catch (e) {}
+// RANKED / CASUAL (versus only): casual games never touch your ranked rating or record. Casual unless you picked ranked before
+let onMode = 'vs', onCpu = 1, onRk = 0;
+try { const o = JSON.parse(localStorage.getItem('bobbleOnline') || '{}'); if (o.m === 'coop') onMode = 'coop'; if (o.cpu >= 0) onCpu = o.cpu; if (o.rk === 1) onRk = 1; } catch (e) {}
 const onCoop = () => onMode === 'coop';
 function onCpuTeam() {
   const L = CT.NFL, mine = TEAMS[sel.idx[sel.you]];
@@ -1135,16 +1136,22 @@ function onCpuTeam() {
   return L[onCpu].id === (mine && mine.id) ? L[(onCpu + 1) % L.length] : L[onCpu];
 }
 const ON_HELP = { vs: 'Play a friend on another phone or computer. One of you hosts and gets a code, the other types it in.',
+  rk: 'RANKED: the win or loss counts toward your rating and record. The host picks RANKED or CASUAL.',
+  cs: 'CASUAL: just for fun, your rating and record stay the same. The host picks RANKED or CASUAL.',
   coop: 'You two on the same team vs the CPU. The host picks the teams and calls the plays, then gets a code for the friend to type in.' };
 function renderOnlineMode() {
   $('onMode').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.m === onMode));
   $('online').classList.toggle('coop', onCoop());
+  $('onRk').querySelectorAll('button').forEach(b => b.classList.toggle('on', +b.dataset.r === onRk));
   const t = onCpuTeam(); $('onCpuName').textContent = t.city + ' ' + t.name; $('onCpuRow').style.setProperty('--cc', t.c1);
   $('onDiff').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === $('optDiff').value));
-  if (!Net.role && $('onPick').style.display !== 'none' && Object.values(ON_HELP).includes($('onStatus').textContent)) $('onStatus').textContent = ON_HELP[onMode];
-  try { localStorage.setItem('bobbleOnline', JSON.stringify({ m: onMode, cpu: onCpu })); } catch (e) {}
+  if (!Net.role && $('onPick').style.display !== 'none' && Object.values(ON_HELP).includes($('onStatus').textContent)) $('onStatus').textContent = onHelp([ON_HELP.rk, ON_HELP.cs].includes($('onStatus').textContent));
+  try { localStorage.setItem('bobbleOnline', JSON.stringify({ m: onMode, cpu: onCpu, rk: onRk })); } catch (e) {}
 }
 $('onMode').querySelectorAll('button').forEach(b => b.onclick = () => { if (Net.role || onMode === b.dataset.m) return; onMode = b.dataset.m; Sound.click(); renderOnlineMode(); });
+$('onRk').querySelectorAll('button').forEach(b => b.onclick = () => { if (Net.role || onRk === +b.dataset.r) return; onRk = +b.dataset.r; Sound.click(); $('onStatus').textContent = onHelp(true); renderOnlineMode(); });
+function onHelp(rk) { return onCoop() ? ON_HELP.coop : rk ? ON_HELP[onRk ? 'rk' : 'cs'] : ON_HELP.vs; }
+const onRanked = () => !onCoop() && onRk === 1; // what the host sends in its start message (net.js)
 $('onCpuRow').querySelectorAll('.muStep').forEach(b => b.onclick = () => {
   if (Net.role) return;
   const was = onCpuTeam(); onCpu += +b.dataset.d; if (onCpuTeam() === was) onCpu += +b.dataset.d; // (skips your own team)
@@ -1153,7 +1160,7 @@ $('onCpuRow').querySelectorAll('.muStep').forEach(b => b.onclick = () => {
 $('onDiff').querySelectorAll('button').forEach(b => b.onclick = () => { if (Net.role) return; $('optDiff').value = b.dataset.v; saveOpts(); Sound.click(); renderOnlineMode(); });
 function openOnline(msg) {
   $('onCodeBox').style.display = 'none'; $('onJoinBox').style.display = 'none'; $('onPick').style.display = '';
-  $('onStatus').textContent = msg || ON_HELP[onMode];
+  $('onStatus').textContent = msg || onHelp();
   renderOnlineTeam(); renderOnlineMode(); show('online');
 }
 function onlineMsg(t) { onlineWait(null); openOnline(t); }
@@ -1178,10 +1185,10 @@ $('onHost').onclick = () => {
   if (typeof Peer === 'undefined') { $('onStatus').textContent = "Online play couldn't load. Check your internet and refresh."; return; }
   $('onPick').style.display = 'none'; $('onCodeBox').style.display = ''; $('onCode').textContent = '....';
   $('onStatus').textContent = 'Getting a code...';
-  Net.host(code => { $('onCode').textContent = code; $('onStatus').textContent = `Tell your friend this code. ${onCoop() ? 'They join your team. ' : ''}The game starts when they join. Keep this screen open.`; },
+  Net.host(code => { $('onCode').textContent = code; $('onStatus').textContent = `${onCoop() ? '' : onRanked() ? 'RANKED GAME. ' : 'CASUAL GAME (rating stays the same). '}Tell your friend this code. ${onCoop() ? 'They join your team. ' : ''}The game starts when they join. Keep this screen open.`; },
     st => { $('onStatus').textContent = st; });
 };
-$('onJoin').onclick = () => { Sound.click(); $('onPick').style.display = 'none'; $('onJoinBox').style.display = ''; $('onCodeIn').value = ''; $('onCodeIn').focus(); $('onStatus').textContent = 'Type the 4-letter code from your friend\'s screen. JUST WATCH follows their game without playing.'; };
+$('onJoin').onclick = () => { Sound.click(); $('onPick').style.display = 'none'; $('onJoinBox').style.display = ''; $('onCodeIn').value = ''; $('onCodeIn').focus(); $('onStatus').textContent = 'Type the 4-letter code from your friend\'s screen. Their pick of RANKED or CASUAL counts. JUST WATCH follows their game without playing.'; };
 $('onGo').onclick = () => {
   const code = $('onCodeIn').value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
   if (code.length !== 4) { $('onStatus').textContent = 'Codes are 4 letters/numbers.'; return; }

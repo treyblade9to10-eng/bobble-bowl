@@ -612,9 +612,9 @@ SaveGame.FIELDS.push('osn'); // a league game picked back up with RESUME GAME st
 // hosting the matchup: league quarter length, VERSUS, playoff overtime
 { const _sh = Net.startHost; Net.startHost = function (hello) {
   const m = OSN.match; if (!m || !OSN.L) return _sh.call(this, hello);
-  const q = $('optQtr'), qv = q.value, md = onMode;
-  q.value = String(OSN.L.cfg.qtr); onMode = 'vs'; Career.noCAP = true;
-  try { _sh.call(this, hello); } finally { q.value = qv; onMode = md; Career.noCAP = false; }
+  const q = $('optQtr'), qv = q.value, md = onMode, rk = onRk;
+  q.value = String(OSN.L.cfg.qtr); onMode = 'vs'; onRk = 1; Career.noCAP = true; // (league games count for ranked, like before)
+  try { _sh.call(this, hello); } finally { q.value = qv; onMode = md; onRk = rk; Career.noCAP = false; }
   if (m.po && G.online) G.playoff = true;
 }; }
 { const _go = G.hooks.onGameOver; G.hooks.onGameOver = s => { _go(s); if (G.osn && !G.demo) OSN.gameOver(s); }; }
