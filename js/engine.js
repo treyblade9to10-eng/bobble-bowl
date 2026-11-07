@@ -1466,7 +1466,7 @@ function doJuke(p, ax) {
 }
 function doJump(p) {
   if (p.jump > 0 || p.jumpCd > 0 || p.down > 0) return;
-  p.jump = 0.55; p.jumpCd = 1.2; Sound.boing();
+  p.jump = JUMP_T; p.jumpCd = 1.2; Sound.boing();
   addText(p.x, p.y, 'JUMP!', '#7fd3ff', 16, 0.6);
 }
 function doHitStick(p) {
@@ -1557,7 +1557,7 @@ function ai(p, dt) {
       const ttl = f.T - f.t;
       const reach = p.spd * ttl;
       // sometimes a defender leaps for it
-      if (!p.isHuman && !p.jumpTried && dist(p, land) < 2.2 && ttl < 0.4) { p.jumpTried = true; if (chance([0.04, 0.07, 0.1, 0.15][G.diff])) doJump(p); }
+      if (!p.isHuman && !p.jumpTried && dist(p, land) < 2.2 && ttl < 0.34) { p.jumpTried = true; if (chance([0.04, 0.07, 0.1, 0.15][G.diff])) doJump(p); }
       if (dist(p, land) <= reach + 2.2) steer(p, land.x, land.y, 1.1, 0.3);
       else steer(p, lerp(tgt.x, land.x, 0.6), lerp(tgt.y, land.y, 0.6), 1.12);
       return;
@@ -2311,20 +2311,72 @@ function updateFlight(dt) {
   b.z = flightZ(f, u);
   b.spin = (b.spin || 0) + dt * 30;
   if (f.layout && !f.pitch && !f.kick) layOutTick(f.layout, f);
+  if (!f.pitch && !f.kick) wrJump(f);
   // the ball can be picked off on the way: a defender in the passing lane (jumping = higher reach)
   if (!f.pitch && !f.kick && !G.thrownAway && u > 0.12 && u < 0.88) {
     for (const p of G.players) {
       if (p.side === f.passer.side || p.down > 0 || p.engaged || p.laneChecked) continue;
-      const jumping = p.jump > 0, reach = jumping ? 1.4 : 0.5, high = jumping ? 3.6 : 2.0;
+      const jumping = p.jump > 0, jh = jumpH(p), reach = jumping ? 0.6 + 0.8 * jh : 0.5, high = jumping ? 2.1 + 1.5 * jh : 2.0; // up at the top of his jump = more reach
       if (b.z > high || Math.hypot(p.x - b.x, p.y - b.y) > reach) continue;
       p.laneChecked = true;
-      const pInt = clamp((jumping ? (p.isHuman ? 0.7 : 0.3) : p.isHuman ? 0.45 : 0.28) + (rat(p, 'CTH') - 80) / 200 + (p.isHuman ? 0.05 : 0) + (xfOn(p, 'lurker') || xfOn(p, 'shutdown') ? 0.1 : 0) + (abHas(p, 'lurker') && p.assign && p.assign.type === 'zone' ? 0.06 : 0), 0.15, 0.9); // CPU: fewer picks, more tips (players said too many INTs)
+      const pInt = clamp((jumping ? (p.isHuman ? 0.22 + 0.2 * jh : 0.2 + 0.1 * jh) : p.isHuman ? 0.45 : 0.28) + (rat(p, 'CTH') - 80) / 200 + (p.isHuman ? 0.05 : 0) + (xfOn(p, 'lurker') || xfOn(p, 'shutdown') ? 0.1 : 0) + (abHas(p, 'lurker') && p.assign && p.assign.type === 'zone' ? 0.06 : 0), 0.15, 0.9); // CPU: fewer picks, more tips (players said too many INTs)
       b.flight = null; G.showTarget = false;
       if (chance(pInt * Sliders.side(p.side, 'cpuInt'))) { addText(p.x, p.y, jumping ? 'SKY HIGH!' : 'PICKED!', '#7fd3ff', 22, 0.9); return intercept(p); }
       return incomplete(p, 'TIPPED!');
     }
   }
   if (u >= 1) { if (f.kick) { b.flight = null; return catchKick(f); } if (G.chold && !f.cp) catchLock(f); G.chold = null; resolveCatch(); }
+}
+
+// how high he is in his jump right now: 0 = feet on the ground, 1 = the top of it (same arc draw.js shows)
+const JUMP_T = 0.55, jumpH = p => p.jump > 0 ? Math.sin(clamp(1 - p.jump / JUMP_T, 0, 1) * Math.PI) : 0;
+// the receiver goes up with him: a defender leaves his feet by the spot, the target times his own jump to the ball
+function wrJump(f) {
+  const r = f.intended, ttl = f.T - f.t, land = { x: f.tx, y: f.ty };
+  if (!r || r.jump > 0 || r.jumpCd > 0 || r.down > 0 || r.engaged || r.dive > 0 || r.mvAir || ttl < 0.04 || dist(r, land) > 2.2) return;
+  if (!G.players.some(p => p.side !== r.side && p.jump > 0 && p.down <= 0 && dist(p, land) < 2.4)) return;
+  if (f.wrT == null) f.wrT = clamp(0.28 + rand(-1, 1) * clamp(0.1 - (rat(r, 'CTH') - 70) / 400, 0.03, 0.1), 0.16, 0.42); // better hands = better timing
+  if (ttl > f.wrT) return;
+  r.jump = JUMP_T; r.jumpCd = 1.2;
+}
+// a jump ball: the defender in the air at the catch. Timing (how high he is when it gets there), how close he is to the ball,
+// who's in front, ratings. Returns 'int' / 'swat' / 'catch' / 'head' (the receiver high-points it over him), or null = play it out normally
+function jumpBall(j, rcv, rd, f, land, def, dd) {
+  const jd = dist(j, land), dpj = f.dp && f.dp.p === j ? f.dp.res : null;
+  let tq = jumpH(j); // timing: at the top of his jump when it gets there = 1
+  if (dpj === 'perfect') tq = Math.min(1, tq + 0.15); else if (dpj === 'early') tq *= 0.6; // defense meter read
+  const dq = clamp(1 - jd / 1.8, 0, 1);
+  // who's in front: closer to the ball, and between it and the QB (the ball gets to him first)
+  const fx = f.sx - land.x, fy = f.sy - land.y, fm = Math.hypot(fx, fy) || 1, ahead = p => ((p.x - land.x) * fx + (p.y - land.y) * fy) / fm;
+  const contest = rcv && rd < 1.6, R = 1.45;
+  let pos = 1.2;
+  if (contest) pos = clamp(0.55 + (rd - jd) * 0.5 + (ahead(j) - ahead(rcv)) * 0.15, 0.15, 1.3);
+  // ratings: his hands + cover skills vs the receiver's hands, size, catch-in-traffic abilities, Double Me
+  let rq = 0;
+  if (contest) {
+    const s = abSpot(land.x, land.y, f.passer.side);
+    rq = ((rat(j, 'CTH') + rat(j, 'COV')) / 2 - rat(rcv, 'CTH') - (rcv.pos === 'TE' ? 4 : 0) + (j.pos === 'LB' ? 0 : j.pos === 'S' ? -1 : -2)) / 45
+      - (xfOn(rcv, 'hands') ? 0.25 : 0) - (rcv.ab && rcv.ab.some(a => a.fx === 'contest' && abWhen(a, s, { big: j.pos === 'LB' })) ? 0.1 : 0) - jumpH(rcv) * 0.1
+      + (xfOn(j, 'lurker') || xfOn(j, 'shutdown') ? 0.12 : 0) + (abHas(j, 'lurker') ? 0.04 : 0) + 0.03 * (Momentum.of(j.side) - Momentum.of(rcv.side));
+  }
+  const c = clamp(Math.pow(tq, 1.5) * dq * pos * (1 + clamp(rq, -0.45, 0.45)) * (dpj === 'perfect' ? 1.15 : 1), 0, 1); // how much of the ball he gets
+  if (j.isHuman ? chance(c * 0.56 * Sliders.side(j.side, 'cpuInt')) : chance(c * 0.32 * Sliders.side(j.side, 'cpuInt'))) return 'int';
+  if (chance(Math.min(0.9, 0.05 + c * 0.75))) return 'swat';
+  if (!rcv || rd >= R || (def && def !== j && dd < 1.25 && dd < jd)) return null; // nobody there to catch it / another man on him: the normal rules
+  if (!contest || rcv.jump <= 0 || jumpH(j) < 0.3 || dist(j, rcv) > 1.5) return 'catch';
+  // HEADTOP: the receiver goes up over him and takes it off his head (Double Me, contested-catch guys, big hands, a good jump)
+  const pH = clamp(0.22 + (rat(rcv, 'CTH') - 80) / 50 + (xfOn(rcv, 'hands') ? 0.25 : 0) + (rcv.ab && rcv.ab.some(a => a.fx === 'contest') ? 0.12 : 0)
+    + (rcv.pos === 'TE' ? 0.05 : 0) + jumpH(rcv) * 0.2 - (1 - jumpH(j)) * 0.25 - jd * 0.15, 0.05, 0.85);
+  return chance(pH) ? 'head' : 'catch';
+}
+// caught it over the defender's head: big text, a slow-mo beat + camera punch, he may end up on the ground
+function headTop(rcv, j, f) {
+  G.catchStyle = 'head'; G.lastCatch = { k: 'head', t: G.time }; if (typeof mvCount === 'function') mvCount('head');
+  addText(rcv.x, rcv.y, 'HEADTOP!', '#f6c31c', 30, 1.3);
+  G.fx.push({ kind: 'ring', x: rcv.x, y: rcv.y, z: 0, vz: 0, color: '#f6c31c', life: 0.6, max: 0.6 }, { kind: 'punch', x: rcv.x, y: rcv.y, z: 0, vz: 0, life: 0.6, max: 0.6 });
+  G.slowmo = Math.max(G.slowmo || 0, 0.55); cam.shake = Math.max(cam.shake, 6); G.crowdHype = Math.max(G.crowdHype || 0, 1);
+  if (j) { j.mouth = 'O'; j.mouthT = 0.6; if (chance(0.55)) { j.down = 0.9; j.downDir = dirOf(rcv.side); j.vx *= 0.3; j.vy *= 0.3; addDust(j.x, j.y, 4); } }
+  return 'head';
 }
 
 function resolveCatch() {
@@ -2356,32 +2408,28 @@ function resolveCatch() {
   }
   const scrToss = rcv && (G.play.off.screen || G.play.off.screenTo) && rcv.slot === (G.play.off.screenTo || 1) && dirOf(offSide) * (land.x - G.los) < 0.5; // a screen toss: he's facing the QB, easy catch
   // a defender who jumped the route gets first crack at it
-  const jumper = G.players.find(p => p.side !== offSide && p.jump > 0 && p.down <= 0 && dist(p, land) < 2.0);
-  if (jumper) {
-    const jd = dist(jumper, land);
-    const dpj = f.dp && f.dp.p === jumper ? f.dp.res : null; // a well-timed jump wins more often
-    const pInt = clamp((jumper.isHuman ? 0.62 : 0.3) + (rat(jumper, 'CTH') - 75) / 90 - (rd < jd ? 0.25 : 0) - jd * 0.12 + (dpj === 'perfect' ? 0.2 : dpj === 'good' ? 0.08 : 0), 0.1, 0.9);
-    if (chance(pInt * Sliders.side(jumper.side, 'cpuInt'))) return intercept(jumper);
-    if (chance(0.6)) return incomplete(jumper, 'SWATTED!');
-  }
+  const jumper = nearestTo(G.players.filter(p => p.side !== offSide && p.jump > 0 && p.down <= 0 && dist(p, land) < 2.0), land);
+  const jw = jumper ? jumpBall(jumper, rcv, rd, f, land, def, dd) : null;
+  if (jw === 'int') return intercept(jumper);
+  if (jw === 'swat') return incomplete(jumper, rcv && rcv.jump > 0 && rd < 1.6 ? pick(['SWATTED!', 'TIPPED AWAY!', 'GOT A HAND ON IT!']) : 'SWATTED!');
   const dpr = f.dp && f.dp.p === def ? f.dp.res : null;
   const humanDefBonus = (def && def.isHuman ? 0.15 : 0) + (xfOn(def, 'lurker') || xfOn(def, 'shutdown') ? 0.2 : 0) + (dpr === 'perfect' ? 0.15 : dpr === 'good' ? 0.06 : 0);
   const R = 1.45;
   const hands = (xfOn(rcv, 'hands') || f.cp === 'perfect') && rd < 1.6; // a "Double Me" guy (or a PERFECT catch) usually wins the 50-50 ball
   // Universal Coverage / Dual Threat: any defender with this ability close to the catch knocks it loose
-  for (const q of G.players) if (q.side !== f.passer.side && q.down <= 0 && rcv && rd < R && dist(q, land) < (xfOn(q, 'univ') ? 1.7 : 1.2) && (xfOn(q, 'univ') || xfOn(q, 'dualthreat'))
+  if (!jw) for (const q of G.players) if (q.side !== f.passer.side && q.down <= 0 && rcv && rd < R && dist(q, land) < (xfOn(q, 'univ') ? 1.7 : 1.2) && (xfOn(q, 'univ') || xfOn(q, 'dualthreat'))
     && chance((xfOn(q, 'univ') ? 0.8 : 0.45) * (hands ? 0.5 : 1))) return incomplete(q, 'KNOCKED LOOSE!');
   const tight = (xfOn(def, 'shutdown') ? 0.35 : 0) + (abHas(def, 'shade') && def.assign && def.assign.type === 'man' ? 0.12 : 0); // Shutdown: plays the ball from farther away
-  if (def && dd < 0.5 && dd < rd - 0.3 && !(hands && chance(0.7))) { // ball hits the defender right in the body: 7 out of 10 get picked
+  if (!jw && def && dd < 0.5 && dd < rd - 0.3 && !(hands && chance(0.7))) { // ball hits the defender right in the body: 7 out of 10 get picked
     if (chance((def.isHuman ? 0.55 : 0.13) * (scrToss ? 0.4 : 1) * Sliders.side(def.side, 'cpuInt'))) return intercept(def);
     return incomplete(def, 'BROKEN UP!');
   }
-  if (def && dd < 1.25 + tight && dd < rd - 0.25 + tight && !(hands && chance(0.7))) { // defender has inside position
+  if (!jw && def && dd < 1.25 + tight && dd < rd - 0.25 + tight && !(hands && chance(0.7))) { // defender has inside position
     const pInt = clamp((def.isHuman ? 0.08 : 0.04) + (rat(def, 'COV') - 75) / 160 + humanDefBonus + (abHas(def, 'lurker') && def.assign && def.assign.type === 'zone' ? 0.04 : 0) + (G.diff === 3 && !def.isHuman ? 0.06 : 0) - (rd < 1 ? 0.08 : 0), 0.03, 0.6);
     if (chance(pInt * Sliders.side(def.side, 'cpuInt'))) return intercept(def);
     return incomplete(def, 'BROKEN UP!');
   }
-  if (rcv && rd < R && def && dd < 0.8 && def.jump <= 0 && chance(0.015 * Sliders.mul('pen'))) { throwFlag('DPI', def.side, land.x, land.y, def); return incomplete(def, 'INTERFERENCE!'); }
+  if (!jw && rcv && rd < R && def && dd < 0.8 && def.jump <= 0 && chance(0.015 * Sliders.mul('pen'))) { throwFlag('DPI', def.side, land.x, land.y, def); return incomplete(def, 'INTERFERENCE!'); }
   if (rcv && rd < R) {
     let pc = 0.9 + (rat(rcv, 'CTH') - 78) / 160 - Math.max(0, Math.hypot(land.x - f.sx, land.y - f.sy) - 15) * 0.006 - (rd > 0.9 ? 0.08 : 0) - Weather.catchPenalty();
     if (hands) pc += 0.15;
@@ -2390,10 +2438,10 @@ function resolveCatch() {
     if (f.cp === 'perfect') pc += 0.1; else if (f.cp === 'good') pc += 0.08; // timed catch
     if (f.cp === 'perfect') pc = Math.max(pc, def && dd < 1.0 ? 0.86 : 0.96); // in the green = he catches it (a man draped on him can still knock it out)
     pc += abCatch(rcv, def, def && dd < 1.8, f, land); // superstar abilities: route Elites, contested catches, knockouts
-    if (def && dd < 1.8) { pc -= ((hands ? 0.08 : 0.24) - (rat(rcv, 'CTH') - rat(def, 'COV')) / 150) * (scrToss ? 0.4 : 1); if (chance(((def.isHuman ? 0.03 : 0.015) + humanDefBonus * 0.5) * Sliders.side(def.side, 'cpuInt'))) return intercept(def); }
+    if (!jw && def && dd < 1.8) { pc -= ((hands ? 0.08 : 0.24) - (rat(rcv, 'CTH') - rat(def, 'COV')) / 150) * (scrToss ? 0.4 : 1); if (chance(((def.isHuman ? 0.03 : 0.015) + humanDefBonus * 0.5) * Sliders.side(def.side, 'cpuInt'))) return intercept(def); }
     if (scrToss) pc = lerp(pc, 0.97, 0.5);
-    if (chance(clamp(pc, 0.25, 0.97)) || oneHandSave(rcv, rd, def, dd)) {
-      const cs = catchStyle(rcv, f, land, rd); // one hand / diving / toe-tap (a toe-tap keeps his feet in)
+    if (jw || chance(clamp(pc, 0.25, 0.97)) || oneHandSave(rcv, rd, def, dd)) {
+      const cs = jw === 'head' ? headTop(rcv, jumper, f) : catchStyle(rcv, f, land, rd); // one hand / diving / toe-tap (a toe-tap keeps his feet in)
       const backLine = rcv.x < -0.25 || rcv.x > 120.25, sideLine = rcv.y < -0.25 || rcv.y > FIELD_W + 0.25;
       if (Review.catchCall(rcv, f, backLine || sideLine)) { addText(clamp(rcv.x, 1, 119), clamp(rcv.y, 1, FIELD_W - 1), backLine ? 'OUT THE BACK' : 'NO FEET IN', '#fff', 15, 1); return incomplete(rcv, 'OUT OF BOUNDS'); }
       b.holder = rcv; G.bstate = 'run'; Sound.catch(); G.catchX = rcv.x;
@@ -2944,8 +2992,10 @@ function updateCamera(dt) {
   // celly cam: push in on the guy celebrating
   const cg = G.phase === 'dead' ? G.players.find(p => p.celly) : null;
   if (cg) cam.focus = { x: cg.x + (cg.celly.type === 'bowl' ? (cg.face.dir || 1) * 3.5 : 0), y: cg.y };
-  cam.zoom = lerp(cam.zoom || 1, cg ? 1.6 / viewZ : 1, 1 - Math.exp(-dt * (cg ? 3 : 6))); // (same push-in size whatever the CAMERA setting)
-  if (!cg && cam.zoom < 1.01) cam.zoom = 1;
+  const pu = !cg && G.phase === 'live' && G.fx.find(f => f.kind === 'punch'); // HEADTOP: a quick push-in on the catch
+  if (pu) { const h = b && b.holder; cam.focus = { x: h ? h.x : pu.x, y: h ? h.y : pu.y }; }
+  cam.zoom = lerp(cam.zoom || 1, cg ? 1.6 / viewZ : pu ? 1.22 / viewZ : 1, 1 - Math.exp(-dt * (cg ? 3 : pu ? 9 : 6))); // (same push-in size whatever the CAMERA setting)
+  if (!cg && !pu && cam.zoom < 1.01) cam.zoom = 1;
 }
 function updateHint() {
   if (!G.teams) return;

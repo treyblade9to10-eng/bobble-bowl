@@ -198,7 +198,8 @@ const CATCH_LINES = {
   onehand: ['One-handed grab!', 'He snags it with one hand!'],
   dive: ['Diving catch!', 'He laid out for that one!'],
   toe: ['Toe-tap on the sideline, both feet in!', 'Drags the toes, in bounds!'],
-  diveMiss: ['He laid out for it, just out of reach.']
+  diveMiss: ['He laid out for it, just out of reach.'],
+  head: ['HEADTOP! He went right up over the defender and took it off his head!', 'Mossed! He high-pointed it right over the top of the coverage!', 'Up and over! That DB just got headtopped!']
 };
 // the announcer mentions the catch
 if (typeof pbpPlay === 'function') {
@@ -209,7 +210,7 @@ if (typeof pbpPlay === 'function') {
     const rec = G.credit && G.credit.kind === 'rec' && res.type !== 'inc';
     if (cs && CATCH_LINES[cs] && G.pbp && G.pbp.length && (cs === 'diveMiss' ? res.type === 'inc' : rec) && !(G.intBy && res.carrier && res.carrier.side !== G.poss)) {
       const L = G.pbp[G.pbp.length - 1]; L.text += ' ' + pick(CATCH_LINES[cs]);
-      if (out && (cs === 'onehand' || cs === 'toe')) out.big = true; // worth an instant replay
+      if (out && (cs === 'onehand' || cs === 'toe' || cs === 'head')) out.big = true; // worth an instant replay
     }
     return out;
   };
