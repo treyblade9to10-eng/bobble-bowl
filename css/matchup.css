@@ -240,7 +240,7 @@ body:not(.mobile) #select .muArr:hover::after { color: var(--gold); }
 #onSet .muC { min-height: 32px; }
 #onSet .muC button { padding: 6px 4px; font-size: 13px; }
 #onSet .onCo { display: none; }
-#online.coop #onSet .onCo { display: flex; }
+#online.coop #onSet .onCo { display: flex; } #online.coop #onSet .onVs { display: none; }
 #onCpuRow .muV { font-size: 14px; color: #fff; border-left: 4px solid var(--cc, #888); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 6px; }
 @media (max-height: 560px) {
   #online.screen { padding-top: 8px; }
@@ -251,6 +251,14 @@ body:not(.mobile) #select .muArr:hover::after { color: var(--gold); }
   #onCard .muPl .muP:nth-child(2) { display: none; }
   .onFilt { padding: 5px; } .onFilt button { padding: 4px 10px; font-size: 11px; }
   #onSet { margin-bottom: 2px; } #onSet .muRow { padding: 1px 0; } #onSet .muC { min-height: 28px; } #onSet .muC button { padding: 4px 3px; font-size: 12px; } #onSet .muL { width: 62px; font-size: 12px; } #onCpuRow .muV { font-size: 13px; }
-  #online.coop .onNote { display: none; }
+  #online .onNote { display: none; } /* (no room next to the GAME row) */
   #onSide { padding: 10px; } #onPick { gap: 8px; } #onSide #onStatus { margin: 4px 0; font-size: 13px; } #onBack { margin-top: 2px; }
 }
+/* small phones in CO-OP (3 setting rows): slimmer HOST / JOIN so BACK fits */
+@media (max-height: 380px) { #online.coop #onPick { gap: 5px; } #online.coop #onPick button.big { padding-top: 6px; padding-bottom: 6px; } #online.coop #onSide #onStatus { font-size: 12px; margin: 2px 0; } }
+/* Matchup: NFL / COLLEGE switch above VS (js/collegeqg.js) */
+#muLg { display: flex; gap: 0; }
+#muLg button { margin: 0; padding: 6px 14px; font-size: 13px; letter-spacing: .12em; background: #0b0f16cc; color: #ffffffb3; }
+#muLg button.on { background: var(--gold); color: #111; }
+@media (max-height: 560px) { #muLg button { padding: 5px 10px; font-size: 12px; } }
+#select .muCard.colT .muLogo .badge { filter: drop-shadow(0 0 1.5px #fff) drop-shadow(0 0 1px #fff) drop-shadow(0 4px 6px #0009); } /* (crimson A on a crimson card) */

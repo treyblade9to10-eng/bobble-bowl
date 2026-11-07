@@ -8,7 +8,7 @@
 // Faster device hosts: both time a small bit of work when they connect; if the joining device is clearly faster it runs the game
 // instead (before kickoff, same line, nothing to redo). Net.link = who made the connection (code owner / joiner), Net.role = who runs the game.
 // CO-OP: both on the host's team vs the CPU. The host calls the plays and kicks, the guest plays his own guy (G.hp[1] in engine.js).
-const NET_VERSION = 9; // 9: ranked ratings in hello/start, watchers, ICED kicker on the guest
+const NET_VERSION = 10; // 9: ranked ratings in hello/start, watchers, ICED kicker on the guest. 10: RANKED / CASUAL flag in start
 const NET_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 const NET_KEYS = ['Space', 'ShiftLeft', 'ControlLeft', 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyE', 'KeyF', 'KeyR', 'KeyQ', 'Tab', 'KeyC',
   'Digit1', 'Digit2', 'Digit3', 'Digit4', 'Numpad1', 'Numpad2', 'Numpad3', 'Numpad4', 'KeyT', 'KeyX', 'KeyM', 'KeyV', 'KeyB', 'Enter', 'Escape', 'KeyY', 'KeyG', 'KeyU'];
@@ -177,7 +177,7 @@ const Net = {
       if (this.code !== code || this.link !== 'host' || this.relayRoom) return;
       const room = this.relayRoom = this.rroom = db.ref('bobble/rooms/' + code);
       if (G.online) this.watchHost();
-      this.relayOffs.push(Relay.presence(db, room, 'host', () => ({ t: firebase.database.ServerValue.TIMESTAMP, v: NET_VERSION, busy: G.online ? 1 : 0, coop: onCoop() ? 1 : 0 }), ['h2g']));
+      this.relayOffs.push(Relay.presence(db, room, 'host', () => ({ t: firebase.database.ServerValue.TIMESTAMP, v: NET_VERSION, busy: G.online ? 1 : 0, coop: onCoop() ? 1 : 0, rkd: onRanked() ? 1 : 0 }), ['h2g']));
       const g = room.child('guest'), cb = g.on('value', sn => {
         if (this.relayRoom !== room || !sn.val() || this.onRelay) return;
         // a guest came in the relay way (before the game, or a direct game that dropped)
@@ -249,7 +249,7 @@ const Net = {
         if (!h) { noGame = true; onStatus('No game with that code. Check it with your friend, and make sure they are still on the HOST screen.'); return; }
         if (h.v !== NET_VERSION) { onStatus('You two are on different versions. Both of you: close the game all the way and reopen it.'); return; }
         if (h.busy) { onStatus('That game already has two players.'); return; }
-        onStatus(`FOUND ${h.coop ? 'CO-OP ' : ''}GAME ${code}. CONNECTING...`);
+        onStatus(`FOUND ${h.coop ? 'CO-OP ' : h.rkd ? 'RANKED ' : 'CASUAL '}GAME ${code}. CONNECTING...`);
         const wait = () => {
           if (!alive() || this.ready || this.onRelay) return;
           // the direct line is just about to open: give it a little longer
@@ -305,7 +305,7 @@ const Net = {
   },
   swapRoles() {
     this.swapped = true; this.role = 'guest'; this.side = 1;
-    this.send({ t: 'swap', o: { qtr: +$('optQtr').value, weather: $('optWeather').value, night: $('optNight').value } });
+    this.send({ t: 'swap', o: { qtr: +$('optQtr').value, weather: $('optWeather').value, night: $('optNight').value, rkd: typeof onRanked === 'function' && onRanked() ? 1 : 0 } });
     this.send(this.hello());
     if (this.onStatus) this.onStatus("YOUR FRIEND'S DEVICE IS FASTER, SO IT RUNS THE GAME. STARTING...");
   },
@@ -352,7 +352,7 @@ const Net = {
     if (room) try { if (link === 'host') room.remove(); else for (const k of ['guest', 'g2h']) room.child(k).remove(); } catch (e) {}
     Object.assign(this, { peer: null, conn: null, fast: null, fastOk: false, seq: 0, lastSeq: -1, inSeq: 0, lastIn: -1, buf: [], off: null, jit: 0.02, role: null, ready: false, last: null, rosterRef: null, bannerRef: null, pbpRef: null, routeKey: '', picks: {}, pendingCall: null, sounds: [], out: { pressed: [], taps: [] }, relayPrev: null, relayBase: null,
       rroom: null, rdb: null, startMsg: null, callMsgs: [], overMsg: null, rSent: {}, rIds: 0, rCache: {}, held: false, heldPause: false, waitWas: null, swapping: false, rtt: null, onStatus: null, link: null, swapped: false, hostOpts: null, slowHost: false, tipT: 0, gFt: 16.7, gapE: 0.02, lastTm: null, stE: 0, inDeaf: false, directOut: null, expT: null, inKey: '', gRep: null, gOff: null, ga: false, pr: null, prOff: 0, meT: null,
-      wc: 0, wq: [], wT: 0, wn: 0, wKf: 0, wPrev: null, wKeys: [], wOn: false, wDirty: false, wRo: null, wcIn: 0, watch: false, oppRk: null, rkDone: false });
+      wc: 0, wq: [], wT: 0, wn: 0, wKf: 0, wPrev: null, wKeys: [], wOn: false, wDirty: false, wRo: null, wcIn: 0, watch: false, oppRk: null, rkDone: false, ranked: false });
     G.online = false; Input.online = false; Input.use(0); Input.store[1] = null;
   },
   lost(link) {
@@ -425,6 +425,7 @@ const Net = {
       const now = performance.now(), bad = !this.ready || now - this.rxT > LINK_DEAD || (this.onRelay && !this.dbOn);
       const lane = this.onRelay ? 'RELAY' : 'DIRECT';
       t = bad ? 'RECONNECTING...' : this.tipT && now - this.tipT < 8000 ? 'TIP: LET THE FASTER DEVICE HOST' : now - this.okT < 4000 ? `CONNECTED (${lane})` : lane + (this.rtt != null ? ' ' + this.rtt + ' MS' : '');
+      if (G.versus) t = (this.ranked ? 'RANKED' : 'CASUAL') + '  ·  ' + t;
       const n = this.role === 'host' ? this.wc : this.wcIn; if (n > 0 && !bad) t += `  ·  ${n} WATCHING`;
       // signal bars: round trip, relay or direct, and (guest) how often the updates ran dry
       const r = this.rtt;
@@ -524,7 +525,8 @@ const Net = {
     const opts = { qtr, diff: coop ? +$('optDiff').value : 1, humanSide: 0, versus: !coop, coop, weather: typeof bcWeather === 'function' ? bcWeather(bc, pickWeather(wth), wth) : pickWeather(wth), night: night === '1', bcast: bc };
     newGame(mine, theirs, opts);
     this.busy(); this.oppRk = hello.rk; this.rkDone = false; this.watchHost();
-    this.send(this.startMsg = { t: 'start', v: NET_VERSION, rk: typeof Ranked !== 'undefined' ? Ranked.rating() : undefined, teams: G.teams, opts: { qtr: opts.qtr, weather: G.storm ? 'storm' : G.fog ? 'fog' : G.weather, night: G.night, bcast: G.bcast, coop: coop ? 1 : 0, diff: G.diff, wind: gameWind(), slow: this.slowHost ? 1 : 0 }, modes: G.netModes });
+    this.ranked = !coop && (ho ? !!ho.rkd : typeof onRanked === 'function' && onRanked()); // the host's RANKED / CASUAL pick
+    this.send(this.startMsg = { t: 'start', v: NET_VERSION, rk: typeof Ranked !== 'undefined' ? Ranked.rating() : undefined, rkd: this.ranked ? 1 : 0, teams: G.teams, opts: { qtr: opts.qtr, weather: G.storm ? 'storm' : G.fog ? 'fog' : G.weather, night: G.night, bcast: G.bcast, coop: coop ? 1 : 0, diff: G.diff, wind: gameWind(), slow: this.slowHost ? 1 : 0 }, modes: G.netModes });
     if (this.slowHost) this.tipT = performance.now();
   },
   busy() { if (this.relayRoom && this.link === 'host') this.relayRoom.child('host/busy').set(1); }, // nobody else can join now
@@ -818,7 +820,7 @@ const Net = {
     initGame(m.teams[0], m.teams[1], { qtr: m.opts.qtr, diff: coop ? m.opts.diff : 1, humanSide: coop ? 0 : 1, versus: !coop, coop, weather: m.opts.weather, night: m.opts.night, bcast: m.opts.bcast });
     G.wind = m.opts.wind || null; // the host's wind (scorebug arrow)
     this.busy(); if (m.opts.slow) this.tipT = performance.now();
-    this.oppRk = m.rk; this.rkDone = false;
+    this.oppRk = m.rk; this.rkDone = false; this.ranked = !coop && !!m.rkd;
     G.phase = 'idle'; G.players = []; G.ball = null;
   },
   applyRoster(m) {
