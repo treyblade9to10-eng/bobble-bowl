@@ -120,8 +120,8 @@ const Highlights = {
       if (rec && c.catchI >= 0) key = c.catchI;
     }
     const lc = G.lastCatch && G.lastCatch.t >= c.t0 - 1e-6 && cr && cr.kind === 'rec' && lr.type !== 'inc' ? G.lastCatch.k : null; // one-handed / diving / toe-tap (moves.js)
-    if (lc && !title) { ex = 18 + Math.max(0, gain) * 0.4 + (lc === 'dive' ? 0 : 6); title = lc === 'toe' ? 'TOE-TAP CATCH' : lc === 'dive' ? 'DIVING CATCH' : 'ONE-HANDED CATCH'; who = N(cr.p.name); if (c.catchI >= 0) key = c.catchI; }
-    else if (lc && /CATCH|PASS/.test(title)) ex += 8;
+    if (lc && !title) { ex = 18 + Math.max(0, gain) * 0.4 + (lc === 'dive' ? 0 : 6); title = lc === 'head' ? 'HEADTOP CATCH' : lc === 'toe' ? 'TOE-TAP CATCH' : lc === 'dive' ? 'DIVING CATCH' : 'ONE-HANDED CATCH'; who = N(cr.p.name); if (c.catchI >= 0) key = c.catchI; }
+    else if (lc && /CATCH|PASS/.test(title)) ex += lc === 'head' ? 14 : 8;
     if (c.boomI >= 0) { // hit stick / BOOM tackle
       if (!title) { title = 'BIG HIT'; who = G.lastTackler ? N(G.lastTackler.name) : ''; team = def; ex = 24; } else ex += 10;
       if (!/TD|PASS|PICK/.test(title)) key = c.boomI;
