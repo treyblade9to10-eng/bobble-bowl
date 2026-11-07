@@ -44,7 +44,8 @@ const FieldStyle = {
   // the real look: some stadiums paint stripes or a checkerboard, turf fields look brighter
   real(team) {
     const s = team && !team.custom && STADIUMS[team.id];
-    return { ...this.DEF, pat: team && !team.custom && EZ_STYLE[team.id] || 'solid', surf: s && s[2] === 'turf' ? 'turf' : 'grass' };
+    const sh = team && !team.custom && typeof REAL_SHADE !== 'undefined' && REAL_SHADE[team.id];
+    return { ...this.DEF, pat: team && !team.custom && EZ_STYLE[team.id] || 'solid', surf: s && s[2] === 'turf' ? 'turf' : 'grass', ...(sh ? { sh } : {}) };
   },
   of(team) {
     if (!team) return { ...this.DEF };

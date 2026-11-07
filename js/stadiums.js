@@ -1,14 +1,14 @@
-// ---- Stadiums: every team's home field (made-up names), domes keep the weather out ----
+// ---- Stadiums: every team's home field (real names), domes keep the weather out ----
 // roof: 'dome' = indoors (always clear), 'open' = weather happens. turf: 'turf' looks brighter than real grass.
 const STADIUMS = {
-  BUF: ['Orchard Hill Stadium', 'open', 'turf'], MIA: ['Sunshine Rock Stadium', 'open', 'grass'], NE: ['Razor Field', 'open', 'turf'], NYJ: ['MetLive Stadium', 'open', 'turf'],
-  BAL: ['Crab Bank Stadium', 'open', 'grass'], CIN: ['Jungle Stadium', 'open', 'turf'], CLE: ['Lakefront Field', 'open', 'grass'], PIT: ['Three Rivers Field', 'open', 'grass'],
-  HOU: ['Energy Dome', 'dome', 'turf'], IND: ['Lucky Oil Stadium', 'dome', 'turf'], JAX: ['Riverbank Stadium', 'open', 'grass'], TEN: ['Music City Stadium', 'open', 'grass'],
-  DEN: ['Mile High Field', 'open', 'grass'], KC: ['Arrowhead Hill Stadium', 'open', 'grass'], LV: ['Desert Dome', 'dome', 'grass'], LAC: ['SoFly Stadium', 'dome', 'turf'],
-  DAL: ['Big Star Dome', 'dome', 'turf'], NYG: ['MetLive Stadium', 'open', 'turf'], PHI: ['The Linc Field', 'open', 'grass'], WAS: ['Landover Field', 'open', 'grass'],
-  CHI: ['Lakeshore Field', 'open', 'grass'], DET: ['Motor City Dome', 'dome', 'turf'], GB: ['Frozen Tundra Field', 'open', 'grass'], MIN: ['Viking Hall', 'dome', 'turf'],
-  ATL: ['Peach Dome', 'dome', 'turf'], CAR: ['Queen City Stadium', 'open', 'turf'], NO: ['Bayou Superdome', 'dome', 'turf'], TB: ['Pirate Ship Stadium', 'open', 'grass'],
-  ARI: ['Cactus Dome', 'dome', 'grass'], LAR: ['SoFly Stadium', 'dome', 'turf'], SF: ['Bay Gold Stadium', 'open', 'grass'], SEA: ['Sound Field', 'open', 'turf']
+  BUF: ['Highmark Stadium', 'open', 'turf'], MIA: ['Hard Rock Stadium', 'open', 'grass'], NE: ['Gillette Stadium', 'open', 'turf'], NYJ: ['MetLife Stadium', 'open', 'turf'],
+  BAL: ['M&T Bank Stadium', 'open', 'grass'], CIN: ['Paycor Stadium', 'open', 'turf'], CLE: ['Huntington Bank Field', 'open', 'grass'], PIT: ['Acrisure Stadium', 'open', 'grass'],
+  HOU: ['NRG Stadium', 'dome', 'turf'], IND: ['Lucas Oil Stadium', 'dome', 'turf'], JAX: ['EverBank Stadium', 'open', 'grass'], TEN: ['Nissan Stadium', 'open', 'grass'],
+  DEN: ['Empower Field at Mile High', 'open', 'grass'], KC: ['Arrowhead Stadium', 'open', 'grass'], LV: ['Allegiant Stadium', 'dome', 'grass'], LAC: ['SoFi Stadium', 'dome', 'turf'],
+  DAL: ['AT&T Stadium', 'dome', 'turf'], NYG: ['MetLife Stadium', 'open', 'turf'], PHI: ['Lincoln Financial Field', 'open', 'grass'], WAS: ['Northwest Stadium', 'open', 'grass'],
+  CHI: ['Soldier Field', 'open', 'grass'], DET: ['Ford Field', 'dome', 'turf'], GB: ['Lambeau Field', 'open', 'grass'], MIN: ['U.S. Bank Stadium', 'dome', 'turf'],
+  ATL: ['Mercedes-Benz Stadium', 'dome', 'turf'], CAR: ['Bank of America Stadium', 'open', 'turf'], NO: ['Caesars Superdome', 'dome', 'turf'], TB: ['Raymond James Stadium', 'open', 'grass'],
+  ARI: ['State Farm Stadium', 'dome', 'grass'], LAR: ['SoFi Stadium', 'dome', 'turf'], SF: ['Levi\'s Stadium', 'open', 'grass'], SEA: ['Lumen Field', 'open', 'turf']
 };
 // end zone paint for a few places (everyone else is solid)
 const EZ_STYLE = { DEN: 'stripes', KC: 'stripes', GB: 'checker', CHI: 'stripes', DAL: 'checker', TB: 'stripes', SEA: 'checker', NO: 'checker', PIT: 'stripes', BUF: 'checker', LV: 'stripes', JAX: 'checker' };

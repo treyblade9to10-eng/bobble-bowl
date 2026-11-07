@@ -2,15 +2,17 @@
 // COLLEGE puts the 18 college teams (career.js COLLEGES + the real lineups in colleges.js) in front of the NFL teams in TEAMS
 // (CT.useCollege), so both cards go to colleges and ALL TEAMS can still pick an NFL team for college vs NFL.
 // Only the Matchup screen uses it: going back to the title (or Season / Online / Challenges, which call CT.useAll / useLeague) puts TEAMS back.
-Object.assign(STADIUMS, { // made-up names like the NFL ones
-  ALA: ['Tide Hill Stadium', 'open', 'grass'], OSU: ['The Horseshoe', 'open', 'turf'], UGA: ['Between the Hedges', 'open', 'grass'],
-  LSU: ['Death Valley', 'open', 'grass'], MICH: ['The Big House', 'open', 'turf'], TEX: ['Longhorn Memorial Field', 'open', 'turf'],
-  ORE: ['Duck Pond Stadium', 'open', 'turf'], USC: ['The Coliseum', 'open', 'grass'], CLEM: ['Tiger Valley', 'open', 'grass'],
-  PSU: ['Happy Valley Stadium', 'open', 'grass'], ND: ['Golden Dome Field', 'open', 'grass'], TENN: ['Rocky Top Stadium', 'open', 'grass'],
-  WIS: ['Camp Badger', 'open', 'turf'], BSU: ['The Blue Field', 'open', 'turf'], ISU: ['Cyclone Field', 'open', 'turf'],
-  APP: ['Mountain Top Stadium', 'open', 'turf'], TOL: ['The Glass Bowl', 'open', 'turf'], NIU: ['Huskie Field', 'open', 'turf']
+Object.assign(STADIUMS, { // real stadium names
+  ALA: ['Bryant-Denny Stadium', 'open', 'grass'], OSU: ['Ohio Stadium', 'open', 'turf'], UGA: ['Sanford Stadium', 'open', 'grass'],
+  LSU: ['Tiger Stadium', 'open', 'grass'], MICH: ['Michigan Stadium', 'open', 'turf'], TEX: ['DKR-Texas Memorial Stadium', 'open', 'turf'],
+  ORE: ['Autzen Stadium', 'open', 'turf'], USC: ['LA Memorial Coliseum', 'open', 'grass'], CLEM: ['Memorial Stadium', 'open', 'grass'],
+  PSU: ['Beaver Stadium', 'open', 'grass'], ND: ['Notre Dame Stadium', 'open', 'turf'], TENN: ['Neyland Stadium', 'open', 'grass'],
+  WIS: ['Camp Randall Stadium', 'open', 'turf'], BSU: ['Albertsons Stadium', 'open', 'turf'], ISU: ['Jack Trice Stadium', 'open', 'turf'],
+  APP: ['Kidd Brewer Stadium', 'open', 'turf'], TOL: ['Glass Bowl', 'open', 'turf'], NIU: ['Huskie Stadium', 'open', 'turf']
 });
-Object.assign(EZ_STYLE, { TENN: 'checker', LSU: 'stripes', BSU: 'stripes' });
+Object.assign(EZ_STYLE, { TENN: 'checker', LSU: 'stripes' });
+// the real field color where it isn't green (Boise State's famous blue turf)
+const REAL_SHADE = { BSU: 'blue' };
 
 const CQ = {
   KEY: 'bobbleQGCol', list: null,
