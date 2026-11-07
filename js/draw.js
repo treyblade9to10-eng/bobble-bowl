@@ -1549,6 +1549,20 @@ function hudLayer(key, X0, w, h, paint) {
   }
   return c;
 }
+// a logo with a thin rim in the color that stands out on its background (a navy logo on a navy scorebug cell was invisible)
+const logoRims = new Map();
+function logoOn(t, px, bg) {
+  const src = Logo.canvas(t, px), rim = textOn(bg || '#000') === '#fff' || textOn(bg || '#000') === '#ffffff' ? '#ffffff' : '#111111', key = src;
+  let e = logoRims.get(key); if (e && e.rim === rim) return e.c;
+  const pad = Math.max(2, Math.round(px / 22)), c = document.createElement('canvas'); c.width = c.height = px;
+  const sil = document.createElement('canvas'); sil.width = sil.height = px; const sg = sil.getContext('2d');
+  const k = (px - pad * 2) / px; sg.drawImage(src, pad, pad, px * k, px * k); sg.globalCompositeOperation = 'source-in'; sg.fillStyle = rim; sg.fillRect(0, 0, px, px);
+  const g = c.getContext('2d');
+  for (let a = 0; a < 16; a++) g.drawImage(sil, Math.cos(a / 16 * Math.PI * 2) * pad, Math.sin(a / 16 * Math.PI * 2) * pad);
+  g.drawImage(src, pad, pad, px * k, px * k);
+  if (logoRims.size > 80) logoRims.clear();
+  logoRims.set(key, { c, rim }); return c;
+}
 function drawHUDBase(g, G, S, x0, y0, W, H, bx) {
   if (S) bcBar(g, S, x0, y0, W, H); else { g.fillStyle = '#0b0f16f0'; roundRect(g, x0, y0, W, H, 3); g.fill(); }
   const cell = (t, s, x, poss) => {
@@ -1560,7 +1574,7 @@ function drawHUDBase(g, G, S, x0, y0, W, H, bx) {
     const ny = y0 + 18;
     g.fillStyle = textOn(t.c1); g.font = 'italic 900 23px "Barlow Condensed", "Arial Black", sans-serif'; g.textAlign = 'left'; g.textBaseline = 'middle';
     const lx = typeof Logo !== 'undefined' ? 40 : 10; // little logo at the left of the score cell
-    if (lx > 10) g.drawImage(Logo.canvas(t, 64), x + 4, y0 + 6, 34, 34);
+    if (lx > 10) g.drawImage(logoOn(t, 64, t.c1), x + 4, y0 + 6, 34, 34);
     if (S) bcCellDeco(g, G.bcast, x, y0);
     g.fillText(t.id, x + lx, ny);
     if (G.versus && !G.online) { const tg = G.teams.indexOf(t) === G.p1 ? 'P1' : 'P2'; g.font = 'italic 900 11px "Barlow Condensed", Arial, sans-serif'; g.fillStyle = tg === 'P1' ? '#e0222b' : '#1f63e0'; g.fillRect(x + 1, y0 + 3, g.measureText(tg).width + 6, 13); g.fillStyle = '#fff'; g.fillText(tg, x + 4, y0 + 10); g.font = 'italic 900 23px "Barlow Condensed", "Arial Black", sans-serif'; g.fillStyle = textOn(t.c1); }
