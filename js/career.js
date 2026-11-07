@@ -28,13 +28,46 @@ const COLLEGES = [
   { id: 'CLEM', city: 'Clemson', name: 'Tigers', c1: '#F56600', c2: '#522D80', helmet: '#FFFFFF', mask: '#F56600', pants: '#FFFFFF', pr: 2 },
   { id: 'PSU', city: 'Penn State', name: 'Nittany Lions', c1: '#041E42', c2: '#FFFFFF', helmet: '#FFFFFF', mask: '#041E42', pants: '#FFFFFF', pr: 2 },
   { id: 'ND', city: 'Notre Dame', name: 'Fighting Irish', c1: '#0C2340', c2: '#C99700', helmet: '#C99700', mask: '#9a9a9a', pants: '#C99700', pr: 2 },
+  { id: 'IU', city: 'Indiana', name: 'Hoosiers', c1: '#990000', c2: '#EEEDEB', helmet: '#990000', mask: '#FFFFFF', pants: '#FFFFFF', pr: 2 },
+  { id: 'UM', city: 'Miami', name: 'Hurricanes', c1: '#005030', c2: '#F47321', helmet: '#FFFFFF', mask: '#F47321', pants: '#FFFFFF', pr: 2 },
+  { id: 'OU', city: 'Oklahoma', name: 'Sooners', c1: '#841617', c2: '#FDF9D8', helmet: '#841617', mask: '#FFFFFF', pants: '#FDF9D8', pr: 2 },
+  { id: 'FLA', city: 'Florida', name: 'Gators', c1: '#0021A5', c2: '#FA4616', helmet: '#0021A5', mask: '#FFFFFF', pants: '#FFFFFF', pr: 2 },
+  { id: 'TAMU', city: 'Texas A&M', name: 'Aggies', c1: '#500000', c2: '#FFFFFF', helmet: '#FFFFFF', mask: '#500000', pants: '#FFFFFF', pr: 2 },
+  { id: 'MISS', city: 'Ole Miss', name: 'Rebels', c1: '#CE1126', c2: '#14213D', helmet: '#14213D', mask: '#FFFFFF', pants: '#FFFFFF', pr: 2 },
+  { id: 'AUB', city: 'Auburn', name: 'Tigers', c1: '#0C2340', c2: '#E87722', helmet: '#FFFFFF', mask: '#0C2340', pants: '#FFFFFF', pr: 2 },
+  { id: 'FSU', city: 'Florida State', name: 'Seminoles', c1: '#782F40', c2: '#CEB888', helmet: '#CEB888', mask: '#782F40', pants: '#CEB888', pr: 2 },
   { id: 'TENN', city: 'Tennessee', name: 'Volunteers', c1: '#FF8200', c2: '#FFFFFF', helmet: '#FFFFFF', mask: '#FF8200', pants: '#FFFFFF', pr: 1 },
   { id: 'WIS', city: 'Wisconsin', name: 'Badgers', c1: '#C5050C', c2: '#FFFFFF', helmet: '#FFFFFF', mask: '#C5050C', pants: '#FFFFFF', pr: 1 },
   { id: 'BSU', city: 'Boise State', name: 'Broncos', c1: '#0033A0', c2: '#D64309', helmet: '#0033A0', mask: '#D64309', pants: '#0033A0', pr: 1 },
   { id: 'ISU', city: 'Iowa State', name: 'Cyclones', c1: '#C8102E', c2: '#F1BE48', helmet: '#C8102E', mask: '#F1BE48', pants: '#F1BE48', pr: 1 },
+  { id: 'TTU', city: 'Texas Tech', name: 'Red Raiders', c1: '#CC0000', c2: '#000000', helmet: '#111111', mask: '#111111', pants: '#111111', pr: 1 },
+  { id: 'UTAH', city: 'Utah', name: 'Utes', c1: '#CC0000', c2: '#FFFFFF', helmet: '#CC0000', mask: '#9a9a9a', pants: '#FFFFFF', pr: 1 },
+  { id: 'BYU', city: 'BYU', name: 'Cougars', c1: '#002E5D', c2: '#FFFFFF', helmet: '#FFFFFF', mask: '#0047BA', pants: '#FFFFFF', pr: 1 },
+  { id: 'SMU', city: 'SMU', name: 'Mustangs', c1: '#0033A0', c2: '#C8102E', helmet: '#0033A0', mask: '#C8102E', pants: '#FFFFFF', pr: 1 },
+  { id: 'MIZ', city: 'Missouri', name: 'Tigers', c1: '#F1B82D', c2: '#000000', helmet: '#111111', mask: '#111111', pants: '#F1B82D', pr: 1 },
+  { id: 'SC', city: 'South Carolina', name: 'Gamecocks', c1: '#73000A', c2: '#000000', helmet: '#FFFFFF', mask: '#73000A', pants: '#FFFFFF', pr: 1 },
+  { id: 'IOWA', city: 'Iowa', name: 'Hawkeyes', c1: '#000000', c2: '#FFCD00', helmet: '#111111', mask: '#FFCD00', pants: '#FFCD00', pr: 1 },
+  { id: 'NEB', city: 'Nebraska', name: 'Cornhuskers', c1: '#E41C38', c2: '#FDF2D9', helmet: '#FFFFFF', mask: '#E41C38', pants: '#FFFFFF', pr: 1 },
+  { id: 'WASH', city: 'Washington', name: 'Huskies', c1: '#4B2E83', c2: '#B7A57A', helmet: '#4B2E83', mask: '#B7A57A', pants: '#B7A57A', pr: 1 },
+  { id: 'UCLA', city: 'UCLA', name: 'Bruins', c1: '#2D68C4', c2: '#F2A900', helmet: '#F2A900', mask: '#2D68C4', pants: '#F2A900', pr: 1 },
+  { id: 'COLO', city: 'Colorado', name: 'Buffaloes', c1: '#000000', c2: '#CFB87C', helmet: '#111111', mask: '#CFB87C', pants: '#CFB87C', pr: 1 },
+  { id: 'ASU', city: 'Arizona State', name: 'Sun Devils', c1: '#8C1D40', c2: '#FFC627', helmet: '#8C1D40', mask: '#FFC627', pants: '#FFC627', pr: 1 },
+  { id: 'KSU', city: 'Kansas State', name: 'Wildcats', c1: '#512888', c2: '#FFFFFF', helmet: '#D8D8DC', mask: '#512888', pants: '#FFFFFF', pr: 1 },
+  { id: 'TCU', city: 'TCU', name: 'Horned Frogs', c1: '#4D1979', c2: '#A3A9AC', helmet: '#4D1979', mask: '#9a9a9a', pants: '#FFFFFF', pr: 1 },
+  { id: 'LOU', city: 'Louisville', name: 'Cardinals', c1: '#AD0000', c2: '#000000', helmet: '#AD0000', mask: '#111111', pants: '#FFFFFF', pr: 1 },
+  { id: 'VT', city: 'Virginia Tech', name: 'Hokies', c1: '#630031', c2: '#CF4420', helmet: '#630031', mask: '#FFFFFF', pants: '#FFFFFF', pr: 1 },
+  { id: 'UNC', city: 'North Carolina', name: 'Tar Heels', c1: '#7BAFD4', c2: '#13294B', helmet: '#FFFFFF', mask: '#7BAFD4', pants: '#FFFFFF', pr: 1 },
+  { id: 'GT', city: 'Georgia Tech', name: 'Yellow Jackets', c1: '#003057', c2: '#B3A369', helmet: '#B3A369', mask: '#003057', pants: '#FFFFFF', pr: 1 },
   { id: 'APP', city: 'App State', name: 'Mountaineers', c1: '#222222', c2: '#FFCC00', helmet: '#222222', mask: '#FFCC00', pants: '#FFCC00', pr: 0 },
   { id: 'TOL', city: 'Toledo', name: 'Rockets', c1: '#15397F', c2: '#FFD200', helmet: '#15397F', mask: '#FFD200', pants: '#FFFFFF', pr: 0 },
-  { id: 'NIU', city: 'Northern Illinois', name: 'Huskies', c1: '#BA0C2F', c2: '#000000', helmet: '#000000', mask: '#BA0C2F', pants: '#000000', pr: 0 }
+  { id: 'NIU', city: 'Northern Illinois', name: 'Huskies', c1: '#BA0C2F', c2: '#000000', helmet: '#000000', mask: '#BA0C2F', pants: '#000000', pr: 0 },
+  { id: 'JMU', city: 'James Madison', name: 'Dukes', c1: '#450084', c2: '#CBB677', helmet: '#450084', mask: '#CBB677', pants: '#FFFFFF', pr: 0 },
+  { id: 'MEM', city: 'Memphis', name: 'Tigers', c1: '#003087', c2: '#898D8D', helmet: '#003087', mask: '#898D8D', pants: '#898D8D', pr: 0 },
+  { id: 'TULN', city: 'Tulane', name: 'Green Wave', c1: '#006747', c2: '#418FDE', helmet: '#006747', mask: '#FFFFFF', pants: '#FFFFFF', pr: 0 },
+  { id: 'UNLV', city: 'UNLV', name: 'Rebels', c1: '#CF0A2C', c2: '#CAC8C8', helmet: '#CAC8C8', mask: '#CF0A2C', pants: '#CAC8C8', pr: 0 },
+  { id: 'LIB', city: 'Liberty', name: 'Flames', c1: '#0A254E', c2: '#C41230', helmet: '#0A254E', mask: '#C41230', pants: '#FFFFFF', pr: 0 },
+  { id: 'ARMY', city: 'Army', name: 'Black Knights', c1: '#000000', c2: '#D3BC8D', helmet: '#D3BC8D', mask: '#111111', pants: '#D3BC8D', pr: 0 },
+  { id: 'NAVY', city: 'Navy', name: 'Midshipmen', c1: '#00205B', c2: '#C5B783', helmet: '#C5B783', mask: '#00205B', pants: '#C5B783', pr: 0 }
 ];
 // recruit rating: more stars = higher starting ratings and offers from bigger programs
 const RECRUIT = { 1: { ovr: -8, spd: -3 }, 2: { ovr: -4, spd: -1 }, 3: { ovr: 0, spd: 0 }, 4: { ovr: 5, spd: 1 }, 5: { ovr: 10, spd: 2 } };
@@ -45,6 +78,10 @@ function collegeOffers(stars, seed) {
   let list = COLLEGES.filter(t => t.pr <= max);
   if (stars === 4) { const top = COLLEGES.filter(t => t.pr === 3); const skip = top[h % top.length]; list = list.filter(t => t !== skip); } // 4-star: most powerhouses, not all
   if (stars <= 2) list = list.concat(COLLEGES.filter(t => t.pr === max + 1).slice(h % 2, h % 2 + 1)); // one reach offer
+  // lots of schools: up to 10 from your top tier, then the next tiers down (about 14 offers, same ones for the same recruit)
+  const seeded = (x, y) => y.pr - x.pr || hashStr(x.id + h) - hashStr(y.id + h);
+  const top = list.filter(t => t.pr === max).sort(seeded).slice(0, 10), rest = list.filter(t => t.pr !== max).sort(seeded);
+  list = top.concat(rest.slice(0, Math.max(4, 14 - top.length)));
   return list.sort((a, b) => b.pr - a.pr);
 }
 const CAP_GEAR = { visor: 68, gloves: 74, goldGloves: 88 }; // overall needed to unlock
@@ -302,7 +339,7 @@ const Career = {
   // ---------------- college ----------------
   collegeTeam(id) {
     const c = this.cap, base = COLLEGES.find(x => x.id === id);
-    const ro = c.college.rosters[id];
+    const ro = c.college.rosters[id] || (c.college.rosters[id] = this.realCollegeRoster(id) || this.makeCollegeRoster(base.pr)); // (saves from before a school was added)
     const real = !ro.real && this.realCollegeRoster(id); if (real) Object.assign(ro, real); // older saves get the real lineups too
     return { ...base, conf: 'NCAA', div: '', off: ro.off, def: ro.def, k: ro.k, p: ro.p };
   },
@@ -320,7 +357,9 @@ const Career = {
   startCollege(id, post) {
     const c = this.cap, rosters = {};
     for (const t of COLLEGES) rosters[t.id] = this.realCollegeRoster(t.id) || this.makeCollegeRoster(t.pr);
-    const opps = shuffle(COLLEGES.filter(t => t.id !== id).map(t => t.id)).slice(0, 6);
+    // 6 opponents, mostly programs your size (plus a surprise or two)
+    const pr = (COLLEGES.find(t => t.id === id) || { pr: 1 }).pr, fit = t => Math.abs(t.pr - pr) + rand(0, 2.5);
+    const opps = shuffle(COLLEGES.filter(t => t.id !== id).map(t => [t.id, fit(t)]).sort((a, b) => a[1] - b[1]).slice(0, 6).map(x => x[0]));
     c.college = { id, rosters, sched: opps.map((o, i) => ({ opp: o, home: i % 2 === 0, score: null })), week: 0, w: 0, l: 0, bowl: null, done: false, post: post || { bowls: true, cfp: false } };
     c.team = id; c.phase = 'college';
   },

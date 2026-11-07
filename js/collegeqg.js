@@ -1,5 +1,5 @@
 // ---- Quick Game with college teams: an NFL / COLLEGE switch on the Matchup screen ----
-// COLLEGE puts the 18 college teams (career.js COLLEGES + the real lineups in colleges.js) in front of the NFL teams in TEAMS
+// COLLEGE puts the college teams (career.js COLLEGES + the real lineups in colleges.js) in front of the NFL teams in TEAMS
 // (CT.useCollege), so both cards go to colleges and ALL TEAMS can still pick an NFL team for college vs NFL.
 // Only the Matchup screen uses it: going back to the title (or Season / Online / Challenges, which call CT.useAll / useLeague) puts TEAMS back.
 Object.assign(STADIUMS, { // real stadium names
@@ -8,7 +8,19 @@ Object.assign(STADIUMS, { // real stadium names
   ORE: ['Autzen Stadium', 'open', 'turf'], USC: ['LA Memorial Coliseum', 'open', 'grass'], CLEM: ['Memorial Stadium', 'open', 'grass'],
   PSU: ['Beaver Stadium', 'open', 'grass'], ND: ['Notre Dame Stadium', 'open', 'turf'], TENN: ['Neyland Stadium', 'open', 'grass'],
   WIS: ['Camp Randall Stadium', 'open', 'turf'], BSU: ['Albertsons Stadium', 'open', 'turf'], ISU: ['Jack Trice Stadium', 'open', 'turf'],
-  APP: ['Kidd Brewer Stadium', 'open', 'turf'], TOL: ['Glass Bowl', 'open', 'turf'], NIU: ['Huskie Stadium', 'open', 'turf']
+  APP: ['Kidd Brewer Stadium', 'open', 'turf'], TOL: ['Glass Bowl', 'open', 'turf'], NIU: ['Huskie Stadium', 'open', 'turf'],
+  // the 33 added schools (surfaces checked 2026-11: SMU, UNC went back to grass in 2025, Colorado to turf)
+  FLA: ['Ben Hill Griffin Stadium', 'open', 'grass'], OU: ['Oklahoma Memorial Stadium', 'open', 'grass'], TAMU: ['Kyle Field', 'open', 'grass'],
+  AUB: ['Jordan-Hare Stadium', 'open', 'grass'], MISS: ['Vaught-Hemingway Stadium', 'open', 'grass'], SC: ['Williams-Brice Stadium', 'open', 'grass'],
+  MIZ: ['Faurot Field', 'open', 'turf'], IU: ['Memorial Stadium', 'open', 'turf'], IOWA: ['Kinnick Stadium', 'open', 'turf'],
+  NEB: ['Memorial Stadium', 'open', 'turf'], UCLA: ['Rose Bowl', 'open', 'grass'], WASH: ['Husky Stadium', 'open', 'turf'],
+  UTAH: ['Rice-Eccles Stadium', 'open', 'turf'], COLO: ['Folsom Field', 'open', 'turf'], ASU: ['Mountain America Stadium', 'open', 'grass'],
+  KSU: ['Bill Snyder Family Stadium', 'open', 'turf'], TTU: ['Jones AT&T Stadium', 'open', 'turf'], BYU: ['LaVell Edwards Stadium', 'open', 'grass'],
+  TCU: ['Amon G. Carter Stadium', 'open', 'grass'], FSU: ['Doak Campbell Stadium', 'open', 'grass'], UM: ['Hard Rock Stadium', 'open', 'grass'],
+  LOU: ['L&N Stadium', 'open', 'turf'], VT: ['Lane Stadium', 'open', 'grass'], UNC: ['Kenan Stadium', 'open', 'grass'],
+  GT: ['Bobby Dodd Stadium', 'open', 'turf'], SMU: ['Gerald J. Ford Stadium', 'open', 'grass'], ARMY: ['Michie Stadium', 'open', 'turf'],
+  NAVY: ['Navy-Marine Corps Stadium', 'open', 'turf'], TULN: ['Yulman Stadium', 'open', 'turf'], MEM: ['Simmons Bank Liberty Stadium', 'open', 'turf'],
+  UNLV: ['Allegiant Stadium', 'dome', 'turf'], LIB: ['Williams Stadium', 'open', 'turf'], JMU: ['Bridgeforth Stadium', 'open', 'turf']
 });
 Object.assign(EZ_STYLE, { TENN: 'checker', LSU: 'stripes' });
 // the real field color where it isn't green (Boise State's famous blue turf)
@@ -65,7 +77,9 @@ const CQ = {
       const be = card.querySelector('.beOpen'); if (be) be.style.display = t.college ? 'none' : ''; // (roster editing is for NFL teams)
       card.classList.toggle('colT', !!t.college);
       const nm = card.querySelector('.muName'); nm.style.fontSize = ''; // long college names (CRIMSON TIDE, FIGHTING IRISH): shrink to fit
-      for (let fs = parseFloat(getComputedStyle(nm).fontSize), n = 0; nm.scrollWidth > nm.clientWidth + 1 && fs > 16 && n < 12; n++) nm.style.fontSize = (fs -= 2) + 'px';
+      const rg = document.createRange(), px = (el, k) => parseFloat(getComputedStyle(el)[k]) || 0, box = nm.parentElement;
+      const over = () => { rg.selectNodeContents(nm); return rg.getBoundingClientRect().width / ((nm.getBoundingClientRect().width / nm.offsetWidth) || 1) + px(nm, 'paddingLeft') + px(nm, 'paddingRight') > box.clientWidth - px(box, 'paddingLeft') - px(box, 'paddingRight') - 1; }; // (scrollWidth rounds to fit while italic text is still cut off)
+      for (let fs = parseFloat(getComputedStyle(nm).fontSize), n = 0; over() && fs > 12 && n < 14; n++) nm.style.fontSize = (fs -= 2) + 'px';
     }
     if (col) this.s.ids = this.ids();
     this.save();

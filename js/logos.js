@@ -240,8 +240,9 @@ const Logo = (() => {
   // the Rams get their yellow LA (the blue one disappears on their blue end zone and scorebug): ESPN's white version, tinted yellow
   const TINT = { LAR: '#FFD100' };
   const espn = id => `https://a.espncdn.com/i/teamlogos/nfl/${TINT[id] ? '500-dark' : '500'}/${id === 'WAS' ? 'wsh' : id.toLowerCase()}.png`;
-  // real college logos (ESPN team numbers, checked against ESPN's team list 2026-10-24)
-  const NCAA = { ALA: 333, OSU: 194, UGA: 61, LSU: 99, MICH: 130, TEX: 251, ORE: 2483, USC: 30, CLEM: 228, PSU: 213, ND: 87, TENN: 2633, WIS: 275, BSU: 68, ISU: 66, APP: 2026, TOL: 2649, NIU: 2459 };
+  // real college logos (ESPN team numbers, checked against ESPN's team list 2026-10-24; the 33 added 2026-11-07)
+  const NCAA = { ALA: 333, OSU: 194, UGA: 61, LSU: 99, MICH: 130, TEX: 251, ORE: 2483, USC: 30, CLEM: 228, PSU: 213, ND: 87, TENN: 2633, WIS: 275, BSU: 68, ISU: 66, APP: 2026, TOL: 2649, NIU: 2459,
+    FLA: 57, OU: 201, TAMU: 245, AUB: 2, MISS: 145, SC: 2579, MIZ: 142, IU: 84, IOWA: 2294, NEB: 158, UCLA: 26, WASH: 264, UTAH: 254, COLO: 38, ASU: 9, KSU: 2306, TTU: 2641, BYU: 252, TCU: 2628, FSU: 52, UM: 2390, LOU: 97, VT: 259, UNC: 153, GT: 59, SMU: 2567, ARMY: 349, NAVY: 2426, TULN: 2655, MEM: 235, UNLV: 2439, LIB: 2335, JMU: 256 };
   const colId = t => t && !t.custom && NCAA[t.id] ? t.id : null; // no NFL or created team can use these abbreviations
   const logoUrl = t => colId(t) ? `https://a.espncdn.com/i/teamlogos/ncaa/500/${NCAA[t.id]}.png` : espn(t.id);
   let bump = null;

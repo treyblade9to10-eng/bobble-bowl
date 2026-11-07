@@ -262,3 +262,8 @@ body:not(.mobile) #select .muArr:hover::after { color: var(--gold); }
 #muLg button.on { background: var(--gold); color: #111; }
 @media (max-height: 560px) { #muLg button { padding: 5px 10px; font-size: 12px; } }
 #select .muCard.colT .muLogo .badge { filter: drop-shadow(0 0 1.5px #fff) drop-shadow(0 0 1px #fff) drop-shadow(0 4px 6px #0009); } /* (crimson A on a crimson card) */
+/* ALL TEAMS with 51 colleges: each college tier is one full-width box, as many per row as fit */
+#tgList .tgCol { grid-column: 1 / -1; }
+#tgList .tgCol .tgRow { grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); }
+#tgList .tgCol .tgT .badge { filter: drop-shadow(0 0 1px #fff) drop-shadow(0 2px 2px #0008); }
+@media (max-height: 500px) { #tgList .tgCol .tgRow { grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); } }
