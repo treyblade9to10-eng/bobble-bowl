@@ -101,7 +101,7 @@ const CareerHard = {
   // the rival gets a year older and better/worse with the rest of the league (re-read from the roster each season)
   // CPU teams in your games are a little better than in quick games
   oppBoost(t) {
-    const B = [1, 2, 2, 3][Career.cap ? Career.cap.diff || 0 : 1] || 2, up = p => (p && p[0] !== 'OL' ? Object.assign(p.slice(), { 3: Math.min(99, p[3] + B) }) : p);
+    const B = [2, 3, 3, 4][Career.cap ? Career.cap.diff || 0 : 1] || 3, up = p => (p && p[0] !== 'OL' ? Object.assign(p.slice(), { 3: Math.min(99, p[3] + B) }) : p);
     return { ...t, off: t.off.map(up), def: t.def.map(up) };
   },
   label(st) { return { hurt: 'INJURED', susp: 'SITTING OUT', acad: 'ACADEMIC HOLD', bench: 'ON THE BENCH' }[st] || 'STARTER'; },
