@@ -8,7 +8,7 @@
 // Faster device hosts: both time a small bit of work when they connect; if the joining device is clearly faster it runs the game
 // instead (before kickoff, same line, nothing to redo). Net.link = who made the connection (code owner / joiner), Net.role = who runs the game.
 // CO-OP: both on the host's team vs the CPU. The host calls the plays and kicks, the guest plays his own guy (G.hp[1] in engine.js).
-const NET_VERSION = 11; // 11: host sends base rosters, everyone healthy (onlinebase.js). 9: ranked ratings in hello/start, watchers, ICED kicker on the guest. 10: RANKED / CASUAL flag in start
+const NET_VERSION = 12; // 12: college teams online (college only plays college, mv in start). 11: host sends base rosters, everyone healthy (onlinebase.js). 9: ranked ratings in hello/start, watchers, ICED kicker on the guest. 10: RANKED / CASUAL flag in start
 const NET_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 const NET_KEYS = ['Space', 'ShiftLeft', 'ControlLeft', 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyE', 'KeyF', 'KeyR', 'KeyQ', 'Tab', 'KeyC',
   'Digit1', 'Digit2', 'Digit3', 'Digit4', 'Numpad1', 'Numpad2', 'Numpad3', 'Numpad4', 'KeyT', 'KeyX', 'KeyM', 'KeyV', 'KeyB', 'Enter', 'Escape', 'KeyY', 'KeyG', 'KeyU'];
@@ -305,7 +305,7 @@ const Net = {
   },
   swapRoles() {
     this.swapped = true; this.role = 'guest'; this.side = 1;
-    this.send({ t: 'swap', o: { qtr: +$('optQtr').value, weather: $('optWeather').value, night: $('optNight').value, rkd: typeof onRanked === 'function' && onRanked() ? 1 : 0 } });
+    this.send({ t: 'swap', o: { qtr: +$('optQtr').value, weather: $('optWeather').value, night: $('optNight').value, rkd: typeof onRanked === 'function' && onRanked() ? 1 : 0, col: TEAMS[sel.idx[sel.you]].college ? 1 : 0 } });
     this.send(this.hello());
     if (this.onStatus) this.onStatus("YOUR FRIEND'S DEVICE IS FASTER, SO IT RUNS THE GAME. STARTING...");
   },
@@ -351,7 +351,7 @@ const Net = {
     if (this.wOn && this.rroom && link !== 'host') try { this.rroom.child('w').remove(); } catch (e) {} // (we ran the game for watchers)
     if (room) try { if (link === 'host') room.remove(); else for (const k of ['guest', 'g2h']) room.child(k).remove(); } catch (e) {}
     Object.assign(this, { peer: null, conn: null, fast: null, fastOk: false, seq: 0, lastSeq: -1, inSeq: 0, lastIn: -1, buf: [], off: null, jit: 0.02, role: null, ready: false, last: null, rosterRef: null, bannerRef: null, pbpRef: null, routeKey: '', picks: {}, pendingCall: null, sounds: [], out: { pressed: [], taps: [] }, relayPrev: null, relayBase: null,
-      rroom: null, rdb: null, startMsg: null, callMsgs: [], overMsg: null, rSent: {}, rIds: 0, rCache: {}, held: false, heldPause: false, waitWas: null, swapping: false, rtt: null, onStatus: null, link: null, swapped: false, hostOpts: null, slowHost: false, tipT: 0, gFt: 16.7, gapE: 0.02, lastTm: null, stE: 0, inDeaf: false, directOut: null, expT: null, inKey: '', gRep: null, gOff: null, ga: false, pr: null, prOff: 0, meT: null,
+      rroom: null, rdb: null, startMsg: null, callMsgs: [], overMsg: null, rSent: {}, rIds: 0, rCache: {}, held: false, heldPause: false, waitWas: null, swapping: false, rtt: null, onStatus: null, link: null, swapped: false, hostOpts: null, slowHost: false, tipT: 0, mvT: 0, gFt: 16.7, gapE: 0.02, lastTm: null, stE: 0, inDeaf: false, directOut: null, expT: null, inKey: '', gRep: null, gOff: null, ga: false, pr: null, prOff: 0, meT: null,
       wc: 0, wq: [], wT: 0, wn: 0, wKf: 0, wPrev: null, wKeys: [], wOn: false, wDirty: false, wRo: null, wcIn: 0, watch: false, oppRk: null, rkDone: false, ranked: false });
     G.online = false; Input.online = false; Input.use(0); Input.store[1] = null;
   },
@@ -424,7 +424,7 @@ const Net = {
     } else if (on) {
       const now = performance.now(), bad = !this.ready || now - this.rxT > LINK_DEAD || (this.onRelay && !this.dbOn);
       const lane = this.onRelay ? 'RELAY' : 'DIRECT';
-      t = bad ? 'RECONNECTING...' : this.tipT && now - this.tipT < 8000 ? 'TIP: LET THE FASTER DEVICE HOST' : now - this.okT < 4000 ? `CONNECTED (${lane})` : lane + (this.rtt != null ? ' ' + this.rtt + ' MS' : '');
+      t = bad ? 'RECONNECTING...' : this.mvT && now - this.mvT < 20000 ? this.mvTxt : this.tipT && now - this.tipT < 8000 ? 'TIP: LET THE FASTER DEVICE HOST' : now - this.okT < 4000 ? `CONNECTED (${lane})` : lane + (this.rtt != null ? ' ' + this.rtt + ' MS' : '');
       if (G.versus) t = (this.ranked ? 'RANKED' : 'CASUAL') + '  ·  ' + t;
       const n = this.role === 'host' ? this.wc : this.wcIn; if (n > 0 && !bad) t += `  ·  ${n} WATCHING`;
       // signal bars: round trip, relay or direct, and (guest) how often the updates ran dry
@@ -503,6 +503,10 @@ const Net = {
     if (t.logo) CT.smallLogo(t.logo).then(u => { if (this.pack && this.pack.uid === t.uid && u) this.pack.team = { ...body, logo: u }; });
   },
   myTeam() { const t = TEAMS[sel.idx[sel.you]]; return t && t.custom && this.pack && this.pack.uid === t.uid ? this.pack.team : null; },
+  teamById(id) { return CT.NFL.find(t => t.id === id) || (typeof CQ !== 'undefined' && CQ.teams().find(t => t.id === id)) || null; },
+  // a team of the other kind had to switch (college vs NFL): the closest in OVR to the team it plays
+  kindTeam(col, vs) { const o = teamOvr(vs), L = (col ? CQ.teams() : CT.NFL).filter(t => t.id !== vs.id); return L.reduce((b, t) => Math.abs(teamOvr(t) - o) < Math.abs(teamOvr(b) - o) ? t : b); },
+  moved(t) { this.mvT = performance.now(); this.mvTxt = `${t.college ? 'COLLEGE' : 'NFL'} GAME: YOU ARE ${t.city.toUpperCase()}`; },
   // the friend's created team: same safety checks as the Team Database
   theirTeam(ct, notId) {
     const t = typeof CT !== 'undefined' && CT.clean(ct); if (!t || !CT.isClean(t)) return null;
@@ -516,8 +520,13 @@ const Net = {
     if (mine.custom) mine = this.myTeam() ? CT.clean(this.myTeam()) : { ...mine, logo: undefined }; // no big logo in the start message
     const ho = this.hostOpts, coop = !ho && onCoop(); // co-op: the host picked both teams, the guest's pick doesn't matter
     const qtr = ho ? ho.qtr : +$('optQtr').value, wth = ho ? ho.weather : $('optWeather').value, night = ho ? ho.night : $('optNight').value; // (took over hosting: the friend's settings)
-    let theirs = coop ? onCpuTeam() : (hello.ct && this.theirTeam(hello.ct, mine.id)) || CT.NFL.find(t => t.id === hello.team) || CT.NFL[(sel.idx[sel.you] + 1) % 32];
-    if (theirs.id === mine.id) theirs = CT.NFL[(CT.NFL.findIndex(t => t.id === mine.id) + 1) % 32] || CT.NFL[0]; // can't both be the same team
+    let theirs = coop ? onCpuTeam() : (hello.ct && this.theirTeam(hello.ct, mine.id)) || this.teamById(hello.team) || CT.NFL[(sel.idx[sel.you] + 1) % 32];
+    if (theirs.id === mine.id) { const L = mine.college ? CQ.teams() : CT.NFL; theirs = L[(L.findIndex(t => t.id === mine.id) + 1) % L.length] || L[0]; } // can't both be the same team
+    // college teams only play college teams: the code-maker's pick decides (ho.col when the friend's device took over hosting)
+    const col = ho ? !!ho.col : !!mine.college, mv = [0, 0];
+    if (!!mine.college !== col) { mine = this.kindTeam(col, theirs); mv[0] = 1; }
+    if (!coop && !!theirs.college !== col) { theirs = this.kindTeam(col, mine); mv[1] = 1; }
+    if (mv[0]) this.moved(mine);
     Input.online = true; Input.store[1] = Input.remote(); Input.use(0);
     G.online = true; G.netModes = [G.mode, hello.mode === 'mobile' ? 'mobile' : 'computer'];
     G.demo = false; G.season = false; G.challenge = null; G.mini = null; show(null);
@@ -527,7 +536,7 @@ const Net = {
     newGame(mine, theirs, opts);
     this.busy(); this.oppRk = hello.rk; this.rkDone = false; this.watchHost();
     this.ranked = !coop && (ho ? !!ho.rkd : typeof onRanked === 'function' && onRanked()); // the host's RANKED / CASUAL pick
-    this.send(this.startMsg = { t: 'start', v: NET_VERSION, rk: typeof Ranked !== 'undefined' ? Ranked.rating() : undefined, rkd: this.ranked ? 1 : 0, teams: G.teams, opts: { qtr: opts.qtr, weather: G.storm ? 'storm' : G.fog ? 'fog' : G.weather, night: G.night, bcast: G.bcast, coop: coop ? 1 : 0, diff: G.diff, wind: gameWind(), slow: this.slowHost ? 1 : 0 }, modes: G.netModes });
+    this.send(this.startMsg = { t: 'start', v: NET_VERSION, rk: typeof Ranked !== 'undefined' ? Ranked.rating() : undefined, rkd: this.ranked ? 1 : 0, teams: G.teams, mv, opts: { qtr: opts.qtr, weather: G.storm ? 'storm' : G.fog ? 'fog' : G.weather, night: G.night, bcast: G.bcast, coop: coop ? 1 : 0, diff: G.diff, wind: gameWind(), slow: this.slowHost ? 1 : 0 }, modes: G.netModes });
     if (this.slowHost) this.tipT = performance.now();
   },
   busy() { if (this.relayRoom && this.link === 'host') this.relayRoom.child('host/busy').set(1); }, // nobody else can join now
@@ -821,6 +830,7 @@ const Net = {
     initGame(m.teams[0], m.teams[1], { qtr: m.opts.qtr, diff: coop ? m.opts.diff : 1, humanSide: coop ? 0 : 1, versus: !coop, coop, weather: m.opts.weather, night: m.opts.night, bcast: m.opts.bcast });
     G.wind = m.opts.wind || null; // the host's wind (scorebug arrow)
     this.busy(); if (m.opts.slow) this.tipT = performance.now();
+    if (m.mv && m.mv[1] && !this.watch) this.moved(m.teams[1]); // our pick was the other kind: say who we are now
     this.oppRk = m.rk; this.rkDone = false; this.ranked = !coop && !!m.rkd;
     G.phase = 'idle'; G.players = []; G.ball = null;
   },

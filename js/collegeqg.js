@@ -1,6 +1,7 @@
 // ---- Quick Game with college teams: an NFL / COLLEGE switch on the Matchup screen ----
 // COLLEGE puts the college teams (career.js COLLEGES + the real lineups in colleges.js) in front of the NFL teams in TEAMS
-// (CT.useCollege), so both cards go to colleges and ALL TEAMS can still pick an NFL team for college vs NFL.
+// (CT.useCollege), so both cards go to colleges. College teams only play college teams: picking an NFL team in ALL TEAMS
+// moves the other side to the NFL too (and the switch to NFL), see CQ.guard.
 // Only the Matchup screen uses it: going back to the title (or Season / Online / Challenges, which call CT.useAll / useLeague) puts TEAMS back.
 Object.assign(STADIUMS, { // real stadium names
   ALA: ['Bryant-Denny Stadium', 'open', 'grass'], OSU: ['Ohio Stadium', 'open', 'turf'], UGA: ['Sanford Stadium', 'open', 'grass'],
@@ -51,10 +52,27 @@ const CQ = {
     this.s.nfl = this.ids();
     CT.useCollege();
     this.pickIds(this.s.ids || ['ALA', 'OSU']);
-    if (!TEAMS[sel.idx[0]].college && !TEAMS[sel.idx[1]].college) this.pickIds(['ALA', 'OSU']);
+    const c = [0, 1].filter(s => TEAMS[sel.idx[s]].college);
+    if (!c.length) this.pickIds(['ALA', 'OSU']); else if (c.length === 1) { this.fixMix(c[0]); this.note = null; }
   },
   // CT.useAll / useLeague while colleges are in: keep the college picks for next time, NFL picks come back
-  leaving() { if (CT.mode === 'college') this.s.ids = this.ids(); },
+  leaving() { if (CT.mode === 'college' && TEAMS[sel.idx[0]].college && TEAMS[sel.idx[1]].college) this.s.ids = this.ids(); },
+  // no college vs NFL: a team of the same kind as `t` for the other side (`prev` = last pick there, if it fits)
+  partner(t, prev) {
+    const col = !!t.college, ok = x => x && x.id !== t.id && !!x.college === col;
+    const p = prev && TEAMS.find(x => x.id === prev); if (ok(p)) return p;
+    const L = col ? this.teams() : CT.NFL, k = L.findIndex(x => x.id === t.id);
+    return k >= 0 ? L[(k + 1) % L.length] : L.find(ok);
+  },
+  // one side just changed (lead): the other side follows it to college or to the NFL
+  fixMix(lead) {
+    const a = TEAMS[sel.idx[lead]], o = 1 - lead, b = TEAMS[sel.idx[o]];
+    if (!a || !b || !!a.college === !!b.college) return false;
+    const p = this.partner(a, a.college ? (this.s.ids || [])[o] : (this.s.nfl || [])[o]), i = TEAMS.indexOf(p);
+    if (i < 0) return false;
+    sel.idx[o] = i; this.note = { t: performance.now(), txt: `${a.college ? 'COLLEGE' : 'NFL'} VS ${a.college ? 'COLLEGE' : 'NFL'} ONLY: ${o ? 'AWAY' : 'HOME'} IS NOW ${p.city.toUpperCase()}` };
+    return true;
+  },
   back() { if (this.s.nfl) this.pickIds(this.s.nfl); this.save(); },
   // arriving on the Matchup screen: college mode if that's what you had (not when you came to play your created team)
   sync() {
@@ -83,11 +101,30 @@ const CQ = {
     }
     if (col) this.s.ids = this.ids();
     this.save();
+    const n = $('muMix'), on = this.note && performance.now() - this.note.t < 4000;
+    n.textContent = on ? this.note.txt : ''; n.style.display = on ? '' : 'none';
+    clearTimeout(this.noteT); if (on) this.noteT = setTimeout(() => { n.style.display = 'none'; this.note = null; }, 4000);
+  },
+  // before the cards are drawn: never college vs NFL (the side that just changed leads), two NFL teams = the NFL switch
+  guard(b) {
+    if (CT.mode !== 'college') { this.last = null; return; }
+    const ids = this.ids(), last = this.last || ids;
+    const lead = b === 0 || b === 1 ? b : ids[0] !== last[0] && ids[1] === last[1] ? 0 : ids[1] !== last[1] && ids[0] === last[0] ? 1 : sel.you;
+    this.fixMix(lead);
+    if (!TEAMS[sel.idx[0]].college && !TEAMS[sel.idx[1]].college) { this.s.nfl = this.ids(); this.s.on = false; CT.useAll(); }
+    this.last = CT.mode === 'college' ? this.ids() : null;
   }
 };
 CT.useCollege = function () {
   this.mode = 'college'; this.swap = null;
   TEAMS.length = 0; TEAMS.push(...CQ.teams(), ...this.NFL, ...this.mine);
+  this.fixSel();
+};
+// ONLINE screen + online games: the NFL, your teams, then the colleges (after them, so NFL / created picks keep their spots)
+CT.useOnline = function () {
+  if (this.mode === 'college') this.useAll();
+  this.mode = 'online'; this.swap = null;
+  TEAMS.length = 0; TEAMS.push(...this.NFL, ...this.mine, ...CQ.teams());
   this.fixSel();
 };
 for (const k of ['useAll', 'useLeague']) { const f = CT[k]; CT[k] = function (...a) { const was = this.mode === 'college'; if (was) CQ.leaving(); const r = f.apply(this, a); if (was) CQ.back(); return r; }; }
@@ -100,9 +137,9 @@ if (CQ.s.on && CQ.s.nfl && CT.mode === 'all') CQ.pickIds(CQ.s.nfl);
   el.innerHTML = '<button data-l="nfl">NFL</button><button data-l="col">COLLEGE</button>';
   el.querySelectorAll('button').forEach(b => b.onclick = () => CQ.set(b.dataset.l === 'col'));
   $('muMid').insertBefore(el, $('muMid').firstChild);
+  const n = document.createElement('div'); n.id = 'muMix'; n.style.display = 'none'; $('select').appendChild(n); // "the other side switched too"
 }
-{ const _rs = renderSelect; renderSelect = function (b) { CQ.sync(); _rs(b); CQ.paint(); }; }
-// arrows / swipes stay with colleges (or with NFL + your teams) in college mode
+{ const _rs = renderSelect; renderSelect = function (b) { CQ.sync(); CQ.guard(b); _rs(b); CQ.paint(); }; }// arrows / swipes stay with colleges (or with NFL + your teams) in college mode
 { const _mt = moveTeam; moveTeam = function (side, d) {
   if (CT.mode !== 'college') return _mt(side, d);
   const col = !!TEAMS[sel.idx[side]].college, L = TEAMS.map((t, i) => i).filter(i => !!TEAMS[i].college === col && i !== sel.idx[1 - side]);
@@ -141,6 +178,7 @@ if (CQ.s.on && CQ.s.nfl && CT.mode === 'all') CQ.pickIds(CQ.s.nfl);
   try { const f = _tf(tm); return tm.college ? f.map(s => s.replace(/in the league/g, 'in college football')) : f; } finally { TEAMS.length = 0; TEAMS.push(...keep); }
 }; }
 // back on the title: TEAMS goes back to the NFL + your teams (Daily Challenge, Challenges etc. count on that)
-{ const _sh = show; show = function (id) { if (id === 'title' && CT.mode === 'college') CT.useAll(); return _sh(id); }; }
+// (any other menu after ONLINE: the colleges come out of the list again)
+{ const _sh = show; show = function (id) { if ((id === 'title' && CT.mode === 'college') || (CT.mode === 'online' && id !== 'online' && id !== 'osn' && menuScreens.includes(id))) CT.useAll(); return _sh(id); }; }
 // college logos come from the web: repaint the cards / team list when they arrive
 Logo.onReady(() => { if (CT.mode !== 'college' || !$('select').classList.contains('show')) return; if ($('tgrid').classList.contains('show')) renderTeamGrid(); else renderSelect(); });
