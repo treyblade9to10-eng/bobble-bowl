@@ -478,7 +478,7 @@ function renderTrophies() {
   Career.load();
   const T = Career.tro, R = Records.get();
   const titles = T.titles.length
-    ? T.titles.map(t => { const tm = TEAMS.find(x => x.id === t.team); return `<div class="troph"><div class="tsvg">${TROPHY_SVG}</div><b>${bowlName(t.year).toUpperCase()}</b><span>${tm ? `${tm.city} ${tm.name}` : t.team}</span></div>`; }).join('')
+    ? T.titles.map(t => { const tm = TEAMS.find(x => x.id === t.team) || COLLEGES.find(x => x.id === t.team); return `<div class="troph"><div class="tsvg">${TROPHY_SVG}</div><b>${bowlName(t.year).toUpperCase()}</b><span>${tm ? `${tm.city} ${tm.name}` : t.team}</span></div>`; }).join('')
     : '<div class="troEmpty">No Bobble Bowls yet. Win a season and it goes right here.</div>';
   const riv = (T.rivals || []).map(r => `<div class="troph riv"><div class="tsvg">${TROPHY_SVG}</div><b>${r.me} vs ${r.opp}</b><span>Rivalry win${r.year > 1 ? `, Year ${r.year}` : ''}</span></div>`).join('');
   const rec = [

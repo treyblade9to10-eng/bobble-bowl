@@ -261,6 +261,8 @@ body:not(.mobile) #select .muArr:hover::after { color: var(--gold); }
 #muLg button { margin: 0; padding: 6px 14px; font-size: 13px; letter-spacing: .12em; background: #0b0f16cc; color: #ffffffb3; }
 #muLg button.on { background: var(--gold); color: #111; }
 @media (max-height: 560px) { #muLg button { padding: 5px 10px; font-size: 12px; } }
+#muMix { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%) skewX(-8deg); z-index: 30; max-width: 92%; pointer-events: none; padding: 7px 16px; background: #0b0f16f0; border-left: 4px solid var(--gold); color: #fff; font-family: var(--hd); font-style: italic; font-weight: 800; font-size: 15px; letter-spacing: .08em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-shadow: 0 4px 14px #0009; }
+@media (max-height: 560px) { #muMix { bottom: 56px; font-size: 12px; padding: 5px 12px; } }
 #select .muCard.colT .muLogo .badge { filter: drop-shadow(0 0 1.5px #fff) drop-shadow(0 0 1px #fff) drop-shadow(0 4px 6px #0009); } /* (crimson A on a crimson card) */
 /* ALL TEAMS with 51 colleges: each college tier is one full-width box, as many per row as fit */
 #tgList .tgCol { grid-column: 1 / -1; }

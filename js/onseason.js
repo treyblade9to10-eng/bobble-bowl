@@ -11,15 +11,22 @@
 // if it can't happen, both tap SIM IT (or the host sims it after 2 days).
 // Finished games wait in a local queue until they're uploaded, so a game played with no signal still counts.
 // Leagues nobody has touched for 60 days get deleted (lgidx = code -> last touched).
-const OSN_IDLE = 60 * 864e5, OSN_SIM_WAIT = 2 * 864e5, OSN_LIVE = 25 * 60000;
+// College leagues (cfg.lg = 'col', cfg.v = 2): all 51 college teams (one has a bye each week), one big table, and a
+// 12-team playoff like the real College Football Playoff (seeds 1-4 get a bye, no reseeding). Old leagues stay NFL.
+const OSN_IDLE = 60 * 864e5, OSN_SIM_WAIT = 2 * 864e5, OSN_LIVE = 25 * 60000, OSN_V = 2;
+// the college grid on the lobby: by conference (2026)
+const OSN_CONF = [['SEC', 'ALA UGA LSU TEX TENN OU FLA TAMU MISS AUB MIZ SC'], ['BIG TEN', 'OSU MICH ORE USC PSU IU WIS IOWA NEB WASH UCLA'],
+  ['BIG 12', 'ISU TTU UTAH BYU COLO ASU KSU TCU'], ['ACC', 'CLEM UM FSU SMU LOU VT UNC GT'], ['MORE SCHOOLS', 'ND BSU UNLV JMU APP LIB TOL NIU MEM TULN ARMY NAVY']];
 const OSN = {
   KEY: 'bobbleOSeason', QKEY: 'bobbleOSeasonQ', NKEY: 'bobbleOSName',
   me: null, L: null, ref: null, db: null, offs: [], conn: false, view: 'setup', tab: 'stand', conf: null, wkView: null,
-  msg: '', match: null, next: null, fl: {}, busy: false, swept: false, paintT: null, cfg: { games: 8, qtr: 120, diff: 1 },
+  msg: '', match: null, next: null, fl: {}, busy: false, swept: false, paintT: null, cfg: { games: 8, qtr: 120, diff: 1, lg: 'nfl' },
 
   // ---------- small helpers ----------
-  ids() { return CT.NFL.map(t => t.id); },
-  T(id) { return CT.NFL.find(t => t.id === id); },
+  col(c = this.L && this.L.cfg) { return !!(c && c.lg === 'col'); },
+  ids(c) { return this.col(c) ? COLLEGES.map(t => t.id) : CT.NFL.map(t => t.id); },
+  T(id) { return CT.NFL.find(t => t.id === id) || CQ.teams().find(t => t.id === id); },
+  nm(id) { const t = this.T(id); return t.college ? t.city : t.name; }, // (five college Tigers: the school name)
   ovr(id) { const t = this.T(id), all = t.off.concat(t.def); return all.reduce((a, p) => a + p[3], 0) / all.length; },
   rng(k) { return seeded(this.L.cfg.seed + ':' + k); },
   esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]); },
@@ -99,9 +106,9 @@ const OSN = {
     });
     return R;
   },
-  standings(R, conf) {
+  standings(R, conf) { // (college: everyone in one table)
     const pct = id => { const r = R[id], g = r.w + r.l + r.t; return g ? (r.w + r.t / 2) / g : 0; };
-    return this.ids().filter(id => this.T(id).conf === conf).sort((a, b) => pct(b) - pct(a) || (R[b].pf - R[b].pa) - (R[a].pf - R[a].pa) || R[b].pf - R[a].pf);
+    return this.ids().filter(id => this.col() || this.T(id).conf === conf).sort((a, b) => pct(b) - pct(a) || (R[b].pf - R[b].pa) - (R[a].pf - R[a].pa) || R[b].pf - R[a].pf);
   },
   recStr(R, id) { const r = R[id]; return `${r.w}-${r.l}${r.t ? '-' + r.t : ''}`; },
   ready(st, slot) { return this.gamesOf(st, slot).every((g, i) => !(this.owner(g[0]) || this.owner(g[1])) || this.res(slot, i)); },
@@ -113,7 +120,7 @@ const OSN = {
     return { slot, i, h: g[0], a: g[1], h2h: !!(this.owner(g[0]) && this.owner(g[1])), po: slot[0] === 'p', opp: g[0] === me ? g[1] : g[0], home: g[0] === me };
   },
   frGame(st) { st = st || this.L.st; const slot = this.slotOf(st); if (!slot) return null; const f = this.frTm(), i = this.gamesOf(st, slot).findIndex(g => g[0] === f || g[1] === f); return i < 0 ? null : { slot, i, g: this.gamesOf(st, slot)[i] }; },
-  roundName(r) { return ['Wild Card', 'Divisional Round', 'Conference Championship', 'Bobble Bowl'][r] || 'Bobble Bowl'; },
+  roundName(r) { const N = this.col() ? ['First Round', 'Quarterfinal', 'Semifinal', 'National Championship'] : ['Wild Card', 'Divisional Round', 'Conference Championship', 'Bobble Bowl']; return N[r] || N[3]; },
 
   // ---------- moving the league on (runs inside the st transaction) ----------
   step(st, slot) {
@@ -133,6 +140,7 @@ const OSN = {
   // 7 per conference: 4 division winners + 3 wild cards, the 1 seed gets a bye (same as Season.startPlayoffs)
   startPO(st) {
     const R = this.recs(st), seeds = {};
+    if (this.col()) { st.ph = 'po'; st.po = { seeds: { C: this.standings(R).slice(0, 12) }, alive: { C: [] }, r: 0, rounds: [] }; return this.mkRound(st); } // college: the top 12
     for (const c of ['AFC', 'NFC']) {
       const s = this.standings(R, c), win = ['East', 'North', 'South', 'West'].map(v => s.find(id => this.T(id).div === v)).filter(Boolean);
       win.sort((a, b) => s.indexOf(a) - s.indexOf(b));
@@ -144,7 +152,13 @@ const OSN = {
   mkRound(st) {
     const P = st.po, r = P.r, bySeed = c => (P.alive[c] || []).slice().sort((x, y) => P.seeds[c].indexOf(x) - P.seeds[c].indexOf(y));
     const R = { g: [] };
-    if (r === 3) { const a = P.alive.AFC[0], n = P.alive.NFC[0]; R.g.push(this.rng('final')() < 0.5 ? [a, n] : [n, a]); }
+    if (this.col()) { // 5v12, 6v11, 7v10, 8v9 / 1, 4, 2, 3 play those winners / semis / the final (fixed bracket)
+      const s = P.seeds.C, a = (P.alive && P.alive.C) || [], top = (x, y) => s.indexOf(x) <= s.indexOf(y) ? [x, y] : [y, x];
+      if (r === 0) { R.bye = { s1: s[0], s2: s[1], s3: s[2], s4: s[3] }; R.g.push([s[4], s[11]], [s[5], s[10]], [s[6], s[9]], [s[7], s[8]]); }
+      else if (r === 1) R.g.push([s[0], a[3]], [s[3], a[0]], [s[1], a[2]], [s[2], a[1]]);
+      else if (r === 2) R.g.push(top(a[0], a[1]), top(a[2], a[3]));
+      else R.g.push(this.rng('final')() < 0.5 ? [a[0], a[1]] : [a[1], a[0]]);
+    } else if (r === 3) { const a = P.alive.AFC[0], n = P.alive.NFC[0]; R.g.push(this.rng('final')() < 0.5 ? [a, n] : [n, a]); }
     else for (const c of ['AFC', 'NFC']) {
       const s = bySeed(c);
       if (r === 0) { R.bye = R.bye || {}; R.bye[c] = s[0]; R.g.push([s[1], s[6]], [s[2], s[5]], [s[3], s[4]]); }
@@ -156,6 +170,7 @@ const OSN = {
     const P = st.po, r = P.r, slot = 'p' + r, R = P.rounds[r], win = [];
     R.g.forEach((g, i) => { const s = this.scoreOf(st, slot, i) || [1, 0]; win.push(s[0] >= s[1] ? g[0] : g[1]); });
     if (r === 3) { st.champ = win[0]; st.ph = 'done'; return; }
+    if (this.col()) { P.alive = P.alive || {}; P.alive.C = win; P.r++; return this.mkRound(st); }
     for (const c of ['AFC', 'NFC']) P.alive[c] = win.filter(id => this.T(id).conf === c).concat(r === 0 && R.bye ? [R.bye[c]] : []);
     P.r++; this.mkRound(st);
   },
@@ -189,6 +204,8 @@ const OSN = {
     const code = this.me.code;
     if (this.ref && this.ref.key === code) return;
     this.unlisten(); this.L = null; this.loaded = false;
+    clearTimeout(this.slowT); // no answer for a while: say so (with TRY AGAIN) instead of "Loading..." forever
+    this.slowT = setTimeout(() => { if (!this.loaded && this.me && this.me.code === code) { this.msg = this.slowMsg = `Can't reach league ${code} right now. Check your internet, then tap TRY AGAIN.`; this.paint(); } }, 12000);
     Relay.load().then(db => {
       if (!this.me || this.me.code !== code) return;
       this.db = db; const ref = this.ref = db.ref('bobble/leagues/' + code);
@@ -196,27 +213,36 @@ const OSN = {
       const info = db.ref('.info/connected'), pres = ref.child('pres/' + this.me.who);
       const ic = info.on('value', sn => {
         this.conn = !!sn.val();
-        if (this.conn && this.L) { pres.onDisconnect().remove(); pres.set(Date.now()).catch(() => {}); this.flush(); this.sweep(); }
+        if (this.conn && this.L) { pres.onDisconnect().remove(); pres.set(Date.now()).catch(() => {}); this.flush(); this.sweep(); this.stampV(); }
         this.paint();
       });
       this.offs.push(() => ref.off('value', cb), () => { info.off('value', ic); pres.onDisconnect().cancel(); if (this.L) pres.remove().catch(() => {}); });
     }).catch(() => { this.msg = "Can't reach the online server. Check your internet."; this.paint(); });
   },
+  // which league version this app knows, on our player (so the friend can tell if our app is out of date)
+  stampV() {
+    const p = this.L && this.conn && this.L.pl[this.me.who]; if (!p || p.v === OSN_V || this.stamping) return;
+    this.stamping = true;
+    this.ref.child('pl/' + this.me.who).transaction(cur => cur ? { ...cur, v: OSN_V } : undefined).catch(() => {}).then(() => { this.stamping = false; });
+  },
   unlisten() { for (const f of this.offs.splice(0)) try { f(); } catch (e) {} this.ref = null; this.conn = false; },
   got(v) {
     const first = !this.loaded; this.loaded = true;
+    if (this.msg && this.msg === this.slowMsg) this.msg = '';
     if (!v || !v.cfg || !v.pl || !v.pl[this.me.who]) { // deleted (by the host, or nobody played for 60 days)
       if (this.me) { const c = this.me.code; this.unlisten(); this.me = null; this.saveMe(); this.L = null; this.view = 'setup';
-        this.msg = `League ${c} is gone. The host deleted it, or nobody played for 60 days.`; this.paint(); }
+        this.msg = `League ${c} is gone. The host deleted it, or nobody played for 60 days.`; this.label(); this.paint(); }
       return;
     }
     v.res = v.res || {}; v.st = v.st || { ph: 'lobby', wk: 0 }; v.st.cpu = v.st.cpu || {}; v.vote = v.vote || {}; v.pres = v.pres || {};
-    if (v.st.po) { const P = v.st.po; P.rounds = P.rounds || []; P.alive = P.alive || {}; P.alive.AFC = P.alive.AFC || []; P.alive.NFC = P.alive.NFC || []; }
+    if (v.st.po) { const P = v.st.po; P.rounds = P.rounds || []; P.alive = P.alive || {}; P.alive.AFC = P.alive.AFC || []; P.alive.NFC = P.alive.NFC || []; P.alive.C = P.alive.C || []; }
+    if (v.cfg.v > OSN_V) { this.L = null; this.loaded = false; this.msg = 'This league was made on a newer version of Bobble Bowl. Close the game all the way and open it again to update.'; return this.paint(); }
     this.L = v;
+    this.stampV();
     if (first && this.conn) { const pres = this.ref.child('pres/' + this.me.who); pres.onDisconnect().remove(); pres.set(Date.now()).catch(() => {}); this.flush(); this.sweep(); }
     const view = v.st.ph === 'lobby' ? 'lobby' : 'hub'; if (view !== this.view) this.msg = ''; this.view = view;
     if (v.st.ph !== 'lobby') { this.flush(); this.advance(); this.autoSim(); this.trophy(); }
-    this.paint();
+    this.label(); this.paint();
   },
   // once a session: delete leagues nobody has touched for 60 days
   sweep() {
@@ -231,51 +257,63 @@ const OSN = {
   // ---------- making / joining ----------
   create() {
     const name = this.clean($('osName').value); if (!name) return this.say('Type a nickname first (first name or nickname only).');
+    if (this.making) return; this.making = true;
     this.saveName(name); this.say('Making your league...');
+    const slow = setTimeout(() => this.say('Still making your league... Check your internet. Keep this screen open.'), 10000);
     Relay.load().then(db => {
       this.db = db;
       const pick = n => { const c = this.makeCode(); return db.ref('bobble/leagues/' + c + '/cfg').once('value').then(sn => sn.val() && n < 5 ? pick(n + 1) : c); };
       return pick(0).then(code => {
-        const now = Date.now(), c = this.cfg;
-        return db.ref('bobble/leagues/' + code).set({ cfg: { v: 1, games: c.games, qtr: c.qtr, diff: c.diff, seed: String(Math.floor(Math.random() * 1e9)), made: now }, pl: { A: { n: name } }, st: { ph: 'lobby', wk: 0 }, touch: now })
+        const now = Date.now(), c = this.cfg, cfg = { v: 1, games: c.games, qtr: c.qtr, diff: c.diff, seed: String(Math.floor(Math.random() * 1e9)), made: now };
+        if (c.lg === 'col') Object.assign(cfg, { v: 2, lg: 'col' }); // (v 2: older apps can't run a college league)
+        return db.ref('bobble/leagues/' + code).set({ cfg, pl: { A: { n: name, v: OSN_V } }, st: { ph: 'lobby', wk: 0 }, touch: now })
           .then(() => db.ref('bobble/lgidx/' + code).set(now)).then(() => code);
       });
     }).then(code => { this.me = { code, who: 'A', name }; this.saveMe(); this.msg = ''; this.view = 'lobby'; this.listen(); this.paint(); },
-      () => this.say("Can't reach the online server. Check your internet."));
+      () => this.say("Can't reach the online server. Check your internet.")).then(() => { clearTimeout(slow); this.making = false; });
   },
   join() {
     const name = this.clean($('osName').value), code = $('osCodeIn').value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
     if (!name) return this.say('Type a nickname first (first name or nickname only).');
-    if (code.length !== 5) return this.say('League codes are 5 letters/numbers.');
-    if ([...code].some(ch => !NET_CHARS.includes(ch))) return this.say('Codes never use O, 0, I, 1 or L. Look at the code again.');
+    if (code.length === 4) return this.say('That looks like a game code (4 letters). For a quick online game: BACK, then JOIN GAME. League codes have 5.');
+    if (code.length !== 5) return this.say('League codes are 5 letters/numbers. They show on your friend\'s ONLINE SEASON screen.');
+    if ([...code].some(ch => !NET_CHARS.includes(ch))) return this.say(`Codes never use O, 0, I, 1 or L (you typed ${this.esc(code)}). Look at the code again.`);
+    if (this.joining) return; this.joining = true;
     this.saveName(name); this.say('Looking for league ' + code + '...');
+    const slow = setTimeout(() => this.say(`Still looking for league ${code}... Check your internet.`), 10000);
     Relay.load().then(db => {
       this.db = db; const ref = db.ref('bobble/leagues/' + code);
       return ref.once('value').then(sn => {
-        const v = sn.val(); if (!v || !v.cfg) return this.say('No league with that code. Check it with your friend.');
+        const v = sn.val(); if (!v || !v.cfg) return this.say(`No league ${code}. Check the code with your friend (it's on their ONLINE SEASON screen).`);
+        if (v.cfg.v > OSN_V) return this.say('That league was made on a newer version of Bobble Bowl. Close the game all the way and open it again to update, then join.');
         const P = v.pl || {}, same = w => P[w] && String(P[w].n).toLowerCase() === name.toLowerCase();
         if (same('A') || same('B')) return this.joined(code, same('A') ? 'A' : 'B', name); // back in on another phone: same nickname
         if (P.B) return this.say(`That league is full (${this.esc(P.A && P.A.n)} and ${this.esc(P.B.n)}). Rejoining? Use the same nickname as before.`);
-        return ref.child('pl/B').transaction(cur => cur ? undefined : { n: name }).then(r => r.committed ? this.joined(code, 'B', name) : this.say('Someone else just joined that league.'));
+        return ref.child('pl/B').transaction(cur => cur ? undefined : { n: name, v: OSN_V }).then(r => r.committed ? this.joined(code, 'B', name) : this.say('Someone else just joined that league.'));
       });
-    }).catch(() => this.say("Can't reach the online server. Check your internet."));
+    }).catch(() => this.say("Can't reach the online server. Check your internet.")).then(() => { clearTimeout(slow); this.joining = false; });
   },
   joined(code, who, name) { this.me = { code, who, name }; this.saveMe(); this.msg = ''; this.view = 'lobby'; this.listen(); this.touch(); this.paint(); },
   saveName(n) { try { localStorage.setItem(this.NKEY, n); } catch (e) {} },
   pickTeam(id) {
-    const who = this.me.who, fr = this.fr();
+    const who = this.me.who, fr = this.fr(); let why = "Couldn't save that. Check your internet and try again.";
+    this.say('Saving your team...');
     this.ref.transaction(cur => {
       if (!cur || !cur.st || cur.st.ph !== 'lobby' || !cur.pl || !cur.pl[who]) return;
-      if (cur.pl[fr] && cur.pl[fr].tm === id) return; // your friend has it
+      if (!this.ids(cur.cfg).includes(id)) { why = `This is ${this.col(cur.cfg) ? 'a college' : 'an NFL'} league: pick ${this.col(cur.cfg) ? 'a college' : 'an NFL'} team.`; return; } // (college plays college)
+      if (cur.pl[fr] && cur.pl[fr].tm === id) { why = 'Your friend already has that team.'; return; }
       cur.pl[who].tm = id; cur.touch = Date.now(); return cur;
-    }).then(r => { if (!r.committed) this.say('Your friend already has that team.'); }, () => this.say("Couldn't save that. Check your internet."));
+    }).then(r => this.say(r.committed ? '' : why), () => this.say("Couldn't save that. Check your internet and try again."));
   },
+  // a pick that fits this league (an NFL team in a college league doesn't)
+  hasTm(w, L = this.L) { const p = L.pl && L.pl[w]; return !!(p && p.tm && this.ids(L.cfg).includes(p.tm)); },
   start() {
+    this.say('Starting the season...');
     this.ref.transaction(cur => {
-      if (!cur || !cur.st || cur.st.ph !== 'lobby' || !cur.pl || !cur.pl.A || !cur.pl.B || !cur.pl.A.tm || !cur.pl.B.tm) return;
+      if (!cur || !cur.st || cur.st.ph !== 'lobby' || !cur.pl || !this.hasTm('A', cur) || !this.hasTm('B', cur)) return;
       cur.sched = this.makeSched(cur.pl.A.tm, cur.pl.B.tm, cur.cfg.games, seeded(cur.cfg.seed + ':sched'));
       cur.st = { ph: 'reg', wk: 0, t: Date.now() }; cur.touch = Date.now(); return cur;
-    }).then(r => { if (r.committed) { Sound.whistle(); this.touch(); } }, () => this.say("Couldn't start. Check your internet."));
+    }).then(r => { if (r.committed) { Sound.whistle(); this.touch(); this.say(''); } else this.say('Both of you need a team first.'); }, () => this.say("Couldn't start. Check your internet and try again."));
   },
   leave() {
     const host = this.me.who === 'A', started = this.L && this.L.st.ph !== 'lobby';
@@ -315,7 +353,7 @@ const OSN = {
     this.hostMatch();
   },
   liveFr() { const lv = this.L.live, g = this.myGame(); return lv && g && lv.by === this.fr() && lv.slot === g.slot && Date.now() - lv.t < OSN_LIVE ? lv : null; },
-  setSel() { CT.useAll(); const i = TEAMS.findIndex(t => t.id === this.myTm()); if (i >= 0) sel.idx[sel.you] = i; },
+  setSel() { CT.useOnline(); const i =TEAMS.findIndex(t => t.id === this.myTm()); if (i >= 0) sel.idx[sel.you] = i; },
   hostMatch() {
     const g = this.myGame(), m = this.match = { code: this.me.code, slot: g.slot, i: g.i, h: g.h, a: g.a, po: g.po, host: 1, st: 'Getting a code...' };
     this.setSel(); this.paint();
@@ -383,12 +421,28 @@ const OSN = {
   },
 
   // ---------- screens ----------
-  open(msg) {
+  open(msg, code) {
     Sound.init(); CT.useAll(); onlineWait(null); // (the matchup's "waiting for..." banner)
     if (msg) this.msg = msg;
     this.loadMe();
+    if (code && !this.me) this.msg = `${code} is a league code. Type your nickname and tap JOIN.`; // (typed in JOIN GAME)
+    else if (code && this.me.code !== code) this.msg = `You're in league ${this.me.code}. To join ${code}, leave this one first.`;
     if (this.me) { this.listen(); if (this.L) this.view = this.L.st.ph === 'lobby' ? 'lobby' : 'hub'; } else this.view = 'setup';
     show('osn'); this.paint(true);
+    if (code && !this.me && $('osCodeIn')) { $('osCodeIn').value = code; $('osName').focus(); }
+  },
+  // the ONLINE SEASON button on the ONLINE screen: your league and what's waiting for you there
+  todo() {
+    const L = this.L, me = this.me;
+    if (!me) return null;
+    if (!L) return ['LEAGUE ' + me.code, 0];
+    if (L.st.ph === 'lobby') return !this.hasTm(me.who) ? ['PICK YOUR TEAM', 1] : me.who === 'A' && this.hasTm('B') ? ['START THE SEASON', 1] : ['LEAGUE ' + me.code, 0];
+    const g = this.myGame(); if (!g || this.res(g.slot, g.i) || this.pending(g.slot, g.i)) return ['LEAGUE ' + me.code, 0];
+    return [g.h2h ? (this.liveFr() ? this.nick(this.fr()) + ' IS WAITING' : 'MATCHUP WEEK') : 'YOUR GAME IS READY', 1];
+  },
+  label() {
+    const b = $('onSeason'); if (!b) return;
+    const t = this.todo(); b.innerHTML = `ONLINE SEASON <i>${t ? t[0] : 'WITH A FRIEND'}</i>`; b.classList.toggle('todo', !!(t && t[1]));
   },
   say(t) { this.msg = t; const el = $('osMsg'); if (el) el.innerHTML = t; },
   paint(now) {
@@ -400,7 +454,12 @@ const OSN = {
     const el = $('osn'); if (!el.classList.contains('show')) return; // (a late repaint after a game started)
     for (const v of ['setup', 'lobby', 'hub']) el.classList.toggle('os-' + v, v === this.view);
     if (this.view === 'setup') return this.renderSetup();
-    if (!this.L) { el.innerHTML = `<div id="osTop"><span>WITH A FRIEND</span><b>ONLINE SEASON</b></div><div id="osMsg" class="osLoad">${this.msg || 'Loading your league...'}</div><div class="row"><button id="osBack">BACK</button></div>`; $('osBack').onclick = () => this.back(); return; }
+    if (!this.L) {
+      el.innerHTML = `<div id="osTop"><span>WITH A FRIEND</span><b>ONLINE SEASON</b></div><div id="osMsg" class="osLoad">${this.msg || `Loading league ${this.me ? this.me.code : ''}...`}</div><div class="row"><button id="osBack">BACK</button>${this.msg && this.me ? '<button id="osRetry" class="gold">TRY AGAIN</button>' : ''}</div>`;
+      $('osBack').onclick = () => this.back();
+      if ($('osRetry')) $('osRetry').onclick = () => { Sound.click(); this.msg = ''; this.unlisten(); this.listen(); this.paint(true); };
+      return;
+    }
     if ($('osGrid')) return; // picking a team: don't wipe the grid
     if (this.view === 'lobby') return this.renderLobby();
     const keep = ['osSched', 'olBody'].map(id => $(id) ? $(id).scrollTop : 0); // (a repaint keeps the lists where they were)
@@ -417,23 +476,24 @@ const OSN = {
         <div class="osCard">
           <div class="osH">ONE LEAGUE, TWO COACHES</div>
           <div class="osStep"><b>1</b>One of you makes a league and sends the code. The other joins with it.</div>
-          <div class="osStep"><b>2</b>You each pick a team. Your games vs the CPU are played on your own phone, any time.</div>
+          <div class="osStep"><b>2</b>You each pick a team (NFL league: NFL teams, college league: college teams). Your games vs the CPU are played on your own phone, any time.</div>
           <div class="osStep"><b>3</b>When you play each other, both tap PLAY MATCHUP for a live online game (or both tap SIM IT).</div>
           <div class="osStep"><b>4</b>The week moves on when both of you have played. Then playoffs and the Bobble Bowl.</div>
           <div class="osFine">Only your nickname, teams and scores are saved online. A league nobody plays for 60 days is deleted.</div>
         </div>
         <div class="osForm">
-          <div class="muRow"><span class="muL">NICKNAME</span><input id="osName" maxlength="12" autocomplete="off" spellcheck="false" placeholder="First name or nickname" value="${this.esc(nm)}"></div>
+          <div class="muRow"><span class="muL">NICKNAME</span><input id="osName" maxlength="12" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="First name or nickname" value="${this.esc(nm)}"></div>
+          ${this.seg('osL', 'TEAMS', [['nfl', 'NFL'], ['col', 'COLLEGE']], c.lg)}
           ${this.seg('osG', 'GAMES', [[6, '6'], [8, '8'], [12, '12'], [17, '17 FULL']], c.games)}
           ${this.seg('osQ', 'QUARTERS', [[120, '2 MIN'], [180, '3 MIN'], [300, '5 MIN']], c.qtr)}
           ${this.seg('osD', 'CPU', [[0, 'ROOKIE'], [1, 'PRO'], [2, 'ALL-PRO'], [3, 'MADDEN']], c.diff)}
           <button class="big gold" id="osMake">MAKE A LEAGUE</button>
-          <div class="osJoin"><input id="osCodeIn" maxlength="5" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="CODE"><button class="big" id="osJoinGo">JOIN</button></div>
-          <div id="osMsg">${this.msg || 'Got a code from a friend? Type it and tap JOIN.'}</div>
+          <div class="osJoin"><input id="osCodeIn" maxlength="5" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" placeholder="CODE"><button class="big" id="osJoinGo">JOIN</button></div>
+          <div id="osMsg">${this.msg || 'Got a code from a friend? Type it and tap JOIN. Your league from another phone or app? Same nickname + code, then JOIN.'}</div>
           <button id="osBack">BACK</button>
         </div>
       </div>`;
-    for (const [id, k] of [['osG', 'games'], ['osQ', 'qtr'], ['osD', 'diff']]) $(id).querySelectorAll('button').forEach(b => b.onclick = () => { Sound.click(); this.cfg[k] = +b.dataset.v; $(id).querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); });
+    for (const [id, k] of [['osL', 'lg'], ['osG', 'games'], ['osQ', 'qtr'], ['osD', 'diff']]) $(id).querySelectorAll('button').forEach(b => b.onclick = () => { Sound.click(); this.cfg[k] = k === 'lg' ? b.dataset.v : +b.dataset.v; $(id).querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); });
     $('osMake').onclick = () => { Sound.click(); this.create(); };
     $('osJoinGo').onclick = () => { Sound.click(); this.join(); };
     $('osBack').onclick = () => this.back();
@@ -445,34 +505,52 @@ const OSN = {
   },
   renderLobby() {
     const L = this.L, P = L.pl, host = this.me.who === 'A', c = L.cfg;
-    const row = w => `<div class="osPl${w === this.me.who ? ' me' : ''}"><div class="osPn">${P[w] ? this.nick(w) : 'WAITING FOR A FRIEND'}<i>${w === 'A' ? 'HOST' : 'FRIEND'}${w === this.me.who ? '  ·  YOU' : ''}</i></div>${P[w] ? this.teamChip(P[w].tm) : ''}${w === this.me.who ? `<button id="osPick" class="${P[w].tm ? '' : 'gold'}">${P[w].tm ? 'CHANGE' : 'PICK TEAM'}</button>` : ''}</div>`;
-    const can = P.A && P.B && P.A.tm && P.B.tm;
+    const me = this.me.who, fr = this.fr(), has = w => this.hasTm(w);
+    const row = w => `<div class="osPl${w === me ? ' me' : ''}"><div class="osPn">${P[w] ? this.nick(w) : 'NO FRIEND YET'}<i>${w === 'A' ? 'HOST' : 'FRIEND'}${w === me ? '  ·  YOU' : ''}</i></div>${P[w] ? this.teamChip(has(w) && P[w].tm) : ''}${w === me ? `<button id="osPick" class="${has(w) ? '' : 'gold'}">${has(w) ? 'CHANGE' : 'PICK TEAM'}</button>` : ''}</div>`;
+    const can = has('A') && has('B');
+    // the one thing to do next, in plain words
+    const next = !has(me) ? `Tap PICK TEAM and choose your ${this.col() ? 'college ' : ''}team.`
+      : !P[fr] ? `Send code ${this.me.code} to your friend. They open ONLINE, then ONLINE SEASON, type a nickname and the code, then tap JOIN. You can close the game: the league waits.`
+      : !has(fr) ? `Waiting for ${this.nick(fr)} to pick a ${this.col() ? 'college ' : ''}team.`
+      : host ? 'Both teams are in. Tap START SEASON.' : `Waiting for ${this.nick('A')} to tap START SEASON.`;
+    const old = P[fr] && P[fr].v !== OSN_V ? `<div class="osOld">If ${this.nick(fr)}'s screen looks different from yours, their game is out of date: they should close Bobble Bowl all the way and open it again.</div>` : '';
     $('osn').innerHTML = `<div id="osTop"><span>WITH A FRIEND</span><b>ONLINE SEASON</b></div>
       <div id="osSetup">
         <div class="osCard osCodeCard">
           <div class="osH">LEAGUE CODE</div><div id="osCode">${L.cfg && this.me.code}</div>
-          <div class="osFine">${P.B ? 'You\'re both in. Pick your teams.' : 'Send this code to your friend. They tap ONLINE then ONLINE SEASON, type a nickname and the code, then JOIN.'}</div>
-          <div class="osSet">${c.games} GAMES  ·  ${c.qtr / 60} MIN QUARTERS  ·  CPU ${['ROOKIE', 'PRO', 'ALL-PRO', 'MADDEN'][c.diff] || 'PRO'}</div>
+          ${P[fr] ? '' : '<button id="osShare">SEND CODE</button>'}
+          <div class="osSet">${this.col() ? 'COLLEGE' : 'NFL'}  ·  ${c.games} GAMES  ·  ${c.qtr / 60} MIN QUARTERS  ·  CPU ${['ROOKIE', 'PRO', 'ALL-PRO', 'MADDEN'][c.diff] || 'PRO'}</div>
         </div>
         <div class="osForm">
           ${row('A')}${row('B')}
-          ${host ? `<button class="big gold" id="osStart"${can ? '' : ' disabled'}>START SEASON</button>` : `<div class="osWait">${can ? 'Waiting for ' + this.nick('A') + ' to start the season.' : 'Pick a team. The host starts the season.'}</div>`}
-          <div id="osMsg">${this.msg || (host && !can ? 'Both of you need a team before the season can start.' : '')}</div>
+          <div class="osNextStep"><b>NEXT</b>${next}</div>${old}
+          ${host ? `<button class="big gold" id="osStart"${can ? '' : ' disabled'}>START SEASON</button>` : ''}
+          <div id="osMsg">${this.msg}</div>
           <div class="osBtnRow"><button id="osBack">BACK</button><button id="osLeave">${host ? 'DELETE LEAGUE' : 'LEAVE'}</button></div>
         </div>
       </div>`;
+    if ($('osShare')) $('osShare').onclick = () => this.share();
     if ($('osPick')) $('osPick').onclick = () => { Sound.click(); this.openGrid(); };
     if ($('osStart')) $('osStart').onclick = () => { if (can) { Sound.click(); this.start(); } };
     $('osBack').onclick = () => this.back();
     $('osLeave').onclick = () => this.leave();
   },
+  share() {
+    Sound.click();
+    const code = this.me.code, url = location.origin + location.pathname, txt = `Join my Bobble Bowl league! Code ${code}. Open Bobble Bowl, tap ONLINE, then ONLINE SEASON.`;
+    const say = () => this.say(`Tell your friend the code: ${code}`);
+    if (navigator.share) navigator.share({ title: 'Bobble Bowl league', text: txt, url }).catch(() => {});
+    else if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt + ' ' + url).then(() => this.say('Copied. Paste it in a message to your friend.'), say);
+    else say();
+  },
   openGrid() {
     const P = this.L.pl, mine = P[this.me.who].tm, theirs = this.frTm();
     const tile = t => `<button class="tgT${t.id === mine ? ' cur' : ''}${t.id === theirs ? ' opp' : ''}" data-id="${t.id}" style="--c1:${t.c1};--c2:${t.c2}">${teamBadge(t)}<span class="tgN">${t.city}<br><b>${t.name}</b></span><span class="tgO">${teamOvr(t)}</span>${t.id === theirs ? `<span class="tgOpp">${this.nick(this.fr())}</span>` : ''}</button>`;
     let h = '';
-    for (const conf of ['AFC', 'NFC']) for (const dv of ['East', 'North', 'South', 'West']) h += `<div class="tgDiv"><div class="tgDn">${conf} ${dv.toUpperCase()}</div><div class="tgRow">${CT.NFL.filter(t => t.conf === conf && t.div === dv).map(tile).join('')}</div></div>`;
+    if (this.col()) for (const [cf, ids] of OSN_CONF) h += `<div class="tgDiv tgCol"><div class="tgDn">${cf}</div><div class="tgRow">${ids.split(' ').map(id => tile(this.T(id))).join('')}</div></div>`;
+    else for (const conf of ['AFC', 'NFC']) for (const dv of ['East', 'North', 'South', 'West']) h += `<div class="tgDiv"><div class="tgDn">${conf} ${dv.toUpperCase()}</div><div class="tgRow">${CT.NFL.filter(t => t.conf === conf && t.div === dv).map(tile).join('')}</div></div>`;
     const g = document.createElement('div'); g.id = 'osGrid';
-    g.innerHTML = `<div id="osGHead"><span>PICK <b>YOUR</b> TEAM</span><button id="osGClose">CLOSE</button></div><div id="osGList">${h}</div>`;
+    g.innerHTML = `<div id="osGHead"><span>PICK <b>YOUR</b> ${this.col() ? 'COLLEGE ' : ''}TEAM</span><button id="osGClose">CLOSE</button></div><div id="osGList">${h}</div>`;
     $('osn').appendChild(g);
     $('osGClose').onclick = () => { Sound.click(); g.remove(); };
     g.querySelectorAll('.tgT').forEach(b => b.onclick = () => { if (b.dataset.id === theirs) return; Sound.click(); g.remove(); this.pickTeam(b.dataset.id); });
@@ -505,7 +583,7 @@ const OSN = {
       } else btns = `<button class="big" id="osPlay">PLAY</button><button id="osSim">SIM</button>`;
     } else if (st.ph === 'done') {
       const ch = this.T(st.champ), w = this.owner(st.champ);
-      card = `<div class="lbl">BOBBLE BOWL CHAMPION</div><div class="mu">${ch.city} ${ch.name}</div><div class="sub">${w ? (w === this.me.who ? 'That\'s you. It\'s in your Trophy Case.' : this.nick(w) + ' won it all.') : 'Neither of you this time. Run it back?'}</div>`;
+      card = `<div class="lbl">${this.col() ? 'NATIONAL' : 'BOBBLE BOWL'} CHAMPION</div><div class="mu">${ch.city} ${ch.name}</div><div class="sub">${w ? (w === this.me.who ? 'That\'s you. It\'s in your Trophy Case.' : this.nick(w) + ' won it all.') : 'Neither of you this time. Run it back?'}</div>`;
       btns = this.me.who === 'A' ? `<button class="big gold" id="osAgain">NEW LEAGUE</button>` : '';
     } else if (st.ph === 'po') card = `<div class="lbl">${this.roundName(st.po.r).toUpperCase()}</div><div class="mu">${st.po.r === 0 && st.po.rounds[0] && st.po.rounds[0].bye && Object.values(st.po.rounds[0].bye).includes(me) ? 'First-round bye' : 'Your season is over'}</div><div class="sub">${this.nick(fr)} is still playing. The rest gets simmed.</div>`;
     // your friend this week
@@ -552,10 +630,10 @@ const OSN = {
     const who = id => { const w = this.owner(id); return w ? ` <b class="osWho ${w === this.me.who ? 'me' : 'fr'}">${this.nick(w)}</b>` : ''; };
     let h = '';
     if (this.tab === 'stand') {
-      const conf = this.conf || this.T(me).conf, s = this.standings(R, conf);
-      h = `<div class="osConf">${['AFC', 'NFC'].map(c => `<button data-c="${c}" class="${c === conf ? 'on' : ''}">${c}</button>`).join('')}</div><table><tr><th>#</th><th>${conf}</th><th>W-L</th><th>PF</th><th>PA</th></tr>` +
-        s.map((id, i) => { const r = R[id], w = this.owner(id); return `<tr class="${w ? (w === this.me.who ? 'me' : 'fr') : ''} ${i === 6 ? 'cut' : ''}"><td>${i + 1}</td><td>${dot(id)}${this.T(id).name}${who(id)}</td><td>${this.recStr(R, id)}</td><td>${r.pf}</td><td>${r.pa}</td></tr>`; }).join('') +
-        `</table><div class="note">Dashed line = playoff cut (top 7: 4 division winners + 3 wild cards)</div>`;
+      const col = this.col(), conf = col ? 'COLLEGE' : this.conf || this.T(me).conf, s = this.standings(R, conf), cut = col ? 11 : 6;
+      h = (col ? '' : `<div class="osConf">${['AFC', 'NFC'].map(c => `<button data-c="${c}" class="${c === conf ? 'on' : ''}">${c}</button>`).join('')}</div>`) + `<table><tr><th>#</th><th>${conf}</th><th>W-L</th><th>PF</th><th>PA</th></tr>` +
+        s.map((id, i) => { const r = R[id], w = this.owner(id); return `<tr class="${w ? (w === this.me.who ? 'me' : 'fr') : ''} ${i === cut ? 'cut' : ''}"><td>${i + 1}</td><td>${dot(id)}${this.nm(id)}${who(id)}</td><td>${this.recStr(R, id)}</td><td>${r.pf}</td><td>${r.pa}</td></tr>`; }).join('') +
+        `</table><div class="note">${col ? 'Dashed line = playoff cut (top 12, seeds 1-4 get a bye)' : 'Dashed line = playoff cut (top 7: 4 division winners + 3 wild cards)'}</div>`;
     } else if (this.tab === 'scores') {
       const S = this.slots(st).filter(([slot, G]) => G.some((g, i) => this.scoreOf(st, slot, i)));
       if (!S.length) h = '<div class="note">Scores show up here once week 1 is played.</div>';
@@ -571,12 +649,12 @@ const OSN = {
       h = '<div class="leadGrid">' + cats.map(([k, lbl]) => `<div class="leadBox"><div class="leadHead">${lbl}</div>` +
         (all.filter(l => l[k] > 0).sort((a, b) => b[k] - a[k]).slice(0, 5).map((l, i) => `<div class="leadRow ${this.owner(l.t) ? (this.owner(l.t) === this.me.who ? 'me' : 'fr') : ''}"><span>${i + 1}. ${dot(l.t)}${this.esc(lastName(l.name))} <i>${l.t}</i></span><b>${l[k]}</b></div>`).join('') || '<div class="note">No stats yet</div>') + '</div>').join('') + '</div>';
     } else {
-      if (!st.po) h = `<div class="note">After week ${L.cfg.games}: the top 7 in each conference make the playoffs (4 division winners + 3 wild cards, the 1 seed gets a bye). Win three or four games to take the Bobble Bowl.</div>`;
+      if (!st.po) h = `<div class="note">${this.col() ? `After week ${L.cfg.games}: the top 12 make the College Football Playoff (seeds 1-4 get a bye). Win three or four games to take the national title.` : `After week ${L.cfg.games}: the top 7 in each conference make the playoffs (4 division winners + 3 wild cards, the 1 seed gets a bye). Win three or four games to take the Bobble Bowl.`}</div>`;
       else st.po.rounds.forEach((Rd, r) => {
-        h += `<div class="leadHead" style="margin-top:6px">${this.roundName(r).toUpperCase()}${Rd.bye ? ` <span class="osBye">(BYE: ${Rd.bye.AFC}, ${Rd.bye.NFC})</span>` : ''}</div><div class="bracket">` +
+        h += `<div class="leadHead" style="margin-top:6px">${this.roundName(r).toUpperCase()}${Rd.bye ? ` <span class="osBye">(BYE: ${Object.values(Rd.bye).join(', ')})</span>` : ''}</div><div class="bracket">` +
           Rd.g.map((g, i) => { const s = this.scoreOf(st, 'p' + r, i); return `<div class="bgame${this.owner(g[0]) || this.owner(g[1]) ? ' osHum' : ''}"><div class="${s && s[0] > s[1] ? 'win' : ''}">${dot(g[0])}${g[0]}${who(g[0])} <b>${s ? s[0] : ''}</b></div><div class="${s && s[1] > s[0] ? 'win' : ''}">${dot(g[1])}${g[1]}${who(g[1])} <b>${s ? s[1] : ''}</b></div></div>`; }).join('') + '</div>';
       });
-      if (st.champ) h += `<div class="osChamp">CHAMPION: ${dot(st.champ)}${this.T(st.champ).city} ${this.T(st.champ).name}${who(st.champ)}</div>`;
+      if (st.champ) h += `<div class="osChamp">${this.col() ? 'NATIONAL ' : ''}CHAMPION: ${dot(st.champ)}${this.T(st.champ).city} ${this.T(st.champ).name}${who(st.champ)}</div>`;
     }
     el.innerHTML = h;
     el.querySelectorAll('.osConf button').forEach(b => b.onclick = () => { Sound.click(); this.conf = b.dataset.c; this.renderTab(); });
@@ -601,6 +679,9 @@ screens.push('osn'); menuScreens.push('osn');
 { const el = document.createElement('div'); el.id = 'osn'; el.className = 'screen'; $('stage').appendChild(el); }
 // entry: ONLINE screen (under HOST / JOIN)
 { const b = document.createElement('button'); b.id = 'onSeason'; b.innerHTML = 'ONLINE SEASON <i>WITH A FRIEND</i>'; b.onclick = () => { if (Net.role) return; Sound.click(); OSN.open(); }; $('onPick').appendChild(b); }
+// college logos come from the web: an open team grid gets them when they arrive
+Logo.onReady(() => { const g = $('osGrid'); if (!g || !OSN.L) return; const s = $('osGList').scrollTop; g.remove(); OSN.openGrid(); $('osGList').scrollTop = s; });
+{ const _oo = openOnline; openOnline = function (m) { _oo(m); OSN.label(); }; }
 // a game knows it's a league game (G.osn) only when it was started from the league
 { const _ig = initGame; initGame = function (h, a, o) {
   _ig(h, a, o);
@@ -632,5 +713,6 @@ SaveGame.FIELDS.push('osn'); // a league game picked back up with RESUME GAME st
 // results that couldn't upload yet go out when we're back
 setInterval(() => { if (OSN.me && OSN.ref && OSN.L) { OSN.flush(); OSN.advance(); if ($('osn').classList.contains('show') && !OSN.match) OSN.paint(); } }, 15000);
 window.addEventListener('online', () => OSN.flush());
-// a league from last time: connect in the background so finished games upload and the week can move on
-if (OSN.loadMe() && OSN.q().length) setTimeout(() => { try { OSN.listen(); } catch (e) {} }, 3000);
+// a league from last time: connect in the background so finished games upload, the week can move on and
+// the ONLINE SEASON button can say what's waiting (reopening the app finds your league again)
+if (OSN.loadMe()) setTimeout(() => { try { if (!OSN.ref) OSN.listen(); } catch (e) {} }, 3000);

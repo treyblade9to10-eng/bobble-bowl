@@ -1104,21 +1104,23 @@ window.addEventListener('appinstalled', () => { $('btnInstall').style.display = 
 
 // ---------- ONLINE: host a game (get a code) or join with your friend's code ----------
 screens.push('online'); menuScreens.push('online');
-// your team for online: any NFL team or one of your created teams (it gets sent to your friend's game)
+// your team for online: any NFL team, a college team or one of your created teams (it gets sent to your friend's game)
 let onFilt = 'all';
-function onList() { return TEAMS.map((t, i) => i).filter(i => onFilt === 'all' || (onFilt === 'mine') === !!TEAMS[i].custom); }
+const onKind = t => t.custom ? 'mine' : t.college ? 'col' : 'nfl';
+function onList() { return TEAMS.map((t, i) => i).filter(i => onFilt === 'all' || onKind(TEAMS[i]) === onFilt); }
 function renderOnlineTeam(bump) {
-  if (typeof CT !== 'undefined' && CT.mode !== 'all') CT.useAll();
+  if (typeof CT !== 'undefined' && CT.mode !== 'online') CT.useOnline(); // (collegeqg.js: NFL + your teams + the colleges)
   const mine = TEAMS.some(t => t.custom); if (!mine && onFilt === 'mine') onFilt = 'all';
   let list = onList(); if (!list.includes(sel.idx[sel.you])) sel.idx[sel.you] = list[0];
   const t = TEAMS[sel.idx[sel.you]], card = $('onCard');
   card.querySelector('.muBody').innerHTML = muCard(t);
   card.style.setProperty('--c1', t.c1); card.style.setProperty('--c2', t.c2); card.style.setProperty('--fg', textOn(t.c1));
   card.querySelector('.muCnt').textContent = `${list.indexOf(sel.idx[sel.you]) + 1} / ${list.length}`;
-  card.querySelector('.pside').textContent = t.custom ? 'YOUR TEAM  ·  CREATED' : 'YOUR TEAM';
+  card.querySelector('.pside').textContent = t.custom ? 'YOUR TEAM  ·  CREATED' : t.college ? 'YOUR TEAM  ·  COLLEGE' : 'YOUR TEAM';
   card.querySelectorAll('.onFilt button').forEach(b => { b.classList.toggle('on', b.dataset.f === onFilt); b.disabled = b.dataset.f === 'mine' && !mine; });
   if (bump) { card.classList.remove('bump'); void card.offsetWidth; card.classList.add('bump'); }
   if (typeof Net !== 'undefined' && Net.packTeam) Net.packTeam(t);
+  onTm = t.id;
   try { localStorage.setItem('bobbleSel', JSON.stringify(sel)); } catch (e) {}
 }
 function onMove(d) {
@@ -1127,18 +1129,19 @@ function onMove(d) {
 }
 // VERSUS = you vs your friend, CO-OP = you two on the same team vs the CPU (the host's choice counts: teams, CPU team, CPU level)
 // RANKED / CASUAL (versus only): casual games never touch your ranked rating or record. Casual unless you picked ranked before
-let onMode = 'vs', onCpu = 1, onRk = 0;
-try { const o = JSON.parse(localStorage.getItem('bobbleOnline') || '{}'); if (o.m === 'coop') onMode = 'coop'; if (o.cpu >= 0) onCpu = o.cpu; if (o.rk === 1) onRk = 1; } catch (e) {}
+let onMode = 'vs', onCpu = 1, onRk = 0, onTm = null; // (onTm: your online team by id, so a college pick is still there next time)
+try { const o = JSON.parse(localStorage.getItem('bobbleOnline') || '{}'); if (o.m === 'coop') onMode = 'coop'; if (o.cpu >= 0) onCpu = o.cpu; if (o.rk === 1) onRk = 1; if (typeof o.tm === 'string') onTm = o.tm; } catch (e) {}
 const onCoop = () => onMode === 'coop';
 function onCpuTeam() {
-  const L = CT.NFL, mine = TEAMS[sel.idx[sel.you]];
+  const mine = TEAMS[sel.idx[sel.you]], L = mine && mine.college ? CQ.teams() : CT.NFL; // (college plays college)
   onCpu = (onCpu % L.length + L.length) % L.length;
   return L[onCpu].id === (mine && mine.id) ? L[(onCpu + 1) % L.length] : L[onCpu];
 }
 const ON_HELP = { vs: 'Play a friend on another phone or computer. One of you hosts and gets a code, the other types it in.',
   rk: 'RANKED: the win or loss counts toward your rating and record. The host picks RANKED or CASUAL.',
   cs: 'CASUAL: just for fun, your rating and record stay the same. The host picks RANKED or CASUAL.',
-  coop: 'You two on the same team vs the CPU. The host picks the teams and calls the plays, then gets a code for the friend to type in.' };
+  coop: 'You two on the same team vs the CPU. The host picks the teams and calls the plays, then gets a code for the friend to type in.',
+  col: 'College teams only play college teams. If you host, your friend gets a college team too. If you join, the host\'s pick counts.' };
 function renderOnlineMode() {
   $('onMode').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.m === onMode));
   $('online').classList.toggle('coop', onCoop());
@@ -1146,11 +1149,11 @@ function renderOnlineMode() {
   const t = onCpuTeam(); $('onCpuName').textContent = t.city + ' ' + t.name; $('onCpuRow').style.setProperty('--cc', t.c1);
   $('onDiff').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === $('optDiff').value));
   if (!Net.role && $('onPick').style.display !== 'none' && Object.values(ON_HELP).includes($('onStatus').textContent)) $('onStatus').textContent = onHelp([ON_HELP.rk, ON_HELP.cs].includes($('onStatus').textContent));
-  try { localStorage.setItem('bobbleOnline', JSON.stringify({ m: onMode, cpu: onCpu, rk: onRk })); } catch (e) {}
+  try { localStorage.setItem('bobbleOnline', JSON.stringify({ m: onMode, cpu: onCpu, rk: onRk, tm: onTm })); } catch (e) {}
 }
 $('onMode').querySelectorAll('button').forEach(b => b.onclick = () => { if (Net.role || onMode === b.dataset.m) return; onMode = b.dataset.m; Sound.click(); renderOnlineMode(); });
 $('onRk').querySelectorAll('button').forEach(b => b.onclick = () => { if (Net.role || onRk === +b.dataset.r) return; onRk = +b.dataset.r; Sound.click(); $('onStatus').textContent = onHelp(true); renderOnlineMode(); });
-function onHelp(rk) { return onCoop() ? ON_HELP.coop : rk ? ON_HELP[onRk ? 'rk' : 'cs'] : ON_HELP.vs; }
+function onHelp(rk) { return onCoop() ? ON_HELP.coop : rk ? ON_HELP[onRk ? 'rk' : 'cs'] : (TEAMS[sel.idx[sel.you]] || {}).college ? ON_HELP.col : ON_HELP.vs; }
 const onRanked = () => !onCoop() && onRk === 1; // what the host sends in its start message (net.js)
 $('onCpuRow').querySelectorAll('.muStep').forEach(b => b.onclick = () => {
   if (Net.role) return;
@@ -1160,14 +1163,15 @@ $('onCpuRow').querySelectorAll('.muStep').forEach(b => b.onclick = () => {
 $('onDiff').querySelectorAll('button').forEach(b => b.onclick = () => { if (Net.role) return; $('optDiff').value = b.dataset.v; saveOpts(); Sound.click(); renderOnlineMode(); });
 function openOnline(msg) {
   $('onCodeBox').style.display = 'none'; $('onJoinBox').style.display = 'none'; $('onPick').style.display = '';
-  $('onStatus').textContent = msg || onHelp();
+  if (CT.mode !== 'online') { CT.useOnline(); const i = TEAMS.findIndex(t => t.id === onTm); if (i >= 0 && TEAMS[i].college) sel.idx[sel.you] = i; }
   renderOnlineTeam(); renderOnlineMode(); show('online');
+  $('onStatus').textContent = msg || onHelp();
 }
 function onlineMsg(t) { onlineWait(null); openOnline(t); }
 function onlineWait(t) { const el = $('onWait'); el.textContent = t || ''; el.style.display = t ? 'block' : 'none'; }
 $('btnOnline').onclick = () => { Sound.init(); Sound.click(); openOnline(); };
 document.querySelectorAll('#onCard .muArr').forEach(b => b.onclick = e => { e.stopPropagation(); if (!Net.role) onMove(+b.dataset.d); });
-document.querySelectorAll('#onCard .onFilt button').forEach(b => b.onclick = () => { if (Net.role) return; onFilt = b.dataset.f; Sound.click(); renderOnlineTeam(true); });
+document.querySelectorAll('#onCard .onFilt button').forEach(b => b.onclick = () => { if (Net.role) return; onFilt = b.dataset.f; Sound.click(); renderOnlineTeam(true); renderOnlineMode(); });
 { // swipe / mouse wheel on the card
   const el = $('onCard').querySelector('.muBody'); let x0 = null, y0 = 0;
   el.addEventListener('wheel', e => { e.preventDefault(); if (!Net.role) onMove(e.deltaY > 0 ? 1 : -1); }, { passive: false });
@@ -1185,13 +1189,14 @@ $('onHost').onclick = () => {
   if (typeof Peer === 'undefined') { $('onStatus').textContent = "Online play couldn't load. Check your internet and refresh."; return; }
   $('onPick').style.display = 'none'; $('onCodeBox').style.display = ''; $('onCode').textContent = '....';
   $('onStatus').textContent = 'Getting a code...';
-  Net.host(code => { $('onCode').textContent = code; $('onStatus').textContent = `${onCoop() ? '' : onRanked() ? 'RANKED GAME. ' : 'CASUAL GAME (rating stays the same). '}Tell your friend this code. ${onCoop() ? 'They join your team. ' : ''}The game starts when they join. Keep this screen open.`; },
+  Net.host(code => { $('onCode').textContent = code; $('onStatus').textContent = `${onCoop() ? '' : onRanked() ? 'RANKED GAME. ' : 'CASUAL GAME (rating stays the same). '}${!onCoop() && TEAMS[sel.idx[sel.you]].college ? 'College vs college: your friend gets a college team. ' : ''}Tell your friend this code. ${onCoop() ? 'They join your team. ' : ''}The game starts when they join. Keep this screen open.`; },
     st => { $('onStatus').textContent = st; });
 };
 $('onJoin').onclick = () => { Sound.click(); $('onPick').style.display = 'none'; $('onJoinBox').style.display = ''; $('onCodeIn').value = ''; $('onCodeIn').focus(); $('onStatus').textContent = 'Type the 4-letter code from your friend\'s screen. Their pick of RANKED or CASUAL counts. JUST WATCH follows their game without playing.'; };
 $('onGo').onclick = () => {
   const code = $('onCodeIn').value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
-  if (code.length !== 4) { $('onStatus').textContent = 'Codes are 4 letters/numbers.'; return; }
+  if (code.length === 5 && typeof OSN !== 'undefined') return OSN.open(null, code); // a league code (ONLINE SEASON): take them there
+  if (code.length !== 4) { $('onStatus').textContent = 'Game codes are 4 letters/numbers (league codes are 5).'; return; }
   if (typeof Peer === 'undefined') { $('onStatus').textContent = "Online play couldn't load. Check your internet and refresh."; return; }
   Sound.click(); if (G.mode === 'mobile') goFullscreen();
   $('onStatus').textContent = 'CONNECTING...';
