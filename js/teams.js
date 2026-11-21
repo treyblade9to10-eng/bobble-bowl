@@ -124,7 +124,7 @@ const TEAMS = [
     qb2:["QB","Marcus Mariotta",8,73,86,2], rb2:["RB","Austin Ekelur",30,74,89,2],
     bench:[["WR","Treylon Burkz",13,74,89,4],["TE","Ben Sinott",82,67,83,0],["OL","Brandon Colemen",74,72,73,2],["DL","Tim Setle",97,72,69,4],["LB","Sonny Stylez",52,82,90,4],["CB","Rasul Douglaz",29,77,88,3],["S","Jeremy Reavez",39,73,85,5]] },
   { id:"CHI", city:"Chicago", name:"Bears", conf:"NFC", div:"North", c1:"#0B162A", c2:"#C83803", helmet:"#0B162A", mask:"#0B162A",
-    off:[["QB","Caleb Wiliamz",18,94,91,4],["RB","D'Andre Swifty",4,88,90,4],["WR","Rome Odunzee",15,83,91,2],["WR","Luther Burdon III",10,84,92,4],["TE","Colston Lovelund",84,82,86,0],["OL","Joe Thooney",62,96,72,0],["OL","Darnell Right",58,92,72,2],["OL","Jonah Jaxon",73,84,68,2]],
+    off:[["QB","Caleb Wiliamz",18,95,91,4],["RB","D'Andre Swifty",4,88,90,4],["WR","Rome Odunzee",15,83,91,2],["WR","Luther Burdon III",10,84,92,4],["TE","Colston Lovelund",84,82,86,0],["OL","Joe Thooney",62,96,72,0],["OL","Darnell Right",58,92,72,2],["OL","Jonah Jaxon",73,84,68,2]],
     def:[["DL","Montez Sweatt",98,81,87,3],["DL","Grady Jarret",50,81,71,4],["DL","Jeffery Simmonz",99,97,78,5],["LB","Devin Bushe",12,86,87,4],["LB","T.J. Edwardz",53,82,85,2],["CB","Jaylon Johnsin",1,86,89,4],["CB","Kyler Gordan",6,82,88,4],["S","Dillon Theeneman",31,77,92,0]],
     k:["Cairo Santoz",8,78,0], p:["Tory Tayler",19,75,0],
     qb2:["QB","Tyson Bagant",17,59,79,0], rb2:["RB","Kyle Monangay",25,79,86,5],
