@@ -304,7 +304,8 @@ const ColRun = {
     const ct = t - F.CUT; if (ct > -0.08 && ct < 0.25) { g.globalAlpha = 1 - Math.abs(ct + 0.08) / 0.33; g.fillStyle = '#fff'; g.fillRect(0, 0, W, H); g.globalAlpha = 1; }
     const card = (tm, kick, big, sub, a, logo) => {
       g.save(); g.globalAlpha = a; g.translate(Math.round(W * 0.04) - (1 - a) * 80, H - bar - 150); g.rotate(-0.012);
-      g.font = 'italic 900 56px "Barlow Condensed", Arial, sans-serif'; const bw = Math.max(320, g.measureText(big).width + (logo ? 116 : 50));
+      g.font = '700 17px Barlow, Arial, sans-serif'; const sw = g.measureText(sub).width;
+      g.font = 'italic 900 56px "Barlow Condensed", Arial, sans-serif'; const bw = Math.max(320, Math.max(g.measureText(big).width, sw) + (logo ? 116 : 50));
       g.fillStyle = ColShow.INK; g.fillRect(5, 5, bw, 112);
       g.fillStyle = ColShow.PAPER; g.fillRect(0, 0, bw, 112);
       g.fillStyle = tm ? tm.c1 : '#c8102e'; g.fillRect(0, 0, 10, 112); if (tm) { g.fillStyle = tm.c2; g.fillRect(10, 0, 4, 112); }
