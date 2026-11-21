@@ -8,7 +8,7 @@
 // Faster device hosts: both time a small bit of work when they connect; if the joining device is clearly faster it runs the game
 // instead (before kickoff, same line, nothing to redo). Net.link = who made the connection (code owner / joiner), Net.role = who runs the game.
 // CO-OP: both on the host's team vs the CPU. The host calls the plays and kicks, the guest plays his own guy (G.hp[1] in engine.js).
-const NET_VERSION = 10; // 9: ranked ratings in hello/start, watchers, ICED kicker on the guest. 10: RANKED / CASUAL flag in start
+const NET_VERSION = 11; // 11: host sends base rosters, everyone healthy (onlinebase.js). 9: ranked ratings in hello/start, watchers, ICED kicker on the guest. 10: RANKED / CASUAL flag in start
 const NET_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 const NET_KEYS = ['Space', 'ShiftLeft', 'ControlLeft', 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyE', 'KeyF', 'KeyR', 'KeyQ', 'Tab', 'KeyC',
   'Digit1', 'Digit2', 'Digit3', 'Digit4', 'Numpad1', 'Numpad2', 'Numpad3', 'Numpad4', 'KeyT', 'KeyX', 'KeyM', 'KeyV', 'KeyB', 'Enter', 'Escape', 'KeyY', 'KeyG', 'KeyU'];
@@ -523,6 +523,7 @@ const Net = {
     G.demo = false; G.season = false; G.challenge = null; G.mini = null; show(null);
     const bc = typeof quickBcast === 'function' ? quickBcast() : null;
     const opts = { qtr, diff: coop ? +$('optDiff').value : 1, humanSide: 0, versus: !coop, coop, weather: typeof bcWeather === 'function' ? bcWeather(bc, pickWeather(wth), wth) : pickWeather(wth), night: night === '1', bcast: bc };
+    mine = onlineTeam(mine); if (!coop) theirs = onlineTeam(theirs); // base rosters, everyone healthy (onlinebase.js)
     newGame(mine, theirs, opts);
     this.busy(); this.oppRk = hello.rk; this.rkDone = false; this.watchHost();
     this.ranked = !coop && (ho ? !!ho.rkd : typeof onRanked === 'function' && onRanked()); // the host's RANKED / CASUAL pick

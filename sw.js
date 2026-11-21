@@ -1,5 +1,5 @@
 // ---- Offline support: network first (so updates show up right away), saved copy when there's no signal ----
-const CACHE = 'bobble-v16.2';
+const CACHE = 'bobble-v16.3';
 const FILES = [
   './',
   'index.html',
@@ -25,7 +25,7 @@ const FILES = [
   'icons/favicon-48.png',
   'audio/theme.mp3', 'audio/hub.mp3', 'audio/sting_td.mp3', 'audio/sting_kick.mp3',
   'audio/crowd_bed.mp3', 'audio/crowd_hype.mp3', 'audio/crowd_fx.mp3', 'audio/hits.mp3',
-  'js/teams.js',
+  'js/teams.js', 'js/onlinebase.js',
   'js/util.js',
   'js/audio.js',
   'js/plays.js',
