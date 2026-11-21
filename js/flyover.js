@@ -166,7 +166,7 @@ CAM_ZOOMS.fly = 0.62; // (only the intro uses this one)
     if (!Flyover.on || !G.teams) return baseRender();
     const s = Flyover.shot(), keep = { players: G.players, refs: G.refs, ball: G.ball, fx: G.fx, banner: G.banner, x: cam.x, y: cam.y, zoom: cam.zoom, focus: cam.focus, shake: cam.shake, cz: camZoom, tags: nameTagMode };
     G.players = Flyover.runners.filter(p => p.out); G.refs = []; G.ball = null; G.fx = []; G.banner = null;
-    cam.x = s.x; cam.y = s.y; cam.zoom = 1; cam.focus = null; cam.shake = 0; camZoom = s.zoom; nameTagMode = 'off';
+    cam.x = s.x; cam.y = s.y; cam.zoom = s.cz || 1; cam.focus = s.focus || null; cam.shake = 0; camZoom = s.zoom; nameTagMode = 'off';
     try { baseRender(); Flyover.drawCard(ctx); }
     finally { Object.assign(G, { players: keep.players, refs: keep.refs, ball: keep.ball, fx: keep.fx, banner: keep.banner }); Object.assign(cam, { x: keep.x, y: keep.y, zoom: keep.zoom, focus: keep.focus, shake: keep.shake }); camZoom = keep.cz; nameTagMode = keep.tags; }
   };
